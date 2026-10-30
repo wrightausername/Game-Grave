@@ -2183,11 +2183,11 @@ class GameGraveApp(tk.Tk):
         self.button(bottom, "Back up another folder", self._choose_save_backup).pack(side="left", padx=10)
         self.button(bottom, "Preserve setup (Kit)", self._make_resurrection_kit).pack(side="left", padx=10)
         self.button(bottom, "Preview / Restore Kit", self._preview_resurrection_kit).pack(side="left", padx=10)
-        self.button(bottom, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=10)
         helper = tk.Frame(self.content, bg=BG)
         helper.pack(fill="x", pady=(5, 0))
         self.button(helper, "Find my setup automatically", self._start_auto_kit).pack(side="left")
         self.button(helper, "Reconnect verified MO2 kit", self._begin_mo2_reconnect).pack(side="left", padx=10)
+        self.button(helper, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=10)
         self.text(self.content, "Nothing is deleted from Save Vault. Save profiles and known save folders remain "
                   "excluded from bulk cleanup, even when marked for manual review. "
                   "Close the game before making a backup.", 9, WARN, wraplength=830).pack(anchor="w", pady=(10, 0))
