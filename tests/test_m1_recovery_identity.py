@@ -26,7 +26,7 @@ class RecoveryFilenameTests(unittest.TestCase):
         script = recovery._bin_script(r"C:\A\file.txt", restore=True)
         self.assertIn("'ORIGINAL_EXISTS'", script)
         self.assertLess(script.find("if (Test-Path -LiteralPath $original)"),
-                        script.find("$matches[0].InvokeVerb('RESTORE')"))
+                        script.find("$matches[0].InvokeVerb('undelete')"))
 
     def test_full_path_with_apostrophes_is_escaped_as_powershell_literal(self):
         script = recovery._bin_script(r"C:\Player's Downloads\archive.zip")
