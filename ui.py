@@ -3099,7 +3099,8 @@ class GameGraveApp(tk.Tk):
                     self._lab_work("lab_living_created", "Creating verified new kit version…",
                         lambda prev=previous, roots=sources, dest=destination, p=plan:
                         create_living_update(Path(prev), roots, Path(dest), approved=True,
-                                             expected_source_fingerprint=p["source_fingerprint"]))
+                                             expected_source_fingerprint=p["source_fingerprint"],
+                                             expected_previous_archive_hash=p["previous_archive_hash"]))
                 elif name == "lab_living_created":
                     self.status_text.set("New Living Kit version saved")
                     log_event("Living Resurrection Kit version created", payload["archive"])
