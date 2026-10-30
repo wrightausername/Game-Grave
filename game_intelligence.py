@@ -36,6 +36,26 @@ def _within(child, parent) -> bool:
         return False
 
 
+def _linked_ancestor(path: str | Path) -> bool:
+    """Treat symlink/junction ancestors as untrusted ownership evidence."""
+    try:
+        current = Path(os.path.abspath(os.fspath(path)))
+        while True:
+            try:
+                info = current.lstat()
+            except FileNotFoundError:
+                info = None  # A missing child does not hide an existing linked parent.
+            if info is not None and (stat.S_ISLNK(info.st_mode)
+                    or getattr(info, "st_file_attributes", 0) & 0x400):
+                return True
+            parent = current.parent
+            if current == parent:
+                return False
+            current = parent
+    except (OSError, ValueError, TypeError, RuntimeError):
+        return True
+
+
 def _workshop_id(p) -> str | None:
     parts = [x.casefold() for x in Path(p).parts]
     for i in range(len(parts) - 2):
@@ -75,7 +95,10 @@ def build_game_dna(games=(), other_games=(), mods=(), saves=(), manager_profiles
             continue
         owners = []
         workshop = _workshop_id(path)
+        linked_path = _linked_ancestor(path)
         for game in result:
+            if linked_path or _linked_ancestor(game["install_path"]):
+                continue
             if _within(path, game["install_path"]):
                 owners.append((game, "Within recorded game installation"))
             elif workshop and workshop == game["app_id"] and game["launcher"] == "Steam":
@@ -87,11 +110,23 @@ def build_game_dna(games=(), other_games=(), mods=(), saves=(), manager_profiles
             "apparent_bytes": max(0, int(getattr(m, "apparent_bytes", 0) or 0)),
             "protected": True,
         }
-        if not owners:
+        if linked_path:
+            unresolved.append({**row, "reason": "A linked or redirected ancestor prevents trusted ownership association."})
+        elif len(owners) > 1:
+            unresolved.append({**row, "reason": "Multiple launcher/game records claim this location; owner is ambiguous.",
+                               "candidate_games": [g["game"] for g, _ in owners][:10],
+                               "ambiguous": True})
+        elif not owners:
             unresolved.append({**row, "reason": "Ownership unverified; retain files and profiles."})
+        elif owners[0][0]["launcher"] == "Custom library":
+            unresolved.append({**row, "reason": "User-added library folder is not a verified game installation.",
+                               "candidate_games": [owners[0][0]["game"]],
+                               "ambiguous": True})
         else:
-            for game, evidence in owners:
-                game["assets"].append({**row, "evidence": evidence, "confidence": "Location / ID association only"})
+            game, evidence = owners[0]
+            game["assets"].append({**row, "evidence": evidence,
+                                   "confidence": "Location / ID association only",
+                                   "can_recycle": False})
     for s in saves:
         path = str(getattr(s, "path", "") or "")
         if path:
@@ -116,6 +151,9 @@ def build_game_dna(games=(), other_games=(), mods=(), saves=(), manager_profiles
             "incomplete": bool(profile.get("incomplete")),
         }
         matches = [g for g in result if matched_root
+                   and g["launcher"] != "Custom library"
+                   and not _linked_ancestor(g["install_path"])
+                   and not _linked_ancestor(matched_root)
                    and _path(g["install_path"]) == _path(matched_root)]
         if len(matches) == 1:
             matches[0]["manager_profiles"].append({
@@ -156,10 +194,15 @@ def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
     roots = []
     entries = {}
     truncated = False
+    skipped_roots = 0
     for m in sources[:MAX_ROOTS]:
         root = Path(str(getattr(m, "path", "")))
         if (not root.is_dir() or _special(root) or
                 _path(root) in (Path.home().resolve(), Path(_path(root).anchor))):
+            skipped_roots += 1
+            continue
+        if _linked_ancestor(root):
+            skipped_roots += 1
             continue
         roots.append(str(_path(root)))
         for current, dirs, filenames in os.walk(root, topdown=True, followlinks=False):
@@ -191,8 +234,9 @@ def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
         "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "roots": sorted(set(roots)),
         "entries": entries,
-        "truncated": truncated or len(sources) > MAX_ROOTS,
-        "limitations": "Metadata-only, bounded to recognized mod roots, max 3 levels; no game launch verification.",
+        "truncated": truncated or len(sources) > MAX_ROOTS or skipped_roots > 0,
+        "skipped_roots": skipped_roots,
+        "limitations": "Metadata-only, bounded to recognized mod roots, max 3 levels; skipped/linked roots make coverage incomplete; no game launch verification.",
     }
 
 
@@ -204,13 +248,17 @@ def compare_observations(before: dict, after: dict) -> dict:
     new = after.get("entries", {})
     if not isinstance(old, dict) or not isinstance(new, dict):
         raise ValueError("Invalid observation entries.")
+    # Never call an item gone when scans used different roots or hit entry
+    # caps: "missing" can simply mean it was outside the observed subset.
+    partial = (bool(before.get("truncated") or after.get("truncated"))
+               or set(before.get("roots", [])) != set(after.get("roots", [])))
     names = sorted(set(old) | set(new))
     changes = []
     for name in names:
         if name not in old:
-            kind = "added"
+            kind = "possibly added (incomplete comparison)" if partial else "added"
         elif name not in new:
-            kind = "missing from observation"
+            kind = "not observed (incomplete comparison)" if partial else "missing from observation"
         elif old[name] != new[name]:
             kind = "metadata changed"
         else:
@@ -221,8 +269,9 @@ def compare_observations(before: dict, after: dict) -> dict:
         "changes": changes, "count": len(changes),
         "patch_review": sum(x["patch_sensitive"] for x in changes),
         "scope_changed": set(before.get("roots", [])) != set(after.get("roots", [])),
-        "incomplete": bool(before.get("truncated") or after.get("truncated")),
-        "note": "Differences may reflect scans, timestamps, moved paths, or updates; not verified crash causes.",
+        "incomplete": partial,
+        "unreliable_missing_inference": partial,
+        "note": "Coverage gaps or changed roots make missing/added labels uncertain. File differences do not prove crashes or abandoned mods.",
     }
 
 
