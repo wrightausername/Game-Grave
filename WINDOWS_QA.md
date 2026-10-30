@@ -136,3 +136,30 @@ sanitized reports to [M1 issue #10](https://github.com/wrightausername/Game-Grav
 Repeat the tests in the **installed application UI** on both Windows 10 and
 Windows 11, with non-admin and representative locale/accessibility coverage.
 GitHub's automated Windows runner is not a substitute for those sessions.
+
+
+## M2 real gaming PC inventory QA (read-only, not acceptance by itself)
+
+On a Windows 10/11 PC with Steam/Epic/GOG and optionally MO2/Vortex,
+run from the repository source in an ordinary PowerShell session:
+
+```powershell
+python tools/m2_real_pc_qa.py --execute --report GameGrave-M2-local-qa.json
+```
+
+The M2 helper reads **existing launcher inventory metadata, known mod-storage
+roots and manager profile snapshots** on demand. It does not scan every disk,
+alter any files, start games, uninstall anything, or upload telemetry. It
+generates only aggregate counts grouped by a whitelist of software categories,
+plus counts of ambiguous, truncated or stale results. No game titles,
+installation directories, usernames, mod file paths or manager-profile names
+are included in the JSON report. Use a new filename each time; it refuses
+to overwrite a previous report. Press Ctrl+C to cancel.
+
+A human must separately verify detected installs against the launcher UIs,
+whether Steam libraries were moved, whether MO2 mods/profiles are actually
+active, whether Vortex's available JSON backups are stale, and whether addon
+folders are in use. Mark the validation matrix in
+[M2 tracker #11](https://github.com/wrightausername/Game-Grave/issues/11).
+Do not upload screenshots or logs containing usernames or private paths.
+The emitted report deliberately sets `m2_release_accepted: false`, because counts alone cannot prove detection accuracy.
