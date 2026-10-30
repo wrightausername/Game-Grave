@@ -686,12 +686,19 @@ def is_protected_path(path: Path, extra: list[str] | None = None) -> bool:
     # Fail closed for likely personal saves, managed game folders and mod profiles.
     # The generic Old Files cleaner is not a game/mod manager.
     pieces = [part.casefold() for part in p.parts]
-    if any(part in {"saves", "savegames", "saved games", "worlds", "playerprofiles",
-                     "modorganizer", "mod organizer 2", "steamapps",
-                     "addons", "savedvariables", "my games", "saves", "userprofiles", "userskins", "usersights", "usermissions",
-                     "userhangar", "interface", "profiles", "wtf"} for part in pieces):
-        return True
-    if "mods" in pieces and "downloads" not in pieces:
+    # Manager staging or profile roots stay protected even when the user has
+    # moved them under Downloads. A "Downloads" ancestor is not proof that a
+    # Vortex/MO2/CurseForge/Thunderstore item is a disposable download.
+    guarded_names = {
+        "saves", "savegames", "saved games", "worlds", "playerprofiles",
+        "modorganizer", "modorganizer2", "mod organizer", "mod organizer 2",
+        "mo2", "steamapps", "mods", "vortex", "wabbajack", "curseforge",
+        "thunderstore", "r2modman", "modrinth", "prism launcher",
+        "addons", "savedvariables", "my games", "userprofiles",
+        "userskins", "usersights", "usermissions", "userhangar",
+        "interface", "profiles", "wtf"
+    }
+    if any(part in guarded_names for part in pieces):
         return True
     guarded = [Path(os.path.abspath(str(x))) for x in (extra or []) if isinstance(x, str) and x.strip()]
     # Do not permit deletions through this utility in crucial Windows roots.
