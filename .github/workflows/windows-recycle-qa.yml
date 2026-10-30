@@ -2,6 +2,13 @@ name: M1 disposable Windows Recycle Bin + Undo integration
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'core.py'
+      - 'recovery.py'
+      - 'tools/windows_recycle_qa.py'
+      - '.github/workflows/windows-recycle-qa.yml'
 
 permissions:
   contents: read

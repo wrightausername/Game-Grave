@@ -2,6 +2,12 @@ name: Windows installer candidate (unsigned; manual)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'build_installer.ps1'
+      - 'installer/GameGrave.iss'
+      - '.github/workflows/windows-installer-candidate.yml'
 
 permissions:
   contents: read
