@@ -40,6 +40,7 @@ from resurrection_lab import (
 from resurrection_visuals import resurrection_guide
 from ui_shortcuts import PAGE_SHORTCUTS, shortcut_help_text
 from ui_viewport import initial_window_bounds
+from ui_scroll import page_wheel_allowed
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from mod_radar_audit import audit_mod_radar, private_audit_summary
@@ -276,17 +277,9 @@ class GameGraveApp(tk.Tk):
             found = self.winfo_containing(event.x_root, event.y_root)
             if found is None:
                 return
-            child = found
-            within_page = False
-            while child is not None:
-                if isinstance(child, (ttk.Treeview, tk.Text, tk.Listbox,
-                                      ttk.Combobox, ttk.Notebook)):
-                    return
-                if child == self.content or child == self.content_canvas:
-                    within_page = True
-                    break
-                child = child.master
-            if not within_page:
+            if not page_wheel_allowed(
+                    found, self.content, self.content_canvas,
+                    (ttk.Treeview, tk.Text, tk.Listbox, ttk.Combobox, ttk.Notebook)):
                 return
             bounds = self.content_canvas.bbox("all")
             if not bounds or bounds[3] <= self.content_canvas.winfo_height():
