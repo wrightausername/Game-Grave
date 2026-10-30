@@ -22,6 +22,7 @@ class DummyVar:
 class FakeCancelApp:
     _check_scan_cancel = GameGraveApp._check_scan_cancel
     _scan_canceled_status = GameGraveApp._scan_canceled_status
+    _poll = GameGraveApp._poll
 
     def __init__(self):
         self._cancel_scan = threading.Event()
