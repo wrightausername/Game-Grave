@@ -104,3 +104,35 @@ test evidence in [M1 issue #10](https://github.com/wrightausername/Game-Grave/is
 
 A manual workflow exists for a disposable **Windows runner Recycle Bin integration
 smoke test**. It is not a replacement for human UI, installer or OS-build coverage.
+
+
+## M1 repeatable interactive Windows desktop test runner
+
+A native disposable-only helper is available at `tools/windows_m1_desktop_qa.py`.
+**This does NOT inspect or touch your real games, mods, saves or Downloads.**
+Its input must be an ordinary local fixed-drive scratch subdirectory; it creates
+and owns a separate one-time temporary subfolder underneath. It checks:
+
+- Built-in save protection and refusal to recycle a protected file.
+- Rejection of hardlinked files and redirected parent folders.
+- Portable Resurrection Kit ZIP checksum/Unicode restore and refusal to overwrite.
+- A missing Recycle Bin record's honest status.
+- A harmless text file's Recycle Bin/Undo round trip, collision refusal and byte-identical restore.
+
+To run with Python from a **local Windows desktop session** on Windows 10 and 11:
+
+```powershell
+New-Item -ItemType Directory -Force .\GameGrave-M1-Scratch | Out-Null
+$env:GG_QA_DISPOSABLE = 'YES'
+python tools/windows_m1_desktop_qa.py --scratch .\GameGrave-M1-Scratch --execute --report .\GameGrave-M1-report.json
+Remove-Item Env:GG_QA_DISPOSABLE
+```
+
+Choose a fresh report filename each time: the helper intentionally does not
+overwrite prior reports. The JSON contains OS product/build and per-test
+results only, not personal usernames, original paths or filenames. Attach
+sanitized reports to [M1 issue #10](https://github.com/wrightausername/Game-Grave/issues/10).
+`SKIP` and `FAIL` are not valid evidence for that acceptance criterion.
+Repeat the tests in the **installed application UI** on both Windows 10 and
+Windows 11, with non-admin and representative locale/accessibility coverage.
+GitHub's automated Windows runner is not a substitute for those sessions.
