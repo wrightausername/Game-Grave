@@ -1,0 +1,29 @@
+name: Game Grave 1.0 release gates
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - v1.0.0
+      - v1.0.0-rc*
+
+permissions:
+  contents: read
+
+jobs:
+  release-gates:
+    name: Refuse unapproved 1.0 release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require seven milestone acceptance gates and explicit sign-off
+        run: python tools/release_audit.py --strict
+      - name: Run full tests before treating a tag as releasable
+        run: python -m unittest discover -s tests -v
+
+# A passing workflow is necessary, NOT sufficient to ship 1.0: a human must
+# verify evidence, reproducible build, signature and real Windows QA.
+# This workflow never publishes a release or artifact automatically.

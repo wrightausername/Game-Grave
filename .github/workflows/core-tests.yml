@@ -35,3 +35,5 @@ jobs:
           "TMP=$testTemp" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Run unit tests (no game file deletion)
         run: python -m unittest discover -s tests -v
+      - name: Report release readiness without falsely passing unapproved gates
+        run: python tools/release_audit.py

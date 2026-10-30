@@ -68,3 +68,39 @@ The following must be verified on native Windows 10 and Windows 11.
 - **Cleanup History (Advanced → Activity)** groups sessions into expandable rows with individual results and paths. Shader and Graveyard cleanup record start, per-file results, and finish.
 - The desktop still defaults to simple mode. No automatic shader-cache cleaning or automatic protection overrides.
 - **Limitations:** Windows Recycle Bin behavior, actual freed space, live installer operation and game/driver lock handling still need real Windows testing. The Windows installer preview is unsigned and installs a separate Python runtime if unavailable.
+
+
+## Version 1.0 milestone M1: mandatory Windows safety witness record (NOT YET SIGNED OFF)
+
+Run on disposable content only, never an important modpack, a live save, or the original kit.
+For each Windows version, record OS build, file system, administrator/standard user,
+Game Grave commit SHA, whether packaged/installed, date and a permalink to sanitized
+test evidence in [M1 issue #10](https://github.com/wrightausername/Game-Grave/issues/10).
+
+- [ ] **Windows 10 x64** standard-user packaged-install manual pass.
+- [ ] **Windows 11 x64** standard-user packaged-install manual pass.
+- [ ] Scan a disposable Downloads subfolder with old game-like archives; verify stale/new
+      distinction, optional manual review, Never Touch and separate confirmation.
+- [ ] Create a disposable nested directory junction/symlink that points to a protected
+      folder; ensure the recycler refuses the *linked ancestor*, not just linked leaf.
+- [ ] Create an NTFS hardlink to a disposable file; verify generic recycling is refused.
+- [ ] Recycle one temporary ordinary file on a local fixed NTFS drive. Confirm the file
+      appears in the Windows Recycle Bin and disk space is NOT claimed as freed.
+- [ ] Check Undo Center and restore that uniquely matchable file; check original content.
+      Then simulate an original-path collision and verify nothing is overwritten.
+- [ ] Test missing/emptied Recycle Bin records, duplicate path records, locked files,
+      and multilingual shell properties. Refusal is acceptable; unsafe restoration is not.
+- [ ] Verify no successful restore is claimed if Windows Shell did not confirm the
+      path exists afterwards; test UI messages and logging.
+- [ ] Make two Resurrection Kits; test safe backup, checksum verification, restore
+      into an empty target, missing space, renamed ZIP, modified CRC, Unicode filename
+      and an existing target collision.
+- [ ] Test interrupted/power-loss recovery in a disposable environment; make sure
+      incomplete output is labeled, the source remains intact, and no preexisting
+      file or folder is deleted.
+- [ ] Verify protected save/mod/manager folders and a running game are never recycled.
+- [ ] Record failures and passing evidence in issue #10; do not mark M1 passed just
+      because a GitHub Actions test run is green.
+
+A manual workflow exists for a disposable **Windows runner Recycle Bin integration
+smoke test**. It is not a replacement for human UI, installer or OS-build coverage.
