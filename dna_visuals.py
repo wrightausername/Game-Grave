@@ -98,7 +98,7 @@ def _dna_draw(canvas, width, counts, colors):
         _node(canvas,d,"AUTO REMOVED","0","Everything protected",colors,colors["blue"])
 
 
-def dna_visual(parent, dna: dict, *, palette: dict) -> tk.Frame:
+def dna_visual(parent, dna: dict, *, palette: dict, scanned: bool = True) -> tk.Frame:
     """Create a responsive map of observed/unknown/protected relationships."""
     counts=dna_counts(dna)
     root=tk.Frame(parent,bg=palette["panel"])
@@ -107,7 +107,8 @@ def dna_visual(parent, dna: dict, *, palette: dict) -> tk.Frame:
     tk.Label(heading,text="GAME DNA  /  RELATIONSHIP MAP",
              fg=palette["text"],bg=palette["panel"],
              font=("Segoe UI Semibold",11)).pack(side="left")
-    tk.Label(heading,text="LIVE SCAN EVIDENCE",fg=palette["accent"],
+    tk.Label(heading,text="SCAN SNAPSHOT" if scanned else "NOT YET SCANNED",
+             fg=palette["accent"] if scanned else palette["warn"],
              bg=palette["panel"],font=("Segoe UI",8)).pack(side="right")
     canvas=tk.Canvas(root,bg=palette["panel"],highlightthickness=0,
                      borderwidth=0,height=198)
