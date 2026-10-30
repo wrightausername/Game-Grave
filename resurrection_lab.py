@@ -421,6 +421,8 @@ def prepare_pc_transfer(manifest_path: Path, destination_parent: Path,
         if target == archive.parent:
             raise ValueError("Destination would overlap the original backup.")
     target.mkdir(mode=0o700, exist_ok=False)
+    incomplete = target / "TRANSFER_INCOMPLETE.txt"
+    incomplete.write_text("Copy is incomplete. Do not use this folder until Game Grave confirms verification.", encoding="utf-8")
     completed = []
     try:
         for src in (archive, Path(manifest_path)):
@@ -432,6 +434,9 @@ def prepare_pc_transfer(manifest_path: Path, destination_parent: Path,
             completed.append(dst)
             if _sha256(src) != _sha256(dst):
                 raise RuntimeError("Portable kit copy failed integrity verification.")
+        result = inspect_restore(target / Path(manifest_path).name)
+        if not result["verified"]:
+            raise RuntimeError("Copied kit failed its final integrity check.")
         guide = target / "READ_ME_FIRST.txt"
         guide.write_text(
             "GAME GRAVE — PC-TO-PC RESURRECTION\n\n"
@@ -448,9 +453,7 @@ def prepare_pc_transfer(manifest_path: Path, destination_parent: Path,
             "6. Reconnect saves and unsupported mod-manager data manually after review. "
             "No in-game compatibility or launch success is guaranteed.\n",
             encoding="utf-8")
-        result = inspect_restore(target / Path(manifest_path).name)
-        if not result["verified"]:
-            raise RuntimeError("Copied kit failed its final integrity check.")
+        incomplete.unlink()
     except BaseException:
         # Preserve incomplete transfer folder for inspection rather than risking
         # deletion of files placed there by another process.
