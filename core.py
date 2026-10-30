@@ -237,10 +237,18 @@ def parse_vdf(source: str) -> dict:
     return result
 
 
+MAX_STEAM_VDF_BYTES = 16 * 1024 * 1024
+
+
 def read_vdf(path: Path) -> dict:
+    """Read bounded ordinary Steam metadata, never links or huge arbitrary files."""
     try:
+        path = Path(path)
+        if (_has_reparse_component(path) or not path.is_file()
+                or path.stat().st_size > MAX_STEAM_VDF_BYTES):
+            return {}
         return parse_vdf(path.read_text(encoding="utf-8-sig", errors="replace"))
-    except OSError:
+    except (OSError, ValueError, UnicodeError):
         return {}
 
 
@@ -268,11 +276,14 @@ def _steam_roots(extra: list[str] | None = None) -> list[Path]:
     unique = {}
     for p in roots:
         try:
-            resolved = p.expanduser().resolve()
-            if (resolved / "steamapps").is_dir():
-                unique[str(resolved).lower()] = resolved
-        except OSError:
-            pass
+            original = p.expanduser()
+            if not original.is_absolute() or _has_reparse_component(original):
+                continue
+            resolved = original.resolve(strict=True)
+            if (resolved / "steamapps").is_dir() and not _has_reparse_component(resolved / "steamapps"):
+                unique[str(resolved).casefold()] = resolved
+        except (OSError, ValueError, RuntimeError):
+            continue
     return list(unique.values())
 
 
@@ -289,10 +300,13 @@ def steam_libraries(steam_roots: list[Path]) -> list[Path]:
                     candidates.append(Path(path))
         for candidate in candidates:
             try:
-                candidate = candidate.expanduser().resolve()
-                if (candidate / "steamapps").is_dir():
-                    libraries[str(candidate).lower()] = candidate
-            except OSError:
+                original = candidate.expanduser()
+                if not original.is_absolute() or _has_reparse_component(original):
+                    continue
+                candidate = original.resolve(strict=True)
+                if (candidate / "steamapps").is_dir() and not _has_reparse_component(candidate / "steamapps"):
+                    libraries[str(candidate).casefold()] = candidate
+            except (OSError, ValueError, RuntimeError):
                 continue
     return list(libraries.values())
 
