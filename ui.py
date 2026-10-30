@@ -39,6 +39,7 @@ from resurrection_lab import (
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from mod_radar_audit import audit_mod_radar
+from dna_visuals import dna_visual, mod_radar_visual
 from space_planner import plan_for_drive
 from launchers import LauncherGame, find_launcher_games
 from save_vault import create_backup
@@ -392,6 +393,10 @@ class GameGraveApp(tk.Tk):
                 self.text(controls, "• " + message, 9, MUTED, wraplength=820).pack(anchor="w")
         summary = self.panel(pad=13)
         summary.pack(fill="both", expand=True)
+        palette = {"panel": PANEL, "raised": RAISED, "text": TEXT,
+                   "muted": MUTED, "line": LINE, "blue": BLUE,
+                   "accent": ACCENT, "warn": WARN}
+        dna_visual(summary, dna, palette=palette).pack(fill="x", pady=(0, 12))
         self.text(summary, f"{len(dna['games'])} recorded games · "
                   f"{len(dna['unresolved'])} unresolved mod/save locations",
                   14, bold=True).pack(anchor="w", pady=(0, 10))
@@ -840,6 +845,10 @@ class GameGraveApp(tk.Tk):
         self.text(summary, "READ-ONLY: No items will be deleted. Apparent sizes may double count linked files. "
                   "Missing game records, unindexed Workshop folders, and old timestamps are NOT proof of safe deletion.",
                   9, WARN, wraplength=815).pack(anchor="w", pady=(7, 0))
+        palette = {"panel": PANEL, "raised": RAISED, "text": TEXT,
+                   "muted": MUTED, "line": LINE, "blue": BLUE,
+                   "accent": ACCENT, "warn": WARN}
+        mod_radar_visual(summary, palette=palette).pack(fill="x", pady=(11, 3))
         selector = tk.Frame(self.content, bg=BG)
         selector.pack(fill="x", pady=(0, 10))
         self.mod_filter = tk.StringVar(value="All sources")
