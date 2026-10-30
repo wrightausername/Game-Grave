@@ -24,3 +24,9 @@ Each report records OS build (no username), source commit, fabricated test paths
 **M6 beta:** Once M1–M5 have been signed off, use [BETA_TEST_PROTOCOL.md](BETA_TEST_PROTOCOL.md) with exactly the same 12 questions and safe task order for every participant. No testers recruited beforehand.
 
 Time Machine compares same-size/CRC32 apparent matches using **SHA-256 over both uncompressed member streams**, and rechecks the whole archive hashes after comparison. A full integrity comparison may be slower on large 80 GiB kits; progress/responsiveness and cancellation remain a manual performance acceptance requirement. Neither a verified archive nor a Time Machine comparison proves that the game or mod manager will launch.
+
+## Hardened MO2 reconnection and transfer acceptance
+
+The native MO2 reconnection path must reject any symlink/junction ancestor in the instance INI, mod library, profile library, new mod folders or file parent directories. It must compare the ZIP SHA-256 *again after extracting* rather than treating a successful dry-run as proof the file did not change. A late mismatch reports **incomplete, inspect newly created folders**; it cannot certify MO2 success or erase user-managed data automatically. Vortex's live LevelDB remains untouched.
+
+For USB/PC-to-PC exports, verify sources are ordinary files when opened and still match their originals after copying. A changed or redirected input must leave the transfer marked **INCOMPLETE** and must never publish a usable recovery guide. These fail-closed behaviors have synthetic tests; repeat them on disposable native Windows installs. No live manager/game data is needed for failure injection.

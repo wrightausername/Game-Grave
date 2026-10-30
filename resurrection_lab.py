@@ -441,12 +441,24 @@ def prepare_pc_transfer(manifest_path: Path, destination_parent: Path,
     try:
         for src in (archive, Path(manifest_path)):
             dst = target / src.name
-            if not _regular(src):
-                raise ValueError("Original kit file changed during copying.")
-            with src.open("rb") as data, dst.open("xb") as output:
+            if (not _ordinary_ancestry(src) or
+                    not _ordinary_ancestry(target, directory=True)):
+                raise ValueError("Transfer input or destination changed to a redirected path.")
+            original = src.stat()
+            flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0) |
+                     getattr(os, "O_NOFOLLOW", 0))
+            descriptor = os.open(src, flags)
+            with os.fdopen(descriptor, "rb") as data, dst.open("xb") as output:
+                current = os.fstat(data.fileno())
+                if (not stat.S_ISREG(current.st_mode) or
+                        current.st_size != original.st_size or
+                        current.st_mtime_ns != original.st_mtime_ns):
+                    raise RuntimeError("Portable kit source changed before copying.")
                 shutil.copyfileobj(data, output, 1024 * 1024)
             completed.append(dst)
-            if _sha256(src) != _sha256(dst):
+            if (not _ordinary_ancestry(src) or
+                    not _ordinary_ancestry(dst) or
+                    _sha256(src) != _sha256(dst)):
                 raise RuntimeError("Portable kit copy failed integrity verification.")
         result = inspect_restore(target / Path(manifest_path).name)
         if not result["verified"]:
