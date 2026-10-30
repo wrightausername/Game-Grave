@@ -21,12 +21,13 @@ from pathlib import Path
 from manager_profiles import _identity, _ordinary, _verified_game
 from mod_sources import _read_ini, _resolve_mo_path
 from resurrection_v2 import (_manifest_for, _scan_archive, _valid_member,
-                             _relative_name, inspect_restore, MIN_SPACE_BUFFER)
+                             _relative_name, _ordinary_ancestry, _sha256,
+                             inspect_restore, MIN_SPACE_BUFFER)
 
 
 def _mo2_targets(ini_file: Path):
-    if not _ordinary(ini_file):
-        raise ValueError("Choose an ordinary MO2 instance INI file.")
+    if not _ordinary_ancestry(ini_file):
+        raise ValueError("Choose an MO2 instance INI without linked or redirected ancestors.")
     cfg = _read_ini(ini_file)
     if cfg is None or not cfg.has_section("Settings"):
         raise ValueError("MO2 instance configuration is missing or unsupported.")
@@ -37,7 +38,7 @@ def _mo2_targets(ini_file: Path):
     mods = _resolve_mo_path(cfg["Settings"].get("mod_directory", "%BASE_DIR%/mods"),
                             base, ini_file.parent)
     for label, root in (("profiles", profiles), ("mods", mods)):
-        if (not _ordinary(root, directory=True)
+        if (not _ordinary_ancestry(root, directory=True)
                 or root.resolve() in (Path(root.anchor), Path.home().resolve())):
             raise ValueError(f"MO2 {label} folder is unavailable, linked or unsafe.")
         # Configurable MO2 roots may be on separate drives, but must be ordinary folders.
@@ -149,6 +150,7 @@ def _build_mo2_plan(manifest_path: Path, ini_file: Path, games=(), other_games=(
         "not_reconnected_roles": ignored_roles,
         "files": kit["files"], "bytes": total,
         "archive": str(archive_path),
+        "archive_sha256": kit["archive_sha256"],
         "no_overwrite": True, "no_live_game_edit": True,
         "requires_mo2_closed": True,
         "note": "All mod folders must be absent. A new MO2 profile is added; select it in MO2 after restoration.",
@@ -199,12 +201,12 @@ def reconnect_to_mo2(manifest_path: Path, ini_file: Path, games=(),
             # profile directory is merged or overwritten.
             for name in plan["mods_to_add"]:
                 dest = mod_root / name
-                if not _ordinary(mod_root, directory=True):
-                    raise RuntimeError("MO2 mod root changed during restore.")
+                if not _ordinary_ancestry(mod_root, directory=True):
+                    raise RuntimeError("MO2 mod root or ancestor changed during restore.")
                 dest.mkdir(exist_ok=False)
                 created_dirs.append(dest)
-            if not _ordinary(profile_root, directory=True):
-                raise RuntimeError("MO2 profiles root changed during restore.")
+            if not _ordinary_ancestry(profile_root, directory=True):
+                raise RuntimeError("MO2 profiles root or ancestor changed during restore.")
             profile_dest.mkdir(exist_ok=False)
             created_dirs.append(profile_dest)
             for info in infos:
@@ -220,8 +222,8 @@ def reconnect_to_mo2(manifest_path: Path, ini_file: Path, games=(),
                     # guess live save destinations from directory names alone.
                     continue
                 # Files must stay inside an exclusively-created destination.
-                if anchor not in destination.parents or not _ordinary(anchor, directory=True):
-                    raise RuntimeError("Restore destination escaped its reserved folder.")
+                if anchor not in destination.parents or not _ordinary_ancestry(anchor, directory=True):
+                    raise RuntimeError("Restore destination escaped its reserved folder or was redirected.")
                 parents = []
                 parent = destination.parent
                 while parent != anchor:
@@ -229,15 +231,26 @@ def reconnect_to_mo2(manifest_path: Path, ini_file: Path, games=(),
                     parent = parent.parent
                 for directory in reversed(parents):
                     if directory.exists() or directory.is_symlink():
-                        if not _ordinary(directory, directory=True):
+                        if not _ordinary_ancestry(directory, directory=True):
                             raise RuntimeError("Restore encountered linked or changed folder.")
                     else:
                         directory.mkdir(exist_ok=False)
-                with archive.open(info) as source, destination.open("xb") as output:
+                if not _ordinary_ancestry(destination.parent, directory=True):
+                    raise RuntimeError("Restore destination parent became linked or changed.")
+                flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                         getattr(os, "O_BINARY", 0) |
+                         getattr(os, "O_NOFOLLOW", 0))
+                descriptor = os.open(destination, flags, 0o600)
+                with os.fdopen(descriptor, "wb") as output, archive.open(info) as source:
                     shutil.copyfileobj(source, output, 1024 * 1024)
                 created_files.append(destination)
-                if destination.stat().st_size != info.file_size:
-                    raise RuntimeError("Restored file size differs from archive.")
+                if (not _ordinary_ancestry(destination)
+                        or destination.stat().st_size != info.file_size):
+                    raise RuntimeError("Restored file changed or differs from archive.")
+        # A passed dry-run and ZIP CRC do not guarantee an archive stayed
+        # immutable while MO2's new directories were being filled.
+        if _sha256(archive_path).lower() != plan["archive_sha256"].lower():
+            raise RuntimeError("Kit archive changed during MO2 reconnection.")
         return {
             "restored": True, "profile": str(profile_dest),
             "not_reconnected_roles": plan["not_reconnected_roles"],
