@@ -16,7 +16,10 @@ import shutil
 import stat
 import tempfile
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
+
+from core import config_dir
 
 from resurrection_v2 import (
     MAX_BYTES, MAX_FILES, MIN_SPACE_BUFFER, _manifest_for, _regular, _safe_label,
@@ -28,6 +31,50 @@ MAX_VISIBLE = 75
 MAX_HISTORY = 100
 MAX_MODLIST_BYTES = 2_000_000
 MAX_DIFF_ENTRIES = MAX_FILES
+MAX_RECEIPTS = 80
+RECEIPT_LIMIT = 24_000
+
+
+def _receipt_path() -> Path:
+    return config_dir() / "kit_rehearsals.json"
+
+
+def _rehearsal_receipts() -> list[dict]:
+    path = _receipt_path()
+    try:
+        if path.stat().st_size > RECEIPT_LIMIT:
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            return []
+        return [r for r in data[:MAX_RECEIPTS]
+                if isinstance(r, dict) and isinstance(r.get("sha256"), str)
+                and len(r["sha256"]) == 64]
+    except (OSError, ValueError, TypeError):
+        return []
+
+
+def _record_rehearsal(sha256: str, files: int) -> bool:
+    """Store only kit digest/count/time locally; never save personal paths."""
+    try:
+        path = _receipt_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        receipts = [r for r in _rehearsal_receipts() if r["sha256"] != sha256]
+        receipts.insert(0, {"sha256": sha256, "files": int(files),
+                            "time": datetime.now(timezone.utc).isoformat()})
+        with tempfile.NamedTemporaryFile(mode="w", dir=path.parent,
+                    prefix="gg-rehearsal-", suffix=".tmp",
+                    encoding="utf-8", delete=False) as file:
+            temp = Path(file.name)
+            json.dump(receipts[:MAX_RECEIPTS], file)
+        temp.replace(path)
+        return True
+    except (OSError, ValueError, TypeError):
+        try:
+            temp.unlink(missing_ok=True)
+        except (OSError, UnboundLocalError):
+            pass
+        return False
 
 
 def _verified(manifest_path: Path) -> tuple[dict, Path, dict]:
@@ -115,6 +162,8 @@ def missing_pieces(manifest_path: Path) -> dict:
     else:
         unknown.append("Game/mod-manager ownership, load order and dependency completeness are not verified.")
     unknown.append("A valid archive does not prove a game or modded setup will launch.")
+    receipt = next((r for r in _rehearsal_receipts()
+                    if r["sha256"] == meta.get("archive_sha256")), None)
     return {
         "game": inspected["game"], "manager": kind,
         "archive_verified": inspected["verified"], "files": inspected["files"],
@@ -122,7 +171,8 @@ def missing_pieces(manifest_path: Path) -> dict:
         "missing_enabled_mods": missing_enabled[:MAX_VISIBLE],
         "missing_count": len(missing_enabled),
         "issues": issues, "unknown": unknown,
-        "restore_rehearsed": False,
+        "restore_rehearsed": bool(receipt),
+        "rehearsal_time": receipt.get("time") if receipt else None,
         "complete_game_recovery_verified": False,
         "readiness": ("Needs attention" if issues else "Archive intact; setup recovery unverified"),
         "source_manifest": str(Path(manifest_path)),
@@ -273,7 +323,7 @@ def create_living_update(previous_manifest: Path, sources: dict[str, Path],
     return result
 
 
-def rehearse_kit(manifest_path: Path, parent: Path) -> dict:
+def rehearse_kit(manifest_path: Path, parent: Path, *, record=False) -> dict:
     """Extract to an isolated, owned temp folder and compare file hashes.
 
     This exercises ZIP extraction and recovery logic, not game launching.
@@ -302,8 +352,11 @@ def rehearse_kit(manifest_path: Path, parent: Path) -> dict:
                 checked_count += 1
         if checked_count != kit["files"]:
             raise RuntimeError("Rehearsal file count mismatch.")
+    receipt_recorded = (_record_rehearsal(meta["archive_sha256"], checked_count)
+                        if record else False)
     return {
         "game": kit["game"], "files_verified": checked_count,
+        "receipt_recorded": receipt_recorded,
         "archive_verified": True, "isolated_extract_verified": True,
         "game_launch_verified": False,
         "manager_reconnection_verified": False,
