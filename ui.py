@@ -794,7 +794,7 @@ class GameGraveApp(tk.Tk):
         days.bind("<<ComboboxSelected>>", self._change_game_days)
         self.text(secondary_filters, "Sort", 9, MUTED).pack(side="left", padx=(15, 6))
         self.game_sort_var = tk.StringVar(value=self.settings.get("game_sort", "Oldest first"))
-        game_sort = ttk.Combobox(controls, textvariable=self.game_sort_var,
+        game_sort = ttk.Combobox(secondary_filters, textvariable=self.game_sort_var,
                                  values=GAMES_SORT_OPTIONS, state="readonly", style="Dark.TCombobox", width=15)
         game_sort.pack(side="left")
         game_sort.bind("<<ComboboxSelected>>", lambda _e: self._set_view_sort("game_sort", self.game_sort_var, self._populate_games))
