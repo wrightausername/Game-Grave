@@ -46,6 +46,16 @@ consistency while games are running. Users must close games/mod managers before
 backing up and reconnect recovered files manually. Native Windows tests with
 real managers and unusual paths remain a release requirement.
 
+## Resurrection Kit 2.1: automatic source discovery + MO2 profile reconnection
+
+**Implemented in this iteration:** After **Scan PC**, open **Game DNA** or **Save Vault** and use **Find my setup automatically**. Pick a recorded installed game, then review read-only evidence suggestions. Sources come from an exact MO2 game-install/instance/profile association, exact Vortex snapshot-to-game association for staged mods, or a save scanner's matching game label. Nothing is included without confirmation. One folder per category is currently supported. Wrong-game, missing-data and mixed-manager findings are not promoted to safe guesses.
+
+For kits created through a verified MO2 discovery, **Reconnect verified MO2 kit** checks the current MO2 instance INI and installed game, validates every ZIP entry and checksum, checks storage capacity and destination conflicts, and requires explicit approval of the exact plan. On success, it creates **missing mod folders only** and a **new `<Profile>_GameGrave` profile** in the recognized instance. It never overwrites existing mods/profiles, touches the game installation, edits the live MO2 configuration, or deletes files. The user selects the new profile inside MO2. This is intended for clean manager installs, not in-place merging into existing modlists. If conflicts or missing enabled mod folders occur, it fails closed; use **Preview / Restore Kit** into a separate recovery folder instead.
+
+Vortex remains **snapshot-informed discovery and portable-kit capture only**. Rebuilding its active profile and deployment automatically requires a supported Vortex API/extension: do not modify `State.v2` directly. If a kit also includes game saves/config files, the MO2 reconnection step leaves those in the verified ZIP rather than guessing live save locations. Restore those through the existing safe staged-recovery workflow. No unsupported claims about seamless one-click complete game restoration.
+
+**Windows release gates:** Real MO2 instances (including moved paths), hardlinks/junctions, antivirus/file locks, Unicode paths, profile switching and game launches after restore. Automated tests are fixtures and are not proof of real-world manager compatibility.
+
 ## Safety and accuracy constraints
 
 1. **No deletion or modification of games and mods by these features.**
