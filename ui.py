@@ -2878,6 +2878,9 @@ class GameGraveApp(tk.Tk):
                             f"Files: {plan['files']} · size: {human_size(plan['bytes'])}\n\n"
                             "Close MO2 first. Existing folders and game files will not "
                             "be merged, replaced or deleted.\n\n"
+                            f"Other roles not reconnected: {', '.join(plan['not_reconnected_roles']) or 'none'}\n"
+                            "Save/config folders remain available in the verified kit for "
+                            "separate safe recovery.\n\n"
                             "Afterwards, select the new GameGrave profile in MO2.\n\n"
                             "Create the new profile and mod folders?"):
                         self._apply_mo2_reconnect(manifest, ini, plan)
@@ -2888,6 +2891,7 @@ class GameGraveApp(tk.Tk):
                         f"New profile:\n{payload['profile']}\n\n"
                         f"{payload['added_mod_folders']} mod folders restored. "
                         "Open MO2 and select the restored profile. "
+                        f"Kit roles not reconnected: {', '.join(payload['not_reconnected_roles']) or 'none'}. "
                         "Game Grave did not overwrite an existing setup.")
                 elif name == "mo2_reconnect_error":
                     self.status_text.set("MO2 restore not completed; existing setup protected.")
