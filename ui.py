@@ -298,7 +298,8 @@ class GameGraveApp(tk.Tk):
             if found is None:
                 return
             direction = -1 if event.delta > 0 else 1
-            if page_wheel_allowed(found, self.nav_list, self.nav_canvas, ()):
+            if (hasattr(self, "nav_list") and
+                    page_wheel_allowed(found, self.nav_list, self.nav_canvas, ())):
                 bounds = self.nav_canvas.bbox("all")
                 if bounds and bounds[3] > self.nav_canvas.winfo_height():
                     self.nav_canvas.yview_scroll(direction * 3, "units")
