@@ -68,6 +68,18 @@ tested engineering foundation, not a commercial one-click modpack recovery
 guarantee; native Windows tests with real MO2/Vortex and installed games
 are mandatory before production use.
 
+## Resurrection Lab: five recovery tools (developer preview)
+
+Open **Save Vault → Resurrection Lab** (also accessible from Game DNA). All five workflows run only when you initiate them:
+
+- **Missing Pieces / Readiness:** select a saved `*.ggkit.json` manifest. Verifies the ZIP and identifies enabled MO2 mod folders missing from the kit. Other dependencies and game compatibility are reported as **unknown**, never guessed.
+- **Resurrection Rehearsal:** select a manifest and scratch location with adequate space. A disposable copy is restored and SHA-256 checked, then the app removes its own temporary extraction. This does not launch the game or test manager deployment.
+- **Living Kits:** select a previous kit and reselect its corresponding save/mod/profile/config folders. Changes are compared using content hashes. Approve a *new*, independent full archive; previous versions are never overwritten. This is not continuous monitoring or incremental storage deduplication. The new manual revision does not inherit previous manager-verification claims.
+- **Time Machine:** choose two verified kit manifests for the same game, compare changes, and optionally recover an older version into a separate new folder. Use **See kit versions in a folder** to browse unverified manifest filenames before selecting versions.
+- **PC-to-PC Resurrection:** copy a verified ZIP+manifest into an exclusive new transfer directory with an offline `READ_ME_FIRST.txt` guide, then take that entire folder to the second PC. The receiving PC must install the game through its official launcher. Kit restore and clean MO2 reconnect remain available; Vortex live-state restoration is not supported.
+
+**Important:** all five features are tested in synthetic CI fixtures on Windows and Ubuntu, not yet approved for important saves or release. Nothing deletes installed games or mod data; new archives, temporary rehearsals and portable transfer copies require approval. A valid archive is not proof of an in-game launch or complete mod dependency coverage.
+
 ## What's implemented
 
 | Area | Behavior |
