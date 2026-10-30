@@ -56,6 +56,18 @@ Vortex remains **snapshot-informed discovery and portable-kit capture only**. Re
 
 **Windows release gates:** Real MO2 instances (including moved paths), hardlinks/junctions, antivirus/file locks, Unicode paths, profile switching and game launches after restore. Automated tests are fixtures and are not proof of real-world manager compatibility.
 
+## Resurrection Lab: five working first versions (October 30, 2026)
+
+A new **Resurrection Lab** page, reached from Save Vault or Game DNA, provides:
+
+1. **Missing Pieces Detector / Readiness:** verifies a selected kit and checks whether enabled mods named in a preserved MO2 modlist actually have folders in the ZIP. Reports missing components, omitted saves/configs and unknown dependencies. No invented download URLs, compatible-version claims, or unjustified 100% recoverability scores.
+2. **Resurrection Rehearsal:** optional, user-approved extraction into a unique temporary scratch directory, SHA-256 file-by-file comparison to archive contents, and cleanup of only the program-owned temporary directory. Does **not** run the game, test the installed manager or promise save consistency.
+3. **Living Kits:** on-demand review of real changes between a complete v2 kit and user-reselected source folders. Creates a new independent, verified full ZIP only on approval. No background watching or incremental block-level deduplication yet. Manager auto-reattachment evidence is *not carried over* to the new kit until rescanned/reverified.
+4. **Time Machine:** lists local adjacent kit manifests, compares two fully verified snapshots for added/changed/missing paths using ZIP CRC and size, and offers staged recovery of the older version into a fresh folder. No automatic in-place file rollback; CRC is a change heuristic, not a cryptographic identity proof.
+5. **PC-to-PC Resurrection:** copies the verified archive + companion manifest into a new portable folder with a plain-language recovery guide; rechecks the copied kit. Install the game via the supported launcher on the target PC. Existing staged recovery and verified MO2 reconnect support the imported kit. No game executable or license transfers, Vortex live-profile restore, peer-to-peer streaming, or cloud services.
+
+**Release gates:** Real Windows 10/11 installed-application QA, mod manager/game integration tests, large (>40K file) setups, file locks, junctions, Unicode paths, disk-full power-loss recoverability, AV interference and usability on laptop displays. These are real features with known limited scopes, not retail-ready exhaustive recovery promises.
+
 ## Safety and accuracy constraints
 
 1. **No deletion or modification of games and mods by these features.**
