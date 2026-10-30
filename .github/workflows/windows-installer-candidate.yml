@@ -7,6 +7,7 @@ on:
     paths:
       - 'build_installer.ps1'
       - 'installer/GameGrave.iss'
+      - 'tools/windows_installer_ci_smoke.ps1'
       - '.github/workflows/windows-installer-candidate.yml'
 
 permissions:
@@ -53,13 +54,30 @@ jobs:
           $actual = (Get-FileHash -Algorithm SHA256 $setup[0].FullName).Hash.ToLowerInvariant()
           $expected = ((Get-Content $hashFile -Raw) -split '\s+')[0].ToLowerInvariant()
           if ($actual -ne $expected) { throw 'Installer checksum differs from published candidate manifest' }
-          Write-Host 'Candidate compiled and checksum verified; NOT code signed or release approved.'
+          $buildInfo = $setup[0].FullName.Replace('.exe', '.build.json')
+          if (-not (Test-Path $buildInfo)) { throw 'Source provenance build manifest missing' }
+          $report = Get-Content $buildInfo -Raw | ConvertFrom-Json
+          if ($report.installer_sha256 -ne $actual -or
+              $report.source_commit -ne $env:GITHUB_SHA -or
+              $report.signed -ne $false -or
+              $report.release_approved -ne $false) {
+            throw 'Unsigned build provenance does not match this source and executable'
+          }
+          Write-Host 'Candidate compiled, provenance and checksum verified; NOT signed or release approved.'
+      - name: Smoke-test isolated install, reinstall and uninstall
+        shell: pwsh
+        run: |
+          $setup = @(Get-ChildItem release\GameGrave_Setup_v*.exe -File)
+          if ($setup.Count -ne 1) { throw 'Installer candidate count is not one' }
+          $manifest = [IO.Path]::ChangeExtension($setup[0].FullName, '.build.json')
+          .\tools\windows_installer_ci_smoke.ps1 -SetupPath $setup[0].FullName -BuildManifest $manifest
       - uses: actions/upload-artifact@v4
         with:
           name: GameGrave-Unsigned-Installer-Candidate
           path: |
             release/GameGrave_Setup_v*.exe
             release/GameGrave_Setup_v*.sha256
+            release/GameGrave_Setup_v*.build.json
           if-no-files-found: error
           retention-days: 14
 

@@ -46,6 +46,27 @@ $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInv
 $hashFile = Join-Path $PSScriptRoot "release\GameGrave_Setup_v$version.sha256"
 ("$hash  " + [System.IO.Path]::GetFileName($installer)) |
     Out-File -FilePath $hashFile -Encoding ascii
+# The unsigned candidate must be independently traceable to its source
+# commit. Do NOT claim it was signed or accepted for release.
+$sourceCommit = if ($env:GITHUB_SHA -match '\A[0-9a-fA-F]{40}\z') {
+    $env:GITHUB_SHA.ToLowerInvariant()
+} else {
+    'local-build-unverified'
+}
+$buildManifest = Join-Path $PSScriptRoot "release\GameGrave_Setup_v$version.build.json"
+$buildData = [ordered]@{
+    schema = 1
+    product = 'Game Grave'
+    version = $version
+    installer = [IO.Path]::GetFileName($installer)
+    installer_sha256 = $hash
+    source_commit = $sourceCommit
+    signed = $false
+    release_approved = $false
+    build_kind = 'unsigned-engineering-candidate'
+}
+($buildData | ConvertTo-Json -Depth 3) | Set-Content -LiteralPath $buildManifest -Encoding utf8
 Write-Host "Unsigned candidate installer built: $installer"
 Write-Host "SHA-256 manifest: $hashFile"
+Write-Host "Build provenance (UNSIGNED): $buildManifest"
 Write-Host 'NOT A PRODUCTION RELEASE: Requires Authenticode signing, manual clean-Windows QA and 1.0 release gates.'
