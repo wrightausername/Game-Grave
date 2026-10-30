@@ -11,6 +11,7 @@ from typing import Iterable
 
 from core import is_protected_path
 from addon_metadata import inspect_addon_metadata
+from game_intelligence import _linked_ancestor
 
 
 @dataclass(frozen=True)
@@ -25,9 +26,10 @@ class FileVerdict:
 
 
 def _relative(path: Path, parent: Path) -> bool:
-    """Check true directory containment, never a string-prefix comparison."""
+    """Only associate ordinary ancestry; a junction is not trusted game evidence."""
+    if _linked_ancestor(path) or _linked_ancestor(parent):
+        return False
     try:
-        # Path.resolve(strict=False) works for detached or test paths too.
         path.resolve().relative_to(parent.resolve())
         return True
     except (ValueError, OSError, RuntimeError):
