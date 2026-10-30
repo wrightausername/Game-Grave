@@ -24,6 +24,32 @@ class LauncherGame:
     status: str
 
 
+def _ordinary_install(raw) -> Path | None:
+    """Reject blank, relative, root, symlink or junctioned launcher locations.
+
+    A missing Epic InstallLocation formerly became Path('.'), which happened
+    to exist and incorrectly promoted a bad manifest into an installed game.
+    """
+    if not isinstance(raw, str) or not raw.strip() or len(raw) > 4096:
+        return None
+    path = Path(raw.strip())
+    if not path.is_absolute() or path == Path(path.anchor):
+        return None
+    current = path
+    try:
+        while True:
+            info = current.lstat()
+            if current.is_symlink() or getattr(info, "st_file_attributes", 0) & 0x400:
+                return None
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+        return path if path.is_dir() else None
+    except (OSError, ValueError):
+        return None
+
+
 def epic_games(programdata: Path | None = None, cancel: Cancel = None) -> list[LauncherGame]:
     base = (Path(programdata) if programdata is not None else
             Path(os.environ.get('PROGRAMDATA', 'C:/ProgramData')))
@@ -40,8 +66,8 @@ def epic_games(programdata: Path | None = None, cancel: Cancel = None) -> list[L
             entry = json.loads(item.read_text(encoding='utf-8-sig'))
             if not isinstance(entry, dict):
                 continue
-            folder = Path(entry.get('InstallLocation', ''))
-            if not folder.is_dir() or folder.is_symlink():
+            folder = _ordinary_install(entry.get('InstallLocation'))
+            if folder is None:
                 continue
             name = str(entry.get('DisplayName') or entry.get('AppName') or folder.name)[:170]
             size = entry.get('InstallSize')
@@ -77,14 +103,16 @@ def gog_registry(cancel: Cancel = None) -> list[LauncherGame]:
                     identifier = winreg.EnumKey(base, i)
                     i += 1
                     with winreg.OpenKey(base, identifier) as sub:
-                        folder = winreg.QueryValueEx(sub, 'path')[0]
+                        folder = _ordinary_install(winreg.QueryValueEx(sub, 'path')[0])
+                        if folder is None:
+                            continue
                         try:
                             name = winreg.QueryValueEx(sub, 'gameName')[0]
                         except OSError:
-                            name = Path(folder).name
-                        if Path(folder).is_dir():
-                            results.append(LauncherGame(str(name), 'GOG', str(folder),
-                                                        str(identifier), None, 'GOG registry entry; installation found'))
+                            name = folder.name
+                        results.append(LauncherGame(str(name), 'GOG', str(folder),
+                                                    str(identifier), None,
+                                                    'GOG registry entry; installation found'))
                 except OSError:
                     break
     unique = {(g.launcher, g.install_path.casefold()): g for g in results}
@@ -97,11 +125,11 @@ def custom_library_folders(roots: list[str], cancel: Cancel = None) -> list[Laun
     for raw in roots[:15]:
         if cancel and cancel():
             raise InterruptedError('Game scan canceled')
-        root = Path(raw)
-        if root == Path(root.anchor) or not root.is_dir() or root.is_symlink():
+        root = _ordinary_install(raw)
+        if root is None:
             continue
         try:
-            folders = [f for f in root.iterdir() if f.is_dir() and not f.is_symlink()]
+            folders = [f for f in root.iterdir() if _ordinary_install(str(f)) is not None]
         except OSError:
             continue
         for folder in folders[:400]:
@@ -141,10 +169,11 @@ def riot_games(programdata: Path | None = None, cancel: Cancel = None) -> list[L
                 if match:
                     values[match.group(1)] = match.group(2).strip().strip('"\'')
             location = values.get('product_install_full_path')
-            if not location or not Path(location).is_dir() or Path(location).is_symlink():
+            install = _ordinary_install(location)
+            if install is None:
                 continue
             items.append(LauncherGame(values.get('product_display_name') or manifest.parent.name,
-                       'Riot Games', str(Path(location)), manifest.parent.name, None,
+                       'Riot Games', str(install), manifest.parent.name, None,
                        'Riot launcher product settings and installation folder found'))
         except (OSError, ValueError):
             continue
@@ -190,8 +219,8 @@ def vendor_registry_games(cancel: Cancel = None) -> list[LauncherGame]:
                                 pass
                         if not isinstance(install, str):
                             continue
-                        path = Path(install)
-                        if not path.is_dir() or path.is_symlink():
+                        path = _ordinary_install(install)
+                        if path is None:
                             continue
                         results.append(LauncherGame(name, launcher, str(path), name, None,
                                         'Launcher registry record; game name may need verification'))
