@@ -84,12 +84,21 @@ def resurrection_guide(parent, *, colors: dict) -> tk.Frame:
     # Semantic text counterpart for users who cannot see the diagram.
     description = "  |  ".join(f"{i+1}. {title}: {note}"
                               for i, (name, title, note) in enumerate(resurrection_steps()))
-    tk.Label(root, text=description, fg=colors["muted"], bg=colors["panel"],
-             font=("Segoe UI", 9), wraplength=700,
-             justify="left", anchor="w").pack(fill="x", pady=(7, 8))
-    tk.Label(root,
-             text="Verified archive ≠ verified game compatibility. No automatic live rollback.",
-             fg=colors["warn"], bg=colors["panel"],
-             font=("Segoe UI Semibold", 10),
-             wraplength=700, justify="left", anchor="w").pack(fill="x")
+    description_label = tk.Label(
+        root, text=description, fg=colors["muted"], bg=colors["panel"],
+        font=("Segoe UI", 9), wraplength=390,
+        justify="left", anchor="w")
+    description_label.pack(fill="x", pady=(7, 8))
+    caution_label = tk.Label(
+        root,
+        text="Verified archive ≠ verified game compatibility. No automatic live rollback.",
+        fg=colors["warn"], bg=colors["panel"],
+        font=("Segoe UI Semibold", 10),
+        wraplength=390, justify="left", anchor="w")
+    caution_label.pack(fill="x")
+    def wrap_text(event):
+        bound = max(260, event.width - 20)
+        description_label.configure(wraplength=bound)
+        caution_label.configure(wraplength=bound)
+    root.bind("<Configure>", wrap_text)
     return root
