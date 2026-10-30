@@ -71,6 +71,24 @@ class KitV2Tests(unittest.TestCase):
         self.assertEqual((Path(restored["target"]) / "Saves" / "Slot 1" / "Save.sav").read_bytes(),
                          b"important progress")
 
+    def test_preexisting_zip_or_manifest_is_never_overwritten(self):
+        self.zip.write_bytes(b"personal file")
+        with self.assertRaises(FileExistsError):
+            self._make()
+        self.assertEqual(self.zip.read_bytes(), b"personal file")
+        self.zip.unlink()
+        sidecar = self.root / "Skyrim-kit.zip.ggkit.json"
+        sidecar.write_text("private")
+        with self.assertRaises(FileExistsError):
+            self._make()
+        self.assertEqual(sidecar.read_text(), "private")
+        self.assertFalse(self.zip.exists())
+
+    def test_does_not_accept_unlisted_backup_roles(self):
+        with self.assertRaises(ValueError):
+            create_complete_kit("Game", {"SystemFiles": self.saves}, self.zip)
+        self.assertFalse(self.zip.exists())
+
     def test_tampering_rejected_before_restore_creates_folder(self):
         created = self._make()
         with self.zip.open("ab") as stream:
