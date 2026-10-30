@@ -55,7 +55,10 @@ class UpdateResult:
 def _version(value: str) -> tuple[int, int, int]:
     if not isinstance(value, str) or len(value) > 32 or not _SEMVER.fullmatch(value):
         raise UpdateError("Invalid stable release version.")
-    return tuple(int(part) for part in value.split("."))
+    components = tuple(int(part) for part in value.split("."))
+    if any(component > 999999 for component in components):
+        raise UpdateError("Stable release version component is unreasonably large.")
+    return components
 
 
 def _host(value: str) -> str:
@@ -90,6 +93,7 @@ def _https_url(value: str, *, host: str | None = None) -> str:
     path = urllib.parse.unquote(parsed.path)
     if (not path.startswith("/") or "//" in path or
             any(segment in (".", "..") for segment in path.split("/")) or
+            not re.fullmatch(r"/[A-Za-z0-9._/-]+", parsed.path, re.ASCII) or
             any(c in path for c in ("\\", "\x00", "\r", "\n", "@"))):
         raise UpdateError("Update URL path is not approved.")
     return value
