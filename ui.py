@@ -36,6 +36,7 @@ from resurrection_lab import (
     missing_pieces, compare_kits, plan_living_update, create_living_update,
     rehearse_kit, list_snapshots, prepare_pc_transfer,
 )
+from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from space_planner import plan_for_drive
 from launchers import LauncherGame, find_launcher_games
@@ -2049,6 +2050,11 @@ class GameGraveApp(tk.Tk):
             side="left", padx=8)
         self.button(footer, "Back to Save Vault", lambda: self.show_page("Save Vault")).pack(
             side="right")
+        watch_buttons = tk.Frame(self.content, bg=BG)
+        watch_buttons.pack(fill="x", pady=(6, 0))
+        self.button(watch_buttons, "Track a kit (opt in)", self._lab_track).pack(side="left")
+        self.button(watch_buttons, "Check tracked kits", self._lab_check_watches).pack(side="left", padx=8)
+        self.button(watch_buttons, "Stop tracking a kit", self._lab_stop_watching).pack(side="left")
         self.text(self.content, "Local-only, on-demand. No cloud uploads, forced accounts, "
                   "automatic live file rollback, or hidden background monitoring. "
                   "Only new, user-approved backup/transfer files are created.",
@@ -2119,6 +2125,68 @@ class GameGraveApp(tk.Tk):
         self._lab_work(
             "lab_living_preview", "Comparing actual file contents against the saved kit…",
             lambda: (previous, sources, plan_living_update(Path(previous), sources)))
+
+    def _lab_track(self):
+        manifest = self._lab_manifest("Choose kit to track for changes locally")
+        if not manifest:
+            return
+        try:
+            meta, _archive = _manifest_for(Path(manifest))
+            if meta.get("schema") != 2 or not isinstance(meta.get("roles"), list):
+                raise ValueError("Local watches require a full v2 Resurrection Kit.")
+            roles = [r.get("name") for r in meta["roles"] if isinstance(r, dict)]
+            if not roles or len(set(roles)) != len(roles) or not set(roles).issubset(
+                    {"Saves", "Mods", "Profiles", "Configs"}):
+                raise ValueError("Unknown or duplicated backup categories.")
+        except (ValueError, OSError) as exc:
+            messagebox.showwarning("Cannot track this kit", str(exc))
+            return
+        folders = {}
+        for role in roles:
+            location = filedialog.askdirectory(
+                title=f"Choose the LOCAL {role} folder to track for this kit")
+            if not location:
+                return
+            folders[role] = Path(location)
+        if not messagebox.askyesno("Opt in to local change tracking?",
+                "Game Grave will remember the following folders IN A LOCAL FILE "
+                "on this PC:\n\n" +
+                "\n".join(f"• {key}: {path}" for key, path in folders.items()) +
+                "\n\nOnly when you press 'Check tracked kits', Game Grave will "
+                "look for file size/timestamp changes. No file contents are read "
+                "during these quick checks. Nothing uploads or backs up automatically. "
+                "You can stop tracking whenever you choose. Proceed?"):
+            return
+        self._lab_work("lab_watch_saved", "Recording opted-in local kit watch…",
+                       lambda: register_kit_watch(Path(manifest), folders, approved=True))
+
+    def _lab_check_watches(self):
+        if not list_kit_watches():
+            messagebox.showinfo("No tracked kits", "Choose 'Track a kit (opt in)' first.")
+            return
+        self._lab_work("lab_watch_check", "Checking opted-in kit folder metadata…",
+                       check_kit_watches)
+
+    def _lab_stop_watching(self):
+        watched = list_kit_watches()
+        if not watched:
+            messagebox.showinfo("No tracked kits", "There are no local kit watches.")
+            return
+        names = "\n".join(f"{i+1}. {r.get('game', 'Unknown')} · "
+                          f"{Path(r['manifest']).name}" for i, r in enumerate(watched))
+        index = simpledialog.askinteger(
+            "Stop tracking", "Choose watch to remove:\n\n" + names,
+            parent=self, minvalue=1, maxvalue=len(watched))
+        if index is None:
+            return
+        target = watched[index-1]
+        if not messagebox.askyesno("Forget these local paths?",
+                f"Stop watching {target.get('game', 'Unknown')}?\n\n"
+                "This removes the locally stored watch entry and paths. "
+                "It does not remove any source folders or Resurrection Kits."):
+            return
+        self._lab_work("lab_watch_removed", "Stopping local kit monitoring…",
+                       lambda: stop_kit_watch(target["id"], approved=True))
 
     def _lab_time_machine(self):
         older = self._lab_manifest("Choose older kit snapshot")
@@ -3071,6 +3139,51 @@ class GameGraveApp(tk.Tk):
                          else "No receipt was recorded. ") +
                         "Game launch, manager compatibility and original save consistency "
                         "are NOT verified.")
+                elif name == "lab_watch_saved":
+                    self.status_text.set("Kit folders saved for optional local checks")
+                    messagebox.showinfo("Living Kit tracked",
+                        f"{payload['game']} · {payload['folders']} folders.\n\n"
+                        "Game Grave will check metadata only when you ask. "
+                        "No background polling or automatic ZIP updates.")
+                elif name == "lab_watch_removed":
+                    self.status_text.set("Local watch entry removed")
+                    messagebox.showinfo("Stopped tracking",
+                        "Watch entry removed. Existing kits and game files are untouched.")
+                elif name == "lab_watch_check":
+                    changed = [r for r in payload if r["status"] == "possible changes"]
+                    unknown = [r for r in payload if r["status"] == "unknown"]
+                    self.status_text.set(
+                        f"{len(changed)} tracked kit(s) may have changed; "
+                        f"{len(unknown)} need inspection.")
+                    lines = "\n".join(
+                        f"• {r['game']}: {r['status']}" for r in payload[:16])
+                    if changed and messagebox.askyesno("Living Kit watch results",
+                            f"{lines}\n\n"
+                            "Metadata differences are not proof of changed contents. "
+                            "Run a complete content review for a changed kit now?"):
+                        if len(changed) == 1:
+                            chosen = changed[0]
+                        else:
+                            labels = "\n".join(
+                                f"{i+1}. {item['game']} - {Path(item['manifest']).name}"
+                                for i, item in enumerate(changed))
+                            index = simpledialog.askinteger("Review which kit?",
+                                "Choose one changed kit:\n\n" + labels,
+                                parent=self, minvalue=1, maxvalue=len(changed))
+                            if index is None:
+                                continue
+                            chosen = changed[index-1]
+                        sources = {role: Path(path) for role, path in chosen["sources"].items()}
+                        self._lab_work(
+                            "lab_living_preview", "Comparing watched kit against actual file contents…",
+                            lambda entry=chosen, roots=sources: (
+                                entry["manifest"], roots,
+                                plan_living_update(Path(entry["manifest"]), roots)))
+                    elif not changed:
+                        messagebox.showinfo("Living Kit watch results",
+                            f"{lines or 'No kits tracked.'}\n\n"
+                            "Unchanged metadata is not proof of identical file contents. "
+                            "Use Living Kits for full content review when needed.")
                 elif name == "lab_living_preview":
                     previous, sources, plan = payload
                     self.status_text.set("Living Kit comparison completed")
