@@ -44,18 +44,36 @@ $testRoot = Join-Path $workspace '_ci_installer_lifecycle'
 if (Test-Path -LiteralPath $testRoot) {
     throw 'Lifecycle fixture directory already exists; refusing to overwrite it.'
 }
-# An ephemeral clean runner profile is required. Never overwrite real settings.
+# Unit tests may legitimately create settings in the ephemeral CI profile.
+# Never overwrite them: hash the existing files, create a UNIQUE sentinel
+# exclusively, and verify ALL original files remain intact after uninstall.
 $profileDir = Join-Path $env:LOCALAPPDATA 'Game Grave'
+$priorProfile = @()
 if (Test-Path -LiteralPath $profileDir) {
-    throw 'Game Grave profile directory already exists; refusing to touch it.'
+    if ((Get-Item -LiteralPath $profileDir).Attributes -band
+        [IO.FileAttributes]::ReparsePoint) {
+        throw 'Game Grave profile root is redirected. Refusing smoke test.'
+    }
+    $priorProfile = @(Get-ChildItem -LiteralPath $profileDir -File -Recurse |
+        ForEach-Object {
+            [pscustomobject]@{
+                Path = $_.FullName
+                Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            }
+        })
+} else {
+    New-Item -ItemType Directory -Path $profileDir | Out-Null
 }
 New-Item -ItemType Directory -Path $testRoot | Out-Null
-New-Item -ItemType Directory -Path $profileDir | Out-Null
 $installDir = Join-Path $testRoot 'Disposable Game Grave'
 $unrelatedGame = Join-Path $testRoot 'untouched-game-save.bin'
-$profileSentinel = Join-Path $profileDir 'ci-smoke-keep-this.txt'
+$profileSentinel = Join-Path $profileDir "ci-smoke-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.txt"
 [IO.File]::WriteAllBytes($unrelatedGame, [byte[]](0..255))
-[IO.File]::WriteAllText($profileSentinel, 'settings and receipts must survive uninstall')
+$sentinelBytes = [Text.Encoding]::UTF8.GetBytes('settings and receipts must survive uninstall')
+$stream = [IO.File]::Open($profileSentinel, [IO.FileMode]::CreateNew,
+                         [IO.FileAccess]::Write, [IO.FileShare]::None)
+try { $stream.Write($sentinelBytes, 0, $sentinelBytes.Length) }
+finally { $stream.Dispose() }
 $beforeSave = (Get-FileHash $unrelatedGame -Algorithm SHA256).Hash
 $beforeProfile = (Get-FileHash $profileSentinel -Algorithm SHA256).Hash
 
@@ -102,6 +120,13 @@ if (-not [IO.File]::Exists($profileSentinel) -or
     (Get-FileHash $profileSentinel -Algorithm SHA256).Hash -ne $beforeProfile) {
     throw 'Uninstall changed saved local user preferences.'
 }
+foreach ($previous in $priorProfile) {
+    if (-not [IO.File]::Exists($previous.Path) -or
+        (Get-FileHash -LiteralPath $previous.Path -Algorithm SHA256).Hash -ne $previous.Hash) {
+        throw 'Uninstall changed a preexisting Game Grave settings file.'
+    }
+}
+Write-Host "PASS: $($priorProfile.Count) preexisting profile file(s) retained byte-identically."
 Write-Host 'PASS: isolated install, repeat install, uninstall and SHA verification.'
 Write-Host 'PASS: disposable game file and user-profile sentinel survived unchanged.'
 Write-Host 'This is an unsigned CI install test, NOT an interactive Windows 10/11 release sign-off.'
