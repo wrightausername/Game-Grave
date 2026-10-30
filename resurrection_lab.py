@@ -23,7 +23,7 @@ from core import config_dir
 
 from resurrection_v2 import (
     MAX_BYTES, MAX_FILES, MIN_SPACE_BUFFER, _manifest_for, _regular, _safe_label,
-    _scan_archive, _sha256, _safe_tree, _valid_member, create_complete_kit,
+    _scan_archive, _sha256, _safe_tree, _valid_member, _ordinary_ancestry, create_complete_kit,
     inspect_restore, restore_kit,
 )
 
@@ -335,8 +335,8 @@ def rehearse_kit(manifest_path: Path, parent: Path, *, record=False) -> dict:
     """
     meta, archive, kit = _verified(manifest_path)
     parent = Path(parent)
-    if not _regular(parent, directory=True):
-        raise ValueError("Choose an ordinary rehearsal destination folder.")
+    if not _ordinary_ancestry(parent, directory=True):
+        raise ValueError("Choose a rehearsal folder without linked or redirected ancestors.")
     if shutil.disk_usage(parent).free < kit["bytes"] + MIN_SPACE_BUFFER:
         raise OSError("Insufficient free space to rehearse recovery.")
     checked_count = 0
@@ -372,8 +372,8 @@ def rehearse_kit(manifest_path: Path, parent: Path, *, record=False) -> dict:
 def list_snapshots(folder: Path, game: str = "") -> list[dict]:
     """List locally visible sidecar versions; catalog does NOT imply verified."""
     folder = Path(folder)
-    if not _regular(folder, directory=True):
-        raise ValueError("Choose an ordinary folder containing Resurrection Kits.")
+    if not _ordinary_ancestry(folder, directory=True):
+        raise ValueError("Choose a kit-history folder without linked or redirected ancestors.")
     result = []
     for file in sorted(folder.glob("*.ggkit.json"), key=lambda p: p.name.casefold()):
         if not _regular(file) or file.stat().st_size > 1024 * 1024:
@@ -407,8 +407,8 @@ def prepare_pc_transfer(manifest_path: Path, destination_parent: Path,
         raise PermissionError("Approve the target transfer folder before copying.")
     manifest, archive, kit = _verified(manifest_path)
     destination_parent = Path(destination_parent)
-    if not _regular(destination_parent, directory=True):
-        raise ValueError("Choose an ordinary transfer destination directory.")
+    if not _ordinary_ancestry(destination_parent, directory=True):
+        raise ValueError("Choose a transfer destination without linked or redirected ancestors.")
     target = destination_parent / (_safe_label(kit["game"]) + "_GameGrave_Transfer")
     if target.exists() or target.is_symlink():
         raise FileExistsError("Transfer folder already exists; select another parent.")
