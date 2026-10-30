@@ -378,7 +378,7 @@ class GameGraveApp(tk.Tk):
         self.button(dna_tools, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(side="left")
         self.button(dna_tools, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=9)
         self.button(dna_tools, "View visual map", lambda: self._open_dna_visual_map(dna)).pack(side="left", padx=9)
-        self.button(dna_tools, "Export private QA", self._export_private_m2_qa).pack(side="left", padx=9)
+        self.button(dna_tools, "Export QA", self._export_private_m2_qa).pack(side="left", padx=9)
         previous = load_observation()
         if previous:
             self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
