@@ -1,0 +1,226 @@
+{
+  "schema": 1,
+  "product": "Game Grave",
+  "target_release": "1.0.0",
+  "status": "NOT_READY",
+  "note": "All gates start pending; GitHub CI alone does not satisfy real Windows or human beta acceptance.",
+  "milestones": [
+    {
+      "id": "M1",
+      "title": "Core safety and native Windows recovery",
+      "issue_url": "https://github.com/wrightausername/Game-Grave/issues/10",
+      "gates": [
+        {
+          "name": "No unsafe cleanup of protected, redirected, hardlinked or game-owned files",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Native Windows 10 and 11 Recycle Bin plus Undo Center recovery",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Adversarial ZIP and source path safety verified",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Signed-off safety matrix and failure injection",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        }
+      ]
+    },
+    {
+      "id": "M2",
+      "title": "Game intelligence and Mod Radar",
+      "issue_url": "https://github.com/wrightausername/Game-Grave/issues/11",
+      "gates": [
+        {
+          "name": "Evidence-based Steam, Epic and GOG detection on real installations",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "MO2/Vortex and supported ecosystems classified with tested ownership fixtures",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Uncertain content never silently eligible for cleanup",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Drive-aware and hardlink-aware space accounting validated",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        }
+      ]
+    },
+    {
+      "id": "M3",
+      "title": "Resurrection Kit recovery",
+      "issue_url": "https://github.com/wrightausername/Game-Grave/issues/12",
+      "gates": [
+        {
+          "name": "Complete representative multi-root kit preserve and staged restore",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Real MO2 clean-install reconnection and conflict QA",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Rehearsal, Living Kits, Time Machine and PC migration recovery QA",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Failure injection, incomplete dependencies and unsupported Vortex behavior documented",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        }
+      ]
+    },
+    {
+      "id": "M4",
+      "title": "Usability performance and accessibility",
+      "issue_url": "https://github.com/wrightausername/Game-Grave/issues/13",
+      "gates": [
+        {
+          "name": "Accessible keyboard and screen reader workflows",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Scalable layouts at Windows 100, 125, 150 and 200 percent DPI",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Large-library cancellation, latency and memory budgets verified",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Nontechnical user first-run and critical task acceptance",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        }
+      ]
+    },
+    {
+      "id": "M5",
+      "title": "Packaging security privacy and lifetime Pro",
+      "issue_url": "https://github.com/wrightausername/Game-Grave/issues/14",
+      "gates": [
+        {
+          "name": "Real Windows clean installer, upgrade and uninstall QA",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Production Authenticode signature and published independent hashes",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Offline Free, verified live lifetime-Pro issuance and payment if sold",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Update security, privacy disclosures and incident response reviewed",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        }
+      ]
+    },
+    {
+      "id": "M6",
+      "title": "Closed beta and release candidate",
+      "issue_url": "https://github.com/wrightausername/Game-Grave/issues/15",
+      "gates": [
+        {
+          "name": "External closed beta complete on diverse supported Windows PCs",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Zero P0/P1 unresolved release blockers",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Candidate full regression and backup recoverability signed off",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Release notes and supported/unsupported behavior approved",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        }
+      ]
+    },
+    {
+      "id": "M7",
+      "title": "Version 1.0.0 stable release",
+      "issue_url": "https://github.com/wrightausername/Game-Grave/issues/16",
+      "gates": [
+        {
+          "name": "All M1-M6 evidence linked and accepted by owner",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Signed final installer reproducibly tied to a reviewed source commit",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "GA user documents, support and recovery guide published",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        },
+        {
+          "name": "Final release artifact QA and rollback/hotfix procedure accepted",
+          "status": "pending",
+          "evidence_url": "",
+          "verified_by": ""
+        }
+      ]
+    }
+  ]
+}
