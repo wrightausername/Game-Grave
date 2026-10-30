@@ -212,6 +212,32 @@ class ResurrectionLabTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             prepare_pc_transfer(Path(created["manifest"]), usb, approved=True)
 
+    def test_transfer_detects_source_changed_between_preflight_and_open(self):
+        import os
+        k = self.kit()
+        usb = self.root / "USB"
+        usb.mkdir()
+        original_open = os.open
+        changes = []
+
+        def changed_before_open(path, flags, *args, **kwargs):
+            # On the disposable fixture, simulate another process updating
+            # the source after preview but before the transfer read starts.
+            if str(path) == k["archive"] and not changes:
+                source = Path(path)
+                source.write_bytes(source.read_bytes() + b"unexpected append")
+                changes.append(True)
+            return original_open(path, flags, *args, **kwargs)
+
+        with patch("resurrection_lab.os.open", side_effect=changed_before_open):
+            with self.assertRaisesRegex(RuntimeError, "changed before copying"):
+                prepare_pc_transfer(Path(k["manifest"]), usb, approved=True)
+        self.assertTrue(changes)
+        transfer = usb / "Skyrim_GameGrave_Transfer"
+        self.assertTrue((transfer / "TRANSFER_INCOMPLETE.txt").is_file())
+        self.assertFalse((transfer / "READ_ME_FIRST.txt").exists())
+        self.assertTrue((self.saves / "slot" / "save.dat").is_file())
+
     def test_transfer_refuses_corrupted_zip_and_does_not_create_folder(self):
         k = self.kit()
         usb = self.root / "USB"
