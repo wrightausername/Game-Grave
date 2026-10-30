@@ -378,7 +378,8 @@ class GameGraveApp(tk.Tk):
     def _navigate_shortcut(self, page):
         self.show_page(page)
         control = self.nav_buttons.get(page, self.scan_button)
-        self._scroll_navigation_to(page)
+        if hasattr(self, "_scroll_navigation_to"):
+            self._scroll_navigation_to(page)
         control.focus_set()
         return "break"
 
