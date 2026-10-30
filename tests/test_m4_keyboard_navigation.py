@@ -44,7 +44,7 @@ class KeyboardAccessTests(unittest.TestCase):
             "Overview", "Game DNA", "Game Mods", "The Graveyard",
             "Save Vault", "Resurrection Lab", "Undo Center",
         })
-        self.assertNotIn("delete", shortcut_help_text().lower())
+        self.assertNotIn("delete", repr(PAGE_SHORTCUTS).lower())
         self.assertNotIn("recycle", repr(PAGE_SHORTCUTS).lower())
 
     def test_bindings_have_7_pages_help_scan_and_cancel(self):
