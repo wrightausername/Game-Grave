@@ -185,7 +185,10 @@ def _safe_tree(source: Path, dest_zip: Path):
     if dest_zip.resolve(strict=False) == source or source in dest_zip.resolve(strict=False).parents:
         raise ValueError("Save the kit outside the directories being preserved.")
     rows = []
-    for here, folders, files in os.walk(source, topdown=True, followlinks=False):
+    def _walk_error(error):
+        raise OSError("A selected folder could not be fully inspected; no backup was completed.") from error
+    for here, folders, files in os.walk(source, topdown=True, followlinks=False,
+                                        onerror=_walk_error):
         directory = Path(here)
         if any(not _regular(directory / name, directory=True) for name in folders):
             raise ValueError("Source contains linked or unsupported folders. Choose ordinary folders only; nothing was backed up.")
