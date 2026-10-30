@@ -24,14 +24,18 @@ if (-not $paths) {
 }
 & $paths[0] 'installer\GameGrave.iss'
 if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
-# Read the version actually embedded in the Inno Setup definition. The old
-# hardcoded v2.0 name incorrectly rejected a successfully built v2.4 installer.
-$versionLine = Select-String -Path (Join-Path $PSScriptRoot 'installer\GameGrave.iss') `
-    -Pattern '^#define MyAppVersion "([^"]+)"
-if (-not $versionLine -or $versionLine.Matches.Count -ne 1) {
+# Read the exact version embedded in the Inno Setup definition. Do not
+# assume a hardcoded old filename and incorrectly report successful builds as failed.
+$definition = Join-Path $PSScriptRoot 'installer\GameGrave.iss'
+$versionLines = @(Get-Content -LiteralPath $definition |
+    Where-Object { $_.StartsWith('#define MyAppVersion "') })
+if ($versionLines.Count -ne 1) {
     throw 'Cannot identify exactly one installer version in GameGrave.iss'
 }
-$version = $versionLine.Matches[0].Groups[1].Value
+$version = ($versionLines[0] -split '"')[1]
+if (-not [regex]::IsMatch($version, '\A\d+\.\d+\.\d+\z')) {
+    throw 'Installer version must be a strictly numeric three-part version'
+}
 $installer = Join-Path $PSScriptRoot "release\GameGrave_Setup_v$version.exe"
 if (-not (Test-Path $installer)) {
     throw "Inno Setup ran, but the expected versioned installer was not produced: $installer"
