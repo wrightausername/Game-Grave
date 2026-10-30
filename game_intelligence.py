@@ -112,7 +112,7 @@ def _special(path: Path) -> bool:
     """Reject symlinks, Windows reparse points, sockets and non-regular files."""
     try:
         st = path.lstat()
-        return bool(st.st_mode & stat.S_IFLNK or
+        return bool(stat.S_ISLNK(st.st_mode) or
                     getattr(st, "st_file_attributes", 0) & 0x400 or
                     not (stat.S_ISDIR(st.st_mode) or stat.S_ISREG(st.st_mode)))
     except OSError:
@@ -127,10 +127,11 @@ def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
     """
     if not 1 <= int(max_entries) <= MAX_ENTRIES:
         raise ValueError("Choose a valid observation limit.")
+    sources = list(mods)
     roots = []
     entries = {}
     truncated = False
-    for m in list(mods)[:MAX_ROOTS]:
+    for m in sources[:MAX_ROOTS]:
         root = Path(str(getattr(m, "path", "")))
         if (not root.is_dir() or _special(root) or
                 _path(root) in (Path.home().resolve(), Path(_path(root).anchor))):
@@ -165,7 +166,7 @@ def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
         "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "roots": sorted(set(roots)),
         "entries": entries,
-        "truncated": truncated or len(list(mods)) > MAX_ROOTS,
+        "truncated": truncated or len(sources) > MAX_ROOTS,
         "limitations": "Metadata-only, bounded to recognized mod roots, max 3 levels; no game launch verification.",
     }
 
