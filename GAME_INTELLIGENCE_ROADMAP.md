@@ -112,3 +112,12 @@ unverified until separately tested.
 
 The visible Game DNA page is a functional **preview**, not a declaration that
 all eight production features are complete.
+
+## M2 detection accuracy hardening (2026-10-30)
+
+- Reject missing/blank, relative, linked/junctioned, or drive-root launcher installation paths so corrupt Epic metadata does not create phantom installed games.
+- Game DNA records mod storage as associated only when exactly one credible installed launcher record or Steam Workshop app ID matches. Multiple overlapping claims, a user-added custom library, or linked ancestors become protected ambiguous/unresolved records.
+- Mod Radar audit presents read-only counts for associated/unassigned/ambiguous locations, linked paths, stale/incomplete MO2/Vortex profile snapshots and recorded enabled/disabled references. All items remain non-recyclable through this audit.
+- Ghost Watch marks comparisons uncertain when a root was inaccessible/redirected or a scan was capped/changed scope. A missing observation is no longer portrayed as a definite removed file when coverage is incomplete.
+
+**Still M2 release-blocking:** real installed Steam/Epic/GOG/MO2/Vortex coverage tests on Windows 10/11, launcher and manager library moves, ESO/FiveM/MMO fixture coverage and false-positive sampling. CI on synthetic files does not satisfy those requirements. Tracked by [M2 issue #11](https://github.com/wrightausername/Game-Grave/issues/11).
