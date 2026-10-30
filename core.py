@@ -716,10 +716,43 @@ def is_protected_path(path: Path, extra: list[str] | None = None) -> bool:
     return False
 
 
+def _recycle_shell_session_ready(kernel=None) -> bool:
+    """Fail closed when launched as a service or non-console background session.
+
+    Shell Recycle Bin operations depend on the active interactive user session.
+    A headless Windows runner successfully removed a scratch file but could not
+    verify it in the corresponding Recycle Bin. Never invoke that operation
+    from a task or service running in Session 0 or a disconnected session.
+    """
+    try:
+        if kernel is None:
+            if os.name != "nt":
+                return False
+            from ctypes import wintypes
+            kernel = ctypes.windll.kernel32
+            kernel.GetCurrentProcessId.restype = wintypes.DWORD
+            kernel.WTSGetActiveConsoleSessionId.restype = wintypes.DWORD
+            kernel.ProcessIdToSessionId.argtypes = (
+                wintypes.DWORD, ctypes.POINTER(wintypes.DWORD))
+            kernel.ProcessIdToSessionId.restype = wintypes.BOOL
+        from ctypes import wintypes
+        active = int(kernel.WTSGetActiveConsoleSessionId())
+        session = wintypes.DWORD()
+        ok = kernel.ProcessIdToSessionId(
+            kernel.GetCurrentProcessId(), ctypes.byref(session))
+        return bool(ok) and active not in (0, 0xFFFFFFFF) and session.value == active
+    except (OSError, ValueError, AttributeError, TypeError):
+        return False
+
+
 def recycle_file(path: Path) -> None:
     """Send local fixed-disk file to Windows Recycle Bin. Never fall back to permanent delete."""
     if os.name != "nt":
         raise RuntimeError("Recycling requires Windows.")
+    if not _recycle_shell_session_ready():
+        raise RuntimeError("Safe recycling requires an active local Windows desktop session. "
+                           "Unattended services, disconnected remote sessions and headless "
+                           "jobs are blocked until Recycle Bin recovery is verified.")
     from ctypes import wintypes
 
     # Never allow an apparently safe path to escape through a parent junction.
