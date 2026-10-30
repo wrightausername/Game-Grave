@@ -2139,12 +2139,22 @@ class GameGraveApp(tk.Tk):
 
     def _make_resurrection_kit(self):
         chosen = self._selected_saves()
-        if len(chosen) != 1:
-            messagebox.showinfo("Select a save folder",
-                "Select one discovered game save/profile folder to preserve first.")
+        if len(chosen) > 1:
+            messagebox.showinfo("Choose one game", "Select just one save/profile folder at a time.")
             return
-        item = chosen[0]
-        sources = {"Saves": Path(item.path)}
+        if chosen:
+            source, game = Path(chosen[0].path), chosen[0].game
+        else:
+            selected = filedialog.askdirectory(
+                title="Choose the save or profile folder you want to preserve")
+            if not selected:
+                return
+            source = Path(selected)
+            game = simpledialog.askstring("Game name", "What game is this setup for?",
+                                          initialvalue=source.name, parent=self)
+            if not game:
+                return
+        sources = {"Saves": source}
         include_mods = messagebox.askyesno("Include your mod setup?",
             "Resurrection Kit will preserve your selected save folder.\n\n"
             "Do you also want to add a mod/mod-manager profile folder? "
@@ -2158,12 +2168,12 @@ class GameGraveApp(tk.Tk):
         destination = filedialog.asksaveasfilename(
             title="Save your Resurrection Kit ZIP", defaultextension=".zip",
             filetypes=[("ZIP archive", "*.zip")],
-            initialfile=Path(item.path).name + "_Resurrection.zip")
+            initialfile=source.name + "_Resurrection.zip")
         if not destination:
             return
         folders = "\n".join(f"• {role}: {path}" for role, path in sources.items())
         if not messagebox.askyesno("Preserve this setup?",
-                f"Game: {item.game}\n\nFolders to preserve:\n{folders}\n\n"
+                f"Game: {game}\n\nFolders to preserve:\n{folders}\n\n"
                 f"Kit ZIP: {destination}\n\n"
                 "Game Grave saves only these selected folders. Close the game and "
                 "mod manager first. This does not archive the game installation or "
@@ -2172,7 +2182,7 @@ class GameGraveApp(tk.Tk):
         self.status_text.set("Creating and verifying Resurrection Kit…")
         def worker():
             try:
-                created = create_complete_kit(item.game, sources, Path(destination))
+                created = create_complete_kit(game, sources, Path(destination))
                 self.events.put(("kit_result", created))
             except (OSError, ValueError, RuntimeError, InterruptedError, zipfile.BadZipFile) as exc:
                 self.events.put(("kit_error", str(exc)))
