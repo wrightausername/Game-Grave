@@ -101,8 +101,12 @@ def build_game_dna(games=(), other_games=(), mods=(), saves=(), manager_profiles
                 continue
             if _within(path, game["install_path"]):
                 owners.append((game, "Within recorded game installation"))
-            elif workshop and workshop == game["app_id"] and game["launcher"] == "Steam":
-                owners.append((game, "Steam Workshop folder uses this game's app ID"))
+            elif (workshop and workshop == game["app_id"]
+                  and game["launcher"] == "Steam"
+                  and str(getattr(m, "source", "")) == "Steam Workshop"):
+                # A random third-party directory named workshop/content/<id>
+                # is not evidence from the Steam Workshop inventory.
+                owners.append((game, "Steam Workshop scanner recorded this game's app ID"))
         row = {
             "path": path, "kind": "Mod or addon storage",
             "source": str(getattr(m, "source", "Unknown manager")),
