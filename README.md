@@ -14,6 +14,29 @@ Game Grave finds games, mod-manager storage, Workshop folders, caches, and lefto
 
 **Licenses:** The Free version never asks for a key. Settings > **Free / Pro** contains the planned one-time lifetime Pro activation flow. **Pro isn't for sale or activatable in this preview** because the licensing server, paid checkout, and signing configuration aren't deployed. No fake Pro keys or paid feature locks are included. See `INSTALLER_AND_LICENSING.md`.
 
+## Resurrection Kit 2.0 (preview)
+
+**Preserve a setup:** Open Save Vault and select one discovered save/profile folder,
+or select a folder manually. Click **Preserve setup (Kit)**. You may optionally
+include one additional mod/profile folder. Choose a ZIP filename and approve
+the listed source directories. Keep the generated \`filename.zip\` **and**
+\`filename.zip.ggkit.json\` together. No game installation, mods outside your
+selected folders, or cloud data are captured.
+
+**Recover a kit:** Click **Preview / Restore Kit**, choose its \`.ggkit.json\`
+manifest and an existing recovery parent folder. Game Grave verifies the ZIP
+checksum, individual ZIP CRCs, file count and capacity before requesting
+approval. A successful restore creates a fresh \`Game_Restored\` directory with
+\`Saves\` and optional \`Mods/Profiles\` subfolders. It **never** overwrites
+existing game files or changes a mod manager, so you can inspect and reconnect
+recovered files manually.
+
+Close the game and mod manager before creating a kit. Link/junction or unreadable
+content is not silently skipped: the operation is refused if it cannot preserve
+the selected source reliably. Direct one-click modlist redeployment, automatic
+game installation and cloud synchronization are still **not implemented**.
+The Windows preview is not cleared for use as someone's sole save backup.
+
 ## What's implemented
 
 | Area | Behavior |
