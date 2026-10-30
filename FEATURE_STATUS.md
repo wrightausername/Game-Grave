@@ -1,4 +1,6 @@
-# Game Grave feature status | v1.9 engineering preview
+# Game Grave feature status | engineering preview, not stable 1.0
+
+**Current release decision (October 30, 2026):** NOT READY. The historical v1.9/v2.4 sections below describe internal engineering increments, not public release acceptance. Game DNA, Resurrection Lab, Save Vault, Graveyard and Windows unsigned builds exist; M1-M7 gate evidence is tracked in [RELEASE_1_0_PLAN.md](RELEASE_1_0_PLAN.md). Windows Shell Recycle Bin/Undo QA in noninteractive CI failed; a disposable, byte-verified recovery canary now refuses user-file recycling if Undo cannot be proven. Do not claim that the native Windows recovery scenario has passed. The GitHub Windows installer artifact is unsigned and Pro billing remains unavailable.
 
 This file prevents product ideas from being mistaken for tested capabilities.
 
