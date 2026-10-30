@@ -12,8 +12,16 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or -not $env:GITHUB_WORKSPACE) {
     throw 'Refusing installer lifecycle test outside an isolated GitHub Actions runner.'
 }
 $workspace = [IO.Path]::GetFullPath($env:GITHUB_WORKSPACE)
-$setup = [IO.Path]::GetFullPath((Join-Path $workspace $SetupPath))
-$manifestFile = [IO.Path]::GetFullPath((Join-Path $workspace $BuildManifest))
+$setup = if ([IO.Path]::IsPathRooted($SetupPath)) {
+    [IO.Path]::GetFullPath($SetupPath)
+} else {
+    [IO.Path]::GetFullPath((Join-Path $workspace $SetupPath))
+}
+$manifestFile = if ([IO.Path]::IsPathRooted($BuildManifest)) {
+    [IO.Path]::GetFullPath($BuildManifest)
+} else {
+    [IO.Path]::GetFullPath((Join-Path $workspace $BuildManifest))
+}
 if (-not [IO.File]::Exists($setup) -or -not [IO.File]::Exists($manifestFile)) {
     throw 'Unsigned installer candidate or build manifest not found.'
 }
@@ -79,7 +87,7 @@ $uninstallers = @(Get-ChildItem -LiteralPath $installDir -Filter 'unins*.exe' -F
 if ($uninstallers.Count -ne 1) {
     throw 'Expected precisely one uninstall executable in the CI-only install.'
 }
-& $uninstallers[0].FullName '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART'
+& ($uninstallers[0].FullName) '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART'
 if ($LASTEXITCODE -ne 0) {
     throw "Uninstall failed with exit code $LASTEXITCODE"
 }
