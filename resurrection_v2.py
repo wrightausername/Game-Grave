@@ -23,6 +23,9 @@ ROLE_NAMES = {"Saves", "Mods", "Profiles", "Configs"}
 NAME_LIMIT = 180
 DOS_NAMES = {"CON", "PRN", "AUX", "NUL"} | {
     f"{prefix}{number}" for prefix in ("COM", "LPT") for number in range(1, 10)
+} | {
+    # Windows also reserves COM¹, COM², COM³, LPT¹, LPT² and LPT³.
+    f"{prefix}{number}" for prefix in ("COM", "LPT") for number in ("¹", "²", "³")
 }
 
 
@@ -34,6 +37,23 @@ def _regular(path: Path, directory: bool = False) -> bool:
             return False
         return stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
     except (OSError, ValueError):
+        return False
+
+
+def _ordinary_ancestry(path: Path, *, directory=False) -> bool:
+    """Reject a linked/reparse ancestor, not only a linked final component."""
+    current = Path(path).absolute()
+    first = True
+    try:
+        while True:
+            if not _regular(current, directory=(directory if first else True)):
+                return False
+            parent = current.parent
+            if parent == current:
+                return True
+            first = False
+            current = parent
+    except (OSError, ValueError, RuntimeError):
         return False
 
 
@@ -60,8 +80,8 @@ def _safe_label(label: str) -> str:
 
 def _manifest_for(path: Path) -> tuple[dict, Path]:
     path = Path(path)
-    if not _regular(path):
-        raise ValueError("Choose an ordinary Resurrection Kit manifest file.")
+    if not _ordinary_ancestry(path):
+        raise ValueError("Choose a manifest without linked or redirected parent folders.")
     if path.stat().st_size > MAX_MANIFEST_BYTES:
         raise ValueError("Resurrection Kit manifest exceeds size limit.")
     try:
@@ -76,8 +96,8 @@ def _manifest_for(path: Path) -> tuple[dict, Path]:
             or not _relative_name(archive_name) or "/" in archive_name):
         raise ValueError("The backup ZIP filename is invalid.")
     archive = path.parent / archive_name
-    if not _regular(archive):
-        raise ValueError("The backup ZIP is missing, linked or not an ordinary file.")
+    if not _ordinary_ancestry(archive):
+        raise ValueError("The backup ZIP is missing, linked or under an unsafe folder.")
     checksum = manifest.get("archive_sha256", "")
     if (not isinstance(checksum, str) or
             re.fullmatch(r"[0-9a-fA-F]{64}", checksum) is None):
@@ -164,8 +184,8 @@ def inspect_restore(manifest_path: Path, parent: Path | None = None) -> dict:
     }
     if parent is not None:
         parent = Path(parent)
-        if not _regular(parent, directory=True):
-            raise ValueError("Choose an existing, ordinary restore parent directory.")
+        if not _ordinary_ancestry(parent, directory=True):
+            raise ValueError("Choose a restore parent without linked or redirected folders.")
         target = parent / (_safe_label(outcome["game"]) + "_Restored")
         if target.exists() or target.is_symlink():
             raise FileExistsError("A restored folder with that name already exists. Choose another parent folder.")
@@ -177,8 +197,8 @@ def inspect_restore(manifest_path: Path, parent: Path | None = None) -> dict:
 
 def _safe_tree(source: Path, dest_zip: Path):
     """Bounded preflight; never follow symlink/reparse directories or files."""
-    if not _regular(source, directory=True):
-        raise ValueError("Choose existing ordinary save/mod folders, not links or junctions.")
+    if not _ordinary_ancestry(source, directory=True):
+        raise ValueError("Choose source folders without links or redirected ancestors.")
     source = source.resolve(strict=True)
     if source == Path(source.anchor) or source == Path.home().resolve():
         raise ValueError("A drive root or entire home folder cannot be preserved as a kit source.")
@@ -208,15 +228,13 @@ def _safe_tree(source: Path, dest_zip: Path):
 
 
 def _publish_no_replace(temporary: Path, destination: Path) -> None:
-    """Reserve destination exclusively before replacing *our own* placeholder."""
-    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0)
-    fd = os.open(destination, flags, 0o600)
-    os.close(fd)
-    try:
-        temporary.replace(destination)
-    except BaseException:
-        destination.unlink(missing_ok=True)
-        raise
+    """Publish with an atomic no-overwrite hardlink, not replace-over-a-placeholder.
+
+    This works on local NTFS and POSIX filesystems. On unsupported filesystems
+    publishing fails closed instead of risking a time-of-check/use overwrite.
+    """
+    os.link(temporary, destination)
+    temporary.unlink()
 
 
 def _portable_manager_context(metadata: dict | None, roles) -> dict | None:
@@ -260,8 +278,8 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path,
     if any(p.exists() or p.is_symlink() for p in
            (destination, sidecar, partial, partial_manifest)):
         raise FileExistsError("Kit output already exists; choose a new ZIP name.")
-    if not _regular(destination.parent, directory=True):
-        raise ValueError("Choose a local, ordinary destination directory.")
+    if not _ordinary_ancestry(destination.parent, directory=True):
+        raise ValueError("Choose a local destination without linked or redirected folders.")
     captured = {}
     folders = []
     for role, raw in sources.items():
@@ -323,9 +341,10 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path,
         try:
             _publish_no_replace(partial_manifest, sidecar)
         except BaseException:
-            # Remove only the ZIP created by this attempt; never touch source files.
-            destination.unlink(missing_ok=True)
-            raise
+            # Keep the already-published ZIP for manual inspection. Another
+            # process could have changed the name, so never delete it blindly.
+            raise RuntimeError("Kit ZIP was created, but the manifest could not be "
+                               "published. Review the incomplete output manually.")
         return {"archive": str(destination), "manifest": str(sidecar),
                 "verified": True, "files": count, "bytes": total,
                 "roles": [item["name"] for item in manifest["roles"]]}
