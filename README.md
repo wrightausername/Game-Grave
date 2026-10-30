@@ -37,6 +37,37 @@ the selected source reliably. Direct one-click modlist redeployment, automatic
 game installation and cloud synchronization are still **not implemented**.
 The Windows preview is not cleared for use as someone's sole save backup.
 
+## Resurrection Kits: discover a setup and reconnect MO2 (development preview)
+
+After **Scan PC**, select **Game DNA → Find my setup for a Resurrection Kit**,
+or **Save Vault → Find my setup automatically**. Select an installed game,
+review the per-category recommendations, choose the save/profile/mod folders
+to include, and approve the kit destination. A detected MO2 profile and its
+mods are associated only through exact installed-game and MO2 instance paths.
+Vortex staged-mod suggestions require matching game-install evidence from a
+Vortex saved JSON snapshot. Unknown files remain unknown and protected.
+The kit is a ZIP plus an adjacent \`*.ggkit.json\` checksum manifest; keep
+both files together.
+
+**Clean MO2 reinstall:** Once the game and MO2 are installed again, scan the PC
+and open **Save Vault → Reconnect verified MO2 kit**. Choose the kit manifest,
+then review the exact installed-game match, new MO2 profile name and mod
+folder destinations. Close MO2 and approve. The program restores **only
+missing mod folders** plus a **new profile named \`<Original>_GameGrave\`**,
+never merges into existing mods or overwrites any game data. Select the
+new profile inside MO2 afterwards. Missing enabled mod folders, a changed
+plan, incorrect instance, any existing mod-folder conflict or a running
+MO2 instance stops the operation. Other kit roles (including saves) remain
+in the portable kit for **Preview / Restore Kit** into a separate recovery
+directory, not guessed placement into live save directories.
+
+**Vortex:** Automatic active profile restoration is **not supported**.
+Its internal live database is not edited. Save and recovered mod folders
+are available through the verified kit and safe staged restore. This is a
+tested engineering foundation, not a commercial one-click modpack recovery
+guarantee; native Windows tests with real MO2/Vortex and installed games
+are mandatory before production use.
+
 ## What's implemented
 
 | Area | Behavior |

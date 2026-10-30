@@ -29,6 +29,8 @@ from game_intelligence import (build_game_dna, capture_mod_observation, load_obs
                                patch_fallout, regret_calculator, exodus_plan)
 from resurrection_kit import create_resurrection_kit
 from resurrection_v2 import create_complete_kit, inspect_restore, restore_kit
+from kit_discovery import discover_setup, select_sources
+from mo2_reconnect import preview_mo2_reconnect, reconnect_to_mo2
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from space_planner import plan_for_drive
 from launchers import LauncherGame, find_launcher_games
@@ -360,6 +362,7 @@ class GameGraveApp(tk.Tk):
         self.button(row, "Capture / compare changes", self._capture_intelligence, primary=True).pack(side="left")
         self.button(row, "Exodus checklist", self._preview_exodus).pack(side="left", padx=9)
         self.button(row, "Inspect manager profiles", self._inspect_manager_profiles).pack(side="left", padx=9)
+        self.button(controls, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(anchor="w", pady=(8, 0))
         previous = load_observation()
         if previous:
             self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
@@ -2033,6 +2036,10 @@ class GameGraveApp(tk.Tk):
         self.button(bottom, "Back up another folder", self._choose_save_backup).pack(side="left", padx=10)
         self.button(bottom, "Preserve setup (Kit)", self._make_resurrection_kit).pack(side="left", padx=10)
         self.button(bottom, "Preview / Restore Kit", self._preview_resurrection_kit).pack(side="left", padx=10)
+        helper = tk.Frame(self.content, bg=BG)
+        helper.pack(fill="x", pady=(5, 0))
+        self.button(helper, "Find my setup automatically", self._start_auto_kit).pack(side="left")
+        self.button(helper, "Reconnect verified MO2 kit", self._begin_mo2_reconnect).pack(side="left", padx=10)
         self.text(self.content, "Nothing is deleted from Save Vault. Save profiles and known save folders remain "
                   "excluded from bulk cleanup, even when marked for manual review. "
                   "Close the game before making a backup.", 9, WARN, wraplength=830).pack(anchor="w", pady=(10, 0))
@@ -2135,6 +2142,197 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("backup_result", result))
             except (OSError, ValueError, RuntimeError, InterruptedError, zipfile.BadZipFile) as exc:
                 self.events.put(("backup_error", str(exc)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _start_auto_kit(self):
+        """Small setup picker; no scan or source writes happen before user approval."""
+        games = list(self.games) + list(self.other_games)
+        if not games:
+            messagebox.showinfo("Scan PC first",
+                "Run Scan PC to identify installed games and associated mod folders.")
+            return
+        if getattr(self, "_kit_dialog", None) is not None:
+            try:
+                if self._kit_dialog.winfo_exists():
+                    self._kit_dialog.destroy()
+            except tk.TclError:
+                pass
+        window = tk.Toplevel(self)
+        self._kit_dialog = window
+        window.title("Resurrection Kit · Discover my setup")
+        window.geometry("900x640")
+        window.minsize(650, 460)
+        window.configure(bg=BG)
+        window.transient(self)
+        frame = tk.Frame(window, bg=BG, padx=18, pady=15)
+        frame.pack(fill="both", expand=True)
+        self.text(frame, "Build a Resurrection Kit", 18, bold=True).pack(anchor="w")
+        self.text(frame, "Choose one installed game. Game Grave will suggest files with evidence, "
+                  "then you approve exactly what goes into the kit.",
+                  10, MUTED, wraplength=810).pack(anchor="w", pady=(4, 10))
+        labels = [f"{g.name}  [{getattr(g, 'launcher', 'Steam')}]  {g.install_path}"
+                  for g in games]
+        selected = tk.StringVar(value=labels[0])
+        combo = ttk.Combobox(frame, textvariable=selected, values=labels,
+                             state="readonly", width=100, style="Dark.TCombobox")
+        combo.pack(fill="x", pady=(0, 10))
+        self._kit_result_frame = tk.Frame(frame, bg=BG)
+        self._kit_result_frame.pack(fill="both", expand=True)
+        def on_discover():
+            index = combo.current()
+            if index < 0:
+                return
+            game = games[index]
+            self._kit_target_game = game
+            self.status_text.set("Discovering saves and mod-manager folders for " + game.name)
+            def worker():
+                try:
+                    report = inspect_manager_profiles(
+                        list(self.mod_folders), list(self.games), list(self.other_games))
+                    data = discover_setup(game, mods=list(self.mod_folders),
+                                          saves=list(self.save_findings),
+                                          manager_report=report)
+                    self.events.put(("kit_discovery_result", (game.name, data)))
+                except (OSError, ValueError, RuntimeError) as exc:
+                    self.events.put(("kit_error", str(exc)))
+            threading.Thread(target=worker, daemon=True).start()
+        self.button(frame, "Find recommended folders", on_discover, primary=True).pack(
+            anchor="w", pady=(8, 0))
+
+    def _show_kit_discovery(self, game_name, data):
+        window = getattr(self, "_kit_dialog", None)
+        if window is None or not window.winfo_exists():
+            return
+        body = self._kit_result_frame
+        for child in body.winfo_children():
+            child.destroy()
+        rows = data["candidates"]
+        self.text(body, f"{len(rows)} possible setup folders found for {game_name}. "
+                  "Nothing is selected without review.", 11, bold=True).pack(
+            anchor="w", pady=(0, 4))
+        self._kit_role_vars = {}
+        if not rows:
+            self.text(body, "No verified setup folders found. Try adding custom mod roots "
+                      "in Game Mods, or use Preserve setup (Kit) to pick folders manually.",
+                      10, WARN, wraplength=790).pack(anchor="w")
+            return
+        canvas = tk.Canvas(body, bg=BG, highlightthickness=0)
+        bar = ttk.Scrollbar(body, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=bar.set)
+        bar.pack(side="right", fill="y")
+        canvas.pack(side="top", fill="both", expand=True)
+        inner = tk.Frame(canvas, bg=BG)
+        key = canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>", lambda _evt: canvas.configure(
+            scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda evt: canvas.itemconfigure(key, width=evt.width))
+        for role, group in data["groups"].items():
+            if not group:
+                continue
+            self.text(inner, role + " · choose at most one", 12, bold=True).pack(
+                anchor="w", pady=(9, 3))
+            var = tk.StringVar(value="")
+            self._kit_role_vars[role] = var
+            tk.Radiobutton(inner, text="Do not include this type", variable=var,
+                           value="", bg=BG, fg=MUTED, selectcolor=PANEL,
+                           activebackground=BG, activeforeground=TEXT).pack(anchor="w")
+            for j, candidate in enumerate(group):
+                if j == 0 and candidate["default"]:
+                    var.set(candidate["path"])
+                label = f"{candidate['path']}\n   {candidate['evidence']}"
+                tk.Radiobutton(inner, text=label, variable=var,
+                               value=candidate["path"], anchor="w", justify="left",
+                               wraplength=760, bg=BG, fg=TEXT, selectcolor=PANEL,
+                               activebackground=BG, activeforeground=TEXT).pack(
+                    anchor="w", pady=2)
+        def preserve():
+            selected = [c for c in rows if self._kit_role_vars.get(c["role"])
+                        and self._kit_role_vars[c["role"]].get() == c["path"]]
+            try:
+                sources, hints = select_sources(data, selected)
+            except (ValueError, OSError) as exc:
+                messagebox.showwarning("Review sources", str(exc), parent=window)
+                return
+            destination = filedialog.asksaveasfilename(
+                parent=window, title="Save verified Resurrection Kit ZIP",
+                defaultextension=".zip", filetypes=[("ZIP archive", "*.zip")],
+                initialfile=game_name.replace("/", "_").replace("\\", "_") + "_Resurrection.zip")
+            if not destination:
+                return
+            path_lines = "\n".join(f"• {role}: {path}" for role, path in sources.items())
+            if not messagebox.askyesno("Approve these kit sources?",
+                    f"Game: {game_name}\n\n{path_lines}\n\n"
+                    f"Kit: {destination}\n\nClose the game and mod manager first. "
+                    "Game Grave preserves only the listed locations. "
+                    "Missing dependencies are not silently included. Continue?",
+                    parent=window):
+                return
+            window.destroy()
+            self.status_text.set("Preserving selected setup folders…")
+            def worker():
+                try:
+                    result = create_complete_kit(game_name, sources, Path(destination),
+                                                 manager_context=hints)
+                    self.events.put(("kit_result", result))
+                except (OSError, ValueError, RuntimeError, InterruptedError,
+                        zipfile.BadZipFile) as exc:
+                    self.events.put(("kit_error", str(exc)))
+            threading.Thread(target=worker, daemon=True).start()
+        self.button(body, "Create verified kit from selected folders", preserve,
+                    primary=True).pack(anchor="w", pady=(6, 0))
+
+    def _begin_mo2_reconnect(self):
+        """No guessed instance location, no manager-state edits, no overwrite."""
+        known = {}
+        for mod in self.mod_folders:
+            if getattr(mod, "source", "") != "Mod Organizer 2":
+                continue
+            for indicator in getattr(mod, "indicators", ()):
+                if isinstance(indicator, str) and indicator.startswith("MO2 INI: "):
+                    known[indicator[9:]] = True
+        if not known:
+            messagebox.showinfo("MO2 not found",
+                "Scan PC first and add your MO2 instance in Game Mods if needed. "
+                "Direct MO2 restoration is unavailable without a recognized instance. "
+                "Preview / Restore Kit still recovers into a safe separate folder.")
+            return
+        manifest = filedialog.askopenfilename(
+            title="Select MO2 Resurrection Kit manifest",
+            filetypes=[("Game Grave kit", "*.ggkit.json"), ("JSON file", "*.json")])
+        if not manifest:
+            return
+        roots = sorted(known)
+        if len(roots) == 1:
+            ini = roots[0]
+        else:
+            options = "\n".join(f"{i+1}. {path}" for i, path in enumerate(roots[:20]))
+            selected = simpledialog.askinteger("Choose MO2 instance",
+                "Choose the MO2 instance number:\n\n" + options, parent=self,
+                minvalue=1, maxvalue=min(20, len(roots)))
+            if selected is None:
+                return
+            ini = roots[selected-1]
+        games, other_games = list(self.games), list(self.other_games)
+        self.status_text.set("Checking MO2 profile, file conflicts, disk space and kit integrity…")
+        def worker():
+            try:
+                plan = preview_mo2_reconnect(
+                    Path(manifest), Path(ini), games, other_games)
+                self.events.put(("mo2_reconnect_preview", (manifest, ini, plan)))
+            except (OSError, ValueError, RuntimeError, FileExistsError, zipfile.BadZipFile) as exc:
+                self.events.put(("mo2_reconnect_error", str(exc)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_mo2_reconnect(self, manifest, ini, plan):
+        games, other_games = list(self.games), list(self.other_games)
+        self.status_text.set("Reconnecting verified mod and profile folders into MO2…")
+        def worker():
+            try:
+                result = reconnect_to_mo2(Path(manifest), Path(ini), games, other_games,
+                    approved=True, expected_fingerprint=plan["fingerprint"])
+                self.events.put(("mo2_reconnect_result", result))
+            except (OSError, ValueError, RuntimeError, FileExistsError) as exc:
+                self.events.put(("mo2_reconnect_error", str(exc)))
         threading.Thread(target=worker, daemon=True).start()
 
     def _make_resurrection_kit(self):
@@ -2665,6 +2863,39 @@ class GameGraveApp(tk.Tk):
                 elif name == "intelligence_error":
                     self.status_text.set("Game intelligence inspection incomplete.")
                     messagebox.showwarning("Game DNA inspection incomplete", payload)
+                elif name == "kit_discovery_result":
+                    name, discovery = payload
+                    self.status_text.set("Setup discovery finished. Review suggested sources.")
+                    self._show_kit_discovery(name, discovery)
+                elif name == "mo2_reconnect_preview":
+                    manifest, ini, plan = payload
+                    self.status_text.set("MO2 restore preview verified. Approval required.")
+                    if messagebox.askyesno("Approve MO2 profile reconstruction?",
+                            f"Installed game: {plan['game']}\n"
+                            f"Create new profile: {plan['profile_target']}\n"
+                            f"Add {plan['mods_count']} missing mod folder(s) into:\n"
+                            f"{plan['mod_root']}\n\n"
+                            f"Files: {plan['files']} · size: {human_size(plan['bytes'])}\n\n"
+                            "Close MO2 first. Existing folders and game files will not "
+                            "be merged, replaced or deleted.\n\n"
+                            f"Other roles not reconnected: {', '.join(plan['not_reconnected_roles']) or 'none'}\n"
+                            "Save/config folders remain available in the verified kit for "
+                            "separate safe recovery.\n\n"
+                            "Afterwards, select the new GameGrave profile in MO2.\n\n"
+                            "Create the new profile and mod folders?"):
+                        self._apply_mo2_reconnect(manifest, ini, plan)
+                elif name == "mo2_reconnect_result":
+                    self.status_text.set("MO2 kit reconnected as a new profile")
+                    log_event("MO2 Resurrection Kit reconnected", payload["profile"])
+                    messagebox.showinfo("MO2 profile recreated",
+                        f"New profile:\n{payload['profile']}\n\n"
+                        f"{payload['added_mod_folders']} mod folders restored. "
+                        "Open MO2 and select the restored profile. "
+                        f"Kit roles not reconnected: {', '.join(payload['not_reconnected_roles']) or 'none'}. "
+                        "Game Grave did not overwrite an existing setup.")
+                elif name == "mo2_reconnect_error":
+                    self.status_text.set("MO2 restore not completed; existing setup protected.")
+                    messagebox.showwarning("MO2 restore stopped safely", payload)
                 elif name == "kit_result":
                     self.status_text.set("Resurrection Kit saved and verified")
                     log_event("Resurrection Kit created", payload["archive"])
