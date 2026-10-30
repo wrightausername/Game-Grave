@@ -14,15 +14,17 @@ python -m PyInstaller --noconfirm --clean --onedir --windowed `
     launcher.py
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller build failed' }
 
-$paths = @(
-    $env:ISCC_PATH,
-    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-    "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-) | Where-Object { $_ -and (Test-Path $_) }
-if (-not $paths) {
+$compilerCandidates = @(
+    $env:ISCC_PATH
+    (Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6\ISCC.exe')
+    (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
+)
+$iscc = $compilerCandidates | Where-Object { $_ -and (Test-Path $_) } |
+    Select-Object -First 1
+if (-not $iscc) {
     throw 'Inno Setup 6 is required. Install it from https://jrsoftware.org/isinfo.php and rerun this script.'
 }
-& $paths[0] 'installer\GameGrave.iss'
+& $iscc 'installer\GameGrave.iss'
 if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
 # Read the exact version embedded in the Inno Setup definition. Do not
 # assume a hardcoded old filename and incorrectly report successful builds as failed.
