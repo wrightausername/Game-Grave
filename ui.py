@@ -41,6 +41,7 @@ from resurrection_visuals import resurrection_guide
 from ui_shortcuts import PAGE_SHORTCUTS, shortcut_help_text
 from ui_viewport import initial_window_bounds
 from ui_scroll import page_wheel_allowed
+from ui_paging import page_window
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from mod_radar_audit import audit_mod_radar, private_audit_summary
@@ -146,6 +147,8 @@ class GameGraveApp(tk.Tk):
         self.grave_checked: set[str] = set()
         self.file_lookup: dict[str, OldFile] = {}
         self.game_lookup: dict[str, SteamGame] = {}
+        self._pager_indices = {}
+        self._pager_controls = {}
         self.active = "Overview"
         self.scanning = False
         self.last_scan: str | None = None
@@ -455,6 +458,36 @@ class GameGraveApp(tk.Tk):
                   "Automatic cleanup is OFF by default. Every deletion needs your approval.",
                   10, MUTED, wraplength=810).pack(anchor="w")
 
+    def _add_page_controls(self, key, render):
+        """Draw only a bounded slice of each inventory, never truncate stored findings."""
+        self._pager_indices[key] = 0
+        strip = tk.Frame(self.content, bg=BG)
+        strip.pack(fill="x", pady=(5, 0))
+        prior = self.button(strip, "◀ Previous",
+                            lambda: self._change_inventory_page(key, -1, render))
+        prior.pack(side="left")
+        label = tk.StringVar(value="Loading findings…")
+        self.text(strip, "", 9, MUTED, textvariable=label).pack(side="left", padx=10)
+        following = self.button(strip, "Next ▶",
+                                lambda: self._change_inventory_page(key, 1, render))
+        following.pack(side="left")
+        self._pager_controls[key] = (prior, following, label)
+
+    def _change_inventory_page(self, key, direction, render):
+        self._pager_indices[key] = max(0, self._pager_indices.get(key, 0) + direction)
+        render()
+
+    def _reset_inventory_page(self, key, render):
+        self._pager_indices[key] = 0
+        render()
+
+    def _update_inventory_page(self, key, page):
+        self._pager_indices[key] = page.page
+        prior, following, label = self._pager_controls[key]
+        prior.configure(state="normal" if page.page > 0 else "disabled")
+        following.configure(state="normal" if page.page + 1 < page.pages else "disabled")
+        label.set(page.label)
+
     def _tree(self, parent, columns, headings, widths):
         holder = tk.Frame(parent, bg=PANEL)
         holder.pack(fill="both", expand=True)
@@ -745,21 +778,23 @@ class GameGraveApp(tk.Tk):
         search = tk.Entry(controls, textvariable=self.game_search, bg=PANEL, fg=TEXT,
                           insertbackground=TEXT, relief="flat", font=("Segoe UI", 11), width=33)
         search.pack(side="left", ipady=9, padx=(0, 14))
-        self.game_search.trace_add("write", lambda *_: self._populate_games())
+        self.game_search.trace_add("write", lambda *_: self._reset_inventory_page("games", self._populate_games))
         self.only_old = tk.BooleanVar(value=False)
         self.game_old_check = ttk.Checkbutton(controls, text=f"Only {self.settings['game_stale_days']}+ days",
                                 variable=self.only_old, style="Dark.TCheckbutton",
-                                command=self._populate_games)
+                                command=lambda: self._reset_inventory_page("games", self._populate_games))
         self.game_old_check.pack(side="left")
-        self.text(controls, "Threshold (days):", 9, MUTED).pack(side="left", padx=(22, 9))
+        secondary_filters = tk.Frame(self.content, bg=BG)
+        secondary_filters.pack(fill="x", pady=(0, 10))
+        self.text(secondary_filters, "Threshold (days):", 9, MUTED).pack(side="left", padx=(0, 9))
         self.game_days_var = tk.StringVar(value=str(self.settings["game_stale_days"]))
-        days = ttk.Combobox(controls, textvariable=self.game_days_var, values=tuple(map(str, GAME_AGE_OPTIONS)),
+        days = ttk.Combobox(secondary_filters, textvariable=self.game_days_var, values=tuple(map(str, GAME_AGE_OPTIONS)),
                             state="readonly", style="Dark.TCombobox", width=5)
         days.pack(side="left")
         days.bind("<<ComboboxSelected>>", self._change_game_days)
-        self.text(controls, "Sort", 9, MUTED).pack(side="left", padx=(15, 6))
+        self.text(secondary_filters, "Sort", 9, MUTED).pack(side="left", padx=(15, 6))
         self.game_sort_var = tk.StringVar(value=self.settings.get("game_sort", "Oldest first"))
-        game_sort = ttk.Combobox(controls, textvariable=self.game_sort_var,
+        game_sort = ttk.Combobox(secondary_filters, textvariable=self.game_sort_var,
                                  values=GAMES_SORT_OPTIONS, state="readonly", style="Dark.TCombobox", width=15)
         game_sort.pack(side="left")
         game_sort.bind("<<ComboboxSelected>>", lambda _e: self._set_view_sort("game_sort", self.game_sort_var, self._populate_games))
@@ -775,13 +810,16 @@ class GameGraveApp(tk.Tk):
                                       ("source", "Date source A-Z", "Date source Z-A")):
             self.game_tree.heading(column, command=lambda a=first, b=second:
                                    self._game_column_sort(a, b))
+        self._add_page_controls("games", self._populate_games)
         self._populate_games()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(14, 0))
         self.button(actions, "Uninstall selected via Steam", self._uninstall_game, primary=True).pack(side="left")
         self.button(actions, "Open installation folder", self._open_game_folder).pack(side="left", padx=12)
-        self.button(actions, "Clear shader cache…", self._clear_game_shader_cache).pack(side="left", padx=(0, 8))
-        self.button(actions, "Add Steam library", self._add_steam_library).pack(side="right")
+        more_actions = tk.Frame(self.content, bg=BG)
+        more_actions.pack(fill="x", pady=(5, 0))
+        self.button(more_actions, "Clear shader cache…", self._clear_game_shader_cache).pack(side="left")
+        self.button(more_actions, "Add Steam library", self._add_steam_library).pack(side="left", padx=12)
         self.text(self.content,
                   "Unknown means local records don't confirm the last play date. Installation timestamps are NOT used to guess playtime.",
                   9, MUTED, wraplength=840).pack(anchor="w", pady=(16, 0))
@@ -795,7 +833,7 @@ class GameGraveApp(tk.Tk):
         self.settings["game_stale_days"] = int(self.game_days_var.get())
         save_settings(self.settings)
         self.game_old_check.configure(text=f"Only {self.settings['game_stale_days']}+ days")
-        self._populate_games()
+        self._reset_inventory_page("games", self._populate_games)
 
     def _populate_games(self):
         if not hasattr(self, "game_tree") or not self.game_tree.winfo_exists():
@@ -803,16 +841,16 @@ class GameGraveApp(tk.Tk):
         self.game_tree.delete(*self.game_tree.get_children())
         self.game_lookup = {}
         query = self.game_search.get().strip().lower()
-        displayed = sort_games(self.games, self.game_sort_var.get())
-        for game in displayed:
-            if query and query not in game.name.lower():
-                continue
-            if self.only_old.get() and not is_game_neglected(game, self.settings["game_stale_days"]):
-                continue
+        visible = [g for g in sort_games(self.games, self.game_sort_var.get())
+                   if (not query or query in g.name.lower()) and
+                   (not self.only_old.get() or is_game_neglected(g, self.settings["game_stale_days"]))]
+        page = page_window(visible, self._pager_indices.get("games", 0))
+        for game in page.items:
             self.game_tree.insert("", "end", iid=game.app_id,
                                   values=(game.name, age_text(game.last_played),
                                           human_size(game.size) if game.size else "Unknown", game.source))
             self.game_lookup[game.app_id] = game
+        self._update_inventory_page("games", page)
 
     def _selected_game(self):
         if not hasattr(self, "game_tree") or not self.game_tree.winfo_exists():
@@ -946,17 +984,28 @@ class GameGraveApp(tk.Tk):
         self.other_sort_reverse = getattr(self, "other_sort_reverse", False)
         for column in ("game", "launcher", "reported", "status"):
             self.other_tree.heading(column, command=lambda c=column: self._sort_other_launchers(c))
-        ordered = self._ordered_other_games()
-        for idx, g in enumerate(ordered):
-            key = str(idx)
-            self.other_lookup[key] = g
-            self.other_tree.insert("", "end", iid=key, values=(g.name, g.launcher,
-                                   human_size(g.reported_bytes) if g.reported_bytes is not None else "Not reported", g.status))
+        self._add_page_controls("other", self._populate_other_launchers)
+        self._populate_other_launchers()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(12, 0))
         self.button(actions, "Open selected folder", self._open_other_game, primary=True).pack(side="left")
         self.button(actions, "Add a game library folder", self._add_other_library).pack(side="left", padx=10)
         self.button(actions, "Manage library folders", self._manage_other_libraries).pack(side="left")
+
+    def _populate_other_launchers(self):
+        if not hasattr(self, "other_tree") or not self.other_tree.winfo_exists():
+            return
+        self.other_tree.delete(*self.other_tree.get_children())
+        self.other_lookup = {}
+        page = page_window(self._ordered_other_games(), self._pager_indices.get("other", 0))
+        for offset, game in enumerate(page.items):
+            key = str(page.start + offset)
+            self.other_lookup[key] = game
+            self.other_tree.insert("", "end", iid=key, values=(
+                game.name, game.launcher,
+                human_size(game.reported_bytes) if game.reported_bytes is not None else "Not reported",
+                game.status))
+        self._update_inventory_page("other", page)
 
     def _ordered_other_games(self):
         column = getattr(self, "other_sort_column", "game")
@@ -1039,9 +1088,9 @@ class GameGraveApp(tk.Tk):
         pick = ttk.Combobox(selector, textvariable=self.mod_filter, state="readonly", style="Dark.TCombobox",
                             values=("All sources", *sorted({row.source for row in self.mod_folders})), width=20)
         pick.pack(side="left")
-        pick.bind("<<ComboboxSelected>>", lambda *_: self._populate_mods())
+        pick.bind("<<ComboboxSelected>>", lambda *_: self._reset_inventory_page("mods", self._populate_mods))
         self.mod_search = tk.StringVar()
-        self.mod_search.trace_add("write", lambda *_: self._populate_mods())
+        self.mod_search.trace_add("write", lambda *_: self._reset_inventory_page("mods", self._populate_mods))
         tk.Entry(selector, textvariable=self.mod_search, bg=PANEL, fg=TEXT, insertbackground=TEXT,
                  relief="flat", font=("Segoe UI", 10), width=28).pack(side="left", padx=(12, 0), ipady=7)
         self.text(selector, "Sort", 9, MUTED).pack(side="left", padx=(12, 5))
@@ -1057,6 +1106,7 @@ class GameGraveApp(tk.Tk):
                                    (220, 155, 233, 75, 110))
         self.mod_tree.configure(height=7)
         self.mod_tree.bind("<<TreeviewSelect>>", self._show_mod_details)
+        self._add_page_controls("mods", self._populate_mods)
         self._populate_mods()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(10, 0))
@@ -1082,17 +1132,19 @@ class GameGraveApp(tk.Tk):
         self.mod_lookup = {}
         view = self.mod_filter.get()
         query = self.mod_search.get().strip().casefold()
-        for i, folder in enumerate(sort_mods(self.mod_folders, self.mod_sort_var.get())):
-            if view != "All sources" and view != folder.source:
-                continue
-            if query and query not in (folder.name + " " + folder.path + " " + folder.status + " " + folder.source).casefold():
-                continue
-            key = str(i)
+        visible = [folder for folder in sort_mods(self.mod_folders, self.mod_sort_var.get())
+                   if (view == "All sources" or view == folder.source) and
+                   (not query or query in (folder.name + " " + folder.path + " " +
+                                           folder.status + " " + folder.source).casefold())]
+        page = page_window(visible, self._pager_indices.get("mods", 0))
+        for i, folder in enumerate(page.items):
+            key = str(page.start + i)
             items = str(folder.item_count) if folder.item_count else "—"
             self.mod_tree.insert("", "end", iid=key,
                                  values=(folder.name, folder.source, folder.status, items,
                                          human_size(folder.apparent_bytes) + ("+" if folder.truncated else "")))
             self.mod_lookup[key] = folder
+        self._update_inventory_page("mods", page)
 
     def _current_mod_folder(self):
         if not hasattr(self, "mod_tree") or not self.mod_tree.winfo_exists():
@@ -1716,13 +1768,14 @@ class GameGraveApp(tk.Tk):
         file_sort = ttk.Combobox(sort_bar, textvariable=self.files_sort_var, values=FILES_SORT_OPTIONS,
                                  state="readonly", style="Dark.TCombobox", width=18)
         file_sort.pack(side="left", padx=(9, 0))
-        file_sort.bind("<<ComboboxSelected>>", lambda _e: self._set_view_sort("files_sort", self.files_sort_var, self._populate_old_files))
+        file_sort.bind("<<ComboboxSelected>>", lambda _e: self._set_view_sort("files_sort", self.files_sort_var, self._populate_files))
         p = self.panel(pad=10)
         p.pack(fill="both", expand=True)
         self.file_tree = self._tree(p, ("file", "age", "size", "location"),
                                     ("FILENAME", "LAST MODIFIED", "SIZE", "LOCATION"),
                                     (235, 140, 115, 300))
         self.file_tree.tag_configure("protected", foreground=WARN)
+        self._add_page_controls("files", self._populate_files)
         self._populate_files()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(14, 0))
@@ -1745,8 +1798,10 @@ class GameGraveApp(tk.Tk):
             return
         self.file_tree.delete(*self.file_tree.get_children())
         self.file_lookup = {}
-        for index, item in enumerate(sort_files(self.old_files, self.files_sort_var.get())):
-            iid = str(index)
+        page = page_window(sort_files(self.old_files, self.files_sort_var.get()),
+                           self._pager_indices.get("files", 0))
+        for index, item in enumerate(page.items):
+            iid = str(page.start + index)
             path = Path(item.path)
             protected = is_protected_path(path, self.settings.get("never_touch", []))
             self.file_tree.insert("", "end", iid=iid,
@@ -1754,6 +1809,7 @@ class GameGraveApp(tk.Tk):
                                           age_text(item.modified), human_size(item.size), str(path.parent)),
                                   tags=("protected",) if protected else ())
             self.file_lookup[iid] = item
+        self._update_inventory_page("files", page)
 
     def _change_folder(self):
         folder = filedialog.askdirectory(title="Choose folder to scan for old files", initialdir=self.settings["scan_folder"])

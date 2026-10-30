@@ -234,3 +234,7 @@ Game Grave now opens within a conservative primary-screen viewport, rather than 
 Press **F1** to open the keyboard guide, or go to **Settings → Keyboard guide (F1)**. Press **Ctrl+1 through Ctrl+7** to switch between Overview, Game DNA, Game Mods, The Graveyard, Save Vault, Resurrection Lab and Undo Center. Press **F5** for the same read-only Scan PC action as the toolbar, and **Escape** to request cancellation while a scan is running. **No keyboard shortcut authorizes cleanup, deletes files or bypasses a confirmation dialog.**
 
 See [M4 Windows QA](M4_WINDOWS_QA.md) for the required keyboard-only, scaling, color-contrast, Windows Narrator/NVDA and small-monitor checks. Programmatic window fitting is not a claim of complete screen-reader support or that every control is accessible on every screen size.
+
+### M4 large libraries: bounded table rendering
+
+Steam Games, Other Launchers, Game Mods and Old Files use keyboard-focusable **Previous / Next** controls instead of attempting to create thousands of Windows table rows at once. Up to 160 findings appear per page; the label shows your current position and the full count, and **no scan results are discarded**. Search/filter/sort still apply across the entire discovered list. Old Files **Select all shown** selects the *visible page*, and every actual Recycle Bin request still requires normal per-file checks and explicit user confirmation. Steam controls are split into more compact rows to suit smaller displays. The Graveyard's existing safety controls are unchanged.

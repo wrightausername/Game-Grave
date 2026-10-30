@@ -30,3 +30,11 @@ Automated tests exercise cancellation between every scan stage, late `scan_compl
 ## Scroll and compact-control verification
 
 On 1280×720, 1366×768 and 1920×1080 at 100%, 125%, 150% and 200% scaling, verify the page scrollbar reaches the last action on every page, including Settings tabs, Game DNA, The Graveyard, Save Vault and Resurrection Lab. The mouse wheel over a page panel must scroll the outer page; over a Treeview it must scroll the **table**, without losing selection. Check page navigation resets outer scroll to top, keyboard focus remains visible and the Game DNA action buttons no longer clip on laptop-sized windows. The new scroll container is not proof of universal screen reader support. A UI automation test cannot substitute for interactive Win10/Win11 scaling verification.
+
+## Large inventory rendering and pager accessibility
+
+Use a wholly **synthetic** test library with at least 10,000 game-like records, 30,000 mod-root entries and 50,000 disposable old-file records. Confirm Steam Games, Other Launchers, Game Mods and Old Files each render **no more than 160 table rows per page** while preserving the full scan inventory. The **Previous / Next** buttons and total count must remain keyboard reachable, move forward/back without skipping data, and disable appropriately on the first/last page.
+
+Search or source filtering must reset to a valid page; changing sort order must not silently remove data. Each page must preserve the correct object-to-row lookup. For **Old Files**, protection checks, confirmation and Recycle Bin preflight still apply to every selected item; **Select all shown** means the current page only. No background cleanup or deletion authorization is enabled by paging.
+
+Measure first-page rendering, filtering and page-change latency on Windows 10 and 11 with DPI 100–200%, and test F1 keyboard navigation and Narrator/NVDA announcements for the pager label. A synthetic unit test proves bounded insertion, **not** an interactive latency benchmark. Large library scans still need representative hardware timing and cancellation checks.
