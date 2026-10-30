@@ -25,6 +25,7 @@ class CoreTests(unittest.TestCase):
             (root / "steamapps/libraryfolders.vdf").write_text(
                 '"libraryfolders" { "0" { "path" "' + str(root).replace('\\', '\\\\') +
                 '" } "1" { "path" "' + str(extra).replace('\\', '\\\\') + '" } }')
+            (extra / "steamapps" / "common" / "Old Game").mkdir(parents=True)
             (extra / "steamapps/appmanifest_123.acf").write_text('''"AppState" {
                 "appid" "123" "name" "Old Game" "installdir" "Old Game"
                 "SizeOnDisk" "1073741824" "StateFlags" "4" }''')
