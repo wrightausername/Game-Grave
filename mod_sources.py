@@ -11,8 +11,8 @@ import re
 from pathlib import Path
 from typing import Callable
 
-from core import (ModFolder, SteamGame, _is_reparse_point, _measured_files,
-                  _steam_roots, read_vdf, steam_libraries)
+from core import (ModFolder, SteamGame, _is_reparse_point, _has_reparse_component,
+                  _measured_files, _steam_roots, read_vdf, steam_libraries)
 
 
 Cancel = Callable[[], bool] | None
@@ -23,7 +23,9 @@ MAX_FINDINGS = 750
 def _safe_folder(p: Path) -> bool:
     """Never inventory a disk root, system directory, symlink, or junction."""
     try:
-        if _is_reparse_point(p) or not p.is_dir():
+        # A leaf can look ordinary while its parent is a junction into an
+        # unrelated game/manager tree. Skip that root; never assume ownership.
+        if _has_reparse_component(p) or not p.is_dir():
             return False
         resolved = p.resolve()
         return (resolved != Path(resolved.anchor) and resolved != Path.home().resolve()
