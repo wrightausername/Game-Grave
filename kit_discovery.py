@@ -11,7 +11,7 @@ import os
 import stat
 
 from manager_profiles import _identity
-from resurrection_v2 import _regular
+from resurrection_v2 import _ordinary_ancestry
 
 MAX_CANDIDATES = 32
 MAX_PROFILES = 24
@@ -20,7 +20,7 @@ MAX_PROFILES = 24
 def _root_safe(path) -> bool:
     try:
         p = Path(path)
-        return (bool(str(p)) and _regular(p, directory=True)
+        return (bool(str(p)) and p.is_absolute() and _ordinary_ancestry(p, directory=True)
                 and p.resolve() not in (Path.home().resolve(), Path(p.anchor))
                 and len(p.parts) >= 2)
     except (OSError, ValueError, RuntimeError):

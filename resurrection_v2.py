@@ -180,6 +180,7 @@ def inspect_restore(manifest_path: Path, parent: Path | None = None) -> dict:
         "bytes": total,
         "schema": manifest["schema"],
         "archive": str(archive_path),
+        "archive_sha256": manifest["archive_sha256"].lower(),
         "no_overwrite": True,
     }
     if parent is not None:
@@ -296,13 +297,16 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path,
         raise ValueError("Kit exceeds 40,000 files or 80 GiB.")
     if shutil.disk_usage(destination.parent).free < total + MIN_SPACE_BUFFER:
         raise OSError("Not enough free space to create the kit safely.")
+    partial_owned = False
+    manifest_owned = False
     try:
         with zipfile.ZipFile(partial, "x", compression=zipfile.ZIP_DEFLATED,
                              compresslevel=3, allowZip64=True) as archive:
+            partial_owned = True
             for role, (_, entries) in captured.items():
                 for path, rel, size, modified in entries:
-                    if not _regular(path):
-                        raise RuntimeError(f"Source changed during backup: {path.name}")
+                    if not _ordinary_ancestry(path):
+                        raise RuntimeError(f"Source or parent changed during backup: {path.name}")
                     old = path.stat()
                     if old.st_size != size or old.st_mtime_ns != modified:
                         raise RuntimeError(f"Source changed during backup: {path.name}")
@@ -315,8 +319,8 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path,
                             raise RuntimeError(f"Source changed during backup: {path.name}")
                         with archive.open(f"{role}/{rel}", "w", force_zip64=True) as output:
                             shutil.copyfileobj(input_file, output, 1024 * 1024)
-                    if not _regular(path) or path.stat().st_mtime_ns != modified:
-                        raise RuntimeError(f"Source changed during backup: {path.name}")
+                    if not _ordinary_ancestry(path) or path.stat().st_mtime_ns != modified:
+                        raise RuntimeError(f"Source or parent changed during backup: {path.name}")
         with zipfile.ZipFile(partial) as archive:
             infos, actual_total, roles = _scan_archive(archive, 2)
             if len(infos) != count or actual_total != total or len(roles) != len(captured):
@@ -336,6 +340,7 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path,
         if manager_hint is not None:
             manifest["manager_context"] = manager_hint
         with partial_manifest.open("x", encoding="utf-8") as out:
+            manifest_owned = True
             json.dump(manifest, out, indent=2)
         _publish_no_replace(partial, destination)
         try:
@@ -349,8 +354,12 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path,
                 "verified": True, "files": count, "bytes": total,
                 "roles": [item["name"] for item in manifest["roles"]]}
     finally:
-        partial.unlink(missing_ok=True)
-        partial_manifest.unlink(missing_ok=True)
+        # Only remove outputs we actually created. An intervening file
+        # collision while opening with "x" must never delete its owner file.
+        if partial_owned and _regular(partial):
+            partial.unlink(missing_ok=True)
+        if manifest_owned and _regular(partial_manifest):
+            partial_manifest.unlink(missing_ok=True)
 
 
 def restore_kit(manifest_path: Path, parent: Path, *, approved: bool = False) -> dict:
@@ -363,24 +372,36 @@ def restore_kit(manifest_path: Path, parent: Path, *, approved: bool = False) ->
     target.mkdir(mode=0o700, exist_ok=False)
     try:
         manifest, archive_path = _manifest_for(manifest_path)
+        if (manifest["archive_sha256"].lower() != plan["archive_sha256"]
+                or str(archive_path) != plan["archive"]):
+            raise ValueError("Kit manifest or archive changed since approval preview.")
         with zipfile.ZipFile(archive_path) as archive:
             infos, _, _ = _scan_archive(archive, manifest["schema"])
             for info in infos:
                 parts = _valid_member(info, manifest["schema"])
                 destination = target.joinpath(*parts)
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                if not _regular(destination.parent, directory=True):
-                    raise RuntimeError("Restore directory changed; stopping.")
-                with archive.open(info) as source:
-                    with destination.open("xb") as output:
-                        shutil.copyfileobj(source, output, 1024 * 1024)
-                if destination.stat().st_size != info.file_size:
-                    raise RuntimeError("Restore file-size verification failed.")
+                if not _ordinary_ancestry(destination.parent, directory=True):
+                    raise RuntimeError("Restore directory or ancestor changed; stopping.")
+                flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                         getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0))
+                descriptor = os.open(destination, flags, 0o600)
+                # Own the fd before opening the ZIP member; even if ZIP
+                # decompression fails the new staging file handle is closed.
+                with os.fdopen(descriptor, "wb") as output, archive.open(info) as source:
+                    shutil.copyfileobj(source, output, 1024 * 1024)
+                if (not _ordinary_ancestry(destination) or
+                        destination.stat().st_size != info.file_size):
+                    raise RuntimeError("Restore file verification failed.")
+        # CRC validates individual ZIP members, but the original SHA-256 proves
+        # the exact reviewed backup did not mutate between preview and extraction.
+        if _sha256(archive_path).lower() != plan["archive_sha256"]:
+            raise ValueError("Resurrection Kit archive changed during restore; extracted files discarded.")
         return {"restored": True, "target": str(target), "files": plan["files"],
                 "roles": plan["roles"], "no_overwrite": True,
                 "note": "Files recovered to a new directory. Reconnect in the game/mod manager manually; no live installation was changed."}
     except BaseException:
         # Only remove this operation's new, private recovery directory on error.
-        if _regular(target, directory=True):
+        if _ordinary_ancestry(target, directory=True):
             shutil.rmtree(target)
         raise
