@@ -24,6 +24,28 @@ Center available in Free. Nothing in this intelligence layer authorizes deletion
 - **UI:** Game DNA includes an explicit **Inspect manager profiles** action, profile summaries, and per-profile recorded status details. Profile inspection is user-triggered and does not start background monitoring.
 - **Still missing:** complete native Vortex active state queries, conflict analysis, MO2 plugin dependencies and actual deployment verification. A disabled mod may still be required for another profile. Real Windows 10/11 manager fixtures and junctions need manual QA.
 
+## Resurrection Kit 2.0 (October 30, 2026)
+
+The new flow in **Save Vault** is user-controlled: select one discovered save
+location, optionally choose a separate mod/profile folder, then choose where
+to store the ZIP. The program writes the ZIP plus a versioned \`*.ggkit.json\`
+checksum manifest. Both files must stay together. A kit includes **only selected
+folders**, not the game itself or any unselected dependencies.
+
+**Preview / Restore Kit** verifies SHA-256 and ZIP checksums before asking the
+user to approve recovery. The user chooses a parent folder and the app creates
+a **new, non-overwriting** \`Game_Restored\` directory. Existing game saves,
+mod-manager staging and installed games are NEVER replaced automatically. V1
+save-folder kits remain readable via the new restore engine. ZIP path traversal,
+symlinks, reserved names, case collisions and entry-count/size limits are checked.
+
+**Not yet implemented:** automatically locating every save/mod file; relinking
+Vortex/MO2 deployments; safely installing files directly into active games;
+one-click complete game recreation; automatic cloud backup; source file
+consistency while games are running. Users must close games/mod managers before
+backing up and reconnect recovered files manually. Native Windows tests with
+real managers and unusual paths remain a release requirement.
+
 ## Safety and accuracy constraints
 
 1. **No deletion or modification of games and mods by these features.**
