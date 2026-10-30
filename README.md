@@ -196,3 +196,9 @@ Test with `python -m unittest discover -s tests -v`, then `PYTHONPATH=. xvfb-run
 - **Limitations:** Windows Recycle Bin behavior, actual freed space, live installer operation and game/driver lock handling still need real Windows testing. The Windows installer preview is unsigned and installs a separate Python runtime if unavailable.
 
 - **Cleanup History** is in the standard sidebar in simple mode, with expandable session detail.
+
+## M2 Game Intelligence / Mod Radar evidence audit (development preview)
+
+From **Game DNA → Mod Radar audit**, review the currently scanned local records without scanning again, changing files or making cleanup decisions. The audit reports uniquely associated mod storage, unresolved ownership, conflicting game claims, redirected paths and stale/incomplete manager snapshots. **Disabled MO2/Vortex entries are not labeled abandoned or safe to remove.** Files linked only by a user-added library are reported as *unverified*, not confirmed game installations. No removal is approved by this audit.
+
+Launcher path validation is conservative: blank, relative, redirected, drive-root and missing install paths are not accepted as evidence that Epic, GOG, Riot, vendor-registered, or custom games are installed. Game DNA rejects multiple overlapping installation claims rather than assigning one at random. Ghost Watch now labels potential missing/added files as **not observed / possibly added** when source roots differ or sampling is truncated. All of these decisions require real launcher and mod-manager testing before M2 is signed off.

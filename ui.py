@@ -38,6 +38,7 @@ from resurrection_lab import (
 )
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
+from mod_radar_audit import audit_mod_radar
 from space_planner import plan_for_drive
 from launchers import LauncherGame, find_launcher_games
 from save_vault import create_backup
@@ -369,6 +370,7 @@ class GameGraveApp(tk.Tk):
         self.button(row, "Capture / compare changes", self._capture_intelligence, primary=True).pack(side="left")
         self.button(row, "Exodus checklist", self._preview_exodus).pack(side="left", padx=9)
         self.button(row, "Inspect manager profiles", self._inspect_manager_profiles).pack(side="left", padx=9)
+        self.button(row, "Mod Radar audit", self._show_mod_radar_audit).pack(side="left", padx=9)
         dna_tools = tk.Frame(controls, bg=PANEL)
         dna_tools.pack(anchor="w", pady=(8, 0))
         self.button(dna_tools, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(side="left")
@@ -433,6 +435,45 @@ class GameGraveApp(tk.Tk):
         self.text(summary, "Unresolved does not mean abandoned. Association does not mean safe to delete. "
                   "For full folder evidence, use File Detective in Game Mods or The Graveyard.",
                   9, WARN, wraplength=820).pack(anchor="w", pady=(12, 0))
+
+    def _show_mod_radar_audit(self):
+        """Summarize existing scan relationships, never perform cleanup."""
+        if not self.last_scan:
+            messagebox.showinfo("Scan PC first", "Run Scan PC before auditing game/mod ownership.")
+            return
+        result = audit_mod_radar(
+            self.games, self.other_games, self.mod_folders, self.save_findings,
+            (self.profile_report or {}).get("profiles", []))
+        overview = [
+            "MOD RADAR · READ-ONLY OWNERSHIP AUDIT",
+            "",
+            f"Recorded installations: {result['recorded_games']}",
+            f"Scanned mod storage locations: {result['scanned_mod_locations']}",
+            f"Associated by unique installation path or Steam app ID: "
+            f"{result['associated_mod_locations']}",
+            f"Unassigned storage locations: {result['unassigned_mod_locations']}",
+            f"Ambiguous ownership claims: {result['ambiguous_claims']}",
+            f"Linked/redirected paths requiring review: {result['redirected_locations']}",
+            f"Stale manager snapshots: {result['stale_manager_snapshots']}",
+            f"Incomplete manager snapshots: {result['incomplete_manager_snapshots']}",
+            f"MO2/Vortex recorded enabled/disabled references: "
+            f"{result['enabled_profile_references']}/{result['disabled_profile_references']}",
+            "",
+            "Unresolved sample (not deletion recommendations):",
+        ]
+        if result["examples"]:
+            overview.extend(
+                f"• {x['item'][:40]}: {x['reason'][:110]}"
+                for x in result["examples"][:12])
+        else:
+            overview.append("• No unresolved records in the current scan.")
+        overview.extend([
+            "",
+            "0 items approved for cleanup. Active status and orphan status are "
+            "NOT established from folder age, missing manifests or manager markers.",
+            "Re-scan after changing games or mod manager paths.",
+        ])
+        messagebox.showinfo("Game Grave · Mod Radar evidence audit", "\n".join(overview))
 
     def _inspect_manager_profiles(self):
         if not self.last_scan:
