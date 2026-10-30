@@ -143,7 +143,8 @@ def run(scratch: Path) -> int:
                 print("FAIL: Shell cannot verify recoverability.", flush=True)
                 return 1
             restore = _run_ps(_bin_script(str(target), restore=True))
-            if restore != "RESTORED" or target.read_bytes() != (
+            print("RESTORE_STATUS:", restore, "PATH_EXISTS:", target.exists(), flush=True)
+            if restore != "RESTORED" or not target.is_file() or target.read_bytes() != (
                     b"Game Grave disposable Windows recycle diagnostic"):
                 print("FAIL: Shell did not restore matching bytes.", flush=True)
                 return 1
