@@ -17,6 +17,13 @@ Center available in Free. Nothing in this intelligence layer authorizes deletion
 | Patch Fallout | Review of changed potentially sensitive mod/configuration file extensions. | Trusted per-title/per-version compatibility rule database and mod dependency checks |
 | Community Intelligence | Local anonymized category-level rule draft API, no raw paths, no upload. | Explicit opt-in contribution UI, validation service, moderation, review process, signed rule updates |
 
+## MO2 / Vortex relationship iteration (October 30, 2026)
+
+- **Mod Organizer 2:** read-only per-profile `modlist.txt` parser, including enabled, disabled and unmanaged markers. Discovers portable and moved profile folders through the existing scanned `ModOrganizer.ini` paths, and only ties a profile to an installed game when `gamePath` matches its recorded installation root exactly. Entries not found in the configured mods folder are *unverified*, not abandoned.
+- **Vortex:** read-only parsing of optional `manual.json`, `startup.json` or `hourly.json` snapshots under `Vortex/temp/state_backups_full`. Inspects profile names and recorded mod states with stale-backup warnings; never opens Vortex's live `State.v2` LevelDB or changes deployment data. Game ownership requires an exact discovered-install-path match, never an approximate game ID or name.
+- **UI:** Game DNA includes an explicit **Inspect manager profiles** action, profile summaries, and per-profile recorded status details. Profile inspection is user-triggered and does not start background monitoring.
+- **Still missing:** complete native Vortex active state queries, conflict analysis, MO2 plugin dependencies and actual deployment verification. A disabled mod may still be required for another profile. Real Windows 10/11 manager fixtures and junctions need manual QA.
+
 ## Safety and accuracy constraints
 
 1. **No deletion or modification of games and mods by these features.**
