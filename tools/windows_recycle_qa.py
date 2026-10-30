@@ -71,6 +71,12 @@ def run(scratch: Path) -> int:
                            for r in records):
                     raise RuntimeError("Undo Center did not record verified restoration.")
             except (OSError, ValueError, RuntimeError) as exc:
+                if item.exists() and item.read_bytes() == marker:
+                    print("SAFE STOP: original disposable target was preserved.",
+                          file=sys.stderr)
+                else:
+                    print("UNVERIFIED REMOVAL: disposable target is absent or altered.",
+                          file=sys.stderr)
                 print(f"FAIL: Windows integration requires investigation: {exc}",
                       file=sys.stderr)
                 return 1
