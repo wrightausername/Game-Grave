@@ -305,8 +305,8 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path,
             partial_owned = True
             for role, (_, entries) in captured.items():
                 for path, rel, size, modified in entries:
-                    if not _regular(path):
-                        raise RuntimeError(f"Source changed during backup: {path.name}")
+                    if not _ordinary_ancestry(path):
+                        raise RuntimeError(f"Source or parent changed during backup: {path.name}")
                     old = path.stat()
                     if old.st_size != size or old.st_mtime_ns != modified:
                         raise RuntimeError(f"Source changed during backup: {path.name}")
@@ -319,8 +319,8 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path,
                             raise RuntimeError(f"Source changed during backup: {path.name}")
                         with archive.open(f"{role}/{rel}", "w", force_zip64=True) as output:
                             shutil.copyfileobj(input_file, output, 1024 * 1024)
-                    if not _regular(path) or path.stat().st_mtime_ns != modified:
-                        raise RuntimeError(f"Source changed during backup: {path.name}")
+                    if not _ordinary_ancestry(path) or path.stat().st_mtime_ns != modified:
+                        raise RuntimeError(f"Source or parent changed during backup: {path.name}")
         with zipfile.ZipFile(partial) as archive:
             infos, actual_total, roles = _scan_archive(archive, 2)
             if len(infos) != count or actual_total != total or len(roles) != len(captured):
@@ -386,7 +386,9 @@ def restore_kit(manifest_path: Path, parent: Path, *, approved: bool = False) ->
                 flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                          getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0))
                 descriptor = os.open(destination, flags, 0o600)
-                with archive.open(info) as source, os.fdopen(descriptor, "wb") as output:
+                # Own the fd before opening the ZIP member; even if ZIP
+                # decompression fails the new staging file handle is closed.
+                with os.fdopen(descriptor, "wb") as output, archive.open(info) as source:
                     shutil.copyfileobj(source, output, 1024 * 1024)
                 if (not _ordinary_ancestry(destination) or
                         destination.stat().st_size != info.file_size):
