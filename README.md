@@ -242,3 +242,9 @@ Steam Games, Other Launchers, Game Mods and Old Files use keyboard-focusable **P
 ### M4 short-screen sidebar navigation
 
 The main sidebar now scrolls independently from the current page. On small monitors and large text settings, **Settings, Undo Center and Advanced navigation** remain reachable instead of falling below the window. The mouse wheel over the sidebar scrolls its navigation list; page or table scrolling remains separate. Ctrl+1..7 also scrolls the sidebar to reveal the selected shortcut destination. The edition and cleanup-safety reminder stay outside the scrolling navigation list. This is an engineering UI improvement and **not** final Windows screen-reader certification.
+
+### M4 Graveyard large-list review without mass cleanup
+
+The Graveyard now draws **up to 160 findings per page** even if thousands match a filter. The entire filtered review set remains available with Previous/Next, including its total and eligible counts. Checked items persist while you move among pages in the **same filtered view**. **Check page** and **Check eligible on page** do not silently select findings on other pages. **Clear checks** clears your review selections, not the actual files.
+
+**Recycle eligible on page** covers the currently visible page only. **Recycle checked** can use checked items across pages, but **hard-stops when more than 160 items are selected**, before any removal action or confirmation. All pre-existing protection rules, per-file revalidation, manual approval and Recycle Bin behavior remain unchanged. Changing filters prunes selections that are no longer in view so hidden findings are not silently included. Nothing is permanently deleted by the Graveyard and Recycle Bin contents are not yet freed disk space.
