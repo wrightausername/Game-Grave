@@ -24,6 +24,10 @@ from insights import load_history, record_scan, compare_scans, make_room_plan
 from recovery import register_recycle, get_records, check_restore, restore
 from explainer import explain_folder
 from file_detective import investigate, friendly_report
+from game_intelligence import (build_game_dna, capture_mod_observation, load_observation,
+                               save_observation, ghost_watch, what_broke_my_game,
+                               patch_fallout, regret_calculator, exodus_plan)
+from resurrection_kit import create_resurrection_kit
 from space_planner import plan_for_drive
 from launchers import LauncherGame, find_launcher_games
 from save_vault import create_backup
@@ -178,7 +182,7 @@ class GameGraveApp(tk.Tk):
                  font=("Segoe UI Semibold", 9)).pack(anchor="w", padx=23, pady=(0, 13))
         self.nav_buttons = {}
         items = [("Overview", "▦"), ("Steam Games", "▣"), ("Other Launchers", "▣"), ("Game Mods", "◇"),
-                 ("Old Files", "▤"), ("The Graveyard", "☠"), ("Make Room", "◉"),
+                 ("Old Files", "▤"), ("The Graveyard", "☠"), ("Make Room", "◉"), ("Game DNA", "⌁"),
                  ("Save Vault", "♡"), ("Undo Center", "↶"), ("Cleanup History", "◷"), ("Settings", "⚙")]
         if self.settings.get("ui_layout") == "advanced":
             items += [("Storage History", "◷"), ("Automation", "◴")]
@@ -259,6 +263,7 @@ class GameGraveApp(tk.Tk):
             "Old Files": self._files_page,
             "The Graveyard": self._graveyard_page,
             "Make Room": self._make_room_page,
+            "Game DNA": self._game_dna_page,
             "Undo Center": self._undo_page,
             "Cleanup History": self._activity_page,
             "Save Vault": self._save_vault_page,
@@ -336,6 +341,79 @@ class GameGraveApp(tk.Tk):
         tree.pack(side="left", fill="both", expand=True)
         tree.tag_configure("even", background=RAISED)
         return tree
+
+    def _game_dna_page(self):
+        self.header("Game DNA", "Understand game/mod relationships and inspect changes. Nothing is deleted.")
+        dna = build_game_dna(self.games, self.other_games, self.mod_folders, self.save_findings)
+        controls = self.panel(pad=13)
+        controls.pack(fill="x", pady=(0, 12))
+        self.text(controls, "Gaming intelligence · read-only preview", 14, ACCENT, True).pack(anchor="w")
+        self.text(controls, "Game associations need installation records or Steam Workshop IDs. "
+                  "Unmatched mod folders and saves stay protected. Scan PC first to update the inventory.",
+                  10, MUTED, wraplength=820).pack(anchor="w", pady=6)
+        row = tk.Frame(controls, bg=PANEL)
+        row.pack(fill="x", pady=(8, 0))
+        self.button(row, "Capture / compare changes", self._capture_intelligence, primary=True).pack(side="left")
+        self.button(row, "Exodus checklist", self._preview_exodus).pack(side="left", padx=9)
+        previous = load_observation()
+        if previous:
+            self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
+                      10, MUTED).pack(anchor="w", pady=(10, 0))
+        else:
+            self.text(controls, "No mod baseline yet. Capturing one records metadata, not file contents.",
+                      10, MUTED).pack(anchor="w", pady=(10, 0))
+        if getattr(self, "_intel_report", None):
+            report = self._intel_report
+            self.text(controls, f"Ghost Watch: {report.get('count', 0)} changes, "
+                      f"{report.get('patch_review', 0)} mod/config files to review. "
+                      "This does not prove what caused a crash.",
+                      11, WARN, True, wraplength=800).pack(anchor="w", pady=(8, 0))
+            for message in what_broke_my_game(report)[:3]:
+                self.text(controls, "• " + message, 9, MUTED, wraplength=820).pack(anchor="w")
+        summary = self.panel(pad=13)
+        summary.pack(fill="both", expand=True)
+        self.text(summary, f"{len(dna['games'])} recorded games · "
+                  f"{len(dna['unresolved'])} unresolved mod/save locations",
+                  14, bold=True).pack(anchor="w", pady=(0, 10))
+        for game in dna["games"][:10]:
+            self.text(summary, f"• {game['game']} ({game['launcher']}): "
+                      f"{len(game['assets'])} associated mod-storage location(s)",
+                      10, MUTED, wraplength=820).pack(anchor="w", pady=3)
+        if len(dna["games"]) > 10:
+            self.text(summary, f"Showing the first 10 of {len(dna['games'])} games.",
+                      9, MUTED).pack(anchor="w", pady=6)
+        self.text(summary, "Unresolved does not mean abandoned. Association does not mean safe to delete. "
+                  "For full folder evidence, use File Detective in Game Mods or The Graveyard.",
+                  9, WARN, wraplength=820).pack(anchor="w", pady=(12, 0))
+
+    def _capture_intelligence(self):
+        if not self.last_scan:
+            messagebox.showinfo("Scan first", "Run Scan PC before capturing a mod-storage baseline.")
+            return
+        self.status_text.set("Comparing selected mod-folder metadata; no file contents are read…")
+        mods = list(self.mod_folders)
+        def worker():
+            try:
+                before = load_observation()
+                after = capture_mod_observation(mods)
+                save_observation(after)
+                self.events.put(("intelligence_result", ghost_watch(before, after)))
+            except (OSError, ValueError, RuntimeError) as exc:
+                self.events.put(("intelligence_error", str(exc)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _preview_exodus(self):
+        dna = build_game_dna(self.games, self.other_games, self.mod_folders, self.save_findings)
+        plan = exodus_plan(dna)
+        lines = [f"{g['name']} ({g['launcher']}): launcher reinstall/verification needed; "
+                 f"{len(g['related_storage'])} associated mod location(s)."
+                 for g in plan["games"][:12]]
+        messagebox.showinfo("Exodus · migration preview",
+            "\n".join(lines) if lines else "Run Scan PC first to inventory games.")
+        messagebox.showinfo("Exodus limitations",
+            f"{plan['unresolved_count']} save or mod locations remain unverified.\n\n"
+            "This is a planning checklist, not a file transfer. "
+            "Preserve saves and mod profiles separately and use each game launcher for installation.")
 
     def _games_page(self):
         self.header("Steam Games", "Sort out games you haven't launched in a while. You approve every uninstall in Steam.")
@@ -1763,15 +1841,17 @@ class GameGraveApp(tk.Tk):
             self.text(self.plan_body, "Run Scan PC above first to find games and older downloads.",
                       10, MUTED).pack(anchor="w", pady=(0, 7))
         candidates = result['candidates'][:3]
+        cost_notes = regret_calculator(candidates,
+                    build_game_dna(self.games, self.other_games, self.mod_folders, self.save_findings))
         self.text(self.plan_body, "Old game/mod downloads to review", 12, bold=True).pack(anchor="w")
         if not candidates:
             self.text(self.plan_body, "No matching older game archives found on this drive. "
                       "You can still review games or scan another folder.",
                       10, MUTED, wraplength=800).pack(anchor="w", pady=(3, 5))
-        for candidate in candidates:
+        for candidate, cost in zip(candidates, cost_notes):
             self.text(self.plan_body, f"• {candidate.name}  ·  {human_size(candidate.apparent_bytes)} "
-                      "(check before removing)", 10, MUTED,
-                      wraplength=800).pack(anchor="w", pady=2)
+                      f"· recovery effort: {cost['recovery_cost']} (check before removing)",
+                      10, MUTED, wraplength=800).pack(anchor="w", pady=2)
         self.text(self.plan_body, "Installed games to inspect in Steam", 12, bold=True).pack(anchor="w", pady=(10, 2))
         if result['games_to_review']:
             for g in result['games_to_review'][:2]:
@@ -1872,6 +1952,7 @@ class GameGraveApp(tk.Tk):
         bottom.pack(fill="x", pady=(12, 0))
         self.button(bottom, "Back up selected to ZIP", self._backup_selected_save).pack(side="left")
         self.button(bottom, "Back up another folder", self._choose_save_backup).pack(side="left", padx=10)
+        self.button(bottom, "Create Resurrection Kit", self._make_resurrection_kit).pack(side="left", padx=10)
         self.text(self.content, "Nothing is deleted from Save Vault. Save profiles and known save folders remain "
                   "excluded from bulk cleanup, even when marked for manual review. "
                   "Close the game before making a backup.", 9, WARN, wraplength=830).pack(anchor="w", pady=(10, 0))
@@ -1974,6 +2055,32 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("backup_result", result))
             except (OSError, ValueError, RuntimeError, InterruptedError, zipfile.BadZipFile) as exc:
                 self.events.put(("backup_error", str(exc)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _make_resurrection_kit(self):
+        chosen = self._selected_saves()
+        if len(chosen) != 1:
+            messagebox.showinfo("Choose one folder", "Select exactly one save/profile folder for a Resurrection Kit.")
+            return
+        item = chosen[0]
+        destination = filedialog.asksaveasfilename(
+            title="Choose Resurrection Kit ZIP location", defaultextension=".zip",
+            filetypes=[("ZIP archive", "*.zip")],
+            initialfile=Path(item.path).name + "_Resurrection.zip")
+        if not destination:
+            return
+        if not messagebox.askyesno("Create verified Resurrection Kit?",
+                "Game: " + item.game + "\nSource: " + item.path + "\nDestination: " + destination +
+                "\n\nOnly this selected folder is preserved. Mods, game installation and "
+                "automatic restore are not included. Close the game before continuing."):
+            return
+        self.status_text.set("Creating and verifying Resurrection Kit…")
+        def worker():
+            try:
+                created = create_resurrection_kit(item.game, Path(item.path), Path(destination))
+                self.events.put(("kit_result", created))
+            except (OSError, ValueError, RuntimeError, InterruptedError, zipfile.BadZipFile) as exc:
+                self.events.put(("kit_error", str(exc)))
         threading.Thread(target=worker, daemon=True).start()
 
     def _history_page(self):
@@ -2403,6 +2510,28 @@ class GameGraveApp(tk.Tk):
                     self.scan_button.configure(state="normal", bg=ACCENT)
                     self.cancel_button.configure(state="disabled")
                     self.show_page(self.active)
+                elif name == "intelligence_result":
+                    self._intel_report = payload
+                    self.status_text.set("Game DNA change comparison complete. No game files changed.")
+                    if self.active == "Game DNA":
+                        self.show_page("Game DNA")
+                    if payload.get("first_observation"):
+                        messagebox.showinfo("Ghost Watch baseline",
+                            "First on-demand mod metadata snapshot saved. Compare after a later scan.")
+                elif name == "intelligence_error":
+                    self.status_text.set("Game intelligence inspection incomplete.")
+                    messagebox.showwarning("Game DNA inspection incomplete", payload)
+                elif name == "kit_result":
+                    self.status_text.set("Resurrection Kit saved and verified")
+                    log_event("Resurrection Kit created", payload["archive"])
+                    messagebox.showinfo("Resurrection Kit verified",
+                        f"Backed up {payload['files']} files.\nZIP: {payload['archive']}\n"
+                        f"Manifest: {payload['manifest']}\n\n"
+                        "Only the selected save/profile folder is preserved; "
+                        "modpacks and complete game restoration are not included.")
+                elif name == "kit_error":
+                    self.status_text.set("Resurrection Kit could not be completed")
+                    messagebox.showwarning("Resurrection Kit incomplete", payload)
                 elif name == "shader_preview":
                     game, cache = payload
                     self._confirm_shader_cache(game, cache)
