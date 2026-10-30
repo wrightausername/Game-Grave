@@ -30,6 +30,12 @@ def run(scratch: Path) -> int:
         print(f"FAIL: Unsafe QA scratch location: {exc}", file=sys.stderr)
         return 2
 
+    # Running "python tools/windows_recycle_qa.py" sets sys.path[0] to
+    # tools/, not the repository root. Import app code from this checked-out
+    # repository explicitly, never from another installed Game Grave version.
+    repo = Path(__file__).resolve().parents[1]
+    if str(repo) not in sys.path:
+        sys.path.insert(0, str(repo))
     import core
     import recovery
 
