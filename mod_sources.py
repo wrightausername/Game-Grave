@@ -191,7 +191,7 @@ def _mo2_instance(ini_path: Path, cancel: Cancel) -> list[ModFolder]:
             note = 'Managed MO2 instance data; game folders can be elsewhere or uninstalled. Check MO2 instances/profiles before any removal.'
         items = _children(location) if setting == 'mod_directory' else []
         row = _measure(f'{game} · {location.name}', location, 'Mod Organizer 2',
-                       category, note, indicators=(f'Instance {game}', setting),
+                       category, note, indicators=(f'Instance {game}', setting, f'MO2 INI: {ini_path}'),
                        item_count=len(items), cancel=cancel)
         if row:
             rows.append(row)

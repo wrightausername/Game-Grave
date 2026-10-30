@@ -28,6 +28,7 @@ from game_intelligence import (build_game_dna, capture_mod_observation, load_obs
                                save_observation, ghost_watch, what_broke_my_game,
                                patch_fallout, regret_calculator, exodus_plan)
 from resurrection_kit import create_resurrection_kit
+from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from space_planner import plan_for_drive
 from launchers import LauncherGame, find_launcher_games
 from save_vault import create_backup
@@ -117,6 +118,7 @@ class GameGraveApp(tk.Tk):
         self.mod_folders: list[ModFolder] = []
         self.old_files: list[OldFile] = []
         self.save_findings = []
+        self.profile_report = None
         self._scan_started = 0.0
         self._scan_stage = 0
         self._scan_stage_name = ""
@@ -344,7 +346,8 @@ class GameGraveApp(tk.Tk):
 
     def _game_dna_page(self):
         self.header("Game DNA", "Understand game/mod relationships and inspect changes. Nothing is deleted.")
-        dna = build_game_dna(self.games, self.other_games, self.mod_folders, self.save_findings)
+        dna = build_game_dna(self.games, self.other_games, self.mod_folders, self.save_findings,
+                             manager_profiles=(self.profile_report or {}).get("profiles", []))
         controls = self.panel(pad=13)
         controls.pack(fill="x", pady=(0, 12))
         self.text(controls, "Gaming intelligence · read-only preview", 14, ACCENT, True).pack(anchor="w")
@@ -355,6 +358,7 @@ class GameGraveApp(tk.Tk):
         row.pack(fill="x", pady=(8, 0))
         self.button(row, "Capture / compare changes", self._capture_intelligence, primary=True).pack(side="left")
         self.button(row, "Exodus checklist", self._preview_exodus).pack(side="left", padx=9)
+        self.button(row, "Inspect manager profiles", self._inspect_manager_profiles).pack(side="left", padx=9)
         previous = load_observation()
         if previous:
             self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
@@ -382,9 +386,83 @@ class GameGraveApp(tk.Tk):
         if len(dna["games"]) > 10:
             self.text(summary, f"Showing the first 10 of {len(dna['games'])} games.",
                       9, MUTED).pack(anchor="w", pady=6)
+        report = self.profile_report
+        if report is not None:
+            self.text(summary, f"Read-only manager profiles: {report['count']}",
+                      12, bold=True).pack(anchor="w", pady=(8, 4))
+            profile_rows = report["profiles"]
+            if profile_rows:
+                area = tk.Frame(summary, bg=PANEL, height=180)
+                area.pack(fill="both", expand=True, pady=(0, 6))
+                self.profile_tree = self._tree(
+                    area, ("manager", "profile", "game", "enabled", "disabled", "status"),
+                    ("MANAGER", "PROFILE", "MATCHED GAME", "ENABLED", "DISABLED", "RECORD STATUS"),
+                    (115, 130, 190, 75, 80, 185))
+                self.profile_lookup = {}
+                for idx, profile in enumerate(profile_rows):
+                    stats = summarize_manager_profile(profile)
+                    self.profile_lookup[str(idx)] = profile
+                    game = profile.get("verified_game") or "Unverified"
+                    status = ("Stale snapshot" if profile.get("stale") else
+                              "Incomplete" if stats["incomplete"] else "Recorded only")
+                    self.profile_tree.insert("", "end", iid=str(idx),
+                        values=(profile["manager"], profile["profile"], game,
+                                stats["enabled"], stats["disabled"], status))
+                self.profile_tree.bind("<Double-1>", lambda _event: self._view_manager_profile())
+                self.button(summary, "View selected profile details",
+                            self._view_manager_profile).pack(anchor="w", pady=(2, 8))
+            for note in report.get("warnings", [])[:2]:
+                self.text(summary, "• " + note, 9, WARN, wraplength=810).pack(anchor="w", pady=2)
+        else:
+            self.text(summary, "Inspect manager profiles to read MO2 modlists and Vortex backup metadata.",
+                      10, MUTED, wraplength=800).pack(anchor="w", pady=6)
         self.text(summary, "Unresolved does not mean abandoned. Association does not mean safe to delete. "
                   "For full folder evidence, use File Detective in Game Mods or The Graveyard.",
                   9, WARN, wraplength=820).pack(anchor="w", pady=(12, 0))
+
+    def _inspect_manager_profiles(self):
+        if not self.last_scan:
+            messagebox.showinfo("Scan first", "Run Scan PC to identify manager folders and installed games.")
+            return
+        mods, games, other = list(self.mod_folders), list(self.games), list(self.other_games)
+        self.status_text.set("Inspecting local MO2 modlists and Vortex backup profiles…")
+        def worker():
+            try:
+                result = inspect_manager_profiles(mods, games, other)
+                self.events.put(("manager_profiles_result", result))
+            except (OSError, ValueError, RuntimeError) as exc:
+                self.events.put(("manager_profiles_error", str(exc)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _view_manager_profile(self):
+        if (not hasattr(self, "profile_tree") or
+                not self.profile_tree.winfo_exists() or not self.profile_tree.selection()):
+            messagebox.showinfo("Select a profile", "Choose a manager profile in the Game DNA table.")
+            return
+        profile = self.profile_lookup.get(self.profile_tree.selection()[0])
+        if not profile:
+            return
+        from manager_profiles import summarize_manager_profile
+        summary = summarize_manager_profile(profile)
+        flags = ("Outdated snapshot; " if profile.get("stale") else "") + (
+                 "partial data; " if profile.get("incomplete") else "")
+        lines = [
+            f"{profile['manager']} · {profile['profile']}",
+            f"Reported game: {profile.get('game_hint') or 'Unknown'}",
+            f"Verified installed match: {profile.get('verified_game') or 'None'}",
+            f"Profile entries: {len(profile.get('mods', []))} "
+            f"(enabled {summary['enabled']}, disabled {summary['disabled']}, other {summary['other']})",
+            f"Data quality: {flags or 'Recorded metadata only'}",
+            "",
+            "First 35 entries (status is recorded, not confirmed loaded):",
+        ]
+        for item in profile.get("mods", [])[:35]:
+            lines.append(f"• {item['name']}: {item['status']} · {item['storage']}")
+        if len(profile.get("mods", [])) > 35:
+            lines.append(f"... plus {len(profile['mods']) - 35} additional entries")
+        lines += ["", profile.get("note", ""),
+                  "Disabled does NOT mean unused or safe to delete. Nothing was modified."]
+        messagebox.showinfo("Game DNA · manager profile", "\n".join(lines))
 
     def _capture_intelligence(self):
         if not self.last_scan:
@@ -2493,6 +2571,7 @@ class GameGraveApp(tk.Tk):
                     self.scan_percent.set(round(100 * sum(w for _, w in STAGES[:self._scan_stage])))
                 elif name == "scan_complete":
                     self.games, self.other_games, self.mod_folders, self.old_files, self.save_findings, warning = payload
+                    self.profile_report = None  # Profiles must be re-inspected after inventory changes.
                     self.scan_percent.set(100)
                     self.scan_progress_text.set("Scan complete · 100%")
                     try:
@@ -2510,6 +2589,15 @@ class GameGraveApp(tk.Tk):
                     self.scan_button.configure(state="normal", bg=ACCENT)
                     self.cancel_button.configure(state="disabled")
                     self.show_page(self.active)
+                elif name == "manager_profiles_result":
+                    self.profile_report = payload
+                    self.status_text.set(
+                        f"Inspected {payload['count']} manager profiles. Nothing was modified.")
+                    if self.active == "Game DNA":
+                        self.show_page("Game DNA")
+                elif name == "manager_profiles_error":
+                    self.status_text.set("Manager profile inspection incomplete.")
+                    messagebox.showwarning("Profile inspection incomplete", payload)
                 elif name == "intelligence_result":
                     self._intel_report = payload
                     self.status_text.set("Game DNA change comparison complete. No game files changed.")
