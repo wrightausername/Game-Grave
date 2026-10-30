@@ -15,6 +15,7 @@ class IntegratedModSourcesTests(unittest.TestCase):
             root = Path(tmp) / 'Steam'
             apps = root / 'steamapps'
             apps.mkdir(parents=True)
+            (apps / 'common' / 'Game').mkdir(parents=True)
             (apps / 'appmanifest_123.acf').write_text(
                 '"AppState" { "appid" "123" "installdir" "Game" "name" "Game" "StateFlags" "4" }')
             content = apps / 'workshop' / 'content'
