@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 from ui_shortcuts import PAGE_SHORTCUTS, PAGE_KEYS, ACTION_SHORTCUTS, shortcut_help_text
 from ui import GameGraveApp
+from ui_viewport import initial_window_bounds
 
 
 class FakeApp:
@@ -81,6 +82,35 @@ class KeyboardAccessTests(unittest.TestCase):
             self.assertIn(shortcut, guide)
         self.assertIn("Tab / Shift+Tab", guide)
         self.assertIn("approval dialogs", guide)
+
+
+class ViewportAcceptanceTests(unittest.TestCase):
+    def test_desktop_never_opens_off_screen(self):
+        for w, h in ((1920, 1080), (1366, 768), (1280, 720),
+                     (1024, 768), (800, 600), (640, 480)):
+            with self.subTest(w=w, h=h):
+                result = initial_window_bounds(w, h)
+                self.assertGreater(result.width, 0)
+                self.assertGreater(result.height, 0)
+                self.assertLessEqual(result.left + result.width, w)
+                self.assertLessEqual(result.top + result.height, h)
+                self.assertLessEqual(result.min_width, result.width)
+                self.assertLessEqual(result.min_height, result.height)
+
+    def test_normal_desktop_keeps_professional_preferred_size(self):
+        result = initial_window_bounds(1920, 1080)
+        self.assertEqual((result.width, result.height), (1290, 820))
+        self.assertEqual((result.min_width, result.min_height), (990, 660))
+
+    def test_768_high_laptop_has_room_for_taskbar(self):
+        result = initial_window_bounds(1366, 768)
+        self.assertLessEqual(result.height, 672)
+        self.assertLessEqual(result.width, 1290)
+
+    def test_invalid_screen_metrics_refused(self):
+        for size in ((0, 768), (1920, -1), ("1920", 1080), (True, 1080)):
+            with self.subTest(size=size), self.assertRaises(ValueError):
+                initial_window_bounds(*size)
 
 
 if __name__ == "__main__":
