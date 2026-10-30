@@ -1,0 +1,3 @@
+# Windows packaging dependencies. Not required to use the Free source app.
+pyinstaller>=6.12,<7
+cryptography>=44,<47
