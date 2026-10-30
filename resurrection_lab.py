@@ -190,27 +190,41 @@ def compare_kits(before: Path, after: Path) -> dict:
     before_names = {k.casefold(): (k, v) for k, v in previous.items()}
     after_names = {k.casefold(): (k, v) for k, v in current.items()}
     entries = []
-    for key in sorted(set(before_names) | set(after_names)):
-        a = before_names.get(key)
-        b = after_names.get(key)
-        if a is None:
-            change, label = "added", b[0]
-        elif b is None:
-            change, label = "missing in newer snapshot", a[0]
-        elif (a[1].file_size, a[1].CRC) != (b[1].file_size, b[1].CRC):
-            change, label = "changed", b[0]
-        else:
-            continue
-        entries.append({"path": label, "change": change})
-    # Checksums verify whole ZIPs, CRC32 comparisons identify likely file
-    # differences. Identical CRC/size does not prove byte-for-byte identity.
+    strong_checks = 0
+    # ZIP CRC32 and size are only quick hints. Equal CRC/size is NOT proof of
+    # identical file contents. Confirm each seemingly unchanged member by
+    # streaming SHA-256 before declaring that a snapshot is unchanged.
+    with zipfile.ZipFile(old_archive) as old_reader, zipfile.ZipFile(new_archive) as new_reader:
+        for key in sorted(set(before_names) | set(after_names)):
+            a = before_names.get(key)
+            b = after_names.get(key)
+            if a is None:
+                change, label = "added", b[0]
+            elif b is None:
+                change, label = "missing in newer snapshot", a[0]
+            elif (a[1].file_size, a[1].CRC) != (b[1].file_size, b[1].CRC):
+                change, label = "changed", b[0]
+            else:
+                strong_checks += 1
+                with old_reader.open(a[1]) as left, new_reader.open(b[1]) as right:
+                    if _stream_hash(left) != _stream_hash(right):
+                        change, label = "changed", b[0]
+                    else:
+                        continue
+            entries.append({"path": label, "change": change})
+    # The archive is explicitly rehashed after this comparison to detect a
+    # concurrent change made between preview/inspection and the file reads.
+    if (_sha256(old_archive).lower() != old_meta["archive_sha256"].lower() or
+            _sha256(new_archive).lower() != new_meta["archive_sha256"].lower()):
+        raise ValueError("One of the Resurrection Kit snapshots changed during comparison.")
     return {
         "game": old["game"], "before": str(before), "after": str(after),
         "older_files": old["files"], "newer_files": new["files"],
         "change_count": len(entries), "changes": entries[:MAX_VISIBLE],
         "truncated_details": len(entries) > MAX_VISIBLE,
         "full_archive_checksums_verified": True,
-        "file_identity_method": "Uncompressed size + ZIP CRC32; possible collisions",
+        "file_identity_method": "ZIP size/CRC32 prefilter plus SHA-256 for every apparent match",
+        "strong_file_hash_comparisons": strong_checks,
         "no_overwrite": True,
         "note": "Choose a snapshot for separate staged recovery. This comparison never rolls back live files.",
     }

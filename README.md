@@ -218,3 +218,11 @@ Steam metadata files are read only when they are ordinary, bounded-size files, n
 ### One-click private M2 QA report
 
 After scanning your computer, open **Game DNA → Export QA**. Game Grave asks for confirmation, then lets you pick a **new** JSON filename (existing files are never overwritten). The export contains only aggregate counts of detected games, mods and unresolved associations, plus whether manager profiles have been inspected. It **never includes game titles, usernames, file paths, mod names or private profiles**, and nothing is uploaded. The report is QA evidence for human review, not proof that Game Grave correctly detects every installation or that cleanup is safe.
+
+### M3 Resurrection Lab: trustworthy comparisons and a visual map
+
+**Time Machine** verifies both complete kit archives and uses a content SHA-256 comparison when ZIP size/CRC32 make two files appear identical. This catches rare CRC32 collisions that could otherwise hide changes. Comparing very large kits may take longer, but it never alters live game files.
+
+Open **Resurrection Lab → See how Resurrection works · visual guide** for a responsive, high-contrast four-stage walkthrough: **PICK → SEAL → REHEARSE → STAGE**. It explains the practical difference between verified archive integrity and an unproven in-game recovery, includes a text counterpart, and does not trigger backups or cleanup on its own.
+
+Before sending a Resurrection Kit to another Windows PC, use the [M3 Windows recovery test matrix](M3_WINDOWS_QA.md). The eventual closed-beta task order and identical questionnaire are defined in [BETA_TEST_PROTOCOL.md](BETA_TEST_PROTOCOL.md), but recruitment is gated until M1–M5 acceptance.
