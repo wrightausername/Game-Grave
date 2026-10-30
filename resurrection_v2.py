@@ -219,7 +219,30 @@ def _publish_no_replace(temporary: Path, destination: Path) -> None:
         raise
 
 
-def create_complete_kit(game: str, sources: dict[str, Path], destination: Path) -> dict:
+def _portable_manager_context(metadata: dict | None, roles) -> dict | None:
+    """Only portable, reviewed identifiers, never local usernames or paths."""
+    if metadata is None:
+        return None
+    if not isinstance(metadata, dict):
+        raise ValueError("Manager hints must be a dictionary.")
+    kind = metadata.get("kind")
+    if kind not in ("MO2", "Vortex", "unknown"):
+        raise ValueError("Unknown manager hint.")
+    result = {"kind": kind, "auto_discovered": bool(metadata.get("auto_discovered"))}
+    if kind == "MO2":
+        profile = metadata.get("profile", "")
+        if profile:
+            if (not isinstance(profile, str) or not 1 <= len(profile) <= 140
+                    or len(_relative_name(profile)) != 1):
+                raise ValueError("MO2 profile label is not portable.")
+        elif "Profiles" in roles:
+            raise ValueError("MO2 profile name missing from restore metadata.")
+        result["profile"] = profile
+    return result
+
+
+def create_complete_kit(game: str, sources: dict[str, Path], destination: Path,
+                        manager_context: dict | None = None) -> dict:
     """Backup 1-4 explicitly chosen folders. Does not assume all mods are included."""
     if not isinstance(game, str) or not game.strip() or len(game) > 120:
         raise ValueError("Enter a short game name.")
@@ -227,6 +250,7 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path) 
         raise ValueError("Select one or more folders.")
     if any(role not in ROLE_NAMES for role in sources):
         raise ValueError("Unknown backup folder type.")
+    manager_hint = _portable_manager_context(manager_context, sources)
     destination = Path(destination).absolute()
     if destination.suffix.lower() != ".zip":
         raise ValueError("Select a ZIP file destination.")
@@ -289,8 +313,10 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path) 
                 for role, (root, entries) in captured.items()
             ],
             "automatic_game_repair": False,
-            "note": "Explicitly selected folders only. A kit does not automatically reinstall a game, enable mods or reconnect manager profiles.",
+            "note": "Explicitly selected folders only. A kit does not automatically reinstall a game or activate mods.",
         }
+        if manager_hint is not None:
+            manifest["manager_context"] = manager_hint
         with partial_manifest.open("x", encoding="utf-8") as out:
             json.dump(manifest, out, indent=2)
         _publish_no_replace(partial, destination)
