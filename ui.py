@@ -37,6 +37,7 @@ from resurrection_lab import (
     missing_pieces, compare_kits, plan_living_update, create_living_update,
     rehearse_kit, list_snapshots, prepare_pc_transfer,
 )
+from resurrection_visuals import resurrection_guide
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from mod_radar_audit import audit_mod_radar, private_audit_summary
@@ -2138,6 +2139,8 @@ class GameGraveApp(tk.Tk):
 
     def _resurrection_lab_page(self):
         self.header("Resurrection Lab", "Five tools to check, rehearse, preserve, rewind, and move your gaming setup.")
+        self.button(self.content, "See how Resurrection works · visual guide",
+                    self._open_resurrection_visual).pack(anchor="w", pady=(0, 10))
         actions = [
             ("01 · Missing Pieces", "Find missing MO2 mod folders and unresolved recovery dependencies. "
              "The ZIP is checked, but an intact archive never proves game compatibility.",
@@ -2148,7 +2151,7 @@ class GameGraveApp(tk.Tk):
             ("03 · Living Kits", "Compare an older kit with the folders you choose now. "
              "Save an independent new version only after reviewing changes.",
              self._lab_living),
-            ("04 · Time Machine", "Compare verified kit versions and optionally stage "
+            ("04 · Time Machine", "Compare kit versions with SHA-256 content checks, then optionally stage "
              "an older snapshot without overwriting current saves.",
              self._lab_time_machine),
             ("05 · PC-to-PC Resurrection", "Prepare a verified folder for a USB drive or other transfer. "
@@ -2176,6 +2179,23 @@ class GameGraveApp(tk.Tk):
                   "automatic live file rollback, or hidden background monitoring. "
                   "Only new, user-approved backup/transfer files are created.",
                   9, WARN, wraplength=810).pack(anchor="w", pady=(10, 0))
+
+    def _open_resurrection_visual(self):
+        """A simple, responsive explanation of recovery safety and user control."""
+        window = tk.Toplevel(self)
+        window.title("Game Grave · Resurrection visual guide")
+        window.geometry("820x345")
+        window.minsize(440, 340)
+        window.configure(bg=BG)
+        frame = tk.Frame(window, bg=PANEL, padx=16, pady=16,
+                         highlightbackground=LINE, highlightthickness=1)
+        frame.pack(fill="both", expand=True, padx=12, pady=12)
+        colors = {"panel": PANEL, "raised": RAISED, "text": TEXT,
+                  "muted": MUTED, "accent": ACCENT, "blue": BLUE,
+                  "warn": WARN, "line": LINE}
+        resurrection_guide(frame, colors=colors).pack(fill="both", expand=True)
+        self.button(frame, "Got it", window.destroy).pack(anchor="e", pady=(5, 0))
+        window.bind("<Escape>", lambda _event: window.destroy())
 
     def _lab_manifest(self, label="Choose Resurrection Kit manifest"):
         return filedialog.askopenfilename(
