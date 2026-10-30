@@ -21,7 +21,18 @@ def known_locations(home: Path | None = None, env: dict | None = None) -> list[t
     appdata = Path(env.get("APPDATA", home / "AppData" / "Roaming"))
     local = Path(env.get("LOCALAPPDATA", home / "AppData" / "Local"))
     docs = home / "Documents"
-    return [
+    # WoW launcher default locations; custom installations still need user-added roots.
+    program_files = Path(env.get("PROGRAMFILES(X86)", env.get("ProgramFiles(x86)", "C:/Program Files (x86)")))
+    wow = program_files / "World of Warcraft"
+    wow_locations = []
+    for variant in ("_retail_", "_classic_", "_classic_era_", "_ptr_"):
+        wow_locations.extend([
+            ("World of Warcraft", wow / variant / "Interface" / "AddOns",
+             "Installed WoW addons", "Addons may be enabled; manage them in the game or addon manager."),
+            ("World of Warcraft", wow / variant / "WTF" / "Account",
+             "Saved addon settings protected", "WoW character, account and addon settings must be preserved."),
+        ])
+    return wow_locations + [
         ("Thunderstore", appdata / "Thunderstore Mod Manager" / "DataFolder", "Managed profiles and downloaded mods", "Use Thunderstore to manage installed profiles; do not remove active dependencies."),
         ("r2modman", appdata / "r2modmanPlus-local", "Mod manager profile storage", "Profiles can contain active mods and configurations. Inspect in r2modman first."),
         ("Prism Launcher", appdata / "PrismLauncher" / "instances", "Minecraft instances / worlds protected", "Instances may contain unique Minecraft worlds and saves; never automatically clean."),
