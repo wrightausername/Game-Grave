@@ -71,7 +71,7 @@ def _manifest_for(path: Path) -> tuple[dict, Path]:
     if not isinstance(manifest, dict) or manifest.get("schema") not in (1, 2):
         raise ValueError("This Resurrection Kit version is not supported.")
     archive_name = manifest.get("archive")
-    if (not isinstance(archive_name, str) or not archive_name.endswith(".zip")
+    if (not isinstance(archive_name, str) or not archive_name.casefold().endswith(".zip")
             or Path(archive_name).name != archive_name
             or not _relative_name(archive_name) or "/" in archive_name):
         raise ValueError("The backup ZIP filename is invalid.")
@@ -98,8 +98,8 @@ def _valid_member(info: zipfile.ZipInfo, schema: int) -> tuple[str, ...]:
     if info.is_dir():
         raise ValueError("Unexpected directory record in backup ZIP.")
     attrs = info.external_attr >> 16
-    if stat.S_ISLNK(attrs):
-        raise ValueError("ZIP symbolic links cannot be restored.")
+    if stat.S_ISLNK(attrs) or stat.S_ISDIR(attrs):
+        raise ValueError("ZIP links and directory records cannot be restored.")
     parts = _relative_name(info.filename)
     if schema == 2:
         if parts[0] not in ROLE_NAMES or len(parts) < 2:
@@ -187,11 +187,12 @@ def _safe_tree(source: Path, dest_zip: Path):
     rows = []
     for here, folders, files in os.walk(source, topdown=True, followlinks=False):
         directory = Path(here)
-        folders[:] = [name for name in folders if _regular(directory / name, directory=True)]
+        if any(not _regular(directory / name, directory=True) for name in folders):
+            raise ValueError("Source contains linked or unsupported folders. Choose ordinary folders only; nothing was backed up.")
         for name in files:
             path = directory / name
             if not _regular(path):
-                continue
+                raise ValueError("Source contains linked or unsupported files. Choose ordinary folders only; nothing was backed up.")
             relative = path.relative_to(source).as_posix()
             _relative_name(relative)
             st = path.stat()
