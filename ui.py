@@ -317,9 +317,9 @@ class GameGraveApp(tk.Tk):
         frame.pack(fill="both", expand=True, padx=12, pady=12)
         self.text(frame, "Keyboard quick guide", 18, ACCENT, True).pack(
             anchor="w", pady=(0, 12))
-        self.text(frame, shortcut_help_text(), 11, TEXT,
-                  justify="left", wraplength=465,
-                  font=("Consolas", 11)).pack(anchor="w", fill="x")
+        tk.Label(frame, text=shortcut_help_text(), bg=PANEL, fg=TEXT,
+                 font=("Consolas", 11), justify="left", anchor="w",
+                 wraplength=465).pack(anchor="w", fill="x")
         close = self.button(frame, "Close guide", window.destroy)
         close.pack(anchor="e", pady=(18, 0))
         window.bind("<Escape>", lambda _event: window.destroy())
