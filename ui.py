@@ -41,7 +41,7 @@ from resurrection_visuals import resurrection_guide
 from ui_shortcuts import PAGE_SHORTCUTS, shortcut_help_text
 from ui_viewport import initial_window_bounds
 from ui_scroll import page_wheel_allowed
-from ui_paging import page_window
+from ui_paging import page_window, DEFAULT_PAGE_SIZE
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from mod_radar_audit import audit_mod_radar, private_audit_summary
@@ -1411,21 +1411,28 @@ class GameGraveApp(tk.Tk):
         self.grave_tree.heading("size", command=lambda: self._grave_column_sort("Size"))
         self.grave_tree.heading("decision", command=lambda: self._grave_column_sort("Safety"))
         self.graveyard_lookup = {}
+        self._grave_page_keys = set()
+        self._add_page_controls("grave", self._populate_graveyard)
         self._populate_graveyard()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(8, 0))
         self.button(actions, "Why is this here?", self._grave_details).pack(side="left")
-        self.button(actions, "Check eligible", self._grave_select_eligible).pack(side="left", padx=(7, 0))
-        self.button(actions, "Check all shown", self._grave_select_all).pack(side="left", padx=(7, 0))
-        self.button(actions, "Recycle one", self._grave_recycle_one).pack(side="left", padx=(7, 0))
-        self.button(actions, "Recycle selected", self._grave_recycle_selected, primary=True).pack(side="left", padx=(7, 0))
-        self.button(actions, "Recycle all visible eligible…", self._grave_recycle_all, danger=True).pack(side="right")
+        self.button(actions, "Check eligible on page", self._grave_select_eligible).pack(side="left", padx=(7, 0))
+        self.button(actions, "Check page", self._grave_select_all).pack(side="left", padx=(7, 0))
+        self.button(actions, "Clear checks", self._grave_clear_checks).pack(side="left", padx=(7, 0))
+        cleanup_actions = tk.Frame(self.content, bg=BG)
+        cleanup_actions.pack(fill="x", pady=(5, 0))
+        self.button(cleanup_actions, "Recycle one", self._grave_recycle_one).pack(side="left")
+        self.button(cleanup_actions, "Recycle checked (max 160)", self._grave_recycle_selected, primary=True).pack(side="left", padx=(7, 0))
+        self.button(cleanup_actions, "Recycle eligible on page", self._grave_recycle_all, danger=True).pack(side="left", padx=(7, 0))
         utilities = tk.Frame(self.content, bg=BG)
         utilities.pack(fill="x", pady=(6, 0))
         self.button(utilities, "Open Folder", self._grave_open_folder).pack(side="left")
         self.button(utilities, "Protect / Unprotect", self._grave_toggle_protection).pack(side="left", padx=(7, 0))
-        self.text(self.content, "Check multiple rows to choose what to recycle. All eligible items = visible files only. "
-                  "Protected ordinary archives require extra approval. Recycle Bin storage is NOT freed disk space.",
+        self.text(self.content, "Checks persist when you change pages within this filtered view. 'Check page' "
+                  "and 'Recycle eligible on page' affect only the displayed page. Cleanup is limited "
+                  "to 160 entries per explicit approval, with protected files blocked. "
+                  "Recycle Bin storage is NOT freed disk space.",
                   9, MUTED, wraplength=850).pack(anchor="w", pady=(7, 0))
 
     def _populate_graveyard(self):
@@ -1438,10 +1445,13 @@ class GameGraveApp(tk.Tk):
             minimum=self.grave_min_size_var.get(), sort=self.grave_sort_var.get(),
             order=self.grave_order_var.get())
         self.grave_tree.delete(*self.grave_tree.get_children())
-        self.graveyard_lookup = {}
-        self.grave_checked.intersection_update({e.key for e in visible})
-        for item in visible:
-            self.graveyard_lookup[item.key] = item
+        # Full filtered lookup is retained for checked items across pages.
+        # The Treeview itself only creates a small bounded page.
+        self.graveyard_lookup = {entry.key: entry for entry in visible}
+        self.grave_checked.intersection_update(self.graveyard_lookup)
+        page = page_window(visible, self._pager_indices.get("grave", 0))
+        self._grave_page_keys = {entry.key for entry in page.items}
+        for item in page.items:
             override = self._grave_can_override(item)
             self.grave_tree.insert("", "end", iid=item.key, values=(
                 "☑" if item.key in self.grave_checked else "☐",
@@ -1450,13 +1460,14 @@ class GameGraveApp(tk.Tk):
                 "Recycle after review" if item.can_recycle else
                 ("Override possible" if override else "Protected: no direct delete")),
                 tags=() if item.can_recycle else ("protected",))
-        still_selected = [k for k in selected if k in self.graveyard_lookup]
+        still_selected = [key for key in selected if key in self._grave_page_keys]
         if still_selected:
             self.grave_tree.selection_set(still_selected)
-        eligible_visible = sum(e.can_recycle for e in visible)
-        self.grave_count_var.set(
-            f"Showing {len(visible)} of {len(self.graveyard_entries)} findings  •  "
-            f"{eligible_visible} eligible  •  {len(self.grave_checked)} checked")
+        self._grave_summary = (
+            f"{page.label}  •  {len(visible)} filtered of {len(self.graveyard_entries)}"
+            f"  •  {sum(entry.can_recycle for entry in visible)} eligible across pages")
+        self._update_inventory_page("grave", page)
+        self._grave_update_count()
 
     def _grave_view_changed(self, event=None):
         if self._applying_grave_preset:
@@ -1472,7 +1483,7 @@ class GameGraveApp(tk.Tk):
         save_settings(self.settings)
         if hasattr(self, "grave_preset_var"):
             self.grave_preset_var.set("Custom")
-        self._populate_graveyard()
+        self._reset_inventory_page("grave", self._populate_graveyard)
 
     def _grave_column_sort(self, key):
         if self.grave_sort_var.get() == key:
