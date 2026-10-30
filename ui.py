@@ -784,13 +784,15 @@ class GameGraveApp(tk.Tk):
                                 variable=self.only_old, style="Dark.TCheckbutton",
                                 command=lambda: self._reset_inventory_page("games", self._populate_games))
         self.game_old_check.pack(side="left")
-        self.text(controls, "Threshold (days):", 9, MUTED).pack(side="left", padx=(22, 9))
+        secondary_filters = tk.Frame(self.content, bg=BG)
+        secondary_filters.pack(fill="x", pady=(0, 10))
+        self.text(secondary_filters, "Threshold (days):", 9, MUTED).pack(side="left", padx=(0, 9))
         self.game_days_var = tk.StringVar(value=str(self.settings["game_stale_days"]))
-        days = ttk.Combobox(controls, textvariable=self.game_days_var, values=tuple(map(str, GAME_AGE_OPTIONS)),
+        days = ttk.Combobox(secondary_filters, textvariable=self.game_days_var, values=tuple(map(str, GAME_AGE_OPTIONS)),
                             state="readonly", style="Dark.TCombobox", width=5)
         days.pack(side="left")
         days.bind("<<ComboboxSelected>>", self._change_game_days)
-        self.text(controls, "Sort", 9, MUTED).pack(side="left", padx=(15, 6))
+        self.text(secondary_filters, "Sort", 9, MUTED).pack(side="left", padx=(15, 6))
         self.game_sort_var = tk.StringVar(value=self.settings.get("game_sort", "Oldest first"))
         game_sort = ttk.Combobox(controls, textvariable=self.game_sort_var,
                                  values=GAMES_SORT_OPTIONS, state="readonly", style="Dark.TCombobox", width=15)
@@ -814,8 +816,10 @@ class GameGraveApp(tk.Tk):
         actions.pack(fill="x", pady=(14, 0))
         self.button(actions, "Uninstall selected via Steam", self._uninstall_game, primary=True).pack(side="left")
         self.button(actions, "Open installation folder", self._open_game_folder).pack(side="left", padx=12)
-        self.button(actions, "Clear shader cache…", self._clear_game_shader_cache).pack(side="left", padx=(0, 8))
-        self.button(actions, "Add Steam library", self._add_steam_library).pack(side="right")
+        more_actions = tk.Frame(self.content, bg=BG)
+        more_actions.pack(fill="x", pady=(5, 0))
+        self.button(more_actions, "Clear shader cache…", self._clear_game_shader_cache).pack(side="left")
+        self.button(more_actions, "Add Steam library", self._add_steam_library).pack(side="left", padx=12)
         self.text(self.content,
                   "Unknown means local records don't confirm the last play date. Installation timestamps are NOT used to guess playtime.",
                   9, MUTED, wraplength=840).pack(anchor="w", pady=(16, 0))
