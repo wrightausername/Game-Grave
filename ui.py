@@ -2901,7 +2901,11 @@ class GameGraveApp(tk.Tk):
         self.scan_start_var = tk.BooleanVar(value=self.settings.get("scan_on_launch", False))
         ttk.Checkbutton(settings, text="Scan when I open Game Grave (off by default)", variable=self.scan_start_var,
                         command=self._save_startup_pref, style="Dark.TCheckbutton").pack(anchor="w", pady=7)
-        self.button(settings, "Reset appearance", self._reset_appearance).pack(anchor="w", pady=(8, 0))
+        setting_actions = tk.Frame(settings, bg=PANEL)
+        setting_actions.pack(anchor="w", pady=(8, 0))
+        self.button(setting_actions, "Reset appearance", self._reset_appearance).pack(side="left")
+        self.button(setting_actions, "Keyboard guide (F1)", self._open_keyboard_shortcuts).pack(
+            side="left", padx=(9, 0))
 
         preset_panel = self.panel(presets_tab)
         preset_panel.pack(fill="x", pady=(0, 12))
