@@ -163,3 +163,7 @@ folders are in use. Mark the validation matrix in
 [M2 tracker #11](https://github.com/wrightausername/Game-Grave/issues/11).
 Do not upload screenshots or logs containing usernames or private paths.
 The emitted report deliberately sets `m2_release_accepted: false`, because counts alone cannot prove detection accuracy.
+
+### Easier M2 report export directly inside the desktop app
+
+After clicking **Scan PC** and optionally **Inspect manager profiles**, open **Game DNA → Export QA**. Confirm the privacy notice and choose a new JSON destination. The report contains only whitelisted counts, never raw paths, game names or mod/profile names. A checkmark in the report is **not** an M2 sign-off; compare the actual findings against the launchers/managers on both Windows 10 and Windows 11 and record any false positives or missed storage in [M2 issue #11](https://github.com/wrightausername/Game-Grave/issues/11). The separate command-line helper remains available to developers.

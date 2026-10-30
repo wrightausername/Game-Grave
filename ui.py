@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 import queue
 import subprocess
 import sys
@@ -38,7 +39,7 @@ from resurrection_lab import (
 )
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
-from mod_radar_audit import audit_mod_radar
+from mod_radar_audit import audit_mod_radar, private_audit_summary
 from dna_visuals import dna_visual, mod_radar_visual
 from space_planner import plan_for_drive
 from launchers import LauncherGame, find_launcher_games
@@ -377,6 +378,7 @@ class GameGraveApp(tk.Tk):
         self.button(dna_tools, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(side="left")
         self.button(dna_tools, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=9)
         self.button(dna_tools, "View visual map", lambda: self._open_dna_visual_map(dna)).pack(side="left", padx=9)
+        self.button(dna_tools, "Export QA", self._export_private_m2_qa).pack(side="left", padx=9)
         previous = load_observation()
         if previous:
             self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
@@ -466,6 +468,45 @@ class GameGraveApp(tk.Tk):
                   9, MUTED, wraplength=690).pack(anchor="w", pady=(9, 0))
         self.button(frame, "Close visual guide", window.destroy).pack(anchor="e", pady=(10, 0))
         window.bind("<Escape>", lambda _event: window.destroy())
+
+    def _export_private_m2_qa(self):
+        """User-initiated aggregate JSON export; never writes names or paths."""
+        if not self.last_scan:
+            messagebox.showinfo("Scan first", "Run Scan PC before exporting a local M2 report.")
+            return
+        profile_rows = (self.profile_report or {}).get("profiles", [])
+        audit = audit_mod_radar(
+            self.games, self.other_games, self.mod_folders, self.save_findings,
+            profile_rows)
+        report = private_audit_summary(
+            audit, profiles_examined=self.profile_report is not None)
+        if not messagebox.askyesno(
+                "Export private Mod Radar report?",
+                "Create a JSON file containing only scan counts and uncertainty "
+                "categories? No game names, mod names, paths, usernames, "
+                "profile IDs or file contents will be included.\n\n"
+                "Nothing will be deleted, uploaded or repaired."):
+            return
+        selected = filedialog.asksaveasfilename(
+            title="Choose a new QA report filename",
+            defaultextension=".json",
+            initialfile="GameGrave-M2-private-audit.json",
+            filetypes=[("JSON report", "*.json")])
+        if not selected:
+            return
+        path = Path(selected)
+        try:
+            if path.exists() or path.is_symlink():
+                raise FileExistsError("That report already exists. Choose a new name.")
+            with path.open("x", encoding="utf-8") as stream:
+                json.dump(report, stream, indent=2, ensure_ascii=False)
+                stream.write("\n")
+            self.status_text.set("Private Mod Radar QA report exported")
+            messagebox.showinfo("Report created",
+                "Count-only audit exported to the location you selected.\n\n"
+                "A real Windows/launcher QA review is still needed to finish M2.")
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Cannot save QA report", str(exc))
 
     def _show_mod_radar_audit(self):
         """Summarize existing scan relationships, never perform cleanup."""

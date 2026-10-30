@@ -214,3 +214,7 @@ Game DNA now includes a responsive, read-only **relationship map** (automaticall
 ### M2 scanner input safety (engineer preview)
 
 Steam metadata files are read only when they are ordinary, bounded-size files, not symlinks or junction targets. Steam library roots must be existing absolute locations without redirected ancestors, including secondary libraries discovered from `libraryfolders.vdf`. Workshop, Vortex, MO2 and other read-only mod roots are similarly skipped when parent directories traverse a reparse point. This limits false positive attribution and unexpected traversal outside selected library roots, at the cost of marking uncommon symlink-based setups unsupported until reviewed. Missing/oversized metadata does not establish that a game or its mods are unused.
+
+### One-click private M2 QA report
+
+After scanning your computer, open **Game DNA → Export QA**. Game Grave asks for confirmation, then lets you pick a **new** JSON filename (existing files are never overwritten). The export contains only aggregate counts of detected games, mods and unresolved associations, plus whether manager profiles have been inspected. It **never includes game titles, usernames, file paths, mod names or private profiles**, and nothing is uploaded. The report is QA evidence for human review, not proof that Game Grave correctly detects every installation or that cleanup is safe.
