@@ -238,3 +238,7 @@ See [M4 Windows QA](M4_WINDOWS_QA.md) for the required keyboard-only, scaling, c
 ### M4 large libraries: bounded table rendering
 
 Steam Games, Other Launchers, Game Mods and Old Files use keyboard-focusable **Previous / Next** controls instead of attempting to create thousands of Windows table rows at once. Up to 160 findings appear per page; the label shows your current position and the full count, and **no scan results are discarded**. Search/filter/sort still apply across the entire discovered list. Old Files **Select all shown** selects the *visible page*, and every actual Recycle Bin request still requires normal per-file checks and explicit user confirmation. Steam controls are split into more compact rows to suit smaller displays. The Graveyard's existing safety controls are unchanged.
+
+### M4 short-screen sidebar navigation
+
+The main sidebar now scrolls independently from the current page. On small monitors and large text settings, **Settings, Undo Center and Advanced navigation** remain reachable instead of falling below the window. The mouse wheel over the sidebar scrolls its navigation list; page or table scrolling remains separate. Ctrl+1..7 also scrolls the sidebar to reveal the selected shortcut destination. The edition and cleanup-safety reminder stay outside the scrolling navigation list. This is an engineering UI improvement and **not** final Windows screen-reader certification.
