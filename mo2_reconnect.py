@@ -133,6 +133,7 @@ def _build_mo2_plan(manifest_path: Path, ini_file: Path, games=(), other_games=(
         existing = {p.name.casefold() for p in root_mods.iterdir()}
         if any(name.casefold() in existing for name in mod_folders):
             raise FileExistsError("Some kit mods already exist in MO2. No overwrite or merge is attempted.")
+    ignored_roles = [r for r in kit["roles"] if r not in ("Mods", "Profiles")]
     total = kit["bytes"]
     # The two roots could live on different disks. Check per-volume conservative room.
     for root in {root_profiles, root_mods}:
@@ -145,6 +146,7 @@ def _build_mo2_plan(manifest_path: Path, ini_file: Path, games=(), other_games=(
         "mod_root": str(root_mods), "profiles_root": str(root_profiles),
         "profile_target": str(profile_target),
         "mods_to_add": names, "mods_count": len(names),
+        "not_reconnected_roles": ignored_roles,
         "files": kit["files"], "bytes": total,
         "archive": str(archive_path),
         "no_overwrite": True, "no_live_game_edit": True,
@@ -214,7 +216,9 @@ def reconnect_to_mo2(manifest_path: Path, ini_file: Path, games=(),
                     destination = profile_dest.joinpath(*parts[1:])
                     anchor = profile_dest
                 else:
-                    raise RuntimeError("Kit contains unexpected content for MO2.")
+                    # Save/config roles are retained in the verified ZIP. Never
+                    # guess live save destinations from directory names alone.
+                    continue
                 # Files must stay inside an exclusively-created destination.
                 if anchor not in destination.parents or not _ordinary(anchor, directory=True):
                     raise RuntimeError("Restore destination escaped its reserved folder.")
@@ -236,6 +240,7 @@ def reconnect_to_mo2(manifest_path: Path, ini_file: Path, games=(),
                     raise RuntimeError("Restored file size differs from archive.")
         return {
             "restored": True, "profile": str(profile_dest),
+            "not_reconnected_roles": plan["not_reconnected_roles"],
             "added_mod_folders": plan["mods_count"],
             "files": plan["files"],
             "no_overwrite": True,
