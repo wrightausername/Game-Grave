@@ -669,7 +669,7 @@ def is_protected_path(path: Path, extra: list[str] | None = None) -> bool:
     if any(part in {"saves", "savegames", "saved games", "worlds", "playerprofiles",
                      "modorganizer", "mod organizer 2", "steamapps",
                      "addons", "savedvariables", "my games", "saves", "userprofiles", "userskins", "usersights", "usermissions",
-                     "userhangar", "interface", "profiles"} for part in pieces):
+                     "userhangar", "interface", "profiles", "wtf"} for part in pieces):
         return True
     if "mods" in pieces and "downloads" not in pieces:
         return True
