@@ -24,7 +24,22 @@ if (-not $paths) {
 }
 & $paths[0] 'installer\GameGrave.iss'
 if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
-$installer = Join-Path $PSScriptRoot 'release\GameGrave_Setup_v2.0.0.exe'
-if (-not (Test-Path $installer)) { throw 'The installer was not produced' }
-Write-Host "Installer built: $installer"
-Write-Host 'IMPORTANT: This installer is unsigned. Code-sign and QA on real Windows before distributing.'
+# Read the version actually embedded in the Inno Setup definition. The old
+# hardcoded v2.0 name incorrectly rejected a successfully built v2.4 installer.
+$versionLine = Select-String -Path (Join-Path $PSScriptRoot 'installer\GameGrave.iss') `
+    -Pattern '^#define MyAppVersion "([^"]+)"
+if (-not $versionLine -or $versionLine.Matches.Count -ne 1) {
+    throw 'Cannot identify exactly one installer version in GameGrave.iss'
+}
+$version = $versionLine.Matches[0].Groups[1].Value
+$installer = Join-Path $PSScriptRoot "release\GameGrave_Setup_v$version.exe"
+if (-not (Test-Path $installer)) {
+    throw "Inno Setup ran, but the expected versioned installer was not produced: $installer"
+}
+$hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
+$hashFile = Join-Path $PSScriptRoot "release\GameGrave_Setup_v$version.sha256"
+("$hash  " + [System.IO.Path]::GetFileName($installer)) |
+    Out-File -FilePath $hashFile -Encoding ascii
+Write-Host "Unsigned candidate installer built: $installer"
+Write-Host "SHA-256 manifest: $hashFile"
+Write-Host 'NOT A PRODUCTION RELEASE: Requires Authenticode signing, manual clean-Windows QA and 1.0 release gates.'
