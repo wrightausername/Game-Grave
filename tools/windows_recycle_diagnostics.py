@@ -54,12 +54,21 @@ def _shell_visibility(name: str, full_path: Path) -> dict:
         "$bin = (New-Object -ComObject Shell.Application).Namespace(10)\n"
         "if ($null -eq $bin) { throw 'Cannot access Shell Recycle Bin' }\n"
         "$count = 0; $named = 0; $linked = 0; $origin = 0\n"
+        "$matchedFolder = 0; $fullFileName = ''; $displayName = ''; $itemType = ''; $itemName = ''\n"
         "$probeName = " + literal + "\n"
         "$probePath = " + path + "\n"
         "foreach ($item in $bin.Items()) {\n"
         "  $count += 1\n"
         "  $from = [string]$item.ExtendedProperty('System.Recycle.DeletedFrom')\n"
         "  if ($from) { $origin += 1 }\n"
+        "  if ($from -and [string]::Equals($from, [System.IO.Path]::GetDirectoryName($probePath), "
+        "[StringComparison]::OrdinalIgnoreCase)) {\n"
+        "    $matchedFolder += 1\n"
+        "    $fullFileName = [string]$item.ExtendedProperty('System.FileName')\n"
+        "    $displayName = [string]$item.ExtendedProperty('System.ItemNameDisplay')\n"
+        "    $itemType = [string]$item.ExtendedProperty('System.ItemType')\n"
+        "    $itemName = [string]$item.Name\n"
+        "  }\n"
         "  if ([string]::Equals($item.Name, $probeName, "
         "[StringComparison]::OrdinalIgnoreCase)) {\n"
         "    $named += 1\n"
@@ -72,6 +81,11 @@ def _shell_visibility(name: str, full_path: Path) -> dict:
         "'NAMED_PROBE_MATCHES=' + $named\n"
         "'FULL_PATH_MATCHES=' + $linked\n"
         "'ITEMS_WITH_ORIGIN_PROPERTY=' + $origin\n"
+        "'MATCHED_TEMP_FOLDER_COUNT=' + $matchedFolder\n"
+        "'SYSTEM_FILENAME_MATCHES=' + [string]::Equals($fullFileName, $probeName, [StringComparison]::OrdinalIgnoreCase)\n"
+        "'DISPLAYNAME_MATCHES=' + [string]::Equals($displayName, $probeName, [StringComparison]::OrdinalIgnoreCase)\n"
+        "'NAME_WITHOUT_EXTENSION_MATCHES=' + [string]::Equals($itemName, [System.IO.Path]::GetFileNameWithoutExtension($probeName), [StringComparison]::OrdinalIgnoreCase)\n"
+        "'SHELL_ITEMTYPE_MATCHES_EXTENSION=' + [string]::Equals($itemType, [System.IO.Path]::GetExtension($probeName), [StringComparison]::OrdinalIgnoreCase)\n"
     )
     try:
         output = recovery._run_ps(script)
@@ -82,7 +96,10 @@ def _shell_visibility(name: str, full_path: Path) -> dict:
         if "=" in line:
             key, value = line.split("=", 1)
             if key in {"SHELL_ITEM_COUNT", "NAMED_PROBE_MATCHES",
-                       "FULL_PATH_MATCHES", "ITEMS_WITH_ORIGIN_PROPERTY"}:
+                       "FULL_PATH_MATCHES", "ITEMS_WITH_ORIGIN_PROPERTY",
+                       "MATCHED_TEMP_FOLDER_COUNT", "SYSTEM_FILENAME_MATCHES",
+                       "DISPLAYNAME_MATCHES", "NAME_WITHOUT_EXTENSION_MATCHES",
+                       "SHELL_ITEMTYPE_MATCHES_EXTENSION"}:
                 results[key.lower()] = value.strip()
     return results
 
