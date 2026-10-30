@@ -246,26 +246,14 @@ def reconnect_to_mo2(manifest_path: Path, ini_file: Path, games=(),
             "no_overwrite": True,
             "note": "Recreated missing MO2 mod folders and a new profile. Select the restored profile in MO2.",
         }
-    except BaseException as error:
-        # Avoid wiping unrelated files if a concurrent process touched our directories.
-        # Only roll back if *every* newly-created subtree consists solely of the
-        # exact files we created. Any uncertainty leaves directories for review.
-        import collections
-        expected = collections.defaultdict(set)
-        for item in created_files:
-            for ancestor in created_dirs:
-                if ancestor in item.parents:
-                    expected[ancestor].add(item)
-                    break
-        for folder in reversed(created_dirs):
-            try:
-                actual = {p for p in folder.rglob("*") if p.is_file()}
-                linked = any(p.is_symlink() for p in folder.rglob("*"))
-                if not linked and actual == expected[folder]:
-                    shutil.rmtree(folder)
-            except OSError:
-                pass
+    except Exception as error:
+        # Never recursively delete from an actual mod-manager root in an error
+        # handler. A concurrent process or user may have put content there.
+        # Any newly created incomplete folders remain for explicit inspection.
+        # Existing games, mods and profiles were not overwritten.
+        created = ", ".join(str(path) for path in created_dirs[:8])
         raise RuntimeError(
-            "MO2 restoration did not complete. Inspect the manager folders for "
-            "possible partial data; existing game files were not replaced."
+            "MO2 reconnection stopped before completion. New folders may be "
+            "incomplete; close MO2 and inspect them before retrying. "
+            f"New paths requiring review: {created or 'none'}"
         ) from error
