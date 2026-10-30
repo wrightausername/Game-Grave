@@ -207,6 +207,18 @@ def _safe_tree(source: Path, dest_zip: Path):
     return rows
 
 
+def _publish_no_replace(temporary: Path, destination: Path) -> None:
+    """Reserve destination exclusively before replacing *our own* placeholder."""
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0)
+    fd = os.open(destination, flags, 0o600)
+    os.close(fd)
+    try:
+        temporary.replace(destination)
+    except BaseException:
+        destination.unlink(missing_ok=True)
+        raise
+
+
 def create_complete_kit(game: str, sources: dict[str, Path], destination: Path) -> dict:
     """Backup 1-4 explicitly chosen folders. Does not assume all mods are included."""
     if not isinstance(game, str) or not game.strip() or len(game) > 120:
@@ -281,8 +293,13 @@ def create_complete_kit(game: str, sources: dict[str, Path], destination: Path) 
         }
         with partial_manifest.open("x", encoding="utf-8") as out:
             json.dump(manifest, out, indent=2)
-        partial.replace(destination)
-        partial_manifest.replace(sidecar)
+        _publish_no_replace(partial, destination)
+        try:
+            _publish_no_replace(partial_manifest, sidecar)
+        except BaseException:
+            # Remove only the ZIP created by this attempt; never touch source files.
+            destination.unlink(missing_ok=True)
+            raise
         return {"archive": str(destination), "manifest": str(sidecar),
                 "verified": True, "files": count, "bytes": total,
                 "roles": [item["name"] for item in manifest["roles"]]}
