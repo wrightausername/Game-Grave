@@ -26,3 +26,7 @@ Report Windows build, Game Grave commit, display resolution/scale, task ID, obse
 Re-run cancellation tests after every scanner change. Cancellation is cooperative, not a guarantee of immediate interruption within a single slow third-party metadata call, so manual QA should record **cancel response latency** for each scanner and a large sample library. No canceled scan may overwrite the last accepted inventory, announce completion, start cleanup, or write successful scan history.
 
 Automated tests exercise cancellation between every scan stage, late `scan_complete` events, and the difference between explicit cancel and an actual failed scan. These tests do not prove real Windows UI responsiveness at 100,000 mod entries.
+
+## Scroll and compact-control verification
+
+On 1280×720, 1366×768 and 1920×1080 at 100%, 125%, 150% and 200% scaling, verify the page scrollbar reaches the last action on every page, including Settings tabs, Game DNA, The Graveyard, Save Vault and Resurrection Lab. The mouse wheel over a page panel must scroll the outer page; over a Treeview it must scroll the **table**, without losing selection. Check page navigation resets outer scroll to top, keyboard focus remains visible and the Game DNA action buttons no longer clip on laptop-sized windows. The new scroll container is not proof of universal screen reader support. A UI automation test cannot substitute for interactive Win10/Win11 scaling verification.
