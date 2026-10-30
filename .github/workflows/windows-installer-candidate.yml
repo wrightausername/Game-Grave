@@ -1,0 +1,61 @@
+name: Windows installer candidate (unsigned; manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    name: Build and hash development installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Ensure Inno Setup is available
+        shell: pwsh
+        run: |
+          $paths = @(
+            $env:ISCC_PATH,
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
+          ) | Where-Object { $_ -and (Test-Path $_) }
+          if (-not $paths) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot install Inno Setup 6 on CI runner' }
+          }
+      - name: Create disposable TEMP directory for fixture tests
+        shell: pwsh
+        run: |
+          $folder = Join-Path $env:GITHUB_WORKSPACE '_ci_temp'
+          New-Item -ItemType Directory -Force $folder | Out-Null
+          "TEMP=$folder" | Out-File $env:GITHUB_ENV -Append
+          "TMP=$folder" | Out-File $env:GITHUB_ENV -Append
+      - name: Run tests and build unsigned installer with SHA256
+        shell: pwsh
+        run: .\build_installer.ps1
+      - name: Verify unsigned installer and matching hash file exist
+        shell: pwsh
+        run: |
+          $setup = @(Get-ChildItem release\GameGrave_Setup_v*.exe -File)
+          if ($setup.Count -ne 1) { throw 'Expected precisely one installer candidate' }
+          $hashFile = [IO.Path]::ChangeExtension($setup[0].FullName, '.sha256')
+          if (-not (Test-Path $hashFile)) { throw 'SHA256 manifest missing' }
+          $actual = (Get-FileHash -Algorithm SHA256 $setup[0].FullName).Hash.ToLowerInvariant()
+          $expected = ((Get-Content $hashFile -Raw) -split '\s+')[0].ToLowerInvariant()
+          if ($actual -ne $expected) { throw 'Installer checksum differs from published candidate manifest' }
+          Write-Host 'Candidate compiled and checksum verified; NOT code signed or release approved.'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Unsigned-Installer-Candidate
+          path: |
+            release/GameGrave_Setup_v*.exe
+            release/GameGrave_Setup_v*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+# This deliberately does NOT publish a production release, process purchases,
+# or pretend the unsigned installer has passed real Windows QA.
