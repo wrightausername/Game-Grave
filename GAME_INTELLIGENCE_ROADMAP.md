@@ -121,3 +121,13 @@ all eight production features are complete.
 - Ghost Watch marks comparisons uncertain when a root was inaccessible/redirected or a scan was capped/changed scope. A missing observation is no longer portrayed as a definite removed file when coverage is incomplete.
 
 **Still M2 release-blocking:** real installed Steam/Epic/GOG/MO2/Vortex coverage tests on Windows 10/11, launcher and manager library moves, ESO/FiveM/MMO fixture coverage and false-positive sampling. CI on synthetic files does not satisfy those requirements. Tracked by [M2 issue #11](https://github.com/wrightausername/Game-Grave/issues/11).
+
+### Additional Steam and Workshop provenance safeguards
+
+- Appstate manifest filename and app ID must agree; stale manifests with no actual game directory no longer produce phantom "installed" records.
+- Dangerous/relative `installdir` values, redirected folders and linked ancestors are not treated as verified game installations.
+- A Steam Workshop app ID link requires an item reported by the Steam Workshop inventory, not merely a directory resembling Workshop content.
+- File Detective no longer treats symlinked/junctioned ancestors as trusted evidence of ownership.
+- Synthetic tests demonstrate these refusal cases without reading any user's actual game folders.
+
+Still pending M2 release gates: real moved-library/manifest behavior, multiple store installs, Steam Workshop state reconciliation, mod manager snapshot status and live Windows 10/11 acceptance.
