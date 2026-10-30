@@ -38,6 +38,7 @@ from resurrection_lab import (
     rehearse_kit, list_snapshots, prepare_pc_transfer,
 )
 from resurrection_visuals import resurrection_guide
+from ui_shortcuts import PAGE_SHORTCUTS, shortcut_help_text
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from mod_radar_audit import audit_mod_radar, private_audit_summary
@@ -150,6 +151,7 @@ class GameGraveApp(tk.Tk):
         self._cancel_scan = threading.Event()
         self._ui_style()
         self._layout()
+        self._install_keyboard_shortcuts()
         self.show_page("Overview")
         self.after(120, self._poll)
         if self.settings.get("scan_on_launch", False):
@@ -204,7 +206,9 @@ class GameGraveApp(tk.Tk):
         for title, symbol in items:
             b = tk.Button(self.sidebar, text=f"{symbol}    {title}", anchor="w",
                           font=("Segoe UI", 11), bg=SIDEBAR, fg=MUTED,
-                          bd=0, highlightthickness=0, relief="flat", padx=21, pady=10,
+                          bd=0, highlightthickness=1, highlightcolor=ACCENT,
+                          highlightbackground=SIDEBAR, takefocus=1,
+                          relief="flat", padx=21, pady=10,
                           cursor="hand2", command=lambda n=title: self.show_page(n))
             b.pack(fill="x", padx=9, pady=1)
             self.nav_buttons[title] = b
@@ -246,7 +250,9 @@ class GameGraveApp(tk.Tk):
                       activebackground=ACCENT if primary else RAISED,
                       activeforeground=ON_ACCENT if primary else TEXT,
                       font=("Segoe UI Semibold", 10), padx=15, pady=9,
-                      bd=0, relief="flat", highlightthickness=0, cursor="hand2")
+                      bd=0, relief="flat", highlightthickness=1,
+                      highlightcolor=ACCENT, highlightbackground=LINE,
+                      takefocus=1, cursor="hand2")
         return b
 
     def text(self, parent, value, size=11, fg=TEXT, bold=False, **kw):
@@ -262,6 +268,63 @@ class GameGraveApp(tk.Tk):
         frame = tk.Frame(parent or self.content, bg=PANEL, padx=pad, pady=pad,
                          highlightbackground=LINE, highlightthickness=1)
         return frame
+
+    def _install_keyboard_shortcuts(self):
+        """Navigation only, a read-only scan, and safe scan cancellation."""
+        for shortcut, _label, destination in PAGE_SHORTCUTS:
+            number = shortcut.removeprefix("Ctrl+")
+            self.bind("<Control-KeyPress-" + number + ">",
+                      lambda _event, page=destination: self._navigate_shortcut(page))
+        self.bind("<F1>", self._open_keyboard_shortcuts)
+        self.bind("<F5>", self._shortcut_scan)
+        self.bind("<Escape>", self._shortcut_cancel_scan)
+
+    def _navigate_shortcut(self, page):
+        self.show_page(page)
+        control = self.nav_buttons.get(page, self.scan_button)
+        control.focus_set()
+        return "break"
+
+    def _shortcut_scan(self, _event=None):
+        # F5 has the same behavior as the explicit "Scan PC" button.
+        if not self.scanning:
+            self.scan_all()
+        return "break"
+
+    def _shortcut_cancel_scan(self, _event=None):
+        # Escape cannot invoke a recycle or other destructive action.
+        if self.scanning:
+            self._cancel_active_scan()
+            return "break"
+
+    def _open_keyboard_shortcuts(self, _event=None):
+        existing = getattr(self, "_keyboard_window", None)
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.lift()
+                    existing.focus_set()
+                    return "break"
+            except tk.TclError:
+                pass
+        window = tk.Toplevel(self)
+        self._keyboard_window = window
+        window.title("Game Grave · Keyboard shortcuts")
+        window.geometry("530x500")
+        window.minsize(440, 450)
+        window.configure(bg=BG)
+        frame = self.panel(window, 16)
+        frame.pack(fill="both", expand=True, padx=12, pady=12)
+        self.text(frame, "Keyboard quick guide", 18, ACCENT, True).pack(
+            anchor="w", pady=(0, 12))
+        self.text(frame, shortcut_help_text(), 11, TEXT,
+                  justify="left", wraplength=465,
+                  font=("Consolas", 11)).pack(anchor="w", fill="x")
+        close = self.button(frame, "Close guide", window.destroy)
+        close.pack(anchor="e", pady=(18, 0))
+        window.bind("<Escape>", lambda _event: window.destroy())
+        close.focus_set()
+        return "break"
 
     def show_page(self, title):
         self.active = title
