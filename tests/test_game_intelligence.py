@@ -95,7 +95,7 @@ class ChangeObservationTests(unittest.TestCase):
             observation = gg.capture_mod_observation([mod(folder)], max_entries=2)
             self.assertTrue(observation["truncated"])
             self.assertEqual(len(observation["entries"]), 2)
-            self.assertNotIn(str(symlink.resolve(strict=False)), observation["entries"])
+            self.assertNotIn(str(symlink.absolute()), observation["entries"])
 
     def test_change_scope_and_first_baseline_do_not_promise_repair(self):
         first = {"schema": 1, "roots": ["A"], "entries": {"a.dll": [1, 1]}, "truncated": False}
