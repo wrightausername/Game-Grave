@@ -28,6 +28,7 @@ from game_intelligence import (build_game_dna, capture_mod_observation, load_obs
                                save_observation, ghost_watch, what_broke_my_game,
                                patch_fallout, regret_calculator, exodus_plan)
 from resurrection_kit import create_resurrection_kit
+from resurrection_v2 import create_complete_kit, inspect_restore, restore_kit
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from space_planner import plan_for_drive
 from launchers import LauncherGame, find_launcher_games
@@ -2030,7 +2031,8 @@ class GameGraveApp(tk.Tk):
         bottom.pack(fill="x", pady=(12, 0))
         self.button(bottom, "Back up selected to ZIP", self._backup_selected_save).pack(side="left")
         self.button(bottom, "Back up another folder", self._choose_save_backup).pack(side="left", padx=10)
-        self.button(bottom, "Create Resurrection Kit", self._make_resurrection_kit).pack(side="left", padx=10)
+        self.button(bottom, "Preserve setup (Kit)", self._make_resurrection_kit).pack(side="left", padx=10)
+        self.button(bottom, "Preview / Restore Kit", self._preview_resurrection_kit).pack(side="left", padx=10)
         self.text(self.content, "Nothing is deleted from Save Vault. Save profiles and known save folders remain "
                   "excluded from bulk cleanup, even when marked for manual review. "
                   "Close the game before making a backup.", 9, WARN, wraplength=830).pack(anchor="w", pady=(10, 0))
@@ -2138,26 +2140,70 @@ class GameGraveApp(tk.Tk):
     def _make_resurrection_kit(self):
         chosen = self._selected_saves()
         if len(chosen) != 1:
-            messagebox.showinfo("Choose one folder", "Select exactly one save/profile folder for a Resurrection Kit.")
+            messagebox.showinfo("Select a save folder",
+                "Select one discovered game save/profile folder to preserve first.")
             return
         item = chosen[0]
+        sources = {"Saves": Path(item.path)}
+        include_mods = messagebox.askyesno("Include your mod setup?",
+            "Resurrection Kit will preserve your selected save folder.\n\n"
+            "Do you also want to add a mod/mod-manager profile folder? "
+            "You'll choose its exact location. Nothing is guessed or removed.")
+        if include_mods:
+            folder = filedialog.askdirectory(
+                title="Choose the mod or mod-manager profile folder to preserve")
+            if not folder:
+                return  # User chose to include mod data, so don't silently omit it.
+            sources["Mods"] = Path(folder)
         destination = filedialog.asksaveasfilename(
-            title="Choose Resurrection Kit ZIP location", defaultextension=".zip",
+            title="Save your Resurrection Kit ZIP", defaultextension=".zip",
             filetypes=[("ZIP archive", "*.zip")],
             initialfile=Path(item.path).name + "_Resurrection.zip")
         if not destination:
             return
-        if not messagebox.askyesno("Create verified Resurrection Kit?",
-                "Game: " + item.game + "\nSource: " + item.path + "\nDestination: " + destination +
-                "\n\nOnly this selected folder is preserved. Mods, game installation and "
-                "automatic restore are not included. Close the game before continuing."):
+        folders = "\n".join(f"• {role}: {path}" for role, path in sources.items())
+        if not messagebox.askyesno("Preserve this setup?",
+                f"Game: {item.game}\n\nFolders to preserve:\n{folders}\n\n"
+                f"Kit ZIP: {destination}\n\n"
+                "Game Grave saves only these selected folders. Close the game and "
+                "mod manager first. This does not archive the game installation or "
+                "promise automatic mod activation. Continue?"):
             return
         self.status_text.set("Creating and verifying Resurrection Kit…")
         def worker():
             try:
-                created = create_resurrection_kit(item.game, Path(item.path), Path(destination))
+                created = create_complete_kit(item.game, sources, Path(destination))
                 self.events.put(("kit_result", created))
             except (OSError, ValueError, RuntimeError, InterruptedError, zipfile.BadZipFile) as exc:
+                self.events.put(("kit_error", str(exc)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _preview_resurrection_kit(self):
+        manifest = filedialog.askopenfilename(
+            title="Choose your Resurrection Kit manifest (.ggkit.json)",
+            filetypes=[("Game Grave kit", "*.ggkit.json"), ("JSON file", "*.json")])
+        if not manifest:
+            return
+        parent = filedialog.askdirectory(
+            title="Choose where to create a NEW restored folder (no files overwritten)")
+        if not parent:
+            return
+        self.status_text.set("Checking Resurrection Kit checksum and ZIP files…")
+        def worker():
+            try:
+                checked = inspect_restore(Path(manifest), Path(parent))
+                self.events.put(("kit_preview", (manifest, parent, checked)))
+            except (OSError, ValueError, RuntimeError, zipfile.BadZipFile, FileExistsError) as exc:
+                self.events.put(("kit_error", str(exc)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _restore_verified_kit(self, manifest, parent):
+        self.status_text.set("Recovering kit into a new folder; existing game files are untouched…")
+        def worker():
+            try:
+                restored = restore_kit(Path(manifest), Path(parent), approved=True)
+                self.events.put(("kit_restore_result", restored))
+            except (OSError, ValueError, RuntimeError, zipfile.BadZipFile, FileExistsError) as exc:
                 self.events.put(("kit_error", str(exc)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -2612,11 +2658,37 @@ class GameGraveApp(tk.Tk):
                 elif name == "kit_result":
                     self.status_text.set("Resurrection Kit saved and verified")
                     log_event("Resurrection Kit created", payload["archive"])
-                    messagebox.showinfo("Resurrection Kit verified",
-                        f"Backed up {payload['files']} files.\nZIP: {payload['archive']}\n"
-                        f"Manifest: {payload['manifest']}\n\n"
-                        "Only the selected save/profile folder is preserved; "
-                        "modpacks and complete game restoration are not included.")
+                    messagebox.showinfo("Setup preserved",
+                        f"Verified {payload['files']} files in: {', '.join(payload['roles'])}.\n"
+                        f"ZIP: {payload['archive']}\nManifest: {payload['manifest']}\n\n"
+                        "KEEP BOTH FILES TOGETHER. Game installation and any unselected "
+                        "mod folders are not included.")
+                elif name == "kit_preview":
+                    manifest, parent, checked = payload
+                    self.status_text.set("Resurrection Kit verified. Ready for your approval.")
+                    if messagebox.askyesno("Restore verified Resurrection Kit?",
+                            f"Game: {checked['game']}\n"
+                            f"Verified files: {checked['files']}\n"
+                            f"Uncompressed data: {human_size(checked['bytes'])}\n"
+                            f"Included folders: {', '.join(checked['roles'])}\n\n"
+                            f"NEW recovery folder:\n{checked['target']}\n\n"
+                            "Existing files will NOT be replaced. This will not "
+                            "automatically install mods or alter the live game.\n\n"
+                            "Create this recovered copy?"):
+                        self._restore_verified_kit(manifest, parent)
+                elif name == "kit_restore_result":
+                    self.status_text.set("Resurrection Kit files restored to a separate folder")
+                    log_event("Resurrection Kit restored", payload["target"])
+                    if messagebox.askyesno("Recovery files verified",
+                            f"Recovered {payload['files']} files into:\n{payload['target']}\n\n"
+                            "Your installed game and existing saves were not replaced.\n"
+                            "Reconnect the files through the game or mod manager as needed.\n\n"
+                            "Open the new folder in Explorer?"):
+                        try:
+                            if os.name == "nt":
+                                os.startfile(payload["target"])
+                        except OSError as exc:
+                            messagebox.showwarning("Unable to open recovered folder", str(exc))
                 elif name == "kit_error":
                     self.status_text.set("Resurrection Kit could not be completed")
                     messagebox.showwarning("Resurrection Kit incomplete", payload)
