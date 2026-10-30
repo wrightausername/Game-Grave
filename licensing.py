@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import re
+import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,14 +47,26 @@ def free_edition() -> Edition:
 
 
 def activation_ready(url: str = ACTIVATION_URL, public_key: str = ED25519_PUBLIC_KEY_BASE64) -> bool:
-    if not isinstance(url, str) or not url.startswith("https://"):
-        return False
-    if not isinstance(public_key, str):
+    """Require an ordinary HTTPS endpoint with no credentials or redirects."""
+    if not isinstance(url, str) or not isinstance(public_key, str):
         return False
     try:
+        parsed = urllib.parse.urlsplit(url)
+        if (parsed.scheme != "https" or not parsed.hostname or
+                parsed.username is not None or parsed.password is not None or
+                parsed.query or parsed.fragment or
+                parsed.port not in (None, 443) or
+                "\\" in url or any(ord(ch) < 32 for ch in url)):
+            return False
         return len(base64.b64decode(public_key, validate=True)) == 32
-    except (ValueError, base64.binascii.Error):
+    except (ValueError, TypeError, base64.binascii.Error):
         return False
+
+
+class _NoActivationRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # A POST contains a paid product key. Never forward it to another URL.
+        return None
 
 
 def normalize_key(value: str) -> str:
@@ -135,8 +150,11 @@ def activate_key(key: str, *, url: str = ACTIVATION_URL,
     request = urllib.request.Request(url, body,
         {"Content-Type": "application/json", "Accept": "application/json"}, method="POST")
     try:
-        response = (opener or urllib.request.urlopen)(request, timeout=10)
+        open_request = opener or urllib.request.build_opener(_NoActivationRedirect()).open
+        response = open_request(request, timeout=10)
         with response as res:
+            if hasattr(res, "geturl") and res.geturl() != url:
+                raise LicenseError("The activation service redirected unexpectedly.")
             data = res.read(MAX_RESPONSE_BYTES + 1)
         if len(data) > MAX_RESPONSE_BYTES:
             raise LicenseError("The activation response was too large.")
@@ -147,13 +165,27 @@ def activate_key(key: str, *, url: str = ACTIVATION_URL,
     except (UnicodeError, json.JSONDecodeError, TypeError) as exc:
         raise LicenseError("The activation service returned an invalid response.") from exc
     target = destination if destination is not None else receipt_path()
+    temp_path = None
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        tmp = target.with_suffix(".tmp")
-        tmp.write_text(json.dumps(envelope, sort_keys=True), encoding="utf-8")
-        tmp.replace(target)
+        # A predictable shared '.tmp' path can overwrite unrelated local
+        # content. Create an exclusive, unpredictable, same-directory file.
+        with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=target.parent,
+                prefix=f".{target.name}.", suffix=".tmp", delete=False) as output:
+            temp_path = Path(output.name)
+            json.dump(envelope, output, sort_keys=True)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temp_path, target)
     except OSError as exc:
         raise LicenseError("Pro was verified but couldn't be saved. Check folder permissions.") from exc
+    finally:
+        if temp_path is not None:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
     return edition
 
 

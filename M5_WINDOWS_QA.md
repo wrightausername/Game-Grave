@@ -36,3 +36,9 @@ For a future signed candidate, create a separate **update signing keypair** with
 Signed metadata does **not** establish the installer itself is safe. The app currently **only displays** the verified release URL/expected installer SHA-256 when a newer stable version exists; it intentionally does not retrieve or launch the file. Later shipping an installer requires verifying downloaded bytes against the signed manifest hash, verifying an independently trusted Windows Authenticode signature and timestamp, preserving release rollback rules and explicit user approval. A public update service, signer and secure installer delivery are **not deployed**.
 
 **Acceptance:** Exercise a synthetic locally signed manifest via unit tests, then run a real authorized metadata server in a controlled test environment before approving M5. Missing network or metadata must leave all Free functionality and local data intact.
+
+## M5 activation-secret and receipt integrity QA
+
+A live, authorized license service remains unconfigured. Synthetic tests use ephemeral Ed25519 keys and bogus product keys only. Verify that activation rejects HTTPS redirects even when the response is otherwise correctly signed, refuses query-string/embedded-password endpoints, does not log or write the raw activation key, and does not overwrite an unrelated old temporary file.
+
+When the receipt target is locked, a failed activation must preserve any prior *valid* signed proof byte-for-byte and remove its own partial unique temp file without recursively touching any user folder. Tampered or malformed replies cannot replace an existing valid receipt. Live validation of refunds/revocation, multi-device portability, backend rate limits, purchase webhooks, fraud prevention, true payment settlement and recovery of a lost key remain **uncompleted M5 requirements**.
