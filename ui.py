@@ -39,6 +39,7 @@ from resurrection_lab import (
 )
 from resurrection_visuals import resurrection_guide
 from ui_shortcuts import PAGE_SHORTCUTS, shortcut_help_text
+from ui_viewport import initial_window_bounds
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from mod_radar_audit import audit_mod_radar, private_audit_summary
@@ -119,8 +120,9 @@ class GameGraveApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Game Grave v2.4 | Gaming Storage Manager")
-        self.geometry("1290x820")
-        self.minsize(990, 660)
+        bounds = initial_window_bounds(self.winfo_screenwidth(), self.winfo_screenheight())
+        self.geometry(f"{bounds.width}x{bounds.height}+{bounds.left}+{bounds.top}")
+        self.minsize(bounds.min_width, bounds.min_height)
         self.configure(bg=BG)
         self.settings = load_settings()
         self.edition = read_edition()  # Free unless a genuine signed license is verified
