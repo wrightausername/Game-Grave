@@ -2185,7 +2185,7 @@ class GameGraveApp(tk.Tk):
         window = tk.Toplevel(self)
         window.title("Game Grave · Resurrection visual guide")
         window.geometry("820x345")
-        window.minsize(440, 340)
+        window.minsize(440, 420)
         window.configure(bg=BG)
         frame = tk.Frame(window, bg=PANEL, padx=16, pady=16,
                          highlightbackground=LINE, highlightthickness=1)
