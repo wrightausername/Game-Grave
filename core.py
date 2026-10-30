@@ -9,6 +9,7 @@ import os
 import re
 import time
 import tempfile
+import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -790,7 +791,7 @@ def _recycle_canary_passes(parent: Path) -> bool:
             return False
         return bool(canary.is_file() and not _is_reparse_point(canary)
                     and canary.read_bytes() == marker)
-    except (OSError, ValueError, RuntimeError, TimeoutError):
+    except (OSError, ValueError, RuntimeError, TimeoutError, subprocess.TimeoutExpired):
         return False
     finally:
         # Delete only the exact disposable bytes created by Game Grave, and
@@ -822,7 +823,8 @@ def recycle_file(path: Path) -> None:
     path = path.resolve(strict=True)
     if (not path.is_file() or len(str(path)) > 240 or is_protected_path(path)):
         raise ValueError("Protected, unsupported or overly long file path.")
-    if path.stat().st_nlink > 1:
+    before = path.stat()
+    if before.st_nlink > 1:
         raise ValueError("Hard-linked files require manual review, not recycling.")
     root = Path(path.anchor)
     if ctypes.windll.kernel32.GetDriveTypeW(str(root)) != 3:
@@ -837,6 +839,11 @@ def recycle_file(path: Path) -> None:
                            "until the local Recycle Bin and Undo Center pass QA.")
     if _has_reparse_component(path) or not path.is_file() or is_protected_path(path):
         raise ValueError("File eligibility changed while verifying Recycle Bin; stopped.")
+    current = path.stat()
+    if (current.st_size != before.st_size or
+            current.st_mtime_ns != before.st_mtime_ns or
+            current.st_ino != before.st_ino or current.st_nlink > 1):
+        raise ValueError("File changed during the recovery preflight. No user file was recycled.")
     _shell_recycle_operation(path)
 
 
