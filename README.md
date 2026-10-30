@@ -226,3 +226,11 @@ After scanning your computer, open **Game DNA → Export QA**. Game Grave asks f
 Open **Resurrection Lab → See how Resurrection works · visual guide** for a responsive, high-contrast four-stage walkthrough: **PICK → SEAL → REHEARSE → STAGE**. It explains the practical difference between verified archive integrity and an unproven in-game recovery, includes a text counterpart, and does not trigger backups or cleanup on its own.
 
 Before sending a Resurrection Kit to another Windows PC, use the [M3 Windows recovery test matrix](M3_WINDOWS_QA.md). The eventual closed-beta task order and identical questionnaire are defined in [BETA_TEST_PROTOCOL.md](BETA_TEST_PROTOCOL.md), but recruitment is gated until M1–M5 acceptance.
+
+### M4 accessibility and keyboard navigation preview
+
+Game Grave now opens within a conservative primary-screen viewport, rather than forcing a 1290×820 window off the bottom of a smaller laptop display. Visible keyboard focus indicators distinguish buttons in both themes.
+
+Press **F1** to open the keyboard guide, or go to **Settings → Keyboard guide (F1)**. Press **Ctrl+1 through Ctrl+7** to switch between Overview, Game DNA, Game Mods, The Graveyard, Save Vault, Resurrection Lab and Undo Center. Press **F5** for the same read-only Scan PC action as the toolbar, and **Escape** to request cancellation while a scan is running. **No keyboard shortcut authorizes cleanup, deletes files or bypasses a confirmation dialog.**
+
+See [M4 Windows QA](M4_WINDOWS_QA.md) for the required keyboard-only, scaling, color-contrast, Windows Narrator/NVDA and small-monitor checks. Programmatic window fitting is not a claim of complete screen-reader support or that every control is accessible on every screen size.

@@ -38,6 +38,8 @@ from resurrection_lab import (
     rehearse_kit, list_snapshots, prepare_pc_transfer,
 )
 from resurrection_visuals import resurrection_guide
+from ui_shortcuts import PAGE_SHORTCUTS, shortcut_help_text
+from ui_viewport import initial_window_bounds
 from kit_watch import register_kit_watch, list_kit_watches, check_kit_watches, stop_kit_watch
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from mod_radar_audit import audit_mod_radar, private_audit_summary
@@ -118,8 +120,9 @@ class GameGraveApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Game Grave v2.4 | Gaming Storage Manager")
-        self.geometry("1290x820")
-        self.minsize(990, 660)
+        bounds = initial_window_bounds(self.winfo_screenwidth(), self.winfo_screenheight())
+        self.geometry(f"{bounds.width}x{bounds.height}+{bounds.left}+{bounds.top}")
+        self.minsize(bounds.min_width, bounds.min_height)
         self.configure(bg=BG)
         self.settings = load_settings()
         self.edition = read_edition()  # Free unless a genuine signed license is verified
@@ -150,6 +153,7 @@ class GameGraveApp(tk.Tk):
         self._cancel_scan = threading.Event()
         self._ui_style()
         self._layout()
+        self._install_keyboard_shortcuts()
         self.show_page("Overview")
         self.after(120, self._poll)
         if self.settings.get("scan_on_launch", False):
@@ -204,7 +208,9 @@ class GameGraveApp(tk.Tk):
         for title, symbol in items:
             b = tk.Button(self.sidebar, text=f"{symbol}    {title}", anchor="w",
                           font=("Segoe UI", 11), bg=SIDEBAR, fg=MUTED,
-                          bd=0, highlightthickness=0, relief="flat", padx=21, pady=10,
+                          bd=0, highlightthickness=1, highlightcolor=ACCENT,
+                          highlightbackground=SIDEBAR, takefocus=1,
+                          relief="flat", padx=21, pady=10,
                           cursor="hand2", command=lambda n=title: self.show_page(n))
             b.pack(fill="x", padx=9, pady=1)
             self.nav_buttons[title] = b
@@ -246,7 +252,9 @@ class GameGraveApp(tk.Tk):
                       activebackground=ACCENT if primary else RAISED,
                       activeforeground=ON_ACCENT if primary else TEXT,
                       font=("Segoe UI Semibold", 10), padx=15, pady=9,
-                      bd=0, relief="flat", highlightthickness=0, cursor="hand2")
+                      bd=0, relief="flat", highlightthickness=1,
+                      highlightcolor=ACCENT, highlightbackground=LINE,
+                      takefocus=1, cursor="hand2")
         return b
 
     def text(self, parent, value, size=11, fg=TEXT, bold=False, **kw):
@@ -262,6 +270,63 @@ class GameGraveApp(tk.Tk):
         frame = tk.Frame(parent or self.content, bg=PANEL, padx=pad, pady=pad,
                          highlightbackground=LINE, highlightthickness=1)
         return frame
+
+    def _install_keyboard_shortcuts(self):
+        """Navigation only, a read-only scan, and safe scan cancellation."""
+        for shortcut, _label, destination in PAGE_SHORTCUTS:
+            number = shortcut.removeprefix("Ctrl+")
+            self.bind("<Control-KeyPress-" + number + ">",
+                      lambda _event, page=destination: self._navigate_shortcut(page))
+        self.bind("<F1>", self._open_keyboard_shortcuts)
+        self.bind("<F5>", self._shortcut_scan)
+        self.bind("<Escape>", self._shortcut_cancel_scan)
+
+    def _navigate_shortcut(self, page):
+        self.show_page(page)
+        control = self.nav_buttons.get(page, self.scan_button)
+        control.focus_set()
+        return "break"
+
+    def _shortcut_scan(self, _event=None):
+        # F5 has the same behavior as the explicit "Scan PC" button.
+        if not self.scanning:
+            self.scan_all()
+        return "break"
+
+    def _shortcut_cancel_scan(self, _event=None):
+        # Escape cannot invoke a recycle or other destructive action.
+        if self.scanning:
+            self._cancel_active_scan()
+            return "break"
+
+    def _open_keyboard_shortcuts(self, _event=None):
+        existing = getattr(self, "_keyboard_window", None)
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.lift()
+                    existing.focus_set()
+                    return "break"
+            except tk.TclError:
+                pass
+        window = tk.Toplevel(self)
+        self._keyboard_window = window
+        window.title("Game Grave · Keyboard shortcuts")
+        window.geometry("530x500")
+        window.minsize(440, 450)
+        window.configure(bg=BG)
+        frame = self.panel(window, 16)
+        frame.pack(fill="both", expand=True, padx=12, pady=12)
+        self.text(frame, "Keyboard quick guide", 18, ACCENT, True).pack(
+            anchor="w", pady=(0, 12))
+        tk.Label(frame, text=shortcut_help_text(), bg=PANEL, fg=TEXT,
+                 font=("Consolas", 11), justify="left", anchor="w",
+                 wraplength=465).pack(anchor="w", fill="x")
+        close = self.button(frame, "Close guide", window.destroy)
+        close.pack(anchor="e", pady=(18, 0))
+        window.bind("<Escape>", lambda _event: window.destroy())
+        close.focus_set()
+        return "break"
 
     def show_page(self, title):
         self.active = title
@@ -2838,7 +2903,11 @@ class GameGraveApp(tk.Tk):
         self.scan_start_var = tk.BooleanVar(value=self.settings.get("scan_on_launch", False))
         ttk.Checkbutton(settings, text="Scan when I open Game Grave (off by default)", variable=self.scan_start_var,
                         command=self._save_startup_pref, style="Dark.TCheckbutton").pack(anchor="w", pady=7)
-        self.button(settings, "Reset appearance", self._reset_appearance).pack(anchor="w", pady=(8, 0))
+        setting_actions = tk.Frame(settings, bg=PANEL)
+        setting_actions.pack(anchor="w", pady=(8, 0))
+        self.button(setting_actions, "Reset appearance", self._reset_appearance).pack(side="left")
+        self.button(setting_actions, "Keyboard guide (F1)", self._open_keyboard_shortcuts).pack(
+            side="left", padx=(9, 0))
 
         preset_panel = self.panel(presets_tab)
         preset_panel.pack(fill="x", pady=(0, 12))
