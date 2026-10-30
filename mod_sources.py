@@ -151,7 +151,7 @@ def _read_ini(path: Path) -> configparser.RawConfigParser | None:
 
 
 def _resolve_mo_path(raw: str, base: Path, ini_dir: Path) -> Path:
-    raw = re.sub(r'%BASE_DIR%', str(base), raw.strip().strip('"'), flags=re.I)
+    raw = re.sub(r'%BASE_DIR%', lambda _match: str(base), raw.strip().strip('"'), flags=re.I)
     raw = os.path.expandvars(os.path.expanduser(raw))
     # Linux support makes synthetic Windows-style INI fixtures testable.
     if os.name != 'nt':

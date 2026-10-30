@@ -1,4 +1,4 @@
-# Game Grave v2.0 | Gaming Storage Manager
+# Game Grave v2.4 | Gaming Storage Manager
 
 **Status:** Working Windows Python desktop app / engineering preview. Includes a professional **Windows installer build recipe** and secure Free / future lifetime Pro licensing foundation. **The source archive is not an installer executable and has not passed real Windows release QA. Not ready to sell.**
 
@@ -58,7 +58,7 @@ From the `GameGrave` folder:
 python -m unittest discover -s tests -v
 ```
 
-77 automated tests passed on the build machine, plus a virtual desktop smoke test opening the core pages and switching themes/layouts. **That is not equivalent to real Windows testing.** Windows Shell Recycle Bin behavior, registry discovery, UAC cases, multi-drive handling, antivirus compatibility, Microsoft Store installations, installer/signing, and performance on very large libraries need dedicated Windows QA.
+102 Python unit tests passed on the 2026-10-30 development branch on Linux (pending native Windows CI and QA), plus a virtual desktop smoke test opening the core pages and switching themes/layouts. **That is not equivalent to real Windows testing.** Windows Shell Recycle Bin behavior, registry discovery, UAC cases, multi-drive handling, antivirus compatibility, Microsoft Store installations, installer/signing, and performance on very large libraries need dedicated Windows QA.
 
 ## Business model
 

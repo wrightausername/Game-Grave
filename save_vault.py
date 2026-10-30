@@ -27,10 +27,17 @@ def create_backup(source: Path, destination: Path, cancel: Callable[[], bool] | 
         raise FileExistsError("A backup already exists there; choose a new filename.")
     if source == Path(source.anchor) or source == Path.home().resolve():
         raise ValueError("Choose the save/profile folder itself, not an entire drive or home folder.")
-    if source in destination.parents:
-        raise ValueError("Save the ZIP outside the folder being backed up.")
     if not destination.parent.is_dir():
         raise ValueError("Destination folder doesn't exist.")
+    # Compare canonical directories, not a mix of .absolute() and .resolve().
+    # Avoid Windows short-name, case and alias mismatches.
+    dest_parent = destination.parent.resolve(strict=True)
+    try:
+        dest_parent.relative_to(source)
+    except ValueError:
+        pass
+    else:
+        raise ValueError("Save the ZIP outside the folder being backed up.")
 
     total = 0
     files = []

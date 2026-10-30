@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Iterable
 
 from core import is_protected_path
+from addon_metadata import inspect_addon_metadata
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,9 @@ def investigate(path: str | Path, games: Iterable = (), other_games: Iterable = 
         source = str(getattr(mod, 'source', 'Mod storage'))
         evidence = [f"Found in {source} storage: {root}", f"Scanner note: {status}"]
         evidence.extend(str(s) for s in (getattr(mod, 'indicators', ()) or ())[:4])
+        addon = inspect_addon_metadata(target)
+        if addon:
+            evidence.extend(addon.evidence)
         return FileVerdict(
             "Mod or addon storage found", str(getattr(mod, 'name', 'Unknown game')),
             "Known storage location", "This belongs to a location identified by Game Grave's "
@@ -94,6 +98,15 @@ def investigate(path: str | Path, games: Iterable = (), other_games: Iterable = 
                         "Manage subscriptions in Steam. Do not delete Workshop folders by hand.")
             except ValueError:
                 pass
+
+    addon = inspect_addon_metadata(target)
+    if addon:
+        return FileVerdict(
+            "Recognized addon descriptor", addon.ecosystem, "Local descriptor evidence",
+            f"The {addon.ecosystem} addon folder contains a recognizable descriptor "
+            f"for {addon.title}. This does not establish whether the addon is enabled, "
+            "used recently, or safe to remove.",
+            addon.evidence, "Check the game or addon manager. Preserve saved settings and dependencies.")
 
     if is_protected_path(target, never_touch):
         return FileVerdict(

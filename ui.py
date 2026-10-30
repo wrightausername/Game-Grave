@@ -14,6 +14,7 @@ from pathlib import Path
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
 from graveyard import build_graveyard, looks_like_game_archive
+from graveyard_protection import protection_action, set_item_protection
 from ui_presets import (MAX_PRESETS, capture_presentation, normalize_color, validate_name,
                         read_preset_file, sanitize_local_presets, write_preset_file)
 from view_options import (GRAVE_SORT_KEYS, SORT_DIRECTIONS, GRAVE_STATES, GRAVE_SIZES,
@@ -895,6 +896,10 @@ class GameGraveApp(tk.Tk):
         self.grave_tree.bind("<Double-1>", lambda _e: self._grave_details())
         self.grave_tree.bind("<Button-1>", self._grave_toggle_click)
         self.grave_tree.bind("<space>", self._grave_toggle_keyboard)
+        # Mouse and keyboard menus must target the selected row, not a stale item.
+        self.grave_tree.bind("<Button-3>", self._grave_context_click)
+        self.grave_tree.bind("<Shift-F10>", self._grave_context_keyboard)
+        self.grave_tree.bind("<Menu>", self._grave_context_keyboard)
         self.grave_tree.heading("name", command=lambda: self._grave_column_sort("Name"))
         self.grave_tree.heading("category", command=lambda: self._grave_column_sort("Category"))
         self.grave_tree.heading("age", command=lambda: self._grave_column_sort("Age"))
@@ -910,6 +915,10 @@ class GameGraveApp(tk.Tk):
         self.button(actions, "Recycle one", self._grave_recycle_one).pack(side="left", padx=(7, 0))
         self.button(actions, "Recycle selected", self._grave_recycle_selected, primary=True).pack(side="left", padx=(7, 0))
         self.button(actions, "Recycle all visible eligible…", self._grave_recycle_all, danger=True).pack(side="right")
+        utilities = tk.Frame(self.content, bg=BG)
+        utilities.pack(fill="x", pady=(6, 0))
+        self.button(utilities, "Open Folder", self._grave_open_folder).pack(side="left")
+        self.button(utilities, "Protect / Unprotect", self._grave_toggle_protection).pack(side="left", padx=(7, 0))
         self.text(self.content, "Check multiple rows to choose what to recycle. All eligible items = visible files only. "
                   "Protected ordinary archives require extra approval. Recycle Bin storage is NOT freed disk space.",
                   9, MUTED, wraplength=850).pack(anchor="w", pady=(7, 0))
@@ -1096,6 +1105,95 @@ class GameGraveApp(tk.Tk):
                             f"Why shown: {e.finding}\n\nSafety: {e.protection}\n\n"
                             + friendly_report(verdict, e.path)
                             + "\n\nFile size is not guaranteed recoverable space.")
+
+    def _grave_selected_entry(self):
+        selection = self.grave_tree.selection()
+        return self.graveyard_lookup.get(selection[0]) if len(selection) == 1 else None
+
+    def _grave_open_folder(self):
+        entry = self._grave_selected_entry()
+        if entry is None:
+            messagebox.showinfo("Select one", "Select one Graveyard finding first.")
+            return
+        path = Path(entry.path)
+        folder = path if path.is_dir() else path.parent
+        if not folder.is_dir():
+            messagebox.showwarning("Folder unavailable", "This folder no longer exists. Scan again to refresh the result.")
+            return
+        try:
+            # Open a directory, never execute the selected file.
+            if os.name == "nt":
+                os.startfile(str(folder))
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(folder)])
+            else:
+                subprocess.Popen(["xdg-open", str(folder)])
+        except (OSError, RuntimeError) as exc:
+            messagebox.showerror("Could not open folder", str(exc))
+
+    def _grave_toggle_protection(self):
+        entry = self._grave_selected_entry()
+        if entry is None:
+            messagebox.showinfo("Select one", "Select one Graveyard finding first.")
+            return
+        action, reason = protection_action(entry.path, self.settings.get("never_touch", []))
+        if action is None:
+            messagebox.showinfo("Protected by Game Grave", reason)
+            return
+        if action == "Unprotect" and not messagebox.askyesno("Remove personal protection?",
+                f"Stop protecting this specific item?\n\n{entry.path}\n\n"
+                "No files will be deleted. Built-in safety rules still apply."):
+            return
+        updated = set_item_protection(self.settings.get("never_touch", []), entry.path,
+                                      protect=(action == "Protect"))
+        self.settings["never_touch"] = updated
+        save_settings(self.settings)
+        # Recompute can_recycle; never reuse stale eligibility after a protection change.
+        self.graveyard_entries = build_graveyard(
+            self.games, self.mod_folders, self.old_files,
+            self.settings.get("graveyard_days", 365), updated,
+            watched_mods=self.settings.get("graveyard_watchlist", []))
+        self._populate_graveyard()
+        self.status_text.set(f"{action} applied. No files were deleted.")
+
+    def _grave_context_click(self, event):
+        key = self.grave_tree.identify_row(event.y)
+        if not key or key not in self.graveyard_lookup:
+            return
+        self.grave_tree.selection_set(key)
+        self.grave_tree.focus(key)
+        self._grave_show_context(event.x_root, event.y_root)
+        return "break"
+
+    def _grave_context_keyboard(self, event=None):
+        entry = self._grave_selected_entry()
+        if entry is None:
+            key = self.grave_tree.focus()
+            if key not in self.graveyard_lookup:
+                return "break"
+            self.grave_tree.selection_set(key)
+        self._grave_show_context(self.grave_tree.winfo_rootx() + 45,
+                                 self.grave_tree.winfo_rooty() + 45)
+        return "break"
+
+    def _grave_show_context(self, x, y):
+        entry = self._grave_selected_entry()
+        if entry is None:
+            return
+        action, _reason = protection_action(entry.path, self.settings.get("never_touch", []))
+        menu = tk.Menu(self.grave_tree, tearoff=False)
+        menu.add_command(label="Details", command=self._grave_details)
+        menu.add_command(label="Open Folder", command=self._grave_open_folder)
+        menu.add_command(label=action or "Protected by Game Grave",
+                         command=self._grave_toggle_protection,
+                         state="normal" if action else "disabled")
+        menu.add_separator()
+        menu.add_command(label="Move to Recycle Bin…", command=self._grave_recycle_one,
+                         state="normal" if entry.can_recycle or self._grave_can_override(entry) else "disabled")
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
 
     def _grave_detect(self):
         ids = self.grave_tree.selection()
