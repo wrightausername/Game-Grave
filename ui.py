@@ -376,6 +376,7 @@ class GameGraveApp(tk.Tk):
         dna_tools.pack(anchor="w", pady=(8, 0))
         self.button(dna_tools, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(side="left")
         self.button(dna_tools, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=9)
+        self.button(dna_tools, "View visual map", lambda: self._open_dna_visual_map(dna)).pack(side="left", padx=9)
         previous = load_observation()
         if previous:
             self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
@@ -396,7 +397,11 @@ class GameGraveApp(tk.Tk):
         palette = {"panel": PANEL, "raised": RAISED, "text": TEXT,
                    "muted": MUTED, "line": LINE, "blue": BLUE,
                    "accent": ACCENT, "warn": WARN}
-        dna_visual(summary, dna, palette=palette).pack(fill="x", pady=(0, 12))
+        # Keep manager profile tables accessible on smaller monitors.
+        # The full-size diagram is always one click away via "View visual map".
+        if self.winfo_height() >= 830:
+            dna_visual(summary, dna, palette=palette, scanned=bool(self.last_scan)).pack(
+                fill="x", pady=(0, 12))
         self.text(summary, f"{len(dna['games'])} recorded games · "
                   f"{len(dna['unresolved'])} unresolved mod/save locations",
                   14, bold=True).pack(anchor="w", pady=(0, 10))
@@ -440,6 +445,27 @@ class GameGraveApp(tk.Tk):
         self.text(summary, "Unresolved does not mean abandoned. Association does not mean safe to delete. "
                   "For full folder evidence, use File Detective in Game Mods or The Graveyard.",
                   9, WARN, wraplength=820).pack(anchor="w", pady=(12, 0))
+
+    def _open_dna_visual_map(self, dna):
+        """Readable, zoomable native diagram; never launches any file action."""
+        window = tk.Toplevel(self)
+        window.title("Game Grave · Game DNA visual guide")
+        window.geometry("790x350")
+        window.minsize(420, 330)
+        window.configure(bg=BG)
+        frame = tk.Frame(window, bg=PANEL, padx=18, pady=18,
+                         highlightbackground=LINE, highlightthickness=1)
+        frame.pack(fill="both", expand=True, padx=12, pady=12)
+        palette = {"panel": PANEL, "raised": RAISED, "text": TEXT,
+                   "muted": MUTED, "line": LINE, "blue": BLUE,
+                   "accent": ACCENT, "warn": WARN}
+        dna_visual(frame, dna, palette=palette, scanned=bool(self.last_scan)).pack(
+            fill="both", expand=True)
+        self.text(frame, "GREEN / TEAL = associated evidence   ·   GOLD = review needed   ·   "
+                  "BLUE = protected by default",
+                  9, MUTED, wraplength=690).pack(anchor="w", pady=(9, 0))
+        self.button(frame, "Close visual guide", window.destroy).pack(anchor="e", pady=(10, 0))
+        window.bind("<Escape>", lambda _event: window.destroy())
 
     def _show_mod_radar_audit(self):
         """Summarize existing scan relationships, never perform cleanup."""
