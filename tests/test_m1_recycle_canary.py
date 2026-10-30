@@ -42,7 +42,7 @@ class RecycleCanaryTests(unittest.TestCase):
             path.unlink()
 
         def fake_ps(script):
-            if "InvokeVerb('RESTORE')" in script:
+            if "InvokeVerb('undelete')" in script:
                 saved[0].write_bytes(marker)
                 return "RESTORED"
             return "AVAILABLE"
@@ -68,7 +68,7 @@ class RecycleCanaryTests(unittest.TestCase):
             location.append(path)
             path.unlink()
         def ps(script):
-            if "InvokeVerb('RESTORE')" in script:
+            if "InvokeVerb('undelete')" in script:
                 location[0].write_bytes(b"not the canary bytes")
                 return "RESTORED"
             return "AVAILABLE"
