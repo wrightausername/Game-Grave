@@ -3192,6 +3192,20 @@ class GameGraveApp(tk.Tk):
             self._cancel_scan.set()
             self.status_text.set("Cancel requested. Waiting for the current folder check to stop…")
 
+    def _check_scan_cancel(self):
+        """Cooperative checkpoint between slower read-only inventory stages."""
+        if self._cancel_scan.is_set():
+            raise InterruptedError("Scan canceled. Previous inventory remains unchanged.")
+
+    def _scan_canceled_status(self):
+        """Never publish a scan result after the user explicitly canceled."""
+        self.scanning = False
+        self.scan_progress_text.set("Scan canceled · Previous results preserved")
+        self.status_text.set("Scan canceled. No new inventory was saved, and no cleanup ran.")
+        self.scan_button.configure(state="normal", bg=ACCENT)
+        self.cancel_button.configure(state="disabled")
+        log_event("Scan canceled", "User canceled the read-only inventory before acceptance.")
+
     def scan_all(self):
         if self.scanning:
             return
@@ -3215,13 +3229,14 @@ class GameGraveApp(tk.Tk):
             try:
                 self.events.put(("scan_stage", (0, STAGES[0][0])))
                 games = find_games(games_extra)
-                if self._cancel_scan.is_set():
-                    raise InterruptedError("Scan canceled")
+                self._check_scan_cancel()
                 self.events.put(("scan_stage", (1, STAGES[1][0])))
                 other = find_launcher_games(other_roots, cancel=self._cancel_scan.is_set)
+                self._check_scan_cancel()
                 self.events.put(("scan_stage", (2, STAGES[2][0])))
                 mods = find_all_mod_storage(games_extra, mod_roots,
                                             games=games, cancel=self._cancel_scan.is_set)
+                self._check_scan_cancel()
                 self.events.put(("scan_stage", (3, STAGES[3][0])))
                 try:
                     files = scan_old_files(chosen_folder, file_days, cancel=self._cancel_scan.is_set)
@@ -3229,10 +3244,10 @@ class GameGraveApp(tk.Tk):
                 except (ValueError, OSError) as exc:
                     files = []
                     warning = str(exc)
+                self._check_scan_cancel()
                 self.events.put(("scan_stage", (4, STAGES[4][0])))
                 saves = discover_saves()
-                if self._cancel_scan.is_set():
-                    raise InterruptedError("Scan canceled")
+                self._check_scan_cancel()
                 self.events.put(("scan_complete", (games, other, mods, files, saves, warning)))
             except Exception as exc:
                 self.events.put(("scan_error", str(exc)))
@@ -3246,6 +3261,9 @@ class GameGraveApp(tk.Tk):
                     self._scan_stage, self._scan_stage_name = payload
                     self.scan_percent.set(round(100 * sum(w for _, w in STAGES[:self._scan_stage])))
                 elif name == "scan_complete":
+                    if self._cancel_scan.is_set():
+                        self._scan_canceled_status()
+                        continue
                     self.games, self.other_games, self.mod_folders, self.old_files, self.save_findings, warning = payload
                     self.profile_report = None  # Profiles must be re-inspected after inventory changes.
                     self.scan_percent.set(100)
@@ -3547,13 +3565,15 @@ class GameGraveApp(tk.Tk):
                     self.status_text.set("Couldn't scan saved-game folders.")
                     messagebox.showwarning("Save discovery incomplete", payload)
                 elif name == "scan_error":
-                    self.scanning = False
-                    self.scan_progress_text.set("Scan incomplete. No cleanup was performed.")
-                    self.status_text.set("Scan could not finish. Check the chosen folder.")
-                    self.scan_button.configure(state="normal", bg=ACCENT)
-                    self.cancel_button.configure(state="disabled")
-                    log_event("Scan canceled" if self._cancel_scan.is_set() else "Scan failed", payload)
-                    if not self._cancel_scan.is_set():
+                    if self._cancel_scan.is_set():
+                        self._scan_canceled_status()
+                    else:
+                        self.scanning = False
+                        self.scan_progress_text.set("Scan incomplete. No cleanup was performed.")
+                        self.status_text.set("Scan could not finish. Check the chosen folder.")
+                        self.scan_button.configure(state="normal", bg=ACCENT)
+                        self.cancel_button.configure(state="disabled")
+                        log_event("Scan failed", payload)
                         messagebox.showwarning("Scan incomplete", payload)
         except queue.Empty:
             pass
