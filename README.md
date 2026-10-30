@@ -252,3 +252,7 @@ The Graveyard now draws **up to 160 findings per page** even if thousands match 
 ### M5 unsigned installer provenance and CI safety checks
 
 A development-only Windows installer build includes a **SHA-256 checksum** and `.build.json` stating the source commit and explicitly marking the artifact **unsigned / not release-approved**. The Windows installer workflow performs a disposable same-version install, repeat install and uninstall smoke test, including byte-level checks that an unrelated fake game save and local preferences file remain untouched. This is engineering evidence, **not** a signed installer or actual multi-version upgrade certification. Follow [M5 Windows acceptance](M5_WINDOWS_QA.md) for real Windows 10/11 testing, production signing, privacy and one-time Lifetime Pro activation before any sale or public release.
+
+### Secure update checks are opt-in and offline by default
+
+In **Settings → More tools → Check for signed updates**, a user may explicitly request a future stable-release check. Engineering previews show **service not connected** and make no network request. The underlying updater verifies a dedicated Ed25519 signature, exact HTTPS host, SHA-256 installer identity and newer-version status before showing any release information. It **never downloads or runs anything**. Production trust keys, approved endpoints and release sign-off are intentionally unset until a real signed distribution channel exists. These checks do not affect Free, lifetime licensing or Undo Center.
