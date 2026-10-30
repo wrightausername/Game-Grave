@@ -73,9 +73,15 @@ def _bin_script(path: str, restore=False) -> str:
     """
     action = r'''
 if ($matches.Count -eq 1) {
-    $matches[0].InvokeVerb('RESTORE')
-    Start-Sleep -Milliseconds 500
-    if (Test-Path -LiteralPath $original) { 'RESTORED' } else { 'UNVERIFIED' }
+    # Recheck at the last possible moment. Otherwise Windows Shell may
+    # rename/reposition an item over a newly recreated game save.
+    if (Test-Path -LiteralPath $original) {
+        'ORIGINAL_EXISTS'
+    } else {
+        $matches[0].InvokeVerb('RESTORE')
+        Start-Sleep -Milliseconds 500
+        if (Test-Path -LiteralPath $original) { 'RESTORED' } else { 'UNVERIFIED' }
+    }
 } elseif ($matches.Count -eq 0) { 'NOT_FOUND' } else { 'AMBIGUOUS' }
 ''' if restore else r'''
 if ($matches.Count -eq 1) { 'AVAILABLE' }
