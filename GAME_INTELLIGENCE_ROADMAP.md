@@ -139,3 +139,7 @@ Still pending M2 release gates: real moved-library/manifest behavior, multiple s
 - Mod Radar shows the three-stage evidence pipeline **Find → Match → Protect**, with plain-language explanations and a text alternative.
 - Visuals use existing UI colors and redraw on width changes, without images, SVG dependencies, telemetry or user-filesystem writes.
 - Remaining release acceptance: real Windows 10/11 screen-size, high-DPI, keyboard focus and screen-reader QA. Graphical presentation does not resolve unknown mod ownership or satisfy M2 integration gates.
+
+### M2 scanner input safety (engineer preview)
+
+Steam metadata files are read only when they are ordinary, bounded-size files, not symlinks or junction targets. Steam library roots must be existing absolute locations without redirected ancestors, including secondary libraries discovered from `libraryfolders.vdf`. Workshop, Vortex, MO2 and other read-only mod roots are similarly skipped when parent directories traverse a reparse point. This limits false positive attribution and unexpected traversal outside selected library roots, at the cost of marking uncommon symlink-based setups unsupported until reviewed. Missing/oversized metadata does not establish that a game or its mods are unused.
