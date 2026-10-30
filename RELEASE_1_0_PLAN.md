@@ -19,7 +19,7 @@
 - **M2 and M3 partially implemented:** evidence-first discovery and backup/recovery foundation exist, but real launcher and mod-manager recovery QA has not happened.
 - **M4 partial:** themes, scales, views and dialogs exist, but keyboard/screen-reader usability and performance acceptance remain open.
 - **M5 partial:** installer definition and [unsigned Inno Setup candidate build with SHA-256](https://github.com/wrightausername/Game-Grave/actions/runs/41129498352) succeeded. Production Authenticode signing, payment/key issuance, secure update channel, privacy/legal sign-off and clean VM QA remain open.
-- **M6 and M7 not started:** no human closed beta or certified stable build has occurred.
+- **M6 and M7 not started:** no human closed beta or certified stable build has occurred. The identical beta-test questionnaire and disposable-data task script are now prepared in [BETA_TEST_PROTOCOL.md](BETA_TEST_PROTOCOL.md); actual enrollment begins only after M1–M5 acceptance, and the questionnaire wording must be frozen for comparability.
 
 ## Non-negotiable decisions
 
@@ -35,4 +35,4 @@
 
 Each milestone uses its linked GitHub issue for concrete subtasks, PRs, CI results, Windows QA run records and manual evidence. `release_gate_status.json` starts blocked; `tools/release_audit.py` checks it and the release-tag workflow refuses a 1.0 candidate while any gate remains open. This file is a tracker, not a substitute for independently validating the evidence.
 
-**Immediately next:** complete M1, not another speculative feature rollout. Tests should be run against disposable files first, then manually against real Windows 10 and 11 QA machines before progressing.
+**Current engineering work:** M1 and M2 have received substantial safety/detection hardening but still need representative Windows human QA. M3 continues with exact-sha recovery, conservative path checks and fault injection. M6 beta is planned, not started, and M7 stays blocked. Do not count overlapping engineering progress as completed acceptance gates.
