@@ -15,6 +15,8 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
+from cryptography.exceptions import InvalidSignature
+
 from update_config import (
     UPDATE_MANIFEST_URL,
     UPDATE_ED25519_PUBLIC_KEY_BASE64,
@@ -152,7 +154,6 @@ def parse_signed_manifest(raw: bytes, public_key_b64: str,
         sig = base64.b64decode(signature, validate=True)
         if len(key) != 32 or len(sig) != 64:
             raise UpdateError("Update verification key or signature is invalid.")
-        from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
         Ed25519PublicKey.from_public_bytes(key).verify(
             sig, json.dumps(payload, ensure_ascii=True, sort_keys=True,
