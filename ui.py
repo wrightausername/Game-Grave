@@ -55,6 +55,7 @@ from shader_cache import inspect_steam_shader_cache, file_still_matches
 from activity_history import group_activity, session_caption
 from licensing import (LicenseError, activation_ready, activate_key, read_edition,
                        remove_local_activation)
+from updates import UpdateError, check_for_updates, update_ready
 
 from core import (
     APP_NAME, AUTO_BASE_EXTENSIONS, AUTO_EXTRA_EXTENSIONS, GAME_AGE_OPTIONS, TASK_NAME,
@@ -3172,6 +3173,18 @@ class GameGraveApp(tk.Tk):
             self.button(extra, title, lambda page=title: self.show_page(page)).pack(side="left", padx=(0, 8))
         self.text(extra, "Free forever or optional $24.99 lifetime Pro target. No subscriptions or account requirement.",
                   9, MUTED, wraplength=810).pack(anchor="w", pady=(12, 0))
+        updates_panel = self.panel(tools_tab)
+        updates_panel.pack(fill="x", pady=(12, 0))
+        self.text(updates_panel, "Verified updates", 14, bold=True).pack(anchor="w", pady=(0, 8))
+        self.text(updates_panel,
+                  "Only your click can start an update check. Game Grave first verifies a "
+                  "release signature, exact download host and installer SHA-256 metadata. "
+                  "This screen never downloads or installs files automatically.",
+                  10, MUTED, wraplength=750).pack(anchor="w", pady=(0, 8))
+        self.button(updates_panel, "Check for signed updates", self._check_updates_clicked).pack(anchor="w")
+        if not update_ready():
+            self.text(updates_panel, "Engineering preview: update service not connected. No internet request is made.",
+                      9, WARN, wraplength=760).pack(anchor="w", pady=(7, 0))
 
     def _choose_custom_accent(self):
         current = self.settings.get("ui_custom_accent", "#50DCC5")
@@ -3286,6 +3299,28 @@ class GameGraveApp(tk.Tk):
         self.ui_preset_var.set(name)
         if messagebox.askyesno("Apply preset?", "Apply this preset now?", parent=self):
             self._apply_ui_preset()
+
+    def _check_updates_clicked(self):
+        """Never make a network request unless the user explicitly clicks."""
+        if not update_ready():
+            messagebox.showinfo(
+                "Update service not connected",
+                "Signed update discovery is not enabled in this engineering preview. "
+                "No internet request was made. The app remains usable offline.\n\n"
+                "A production signing key and reviewed release service are required.",
+                parent=self)
+            return
+        if getattr(self, "_update_check_active", False):
+            return
+        self._update_check_active = True
+        self.status_text.set("Checking signed release metadata at your request…")
+        def worker():
+            try:
+                report = check_for_updates()
+                self.events.put(("update_check_result", report))
+            except UpdateError as exc:
+                self.events.put(("update_check_error", str(exc)))
+        threading.Thread(target=worker, daemon=True).start()
 
     def _activate_pro(self):
         if not activation_ready():
@@ -3719,6 +3754,32 @@ class GameGraveApp(tk.Tk):
                 elif name == "shader_error":
                     self.status_text.set("Shader cache check incomplete. Nothing was removed.")
                     messagebox.showwarning("Shader cache check incomplete", payload)
+                elif name == "update_check_result":
+                    self._update_check_active = False
+                    if payload.status == "available":
+                        self.status_text.set("A newer signed release was verified. No files were downloaded.")
+                        messagebox.showinfo(
+                            "Verified update available",
+                            f"Installed release: {payload.installed_version}\n"
+                            f"New stable release: {payload.release.version}\n\n"
+                            f"Verified metadata download URL:\n{payload.release.download_url}\n\n"
+                            f"Published installer SHA-256:\n{payload.release.installer_sha256}\n\n"
+                            "Game Grave did NOT download, run, or install the update. "
+                            "Installer Authenticode and byte checksum verification "
+                            "are separate release requirements.",
+                            parent=self)
+                    else:
+                        self.status_text.set("No newer signed stable release was advertised.")
+                        messagebox.showinfo(
+                            "No newer signed stable update",
+                            f"Installed release: {payload.installed_version}\n"
+                            "The verified metadata did not advertise a newer version. "
+                            "No files were changed.",
+                            parent=self)
+                elif name == "update_check_error":
+                    self._update_check_active = False
+                    self.status_text.set("Signed update check incomplete. Game Grave remains offline-capable.")
+                    messagebox.showwarning("Update not verified", payload, parent=self)
                 elif name == "license_activated":
                     self.edition = payload
                     self._layout_after_edition_change()
