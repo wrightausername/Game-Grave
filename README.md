@@ -1,14 +1,14 @@
 # Game Grave v2.4 | Gaming Storage Manager
 
-**Status:** Working Windows Python desktop app / engineering preview. Includes a professional **Windows installer build recipe** and secure Free / future lifetime Pro licensing foundation. **The source archive is not an installer executable and has not passed real Windows release QA. Not ready to sell.**
+**Status:** Engineering preview, **NOT Game Grave 1.0 stable and NOT ready to sell**. The unsigned Windows EXE and Inno Setup development installer build, Free/lifetime-Pro licensing foundation, and automated safety checks are available; production signing, real Windows installer/recovery QA, billing infrastructure and closed beta are not complete. See [the seven-milestone 1.0 release acceptance plan](RELEASE_1_0_PLAN.md).
 
 Game Grave finds games, mod-manager storage, Workshop folders, caches, and leftover installation candidates. It clearly separates *detected data*, *potential review targets*, and *space actually reclaimed*. Scanning never authorizes file deletion.
 
 ## Installing Game Grave on Windows 10 / 11
 
-**Planned customer experience:** Download one normal `GameGrave_Setup_v2.0.0.exe`, follow the installation wizard, then launch Game Grave from the Start Menu. Python is bundled. The installer creates an Add/Remove Programs entry and an uninstaller; desktop shortcut is optional. **Free installs need no license key or account.**
+**Planned customer experience:** Download a signed, versioned `GameGrave_Setup_v*.exe`, follow the installation wizard, then launch Game Grave from the Start Menu. Python is bundled. The installer creates an Add/Remove Programs entry and an uninstaller; desktop shortcut is optional. **Free installs need no license key or account.**
 
-**For developers / testers right now:** This ZIP contains *source* and the Windows installer project, not a ready-built setup `.exe` (a Windows toolchain is needed). On Windows with Python 3.10+ and Inno Setup 6 installed, run `powershell -ExecutionPolicy Bypass -File .\build_installer.ps1`. Find the standalone installer in `release\GameGrave_Setup_v2.0.0.exe`. Or import the source into a dedicated Game Grave GitHub repo and run the included Windows installer workflow.
+**For developers / testers right now:** The source ZIP is not a setup executable. A [successful unsigned installer candidate build](https://github.com/wrightausername/Game-Grave/actions/runs/41129498352) is available as a temporary GitHub Actions artifact with a SHA-256 manifest. To build locally on Windows with Python and Inno Setup 6, run `powershell -ExecutionPolicy Bypass -File .\build_installer.ps1`; the output uses the version in `installer/GameGrave.iss` (currently `GameGrave_Setup_v2.4.0.exe`). **The developer artifact is unsigned and has not passed clean-PC QA. Do not distribute it as 1.0.**
 
 **Source-only quick run:** Extract this ZIP, install Python 3.10+, then double-click `Start_GameGrave.bat`. This is a *developer fallback*, not the eventual consumer install method. Scan PC does not delete files.
 
@@ -108,6 +108,7 @@ Open **Save Vault → Resurrection Lab** (also accessible from Game DNA). All fi
 
 - **Never auto-delete games or mods.** All new ecosystem scans are read-only.
 - **No permanent file deletion action** is implemented. Manual and opt-in scheduled cleanup use Windows Recycle Bin only. If recycling fails, the tool never silently falls back to permanent deletion.
+- **Current M1 safety stop:** On a noninteractive Windows CI runner, Shell reported removing a disposable test file but Undo could not locate it. Game Grave now requires a verified, restored, byte-identical **temporary canary** in the current Windows Recycle Bin before sending any actual user file. If recovery cannot be proven, the user file is left intact. This intentionally adds time and conservatism, and real interactive Windows 10/11 Undo QA remains a release blocker. See [the observed integration failure and safe refusal](https://github.com/wrightausername/Game-Grave/actions/runs/41130487779) and [M1 tracker](https://github.com/wrightausername/Game-Grave/issues/10).
 - File removal in the app needs explicit user approval. Scheduling a predefined Downloads recycling rule requires explicit opt-in; once enabled, that schedule follows the approved rule until disabled.
 - **Recycle Bin does not immediately free disk space.** Emptying it can make recovery impossible. The Undo Center works only while Windows retains a uniquely matchable item, and its Windows restore integration still needs real Windows compatibility testing.
 - Steam uninstall sends a request to Steam. The user approves there and Game Grave does **not** claim it verified the uninstall.
@@ -124,7 +125,7 @@ From the `GameGrave` folder:
 python -m unittest discover -s tests -v
 ```
 
-102 Python unit tests passed on the 2026-10-30 development branch on Linux (pending native Windows CI and QA), plus a virtual desktop smoke test opening the core pages and switching themes/layouts. **That is not equivalent to real Windows testing.** Windows Shell Recycle Bin behavior, registry discovery, UAC cases, multi-drive handling, antivirus compatibility, Microsoft Store installations, installer/signing, and performance on very large libraries need dedicated Windows QA.
+The automated Python unit test suite passes on Ubuntu and Windows GitHub Actions runners, with additional synthetic GUI smoke tests. **That is not equivalent to real installed-app Windows 10/11 QA.** Windows Shell Recycle Bin behavior, registry discovery, UAC cases, multi-drive handling, antivirus compatibility, Microsoft Store installations, installer/signing, and performance on very large libraries need dedicated Windows QA.
 
 ## Business model
 
