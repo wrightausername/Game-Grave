@@ -85,10 +85,12 @@ class InventoryPaginationTests(unittest.TestCase):
     def test_old_files_enforce_protection_on_current_page_only(self):
         view=FakePage("files",25)
         view.file_tree=FakeTree()
+        view.settings={"never_touch":[]}
         view.files_sort_var=FakeVar("Largest first")
         view.old_files=[SimpleNamespace(path=f"/fake/old{i}.zip",modified=0,size=i)
                         for i in range(40000)]
         with patch("ui.sort_files",side_effect=lambda items,_sort:items), \
+             patch("ui.age_text",return_value="Old"), \
              patch("ui.is_protected_path",return_value=True) as guard:
             GameGraveApp._populate_files(view)
         self.assertEqual(guard.call_count,DEFAULT_PAGE_SIZE)
