@@ -150,12 +150,12 @@ class KitV2Tests(unittest.TestCase):
             link.symlink_to(outside)
         except (NotImplementedError, OSError):
             self.skipTest("Symlinks unavailable on this test filesystem")
-        created = self._make()
-        with zipfile.ZipFile(self.zip) as archive:
-            self.assertNotIn("Saves/LinkedSecret.sav", archive.namelist())
+        with self.assertRaisesRegex(ValueError, "linked or unsupported"):
+            self._make()
+        self.assertFalse(self.zip.exists())
         with self.assertRaises(ValueError):
             create_complete_kit("Game", {"Saves": link}, self.root / "other.zip")
-        self.assertTrue(Path(created["manifest"]).exists())
+        self.assertTrue(outside.exists())
 
     def test_corrupt_sidecar_and_missing_archive_fail_closed(self):
         manifest = self.root / "untrusted.ggkit.json"
@@ -167,7 +167,7 @@ class KitV2Tests(unittest.TestCase):
     def test_insufficient_space_stops_before_restore(self):
         created = self._make()
         import resurrection_v2 as module
-        with patch.object(module.shutil, "disk_usage", return_value=(100, 100, 0)):
+        with patch.object(module.shutil, "disk_usage", return_value=__import__("types").SimpleNamespace(total=100, used=100, free=0)):
             with self.assertRaisesRegex(OSError, "free space"):
                 inspect_restore(Path(created["manifest"]), self.restore_parent)
         self.assertEqual(list(self.restore_parent.iterdir()), [])
