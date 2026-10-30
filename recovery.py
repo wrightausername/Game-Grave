@@ -78,9 +78,15 @@ if ($matches.Count -eq 1) {
     if (Test-Path -LiteralPath $original) {
         'ORIGINAL_EXISTS'
     } else {
-        $matches[0].InvokeVerb('RESTORE')
-        Start-Sleep -Milliseconds 500
-        if (Test-Path -LiteralPath $original) { 'RESTORED' } else { 'UNVERIFIED' }
+        # "undelete" is the canonical Shell context-menu verb for restoring
+        # Recycle Bin entries, unlike the localized displayed menu text.
+        $matches[0].InvokeVerb('undelete')
+        $restored = $false
+        for ($n = 0; $n -lt 12; $n++) {
+            if (Test-Path -LiteralPath $original) { $restored = $true; break }
+            Start-Sleep -Milliseconds 250
+        }
+        if ($restored) { 'RESTORED' } else { 'UNVERIFIED' }
     }
 } elseif ($matches.Count -eq 0) { 'NOT_FOUND' } else { 'AMBIGUOUS' }
 ''' if restore else r'''
