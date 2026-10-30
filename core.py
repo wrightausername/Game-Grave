@@ -8,6 +8,8 @@ import json
 import os
 import re
 import time
+import tempfile
+import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -745,45 +747,104 @@ def _recycle_shell_session_ready(kernel=None) -> bool:
         return False
 
 
-def recycle_file(path: Path) -> None:
-    """Send local fixed-disk file to Windows Recycle Bin. Never fall back to permanent delete."""
-    if os.name != "nt":
-        raise RuntimeError("Recycling requires Windows.")
-    if not _recycle_shell_session_ready():
-        raise RuntimeError("Safe recycling requires an active local Windows desktop session. "
-                           "Unattended services, disconnected remote sessions and headless "
-                           "jobs are blocked until Recycle Bin recovery is verified.")
-    from ctypes import wintypes
+def _shell_recycle_operation(path: Path) -> None:
+    """Low-level Windows Shell request, used ONLY after safety preflight.
 
-    # Never allow an apparently safe path to escape through a parent junction.
-    if _has_reparse_component(path):
-        raise ValueError("Linked or redirected file paths are never eligible for recycling.")
-    path = path.resolve(strict=True)
-    if (not path.is_file() or len(str(path)) > 240 or
-            is_protected_path(path)):
-        raise ValueError("Protected, unsupported or overly long file path.")
-    # Hard links can share data with active game files; their ownership is
-    # ambiguous. Do not recycle these through a generic cleanup utility.
-    if path.stat().st_nlink > 1:
-        raise ValueError("Hard-linked files require manual review, not recycling.")
-    root = Path(path.anchor)
-    drive_type = ctypes.windll.kernel32.GetDriveTypeW(str(root))
-    if drive_type != 3:  # DRIVE_FIXED. Reject network/removable drives.
-        raise ValueError("Only local fixed disks can use automatic Recycle Bin cleanup.")
+    The FOF_ALLOWUNDO flag requests the Recycle Bin. The caller must not
+    assume success alone proves the file is recoverable in every environment.
+    """
+    from ctypes import wintypes
 
     class SHFILEOPSTRUCTW(ctypes.Structure):
         _fields_ = [("hwnd", wintypes.HWND), ("wFunc", wintypes.UINT),
                     ("pFrom", wintypes.LPCWSTR), ("pTo", wintypes.LPCWSTR),
                     ("fFlags", wintypes.WORD), ("fAnyOperationsAborted", wintypes.BOOL),
                     ("hNameMappings", wintypes.LPVOID), ("lpszProgressTitle", wintypes.LPCWSTR)]
-
     op = SHFILEOPSTRUCTW()
     op.wFunc = 3  # FO_DELETE
     op.pFrom = str(path) + "\0\0"
-    op.fFlags = 0x0040 | 0x0010 | 0x0004 | 0x0400  # ALLOWUNDO, NOCONFIRMATION, SILENT, NOERRORUI
+    op.fFlags = 0x0040 | 0x0010 | 0x0004 | 0x0400
     result = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(op))
     if result or op.fAnyOperationsAborted or path.exists():
         raise OSError(f"Windows could not recycle this file (code {result}).")
+
+
+def _recycle_canary_passes(parent: Path) -> bool:
+    """Verify Windows can recycle AND restore a disposable file on this drive.
+
+    A user file is NEVER submitted to the Shell unless its own directory first
+    passes this one-file preflight. The only permanent unlink targets the
+    program-generated canary after a successful restore, not the user's data.
+    """
+    marker = b"Game Grave safe Recycle Bin canary"
+    canary = None
+    try:
+        fd, raw = tempfile.mkstemp(prefix="gg-safe-recycle-", suffix=".txt", dir=parent)
+        canary = Path(raw)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(marker)
+        _shell_recycle_operation(canary)
+        from recovery import _bin_script, _run_ps
+        if _run_ps(_bin_script(str(canary))) != "AVAILABLE":
+            return False
+        if _run_ps(_bin_script(str(canary), restore=True)) != "RESTORED":
+            return False
+        return bool(canary.is_file() and not _is_reparse_point(canary)
+                    and canary.read_bytes() == marker)
+    except (OSError, ValueError, RuntimeError, TimeoutError, subprocess.TimeoutExpired):
+        return False
+    finally:
+        # Delete only the exact disposable bytes created by Game Grave, and
+        # only after verifying it is not a link. Never erase an alien file.
+        if canary is not None:
+            try:
+                if (canary.is_file() and not _is_reparse_point(canary)
+                        and canary.stat().st_size == len(marker)
+                        and canary.read_bytes() == marker):
+                    canary.unlink()
+            except (OSError, ValueError):
+                pass
+
+
+def recycle_file(path: Path) -> None:
+    """Recycle a user file only if its Windows session proves Undo works first.
+
+    Deliberately conservative and slower than bulk delete. Never silently
+    degrade to permanent removal when Windows Shell recycling is unavailable.
+    """
+    if os.name != "nt":
+        raise RuntimeError("Recycling requires Windows.")
+    if not _recycle_shell_session_ready():
+        raise RuntimeError("Recycling requires an active local Windows desktop session; "
+                           "background services and disconnected sessions are blocked.")
+
+    if _has_reparse_component(path):
+        raise ValueError("Linked or redirected file paths are never eligible for recycling.")
+    path = path.resolve(strict=True)
+    if (not path.is_file() or len(str(path)) > 240 or is_protected_path(path)):
+        raise ValueError("Protected, unsupported or overly long file path.")
+    before = path.stat()
+    if before.st_nlink > 1:
+        raise ValueError("Hard-linked files require manual review, not recycling.")
+    root = Path(path.anchor)
+    if ctypes.windll.kernel32.GetDriveTypeW(str(root)) != 3:
+        raise ValueError("Only local fixed disks can use Recycle Bin cleanup.")
+
+    # A disposable canary must be present in and restorable from this session's
+    # Windows Recycle Bin before ANY user-owned file is passed to the Shell.
+    # In inaccessible/headless runners, the canary may be lost; user data is not.
+    if not _recycle_canary_passes(path.parent):
+        raise RuntimeError("Recycle Bin recovery preflight FAILED on this Windows session. "
+                           "Your file was NOT touched. Use Windows Explorer manually "
+                           "until the local Recycle Bin and Undo Center pass QA.")
+    if _has_reparse_component(path) or not path.is_file() or is_protected_path(path):
+        raise ValueError("File eligibility changed while verifying Recycle Bin; stopped.")
+    current = path.stat()
+    if (current.st_size != before.st_size or
+            current.st_mtime_ns != before.st_mtime_ns or
+            current.st_ino != before.st_ino or current.st_nlink > 1):
+        raise ValueError("File changed during the recovery preflight. No user file was recycled.")
+    _shell_recycle_operation(path)
 
 
 def run_auto_cleanup() -> tuple[int, int, str]:
