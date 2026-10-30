@@ -79,10 +79,15 @@ $beforeProfile = (Get-FileHash $profileSentinel -Algorithm SHA256).Hash
 
 function Invoke-UnsignedInstaller([string]$label) {
     $logFile = Join-Path $testRoot "$label.log"
-    $args = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER',
-              "/DIR=$installDir", "/LOG=$logFile")
-    & $setup @args
-    if ($LASTEXITCODE -ne 0) { throw "$label failed with installer exit code $LASTEXITCODE" }
+    $installerArguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
+        '/CURRENTUSER', '/SP-', ('/DIR="' + $installDir + '"'),
+        ('/LOG="' + $logFile + '"'))
+    # Inno Setup is a GUI-subsystem executable. Invoking it with '&' can
+    # return before the installer exits, leaving LASTEXITCODE null.
+    $process = Start-Process -FilePath $setup -ArgumentList $installerArguments -Wait -PassThru
+    if ($process.ExitCode -ne 0) {
+        throw "$label failed with installer exit code $($process.ExitCode)"
+    }
     $installedExe = Join-Path $installDir 'GameGrave.exe'
     if (-not [IO.File]::Exists($installedExe)) {
         throw "$label did not install GameGrave.exe at the isolated destination."
@@ -105,9 +110,9 @@ $uninstallers = @(Get-ChildItem -LiteralPath $installDir -Filter 'unins*.exe' -F
 if ($uninstallers.Count -ne 1) {
     throw 'Expected precisely one uninstall executable in the CI-only install.'
 }
-& ($uninstallers[0].FullName) '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART'
-if ($LASTEXITCODE -ne 0) {
-    throw "Uninstall failed with exit code $LASTEXITCODE"
+$uninstallProcess = Start-Process -FilePath $uninstallers[0].FullName -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+if ($uninstallProcess.ExitCode -ne 0) {
+    throw "Uninstall failed with exit code $($uninstallProcess.ExitCode)"
 }
 if ([IO.File]::Exists((Join-Path $installDir 'GameGrave.exe'))) {
     throw 'Uninstall left the application executable behind.'
