@@ -1,0 +1,53 @@
+name: Windows preview build (unsigned)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-preview:
+    name: Build Windows preview executable
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install packaging dependencies
+        run: python -m pip install -r build-requirements.txt
+
+      - name: Prepare writable temporary folder for Windows safety tests
+        shell: pwsh
+        run: |
+          $testTemp = Join-Path $env:GITHUB_WORKSPACE "_ci_temp"
+          New-Item -ItemType Directory -Force $testTemp | Out-Null
+          "TMPDIR=$testTemp" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TEMP=$testTemp" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TMP=$testTemp" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Run unit tests before packaging
+        run: python -m unittest discover -s tests -v
+
+      - name: Build standalone application
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name GameGrave --hidden-import cryptography.hazmat.primitives.asymmetric.ed25519 launcher.py
+          if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed' }
+          if (-not (Test-Path 'dist/GameGrave.exe')) { throw 'Windows executable was not created' }
+
+      - name: Upload unsigned preview executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Windows-Preview
+          path: dist/GameGrave.exe
+          if-no-files-found: error
+          retention-days: 14
+
+# Developer-only CI artifact. Not a signed, installed or QA-approved release.
+# Running the bundled app never bypasses explicit cleanup approval.
