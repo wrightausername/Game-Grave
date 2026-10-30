@@ -1,0 +1,33 @@
+name: M1 disposable Windows Recycle Bin + Undo integration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  undo-smoke:
+    name: Verify disposable file round-trip through native Windows Shell
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create private QA scratch folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force '_ci_temp' | Out-Null
+      - name: Exercise Recycle Bin + in-app Undo with a new disposable text file ONLY
+        shell: pwsh
+        env:
+          GG_QA_DISPOSABLE: 'YES'
+        run: |
+          python tools/windows_recycle_qa.py --scratch _ci_temp --execute
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Disposable Windows Shell Recycle Bin/Undo smoke failed; M1 remains BLOCKED.'
+          }
+      - name: Report that human Windows 10/11 acceptance is still required
+        shell: pwsh
+        run: Write-Host 'Automated smoke is NOT native user-facing Windows 10/11 installer QA.'
