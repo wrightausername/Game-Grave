@@ -31,6 +31,11 @@ from resurrection_kit import create_resurrection_kit
 from resurrection_v2 import create_complete_kit, inspect_restore, restore_kit
 from kit_discovery import discover_setup, select_sources
 from mo2_reconnect import preview_mo2_reconnect, reconnect_to_mo2
+from resurrection_v2 import _manifest_for
+from resurrection_lab import (
+    missing_pieces, compare_kits, plan_living_update, create_living_update,
+    rehearse_kit, list_snapshots, prepare_pc_transfer,
+)
 from manager_profiles import inspect_manager_profiles, summarize_manager_profile
 from space_planner import plan_for_drive
 from launchers import LauncherGame, find_launcher_games
@@ -272,6 +277,7 @@ class GameGraveApp(tk.Tk):
             "Undo Center": self._undo_page,
             "Cleanup History": self._activity_page,
             "Save Vault": self._save_vault_page,
+            "Resurrection Lab": self._resurrection_lab_page,
             "Storage History": self._history_page,
             "Settings": self._settings_page,
             "Automation": self._automation_page,
@@ -362,7 +368,10 @@ class GameGraveApp(tk.Tk):
         self.button(row, "Capture / compare changes", self._capture_intelligence, primary=True).pack(side="left")
         self.button(row, "Exodus checklist", self._preview_exodus).pack(side="left", padx=9)
         self.button(row, "Inspect manager profiles", self._inspect_manager_profiles).pack(side="left", padx=9)
-        self.button(controls, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(anchor="w", pady=(8, 0))
+        dna_tools = tk.Frame(controls, bg=PANEL)
+        dna_tools.pack(anchor="w", pady=(8, 0))
+        self.button(dna_tools, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(side="left")
+        self.button(dna_tools, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=9)
         previous = load_observation()
         if previous:
             self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
@@ -2009,6 +2018,144 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("undo_error", str(exc)))
         threading.Thread(target=worker, daemon=True).start()
 
+    def _resurrection_lab_page(self):
+        self.header("Resurrection Lab", "Five tools to check, rehearse, preserve, rewind, and move your gaming setup.")
+        actions = [
+            ("01 · Missing Pieces", "Find missing MO2 mod folders and unresolved recovery dependencies. "
+             "The ZIP is checked, but an intact archive never proves game compatibility.",
+             self._lab_missing_pieces),
+            ("02 · Resurrection Rehearsal", "Temporarily extract and hash-check a full kit in an isolated "
+             "test folder. It never touches live games and removes its own temporary copy.",
+             self._lab_rehearsal),
+            ("03 · Living Kits", "Compare an older kit with the folders you choose now. "
+             "Save an independent new version only after reviewing changes.",
+             self._lab_living),
+            ("04 · Time Machine", "Compare verified kit versions and optionally stage "
+             "an older snapshot without overwriting current saves.",
+             self._lab_time_machine),
+            ("05 · PC-to-PC Resurrection", "Prepare a verified folder for a USB drive or other transfer. "
+             "Reinstall the game through its launcher on the destination PC.",
+             self._lab_transfer),
+        ]
+        for label, desc, fn in actions:
+            panel = self.panel(pad=11)
+            panel.pack(fill="x", pady=(0, 8))
+            self.button(panel, label, fn, primary=(label.startswith("01"))).pack(side="left", padx=(0, 16))
+            self.text(panel, desc, 9, MUTED, wraplength=560).pack(side="left", anchor="w")
+        footer = tk.Frame(self.content, bg=BG)
+        footer.pack(fill="x", pady=(5, 0))
+        self.button(footer, "See kit versions in a folder", self._lab_list_versions).pack(side="left")
+        self.button(footer, "Restore older kit safely", self._preview_resurrection_kit).pack(
+            side="left", padx=8)
+        self.button(footer, "Back to Save Vault", lambda: self.show_page("Save Vault")).pack(
+            side="right")
+        self.text(self.content, "Local-only, on-demand. No cloud uploads, forced accounts, "
+                  "automatic live file rollback, or hidden background monitoring. "
+                  "Only new, user-approved backup/transfer files are created.",
+                  9, WARN, wraplength=810).pack(anchor="w", pady=(10, 0))
+
+    def _lab_manifest(self, label="Choose Resurrection Kit manifest"):
+        return filedialog.askopenfilename(
+            title=label,
+            filetypes=[("Game Grave Resurrection Kit", "*.ggkit.json"), ("JSON files", "*.json")])
+
+    def _lab_work(self, event, description, task):
+        self.status_text.set(description)
+        def worker():
+            try:
+                output = task()
+                self.events.put((event, output))
+            except (OSError, ValueError, RuntimeError, PermissionError,
+                    FileExistsError, zipfile.BadZipFile, EOFError) as exc:
+                self.events.put(("lab_error", str(exc)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _lab_missing_pieces(self):
+        manifest = self._lab_manifest("Select kit to check for missing components")
+        if manifest:
+            self._lab_work("lab_missing", "Checking kit integrity and required MO2 entries…",
+                           lambda: missing_pieces(Path(manifest)))
+
+    def _lab_rehearsal(self):
+        manifest = self._lab_manifest("Choose kit to rehearse safely")
+        if not manifest:
+            return
+        parent = filedialog.askdirectory(
+            title="Choose a scratch folder with sufficient free space (NOT a live game directory)")
+        if not parent:
+            return
+        if not messagebox.askyesno("Rehearse restoration?",
+                "Game Grave will create a temporary copy of this kit in:\n"
+                + parent + "\n\n"
+                "It will hash-check the extracted files and remove ONLY its own "
+                "temporary test folder. This can require significant disk space. "
+                "The game and mod manager will NOT be launched. Proceed?"):
+            return
+        self._lab_work("lab_rehearsal", "Rehearsing kit extraction and SHA-256 checks…",
+                       lambda: rehearse_kit(Path(manifest), Path(parent)))
+
+    def _lab_living(self):
+        previous = self._lab_manifest("Choose existing kit to compare with live folders")
+        if not previous:
+            return
+        try:
+            meta, _archive = _manifest_for(Path(previous))
+            if meta.get("schema") != 2 or not isinstance(meta.get("roles"), list):
+                raise ValueError("Living revisions require an existing v2 kit manifest.")
+            roles = [r.get("name") for r in meta["roles"] if isinstance(r, dict)]
+            if not roles or len(roles) != len(set(roles)) or not set(roles).issubset(
+                    {"Saves", "Mods", "Profiles", "Configs"}):
+                raise ValueError("This kit lists unsupported backup folder categories.")
+        except (OSError, ValueError) as exc:
+            messagebox.showwarning("Unsupported kit", str(exc))
+            return
+        sources = {}
+        for role in roles:
+            path = filedialog.askdirectory(
+                title=f"Select current {role} folder corresponding to the old kit")
+            if not path:
+                return
+            sources[role] = Path(path)
+        self._lab_work(
+            "lab_living_preview", "Comparing actual file contents against the saved kit…",
+            lambda: (previous, sources, plan_living_update(Path(previous), sources)))
+
+    def _lab_time_machine(self):
+        older = self._lab_manifest("Choose older kit snapshot")
+        if not older:
+            return
+        newer = self._lab_manifest("Choose newer snapshot of the SAME game")
+        if not newer:
+            return
+        self._lab_work("lab_time_machine", "Checking and comparing full kit snapshots…",
+                       lambda: compare_kits(Path(older), Path(newer)))
+
+    def _lab_list_versions(self):
+        parent = filedialog.askdirectory(
+            title="Choose the folder that contains your Resurrection Kits")
+        if not parent:
+            return
+        self._lab_work("lab_versions", "Reading local kit snapshot manifests…",
+                       lambda: list_snapshots(Path(parent)))
+
+    def _lab_transfer(self):
+        manifest = self._lab_manifest("Choose kit to copy to another PC")
+        if not manifest:
+            return
+        destination = filedialog.askdirectory(
+            title="Choose a USB / transfer drive folder with enough free space")
+        if not destination:
+            return
+        if not messagebox.askyesno("Prepare PC-to-PC transfer?",
+                f"Copy the kit and manifest into a NEW folder within:\n{destination}\n\n"
+                "No game binaries or game licenses are included. "
+                "The entire copy is verified. The destination PC still needs the "
+                "game installed through its launcher.\n\nContinue?"):
+            return
+        self._lab_work("lab_transfer", "Preparing and verifying portable kit copy…",
+                       lambda: prepare_pc_transfer(
+                           Path(manifest), Path(destination), approved=True))
+
     def _save_vault_page(self):
         self.header("Save Vault", "Find game saves automatically. Choose what stays protected.")
         intro = self.panel(pad=13)
@@ -2036,6 +2183,7 @@ class GameGraveApp(tk.Tk):
         self.button(bottom, "Back up another folder", self._choose_save_backup).pack(side="left", padx=10)
         self.button(bottom, "Preserve setup (Kit)", self._make_resurrection_kit).pack(side="left", padx=10)
         self.button(bottom, "Preview / Restore Kit", self._preview_resurrection_kit).pack(side="left", padx=10)
+        self.button(bottom, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=10)
         helper = tk.Frame(self.content, bg=BG)
         helper.pack(fill="x", pady=(5, 0))
         self.button(helper, "Find my setup automatically", self._start_auto_kit).pack(side="left")
@@ -2386,8 +2534,8 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("kit_error", str(exc)))
         threading.Thread(target=worker, daemon=True).start()
 
-    def _preview_resurrection_kit(self):
-        manifest = filedialog.askopenfilename(
+    def _preview_resurrection_kit(self, preselected_manifest=None):
+        manifest = preselected_manifest or filedialog.askopenfilename(
             title="Choose your Resurrection Kit manifest (.ggkit.json)",
             filetypes=[("Game Grave kit", "*.ggkit.json"), ("JSON file", "*.json")])
         if not manifest:
@@ -2896,6 +3044,95 @@ class GameGraveApp(tk.Tk):
                 elif name == "mo2_reconnect_error":
                     self.status_text.set("MO2 restore not completed; existing setup protected.")
                     messagebox.showwarning("MO2 restore stopped safely", payload)
+                elif name == "lab_missing":
+                    message = (f"{payload['game']} · {payload['readiness']}\n"
+                        f"Verified archive: {payload['files']} files\n"
+                        f"Manager: {payload['manager']}\n\n")
+                    if payload["missing_count"]:
+                        message += (f"Missing enabled mod folders ({payload['missing_count']}):\n" +
+                                    "\n".join("• " + v for v in payload["missing_enabled_mods"][:20]) + "\n\n")
+                    if payload["issues"]:
+                        message += "Problems:\n" + "\n".join("• " + v for v in payload["issues"][:10]) + "\n\n"
+                    message += ("Still unverified:\n" +
+                        "\n".join("• " + v for v in payload["unknown"][:8]) +
+                        "\n\nNo original download links were invented.")
+                    self.status_text.set("Missing Pieces audit completed (read-only)")
+                    messagebox.showinfo("Resurrection Readiness", message)
+                elif name == "lab_rehearsal":
+                    self.status_text.set("Isolated Resurrection Rehearsal verified")
+                    messagebox.showinfo("Rehearsal passed",
+                        f"{payload['game']}: extracted and SHA-256 checked "
+                        f"{payload['files_verified']} files in an isolated scratch folder.\n\n"
+                        "The temporary files were cleaned up. Game launch, manager "
+                        "compatibility and original save consistency are NOT verified.")
+                elif name == "lab_living_preview":
+                    previous, sources, plan = payload
+                    self.status_text.set("Living Kit comparison completed")
+                    if not plan["changed"]:
+                        messagebox.showinfo("Already current",
+                            "No file-content differences found. The existing kit is still current. "
+                            "No new ZIP was created.")
+                        continue
+                    preview = "\n".join(
+                        f"• {c['change']}: {c['path']}" for c in plan["changes"][:18])
+                    if not messagebox.askyesno("Save a new kit version?",
+                            f"Game: {plan['game']}\nChanges: {plan['change_count']}\n"
+                            f"Files in new version: {plan['files']}\n\n"
+                            f"{preview}\n\n"
+                            "A NEW independent ZIP will be created; the previous kit remains "
+                            "unchanged. The new kit will NOT inherit old manager identity "
+                            "evidence. Continue?"):
+                        continue
+                    destination = filedialog.asksaveasfilename(
+                        title="Save new immutable Resurrection Kit version",
+                        defaultextension=".zip", filetypes=[("ZIP archive", "*.zip")],
+                        initialfile=plan["game"].replace("/", "_").replace("\\", "_") +
+                                    "_Resurrection_vNext.zip")
+                    if not destination:
+                        continue
+                    self._lab_work("lab_living_created", "Creating verified new kit version…",
+                        lambda prev=previous, roots=sources, dest=destination, p=plan:
+                        create_living_update(Path(prev), roots, Path(dest), approved=True,
+                                             expected_source_fingerprint=p["source_fingerprint"]))
+                elif name == "lab_living_created":
+                    self.status_text.set("New Living Kit version saved")
+                    log_event("Living Resurrection Kit version created", payload["archive"])
+                    messagebox.showinfo("New version verified",
+                        f"{payload['files']} files preserved in independent ZIP:\n"
+                        f"{payload['archive']}\n\nManifest:\n{payload['manifest']}\n\n"
+                        "The previous version was not changed.")
+                elif name == "lab_time_machine":
+                    self.status_text.set("Time Machine comparison completed")
+                    lines = "\n".join(
+                        f"• {c['change']}: {c['path']}" for c in payload["changes"][:22])
+                    if messagebox.askyesno("Time Machine · Snapshot comparison",
+                            f"{payload['game']}\n"
+                            f"{payload['older_files']} older files → {payload['newer_files']} newer\n"
+                            f"{payload['change_count']} differences detected\n\n"
+                            f"{lines or '(No detected differences)'}\n\n"
+                            "Differences use size + ZIP CRC32. Both full archive "
+                            "checksums passed, but game compatibility is unverified.\n\n"
+                            "Stage the OLDER kit in a NEW recovery folder?"):
+                        self._preview_resurrection_kit(payload["before"])
+                elif name == "lab_versions":
+                    self.status_text.set(f"Found {len(payload)} local kit versions")
+                    listing = "\n".join(
+                        f"• {r['game']} — {Path(r['manifest']).name} "
+                        "(not integrity-checked yet)" for r in payload[:30])
+                    messagebox.showinfo("Kit versions", listing or
+                        "No readable Resurrection Kit manifests found in that directory.")
+                elif name == "lab_transfer":
+                    self.status_text.set("Portable PC-to-PC kit copy verified")
+                    log_event("Resurrection PC transfer prepared", payload["target"])
+                    messagebox.showinfo("Portable transfer ready",
+                        f"Verified {payload['files_in_kit']} kit files.\n\n"
+                        f"Transfer folder:\n{payload['target']}\n\n"
+                        "Copy the ENTIRE folder to the new PC. Follow READ_ME_FIRST.txt. "
+                        "Install the game normally through its launcher; restore "
+                        "game saves and mods only after review.")
+                elif name == "lab_error":
+                    self.status_text.set("Resurrection Lab operation stopped safely")
+                    messagebox.showwarning("Resurrection Lab incomplete", payload)
                 elif name == "kit_result":
                     self.status_text.set("Resurrection Kit saved and verified")
                     log_event("Resurrection Kit created", payload["archive"])
