@@ -8,6 +8,14 @@ on:
       - 'core.py'
       - 'recovery.py'
       - 'tools/windows_recycle_qa.py'
+      - 'tools/windows_recycle_diagnostics.py'
+      - '.github/workflows/windows-recycle-qa.yml'
+  pull_request:
+    paths:
+      - 'core.py'
+      - 'recovery.py'
+      - 'tools/windows_recycle_qa.py'
+      - 'tools/windows_recycle_diagnostics.py'
       - '.github/workflows/windows-recycle-qa.yml'
 
 permissions:
@@ -26,6 +34,16 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force '_ci_temp' | Out-Null
+      - name: Diagnose Shell visibility around a second disposable text file
+        shell: pwsh
+        continue-on-error: true
+        env:
+          GG_QA_DISPOSABLE: 'YES'
+        run: |
+          python tools/windows_recycle_diagnostics.py --scratch _ci_temp --execute
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'Recycle diagnostics show limitations. Primary safety QA must still fail closed.'
+          }
       - name: Exercise Recycle Bin + in-app Undo with a new disposable text file ONLY
         shell: pwsh
         env:
