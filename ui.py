@@ -1586,28 +1586,40 @@ class GameGraveApp(tk.Tk):
             self._grave_toggle(key)
         return "break"
 
+    def _grave_update_count(self):
+        self.grave_count_var.set(
+            f"{getattr(self, '_grave_summary', 'Graveyard review')}  •  "
+            f"{len(self.grave_checked)} checked across filtered pages")
+
     def _grave_toggle(self, key):
-        if key not in self.graveyard_lookup:
+        if key not in self._grave_page_keys or key not in self.graveyard_lookup:
             return
         if key in self.grave_checked:
             self.grave_checked.remove(key)
         else:
             self.grave_checked.add(key)
         self.grave_tree.set(key, "check", "☑" if key in self.grave_checked else "☐")
-        self.grave_count_var.set(f"{len(self.graveyard_lookup)} visible findings  •  {len(self.grave_checked)} checked")
+        self._grave_update_count()
 
     def _grave_select_all(self):
-        self.grave_checked = set(self.graveyard_lookup)
+        # "Check page" must not silently select thousands of other findings.
+        self.grave_checked.update(self._grave_page_keys)
         self._grave_refresh_checks()
 
     def _grave_select_eligible(self):
-        self.grave_checked = {key for key, item in self.graveyard_lookup.items() if item.can_recycle}
+        self.grave_checked.update(
+            key for key in self._grave_page_keys
+            if self.graveyard_lookup[key].can_recycle)
+        self._grave_refresh_checks()
+
+    def _grave_clear_checks(self):
+        self.grave_checked.clear()
         self._grave_refresh_checks()
 
     def _grave_refresh_checks(self):
-        for key in self.graveyard_lookup:
+        for key in self._grave_page_keys:
             self.grave_tree.set(key, "check", "☑" if key in self.grave_checked else "☐")
-        self.grave_count_var.set(f"{len(self.graveyard_lookup)} visible findings  •  {len(self.grave_checked)} checked")
+        self._grave_update_count()
 
     def _grave_details(self):
         ids = self.grave_tree.selection()
@@ -1729,10 +1741,21 @@ class GameGraveApp(tk.Tk):
         self._grave_recycle_ids(list(self.grave_checked))
 
     def _grave_recycle_all(self):
-        self._grave_recycle_ids([k for k, e in self.graveyard_lookup.items() if e.can_recycle])
+        self._grave_recycle_ids(
+            [key for key in self._grave_page_keys
+             if self.graveyard_lookup[key].can_recycle])
 
     def _grave_recycle_ids(self, ids):
         import uuid
+        # Fail closed before any override or recycle prompt if too many items.
+        # No invisible cross-page batch can become a massive destructive task.
+        if len(ids) > DEFAULT_PAGE_SIZE:
+            messagebox.showwarning(
+                "Limit this cleanup to 160 files",
+                f"{len(ids)} items are checked across pages. A single cleanup "
+                f"can contain at most {DEFAULT_PAGE_SIZE} files. Narrow your filters, "
+                "clear checks, or select a smaller set. Nothing was moved.")
+            return
         chosen = [self.graveyard_lookup[k] for k in ids if k in self.graveyard_lookup]
         blocked = [e for e in chosen if not e.can_recycle and not self._grave_can_override(e)]
         if blocked:
