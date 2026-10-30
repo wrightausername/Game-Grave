@@ -8,6 +8,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from resurrection_v2 import create_complete_kit, inspect_restore
 from resurrection_lab import (
@@ -162,6 +163,36 @@ class ResurrectionLabTests(unittest.TestCase):
             rehearse_kit(Path(created["manifest"]), scratch)
         self.assertFalse(list(scratch.iterdir()))
 
+    def test_rehearsal_receipt_updates_readiness_only_for_same_archive_hash(self):
+        created = self.kit()
+        scratch = self.root / "Scratch"
+        scratch.mkdir()
+        with patch("resurrection_lab.config_dir", return_value=self.root / "GGData"):
+            before = missing_pieces(Path(created["manifest"]))
+            self.assertFalse(before["restore_rehearsed"])
+            result = rehearse_kit(Path(created["manifest"]), scratch, record=True)
+            self.assertTrue(result["receipt_recorded"])
+            after = missing_pieces(Path(created["manifest"]))
+            self.assertTrue(after["restore_rehearsed"])
+            self.assertFalse(after["complete_game_recovery_verified"])
+            receipts = (self.root / "GGData" / "kit_rehearsals.json").read_text()
+            self.assertNotIn(str(self.root), receipts)
+            self.assertFalse(list(scratch.iterdir()))
+            (self.saves / "slot" / "save.dat").write_bytes(b"new version")
+            updated = self.kit(destination=self.new)
+            self.assertFalse(missing_pieces(Path(updated["manifest"]))["restore_rehearsed"])
+
+    def test_baseline_hash_change_refuses_preapproved_living_version(self):
+        first = self.kit()
+        (self.saves / "slot" / "save.dat").write_bytes(b"edited")
+        plan = plan_living_update(Path(first["manifest"]), self.sources)
+        with self.assertRaisesRegex(ValueError, "previous kit changed"):
+            create_living_update(Path(first["manifest"]), self.sources, self.new,
+                                 approved=True,
+                                 expected_source_fingerprint=plan["source_fingerprint"],
+                                 expected_previous_archive_hash="deadbeef" * 8)
+        self.assertFalse(self.new.exists())
+
     def test_transfer_folder_contains_only_verified_portable_parts_and_guide(self):
         created = self.kit()
         usb = self.root / "USB"
@@ -173,6 +204,7 @@ class ResurrectionLabTests(unittest.TestCase):
         self.assertTrue(transfer["portable_copy_verified"])
         self.assertFalse(transfer["launcher_installation_included"])
         self.assertTrue((folder / "READ_ME_FIRST.txt").is_file())
+        self.assertFalse((folder / "TRANSFER_INCOMPLETE.txt").exists())
         self.assertTrue((folder / Path(created["archive"]).name).exists())
         self.assertTrue(inspect_restore(Path(transfer["manifest"]))["verified"])
         self.assertEqual((self.saves / "slot" / "save.dat").read_bytes(), b"progress 1")
