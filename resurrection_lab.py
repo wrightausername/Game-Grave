@@ -306,7 +306,8 @@ def plan_living_update(previous_manifest: Path, sources: dict[str, Path]) -> dic
 
 def create_living_update(previous_manifest: Path, sources: dict[str, Path],
                          destination: Path, *, approved=False,
-                         expected_source_fingerprint="") -> dict:
+                         expected_source_fingerprint="",
+                         expected_previous_archive_hash="") -> dict:
     if approved is not True or not expected_source_fingerprint:
         raise PermissionError("Approve the reviewed kit update first.")
     checked = plan_living_update(previous_manifest, sources)
@@ -314,6 +315,9 @@ def create_living_update(previous_manifest: Path, sources: dict[str, Path],
         raise ValueError("Selected source folders match the existing kit; no new version needed.")
     if checked["source_fingerprint"] != expected_source_fingerprint:
         raise ValueError("Sources changed since the review. Review again.")
+    if expected_previous_archive_hash and (checked["previous_archive_hash"] !=
+                                            expected_previous_archive_hash):
+        raise ValueError("The previous kit changed since review. Review again.")
     # Deliberately do not inherit MO2/Vortex verified-manager status after
     # re-selecting folders. Auto-reconnect needs a fresh discovery evidence pass.
     result = create_complete_kit(checked["game"], sources, destination)
