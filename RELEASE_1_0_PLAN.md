@@ -15,10 +15,10 @@
 ## Engineering status as of 2026-10-30
 
 - **Existing but not release-accepted:** Graveyard, Never Touch, Undo Center, Game DNA, Mod Radar read-only discovery, Save Vault, Resurrection Lab, Free/lifetime-Pro verification foundation, Windows executable CI. None by itself proves actual Windows user safety.
-- **M1 actively underway:** reject junction/reparse ancestors and hardlinks in the recycler; use atomic no-overwrite kit publication. Regression tests are necessary but real Windows integration QA remains.
+- **M1 actively underway:** merged protections for junction/reparse ancestors, hardlinks and manager storage under Downloads, atomic no-overwrite kit publication, and per-operation disposable Recycle Bin canary with byte-identical restore prerequisite. All existing automated unit tests pass. **The noninteractive Windows Recycle Bin/Undo smoke fails with missing shell entries; after the canary safeguard, the real target is preserved.** Windows 10/11 interactive QA and a supported recovery strategy remain open. See #10 and https://github.com/wrightausername/Game-Grave/actions/runs/41130487779.
 - **M2 and M3 partially implemented:** evidence-first discovery and backup/recovery foundation exist, but real launcher and mod-manager recovery QA has not happened.
 - **M4 partial:** themes, scales, views and dialogs exist, but keyboard/screen-reader usability and performance acceptance remain open.
-- **M5 partial:** installer definition and unsigned build process exist. Production Authenticode signing, payment/key issuance, secure update channel, privacy/legal sign-off and clean VM QA remain open.
+- **M5 partial:** installer definition and [unsigned Inno Setup candidate build with SHA-256](https://github.com/wrightausername/Game-Grave/actions/runs/41129498352) succeeded. Production Authenticode signing, payment/key issuance, secure update channel, privacy/legal sign-off and clean VM QA remain open.
 - **M6 and M7 not started:** no human closed beta or certified stable build has occurred.
 
 ## Non-negotiable decisions
