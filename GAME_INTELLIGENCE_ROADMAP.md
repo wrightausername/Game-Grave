@@ -131,3 +131,11 @@ all eight production features are complete.
 - Synthetic tests demonstrate these refusal cases without reading any user's actual game folders.
 
 Still pending M2 release gates: real moved-library/manifest behavior, multiple store installs, Steam Workshop state reconciliation, mod manager snapshot status and live Windows 10/11 acceptance.
+
+### M2 visual learning layer
+
+- Native responsive diagrams in **Game DNA** and **Game Mods & Hidden Storage** explain evidence-based ownership and protection, not cleanup recommendations.
+- Game DNA links recorded games, associated mod storage and unresolved records visually, with distinct solid/dotted associations and an explicit 0 automatic removals display. Users on compact displays can open a larger **View visual map** pop-up.
+- Mod Radar shows the three-stage evidence pipeline **Find → Match → Protect**, with plain-language explanations and a text alternative.
+- Visuals use existing UI colors and redraw on width changes, without images, SVG dependencies, telemetry or user-filesystem writes.
+- Remaining release acceptance: real Windows 10/11 screen-size, high-DPI, keyboard focus and screen-reader QA. Graphical presentation does not resolve unknown mod ownership or satisfy M2 integration gates.
