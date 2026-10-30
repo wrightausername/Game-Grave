@@ -242,8 +242,60 @@ class GameGraveApp(tk.Tk):
         self.progress_label = tk.Label(self.progress_area, textvariable=self.scan_progress_text,
                            bg=BG, fg=MUTED, font=("Segoe UI", 9), anchor="w")
         self.progress_label.pack(fill="x")
-        self.content = tk.Frame(self.main, bg=BG)
-        self.content.pack(fill="both", expand=True, padx=30, pady=(0, 24))
+        # Keep crowded pages usable on 720p laptops and at larger DPI.
+        # A scrollbar belongs to the page, not to its inner Treeviews.
+        self.content_shell = tk.Frame(self.main, bg=BG)
+        self.content_shell.pack(fill="both", expand=True, padx=20, pady=(0, 12))
+        self.content_canvas = tk.Canvas(self.content_shell, bg=BG,
+                                        highlightthickness=0, borderwidth=0,
+                                        takefocus=0)
+        self.content_scrollbar = ttk.Scrollbar(
+            self.content_shell, orient="vertical",
+            command=self.content_canvas.yview)
+        self.content_canvas.configure(yscrollcommand=self.content_scrollbar.set)
+        self.content_scrollbar.pack(side="right", fill="y")
+        self.content_canvas.pack(side="left", fill="both", expand=True)
+        self.content = tk.Frame(self.content_canvas, bg=BG)
+        self._content_window = self.content_canvas.create_window(
+            (0, 0), window=self.content, anchor="nw")
+        self.content.bind("<Configure>", self._update_content_scrollregion)
+        self.content_canvas.bind("<Configure>", self._fit_content_width)
+        self.bind("<MouseWheel>", self._scroll_page_on_wheel, add="+")
+
+    def _update_content_scrollregion(self, _event=None):
+        """Update the outer page's scroll extent after page controls reflow."""
+        self.content_canvas.configure(scrollregion=self.content_canvas.bbox("all"))
+
+    def _fit_content_width(self, event):
+        self.content_canvas.itemconfigure(self._content_window, width=event.width)
+        self._update_content_scrollregion()
+
+    def _scroll_page_on_wheel(self, event):
+        """Use the outer page wheel only if an inner scrollable does not own it."""
+        try:
+            found = self.winfo_containing(event.x_root, event.y_root)
+            if found is None:
+                return
+            child = found
+            within_page = False
+            while child is not None:
+                if isinstance(child, (ttk.Treeview, tk.Text, tk.Listbox,
+                                      ttk.Combobox, ttk.Notebook)):
+                    return
+                if child == self.content or child == self.content_canvas:
+                    within_page = True
+                    break
+                child = child.master
+            if not within_page:
+                return
+            bounds = self.content_canvas.bbox("all")
+            if not bounds or bounds[3] <= self.content_canvas.winfo_height():
+                return
+            direction = -1 if event.delta > 0 else 1
+            self.content_canvas.yview_scroll(direction * 3, "units")
+            return "break"
+        except (tk.TclError, AttributeError):
+            return
 
     def button(self, parent, label, command, primary=False, danger=False):
         fg = ON_ACCENT if primary else (RED if danger else TEXT)
@@ -330,6 +382,8 @@ class GameGraveApp(tk.Tk):
 
     def show_page(self, title):
         self.active = title
+        if hasattr(self, "content_canvas"):
+            self.content_canvas.yview_moveto(0)
         for name, b in self.nav_buttons.items():
             selected = name == title
             b.configure(bg=RAISED if selected else SIDEBAR, fg=ACCENT if selected else MUTED)
@@ -437,14 +491,18 @@ class GameGraveApp(tk.Tk):
         row.pack(fill="x", pady=(8, 0))
         self.button(row, "Capture / compare changes", self._capture_intelligence, primary=True).pack(side="left")
         self.button(row, "Exodus checklist", self._preview_exodus).pack(side="left", padx=9)
-        self.button(row, "Inspect manager profiles", self._inspect_manager_profiles).pack(side="left", padx=9)
-        self.button(row, "Mod Radar audit", self._show_mod_radar_audit).pack(side="left", padx=9)
+        row2 = tk.Frame(controls, bg=PANEL)
+        row2.pack(fill="x", pady=(6, 0))
+        self.button(row2, "Inspect manager profiles", self._inspect_manager_profiles).pack(side="left")
+        self.button(row2, "Mod Radar audit", self._show_mod_radar_audit).pack(side="left", padx=9)
         dna_tools = tk.Frame(controls, bg=PANEL)
-        dna_tools.pack(anchor="w", pady=(8, 0))
+        dna_tools.pack(fill="x", pady=(8, 0))
         self.button(dna_tools, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(side="left")
         self.button(dna_tools, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=9)
-        self.button(dna_tools, "View visual map", lambda: self._open_dna_visual_map(dna)).pack(side="left", padx=9)
-        self.button(dna_tools, "Export QA", self._export_private_m2_qa).pack(side="left", padx=9)
+        dna_tools2 = tk.Frame(controls, bg=PANEL)
+        dna_tools2.pack(fill="x", pady=(6, 0))
+        self.button(dna_tools2, "View visual map", lambda: self._open_dna_visual_map(dna)).pack(side="left")
+        self.button(dna_tools2, "Export QA", self._export_private_m2_qa).pack(side="left", padx=9)
         previous = load_observation()
         if previous:
             self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
