@@ -180,6 +180,54 @@ class AutoResurrectionTests(unittest.TestCase):
                                     manager_report=self.manager_report)
         self.assertEqual(discovered["candidates"], [])
 
+    def test_mo2_rejects_aliased_instance_config_before_touching_files(self):
+        created = self.create_kit()
+        self.prepare_fresh_mo2()
+        shortcut = self.root / "LinkedMO2Instance"
+        try:
+            shortcut.symlink_to(self.mod_base, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("Directory links unavailable on this test runner")
+        with self.assertRaisesRegex(ValueError, "linked or redirected ancestors"):
+            preview_mo2_reconnect(Path(created["manifest"]),
+                                  shortcut / "ModOrganizer.ini", [self.game])
+        self.assertEqual(list(self.mod_root.iterdir()), [])
+        self.assertEqual(list(self.profile_root.iterdir()), [])
+
+    def test_mo2_rejects_redirected_profiles_root(self):
+        created = self.create_kit()
+        self.prepare_fresh_mo2()
+        moved = self.root / "OtherProfileLocation"
+        self.profile_root.rename(moved)
+        try:
+            self.profile_root.symlink_to(moved, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("Directory links unavailable on this test runner")
+        with self.assertRaisesRegex(ValueError, "linked or unsafe"):
+            preview_mo2_reconnect(Path(created["manifest"]), self.ini,
+                                  [self.game])
+        self.assertEqual(list(self.mod_root.iterdir()), [])
+        self.assertEqual(list(moved.iterdir()), [])
+
+    def test_mo2_rechecks_reviewed_zip_integrity_after_extract(self):
+        created = self.create_kit()
+        self.prepare_fresh_mo2()
+        plan = preview_mo2_reconnect(Path(created["manifest"]), self.ini,
+                                     [self.game])
+        original_kit_bytes = Path(created["archive"]).read_bytes()
+        with patch("mo2_reconnect._closed_manager_check", return_value=None), \
+             patch("mo2_reconnect._sha256", return_value="0" * 64):
+            with self.assertRaisesRegex(RuntimeError, "incomplete"):
+                reconnect_to_mo2(Path(created["manifest"]), self.ini,
+                                 [self.game], approved=True,
+                                 expected_fingerprint=plan["fingerprint"])
+        # A failed late verification must never claim success or erase any
+        # existing mod-manager data, including the immutable kit itself.
+        self.assertEqual(Path(created["archive"]).read_bytes(), original_kit_bytes)
+        self.assertTrue((self.mod_root / "SkyUI" / "skyui.esp").is_file())
+        self.assertTrue((self.profile_root / "Default_GameGrave" / "modlist.txt").is_file())
+        self.assertTrue(self.ini.exists())
+
     def test_vortex_does_not_claim_relink_to_leveldb(self):
         target = self.root / "Vortex" / "skyrimse" / "mods"
         target.mkdir(parents=True)
