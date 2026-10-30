@@ -9,6 +9,7 @@ on:
       - 'recovery.py'
       - 'tools/windows_recycle_qa.py'
       - 'tools/windows_recycle_diagnostics.py'
+      - 'tools/windows_m1_desktop_qa.py'
       - '.github/workflows/windows-recycle-qa.yml'
   pull_request:
     paths:
@@ -16,6 +17,7 @@ on:
       - 'recovery.py'
       - 'tools/windows_recycle_qa.py'
       - 'tools/windows_recycle_diagnostics.py'
+      - 'tools/windows_m1_desktop_qa.py'
       - '.github/workflows/windows-recycle-qa.yml'
 
 permissions:
@@ -53,6 +55,23 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'Disposable Windows Shell Recycle Bin/Undo smoke failed; M1 remains BLOCKED.'
           }
+      - name: Run extended disposable M1 acceptance fixtures on Windows runner
+        shell: pwsh
+        env:
+          GG_QA_DISPOSABLE: 'YES'
+        run: |
+          python tools/windows_m1_desktop_qa.py --scratch _ci_temp --execute --report _ci_temp/m1-report.json
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Extended M1 disposable checks incomplete; interactive Windows 10/11 release QA still required.'
+          }
+      - name: Upload privacy-limited disposable M1 QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-M1-Windows-QA-Report
+          path: _ci_temp/m1-report.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Report that human Windows 10/11 acceptance is still required
         shell: pwsh
-        run: Write-Host 'Automated smoke is NOT native user-facing Windows 10/11 installer QA.'
+        run: Write-Host 'Runner verification is NOT native user-facing Windows 10/11 installer QA.'
