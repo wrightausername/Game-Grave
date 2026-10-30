@@ -578,6 +578,26 @@ def _is_reparse_point(path: Path) -> bool:
         return True
 
 
+def _has_reparse_component(path: Path) -> bool:
+    """Fail closed if a file or any directory in its existing path is a link.
+
+    A safe-looking Downloads path may otherwise traverse a junction into live
+    saves, mods or system files. Checking the leaf alone is not sufficient.
+    """
+    try:
+        current = Path(os.path.abspath(os.fspath(path)))
+        while True:
+            if _is_reparse_point(current):
+                return True
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+        return False
+    except (OSError, ValueError, TypeError):
+        return True
+
+
 def safe_scan_root(path: Path) -> bool:
     """Refuse drive root/home and core operating-system directories."""
     try:
@@ -695,11 +715,17 @@ def recycle_file(path: Path) -> None:
         raise RuntimeError("Recycling requires Windows.")
     from ctypes import wintypes
 
-    if _is_reparse_point(path):
-        raise ValueError("Reparse points and symbolic links are not eligible.")
+    # Never allow an apparently safe path to escape through a parent junction.
+    if _has_reparse_component(path):
+        raise ValueError("Linked or redirected file paths are never eligible for recycling.")
     path = path.resolve(strict=True)
-    if not path.is_file() or len(str(path)) > 240:
-        raise ValueError("Not an ordinary, local Windows file (or path is too long).")
+    if (not path.is_file() or len(str(path)) > 240 or
+            is_protected_path(path)):
+        raise ValueError("Protected, unsupported or overly long file path.")
+    # Hard links can share data with active game files; their ownership is
+    # ambiguous. Do not recycle these through a generic cleanup utility.
+    if path.stat().st_nlink > 1:
+        raise ValueError("Hard-linked files require manual review, not recycling.")
     root = Path(path.anchor)
     drive_type = ctypes.windll.kernel32.GetDriveTypeW(str(root))
     if drive_type != 3:  # DRIVE_FIXED. Reject network/removable drives.
