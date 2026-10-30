@@ -69,7 +69,7 @@ class ManagedRootSafetyTests(unittest.TestCase):
         script = recovery._bin_script(r"C:\Users\Test\Saves\save1.ess", restore=True)
         self.assertIn("'ORIGINAL_EXISTS'", script)
         self.assertLess(script.index("if (Test-Path -LiteralPath $original)"),
-                        script.index("$matches[0].InvokeVerb('RESTORE')"))
+                        script.index("$matches[0].InvokeVerb('undelete')"))
         self.assertIn("OrdinalIgnoreCase", script)
 
 
