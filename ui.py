@@ -2092,7 +2092,7 @@ class GameGraveApp(tk.Tk):
                 "The game and mod manager will NOT be launched. Proceed?"):
             return
         self._lab_work("lab_rehearsal", "Rehearsing kit extraction and SHA-256 checks…",
-                       lambda: rehearse_kit(Path(manifest), Path(parent)))
+                       lambda: rehearse_kit(Path(manifest), Path(parent), record=True))
 
     def _lab_living(self):
         previous = self._lab_manifest("Choose existing kit to compare with live folders")
@@ -3048,6 +3048,9 @@ class GameGraveApp(tk.Tk):
                     message = (f"{payload['game']} · {payload['readiness']}\n"
                         f"Verified archive: {payload['files']} files\n"
                         f"Manager: {payload['manager']}\n\n")
+                    message += ("Isolated restore rehearsal: " +
+                                ("passed (game launch not tested)" if payload.get("restore_rehearsed")
+                                 else "not yet recorded") + "\n\n")
                     if payload["missing_count"]:
                         message += (f"Missing enabled mod folders ({payload['missing_count']}):\n" +
                                     "\n".join("• " + v for v in payload["missing_enabled_mods"][:20]) + "\n\n")
@@ -3063,8 +3066,11 @@ class GameGraveApp(tk.Tk):
                     messagebox.showinfo("Rehearsal passed",
                         f"{payload['game']}: extracted and SHA-256 checked "
                         f"{payload['files_verified']} files in an isolated scratch folder.\n\n"
-                        "The temporary files were cleaned up. Game launch, manager "
-                        "compatibility and original save consistency are NOT verified.")
+                        "The temporary files were cleaned up. " +
+                        ("A local checksum receipt was recorded. " if payload.get("receipt_recorded")
+                         else "No receipt was recorded. ") +
+                        "Game launch, manager compatibility and original save consistency "
+                        "are NOT verified.")
                 elif name == "lab_living_preview":
                     previous, sources, plan = payload
                     self.status_text.set("Living Kit comparison completed")
