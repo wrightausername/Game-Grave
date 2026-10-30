@@ -203,6 +203,24 @@ class GameGraveApp(tk.Tk):
                  font=("Segoe UI Semibold", 21)).pack(side="left")
         tk.Label(self.sidebar, text="YOUR GAMING STORAGE", bg=SIDEBAR, fg=MUTED,
                  font=("Segoe UI Semibold", 9)).pack(anchor="w", padx=23, pady=(0, 13))
+        # Navigation must remain reachable even when all 14 entries exceed
+        # the available laptop height or the user selects large text.
+        self.nav_container = tk.Frame(self.sidebar, bg=SIDEBAR)
+        self.nav_container.pack(fill="both", expand=True)
+        self.nav_canvas = tk.Canvas(self.nav_container, bg=SIDEBAR,
+                                    highlightthickness=0, borderwidth=0)
+        self.nav_scrollbar = ttk.Scrollbar(
+            self.nav_container, orient="vertical", command=self.nav_canvas.yview)
+        self.nav_canvas.configure(yscrollcommand=self.nav_scrollbar.set)
+        self.nav_scrollbar.pack(side="right", fill="y")
+        self.nav_canvas.pack(side="left", fill="both", expand=True)
+        self.nav_list = tk.Frame(self.nav_canvas, bg=SIDEBAR)
+        self._nav_window = self.nav_canvas.create_window(
+            (0, 0), window=self.nav_list, anchor="nw")
+        self.nav_list.bind("<Configure>", lambda _e:
+                           self.nav_canvas.configure(scrollregion=self.nav_canvas.bbox("all")))
+        self.nav_canvas.bind("<Configure>", lambda e:
+                             self.nav_canvas.itemconfigure(self._nav_window, width=e.width))
         self.nav_buttons = {}
         items = [("Overview", "▦"), ("Steam Games", "▣"), ("Other Launchers", "▣"), ("Game Mods", "◇"),
                  ("Old Files", "▤"), ("The Graveyard", "☠"), ("Make Room", "◉"), ("Game DNA", "⌁"),
@@ -210,7 +228,7 @@ class GameGraveApp(tk.Tk):
         if self.settings.get("ui_layout") == "advanced":
             items += [("Storage History", "◷"), ("Automation", "◴")]
         for title, symbol in items:
-            b = tk.Button(self.sidebar, text=f"{symbol}    {title}", anchor="w",
+            b = tk.Button(self.nav_list, text=f"{symbol}    {title}", anchor="w",
                           font=("Segoe UI", 11), bg=SIDEBAR, fg=MUTED,
                           bd=0, highlightthickness=1, highlightcolor=ACCENT,
                           highlightbackground=SIDEBAR, takefocus=1,
@@ -218,7 +236,6 @@ class GameGraveApp(tk.Tk):
                           cursor="hand2", command=lambda n=title: self.show_page(n))
             b.pack(fill="x", padx=9, pady=1)
             self.nav_buttons[title] = b
-        tk.Frame(self.sidebar, bg=SIDEBAR).pack(expand=True, fill="both")
         tk.Label(self.sidebar, text=f"{self.edition.name.upper()} EDITION  •  LOCAL-FIRST", bg=SIDEBAR, fg=MUTED,
                  font=("Segoe UI", 8)).pack(anchor="w", padx=22, pady=(0, 8))
         tk.Label(self.sidebar, text="Game removals require approval", bg=SIDEBAR, fg=ACCENT,
@@ -280,6 +297,14 @@ class GameGraveApp(tk.Tk):
             found = self.winfo_containing(event.x_root, event.y_root)
             if found is None:
                 return
+            direction = -1 if event.delta > 0 else 1
+            if (hasattr(self, "nav_list") and
+                    page_wheel_allowed(found, self.nav_list, self.nav_canvas, ())):
+                bounds = self.nav_canvas.bbox("all")
+                if bounds and bounds[3] > self.nav_canvas.winfo_height():
+                    self.nav_canvas.yview_scroll(direction * 3, "units")
+                    return "break"
+                return
             if not page_wheel_allowed(
                     found, self.content, self.content_canvas,
                     (ttk.Treeview, tk.Text, tk.Listbox, ttk.Combobox, ttk.Notebook)):
@@ -287,7 +312,6 @@ class GameGraveApp(tk.Tk):
             bounds = self.content_canvas.bbox("all")
             if not bounds or bounds[3] <= self.content_canvas.winfo_height():
                 return
-            direction = -1 if event.delta > 0 else 1
             self.content_canvas.yview_scroll(direction * 3, "units")
             return "break"
         except (tk.TclError, AttributeError):
@@ -329,9 +353,34 @@ class GameGraveApp(tk.Tk):
         self.bind("<F5>", self._shortcut_scan)
         self.bind("<Escape>", self._shortcut_cancel_scan)
 
+    def _scroll_navigation_to(self, page):
+        """Reveal keyboard-selected navigation button even if below the fold."""
+        if not hasattr(self, "nav_canvas"):
+            return
+        button = self.nav_buttons.get(page)
+        if button is None:
+            return
+        try:
+            self.nav_canvas.update_idletasks()
+            top = self.nav_canvas.canvasy(0)
+            height = self.nav_canvas.winfo_height()
+            position = button.winfo_y()
+            bottom = position + button.winfo_height()
+            total = max(1, self.nav_list.winfo_height())
+            if height <= 1:
+                return
+            if position < top:
+                self.nav_canvas.yview_moveto(position / total)
+            elif bottom > top + height:
+                self.nav_canvas.yview_moveto(max(0, bottom - height) / total)
+        except tk.TclError:
+            return
+
     def _navigate_shortcut(self, page):
         self.show_page(page)
         control = self.nav_buttons.get(page, self.scan_button)
+        if hasattr(self, "_scroll_navigation_to"):
+            self._scroll_navigation_to(page)
         control.focus_set()
         return "break"
 
