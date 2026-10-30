@@ -1084,9 +1084,9 @@ class GameGraveApp(tk.Tk):
         pick = ttk.Combobox(selector, textvariable=self.mod_filter, state="readonly", style="Dark.TCombobox",
                             values=("All sources", *sorted({row.source for row in self.mod_folders})), width=20)
         pick.pack(side="left")
-        pick.bind("<<ComboboxSelected>>", lambda *_: self._populate_mods())
+        pick.bind("<<ComboboxSelected>>", lambda *_: self._reset_inventory_page("mods", self._populate_mods))
         self.mod_search = tk.StringVar()
-        self.mod_search.trace_add("write", lambda *_: self._populate_mods())
+        self.mod_search.trace_add("write", lambda *_: self._reset_inventory_page("mods", self._populate_mods))
         tk.Entry(selector, textvariable=self.mod_search, bg=PANEL, fg=TEXT, insertbackground=TEXT,
                  relief="flat", font=("Segoe UI", 10), width=28).pack(side="left", padx=(12, 0), ipady=7)
         self.text(selector, "Sort", 9, MUTED).pack(side="left", padx=(12, 5))
@@ -1102,6 +1102,7 @@ class GameGraveApp(tk.Tk):
                                    (220, 155, 233, 75, 110))
         self.mod_tree.configure(height=7)
         self.mod_tree.bind("<<TreeviewSelect>>", self._show_mod_details)
+        self._add_page_controls("mods", self._populate_mods)
         self._populate_mods()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(10, 0))
@@ -1127,17 +1128,19 @@ class GameGraveApp(tk.Tk):
         self.mod_lookup = {}
         view = self.mod_filter.get()
         query = self.mod_search.get().strip().casefold()
-        for i, folder in enumerate(sort_mods(self.mod_folders, self.mod_sort_var.get())):
-            if view != "All sources" and view != folder.source:
-                continue
-            if query and query not in (folder.name + " " + folder.path + " " + folder.status + " " + folder.source).casefold():
-                continue
-            key = str(i)
+        visible = [folder for folder in sort_mods(self.mod_folders, self.mod_sort_var.get())
+                   if (view == "All sources" or view == folder.source) and
+                   (not query or query in (folder.name + " " + folder.path + " " +
+                                           folder.status + " " + folder.source).casefold())]
+        page = page_window(visible, self._pager_indices.get("mods", 0))
+        for i, folder in enumerate(page.items):
+            key = str(page.start + i)
             items = str(folder.item_count) if folder.item_count else "—"
             self.mod_tree.insert("", "end", iid=key,
                                  values=(folder.name, folder.source, folder.status, items,
                                          human_size(folder.apparent_bytes) + ("+" if folder.truncated else "")))
             self.mod_lookup[key] = folder
+        self._update_inventory_page("mods", page)
 
     def _current_mod_folder(self):
         if not hasattr(self, "mod_tree") or not self.mod_tree.winfo_exists():
@@ -1761,13 +1764,14 @@ class GameGraveApp(tk.Tk):
         file_sort = ttk.Combobox(sort_bar, textvariable=self.files_sort_var, values=FILES_SORT_OPTIONS,
                                  state="readonly", style="Dark.TCombobox", width=18)
         file_sort.pack(side="left", padx=(9, 0))
-        file_sort.bind("<<ComboboxSelected>>", lambda _e: self._set_view_sort("files_sort", self.files_sort_var, self._populate_old_files))
+        file_sort.bind("<<ComboboxSelected>>", lambda _e: self._set_view_sort("files_sort", self.files_sort_var, self._populate_files))
         p = self.panel(pad=10)
         p.pack(fill="both", expand=True)
         self.file_tree = self._tree(p, ("file", "age", "size", "location"),
                                     ("FILENAME", "LAST MODIFIED", "SIZE", "LOCATION"),
                                     (235, 140, 115, 300))
         self.file_tree.tag_configure("protected", foreground=WARN)
+        self._add_page_controls("files", self._populate_files)
         self._populate_files()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(14, 0))
@@ -1790,8 +1794,10 @@ class GameGraveApp(tk.Tk):
             return
         self.file_tree.delete(*self.file_tree.get_children())
         self.file_lookup = {}
-        for index, item in enumerate(sort_files(self.old_files, self.files_sort_var.get())):
-            iid = str(index)
+        page = page_window(sort_files(self.old_files, self.files_sort_var.get()),
+                           self._pager_indices.get("files", 0))
+        for index, item in enumerate(page.items):
+            iid = str(page.start + index)
             path = Path(item.path)
             protected = is_protected_path(path, self.settings.get("never_touch", []))
             self.file_tree.insert("", "end", iid=iid,
@@ -1799,6 +1805,7 @@ class GameGraveApp(tk.Tk):
                                           age_text(item.modified), human_size(item.size), str(path.parent)),
                                   tags=("protected",) if protected else ())
             self.file_lookup[iid] = item
+        self._update_inventory_page("files", page)
 
     def _change_folder(self):
         folder = filedialog.askdirectory(title="Choose folder to scan for old files", initialdir=self.settings["scan_folder"])
