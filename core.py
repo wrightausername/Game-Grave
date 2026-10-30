@@ -357,11 +357,16 @@ def find_games(extra_roots: list[str] | None = None) -> list[SteamGame]:
     result: dict[str, SteamGame] = {}
     for lib in steam_libraries(roots):
         for manifest in (lib / "steamapps").glob("appmanifest_*.acf"):
+            # A manifest can be stale, malformed, spoofed or redirected. These
+            # are read-only hints; never present a phantom install as active.
+            if _has_reparse_component(manifest):
+                continue
             info = read_vdf(manifest).get("appstate", {})
             if not isinstance(info, dict):
                 continue
             app_id = str(info.get("appid", ""))
-            if not app_id.isdecimal():
+            if (not app_id.isdecimal() or
+                    manifest.stem != "appmanifest_" + app_id):
                 continue
             try:
                 state = int(info.get("stateflags", 4))
@@ -372,10 +377,16 @@ def find_games(extra_roots: list[str] | None = None) -> list[SteamGame]:
                 continue
             name = str(info.get("name", f"Steam app {app_id}"))
             install_dir = str(info.get("installdir", ""))
-            if not install_dir or Path(install_dir).name != install_dir or install_dir in (".", ".."):
+            if (not install_dir or len(install_dir) > 200 or
+                    install_dir.strip() != install_dir or install_dir in (".", "..")
+                    or any(c in install_dir for c in "/\\:") or
+                    any(ord(c) < 32 for c in install_dir)):
                 continue
             directory = lib / "steamapps" / "common" / install_dir
-            # Preserve games moved or staged under another location; a manifest is required.
+            if not directory.is_dir() or _has_reparse_component(directory):
+                # Steam appstate may survive game removal or interrupted
+                # relocation. A manifest alone is not an installed game.
+                continue
             last = histories.get(app_id)
             source = "Steam account history" if last else "Unknown"
             from_manifest = _valid_timestamp(info.get("lastplayed"))
