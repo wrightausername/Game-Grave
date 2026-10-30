@@ -44,7 +44,7 @@ def _workshop_id(p) -> str | None:
     return None
 
 
-def build_game_dna(games=(), other_games=(), mods=(), saves=()) -> dict:
+def build_game_dna(games=(), other_games=(), mods=(), saves=(), manager_profiles=()) -> dict:
     """Build defensible per-game relationships. No name-based assignment.
 
     Save-location titles and manager folder names are *suggestions*, never
@@ -66,7 +66,7 @@ def build_game_dna(games=(), other_games=(), mods=(), saves=()) -> dict:
             "app_id": app_id,
             "install_path": install,
             "install_evidence": "Manifest or inventory record; individual files may still be needed.",
-            "assets": [],
+            "assets": [], "manager_profiles": [],
         })
     unresolved = []
     for m in mods:
@@ -101,6 +101,31 @@ def build_game_dna(games=(), other_games=(), mods=(), saves=()) -> dict:
                 "game_hint": str(getattr(s, "game", "")),
                 "protected": True,
                 "reason": "Save location was detected; ownership and contents are not verified.",
+            })
+    for profile in manager_profiles:
+        if not isinstance(profile, dict):
+            continue
+        matched_root = str(profile.get("verified_install_path", "") or "")
+        record = {
+            "manager": str(profile.get("manager", "Unknown")),
+            "profile": str(profile.get("profile", "Unnamed")),
+            "mod_count": len(profile.get("mods", [])),
+            "source": str(profile.get("source", "")),
+            "protected": True,
+            "stale": bool(profile.get("stale")),
+            "incomplete": bool(profile.get("incomplete")),
+        }
+        matches = [g for g in result if matched_root
+                   and _path(g["install_path"]) == _path(matched_root)]
+        if len(matches) == 1:
+            matches[0]["manager_profiles"].append({
+                **record, "evidence": "Manager game path exactly matches a recorded game installation"})
+        else:
+            unresolved.append({
+                "kind": "Unverified manager profile", "path": record["source"],
+                "source": record["manager"], "profile": record["profile"],
+                "protected": True,
+                "reason": "Profile ownership could not be tied to a recorded game installation.",
             })
     return {
         "schema": SCHEMA, "games": result, "unresolved": unresolved,
