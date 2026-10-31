@@ -14,7 +14,7 @@ import uuid
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
+    QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMessageBox, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
@@ -1132,6 +1132,126 @@ class ScreenMethods:
         br.addWidget(button("Add game capture folder", lambda: modify_shots()))
         br.addWidget(button("Remove selected", lambda: modify_shots(True)))
         stack.addWidget(buttons)
+        page.content.addWidget(p)
+
+        p, ai_stack = panel()
+        ai_stack.addWidget(section_title("AI Assistant", "Optional • fully automatic setup"))
+        ai_stack.addWidget(label(
+            "When you enable AI, Game Grave downloads and installs the local AI engine "
+            "and model for you. No extra program, terminal, or account required. "
+            "AI remains off by default, runs on this PC, and cannot delete files.",
+            "subtle", wrap=True))
+        from ai_bundle import INSTALL_MESSAGE, is_ai_installed
+        from PySide6.QtWidgets import QProgressBar
+        ai_status = label("AI installed." if is_ai_installed() else
+                          "Not installed. Around 1.2 GB on first enable.", "subtle", wrap=True)
+        ai_bar = QProgressBar()
+        ai_bar.setRange(0, 100)
+        ai_bar.setValue(0)
+        ai_bar.hide()
+        ai_toggle = QCheckBox("Enable AI Assistant")
+        ai_toggle.setChecked(self.settings.get("ai_assistant_enabled") is True)
+        def open_ai_chat():
+            from gg_desktop.ai_dialog import open_local_ai_dialog
+            open_local_ai_dialog(self)
+        ai_open = button("Open AI Assistant", open_ai_chat)
+        ai_open.setEnabled(ai_toggle.isChecked() and is_ai_installed())
+        ai_stack.addWidget(ai_toggle)
+        ai_stack.addWidget(ai_status)
+        ai_stack.addWidget(ai_bar)
+        ai_stack.addWidget(ai_open)
+        ai_stack.addWidget(label(
+            "The optional model is downloaded only with your permission, checked "
+            "for integrity, and stored under your local Game Grave data folder. "
+            "Normal cleanup and scans never depend on AI.",
+            "subtle", wrap=True))
+        def restore_toggle(value):
+            ai_toggle.blockSignals(True)
+            ai_toggle.setChecked(value)
+            ai_toggle.blockSignals(False)
+        def save_enabled(value):
+            changed = dict(self.settings)
+            changed["ai_assistant_enabled"] = bool(value)
+            save_settings(changed)
+            self.settings = changed
+        def still_visible():
+            # Navigating away destroys the Qt Settings page during long model downloads.
+            # Keep the approved background operation valid even when its widgets vanish.
+            try:
+                from shiboken6 import isValid
+                return all(isValid(w) for w in (ai_toggle, ai_status, ai_bar, ai_open))
+            except (RuntimeError, ImportError):
+                return False
+        def setup_finished(result):
+            ok, detail = result
+            if ok:
+                try:
+                    save_enabled(True)
+                except (OSError, ValueError) as exc:
+                    ok, detail = False, str(exc)
+            if still_visible():
+                ai_bar.hide()
+                ai_toggle.setEnabled(True)
+                restore_toggle(bool(ok))
+                ai_open.setEnabled(bool(ok))
+                ai_status.setText(
+                    "AI installed and ready. Open the assistant to begin." if ok else
+                    "AI not installed. Normal Game Grave features are unchanged.")
+            if not ok:
+                self.error("AI setup could not finish", detail)
+            elif not still_visible():
+                self.status.setText("AI installed and ready. Open Settings to use it.")
+        def set_ai_enabled(checked):
+            if not checked:
+                try:
+                    save_enabled(False)
+                except (OSError, ValueError) as exc:
+                    restore_toggle(True)
+                    self.error("Could not disable AI", str(exc))
+                    return
+                from ai_bundle import stop_ai
+                stop_ai()
+                ai_open.setEnabled(False)
+                ai_status.setText("AI disabled. You can enable it any time.")
+                return
+            if is_ai_installed():
+                try:
+                    save_enabled(True)
+                except (OSError, ValueError) as exc:
+                    restore_toggle(False)
+                    self.error("Could not enable AI", str(exc))
+                    return
+                ai_open.setEnabled(True)
+                ai_status.setText("AI ready. All processing stays on this PC.")
+                return
+            if not self.confirm("Install AI Assistant?", INSTALL_MESSAGE):
+                restore_toggle(False)
+                return
+            restore_toggle(False)
+            ai_toggle.setEnabled(False)
+            ai_open.setEnabled(False)
+            ai_bar.setValue(0)
+            ai_bar.show()
+            ai_status.setText("Installing AI automatically. Do not close Game Grave.")
+            def work(emit):
+                from ai_bundle import AiSetupError, install_ai
+                try:
+                    install_ai(lambda stage, fraction:
+                               emit(int(fraction * 100), stage))
+                    return True, ""
+                except (AiSetupError, OSError, ValueError) as exc:
+                    return False, str(exc)
+                except Exception:
+                    return False, "Unexpected installation error. Existing files remain unchanged."
+            def show_progress(percent, stage):
+                if still_visible():
+                    ai_bar.setValue(percent)
+                    ai_status.setText(stage + " • " + str(percent) + "%")
+            self.job(work, setup_finished, progress=show_progress,
+                     error_title="AI setup failed")
+        ai_toggle.toggled.connect(set_ai_enabled)
+        if self.settings.get("ai_assistant_enabled") and not is_ai_installed():
+            ai_status.setText("AI not installed. Disable and re-enable to set up automatically.")
         page.content.addWidget(p)
 
         p, stack = panel()

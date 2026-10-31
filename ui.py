@@ -3404,6 +3404,52 @@ class GameGraveApp(tk.Tk):
         tabs.add(protected_tab, text="Never Touch")
         tabs.add(tools_tab, text="More tools")
         tabs.add(edition_tab, text="Free / Pro")
+        ai_tab = tk.Frame(tabs, bg=BG)
+        tabs.add(ai_tab, text="AI Assistant")
+        ai_panel = self.panel(ai_tab)
+        ai_panel.pack(fill="x", pady=(0, 12))
+        self.text(ai_panel, "Built-in AI Assistant", 14, bold=True).pack(anchor="w", pady=(0, 9))
+        self.text(ai_panel,
+                  "Enable it once, approve the download, and Game Grave installs "
+                  "the local AI engine and model automatically. No separate apps, "
+                  "terminal, accounts, subscriptions or AI-driven deletion.",
+                  10, MUTED, wraplength=760).pack(anchor="w", pady=(0, 11))
+        from ai_bundle import is_ai_installed
+        self.ai_enabled_var = tk.BooleanVar(
+            value=self.settings.get("ai_assistant_enabled") is True)
+        self.ai_toggle = ttk.Checkbutton(
+            ai_panel, text="Enable optional AI Assistant",
+            variable=self.ai_enabled_var, command=self._save_ai_assistant_pref,
+            style="Dark.TCheckbutton")
+        self.ai_toggle.pack(anchor="w", pady=(0, 11))
+        self.ai_install_status = tk.StringVar(
+            value="AI installed and ready." if is_ai_installed()
+                  else "Not installed. One-time download: about 1.2 GB.")
+        self.text(ai_panel, "Setup progress", 10, MUTED).pack(anchor="w", pady=(0, 3))
+        self.ai_progress = ttk.Progressbar(ai_panel, orient="horizontal",
+                                         length=510, mode="determinate", maximum=100)
+        self.ai_progress.pack(anchor="w", fill="x", pady=(0, 7))
+        tk.Label(ai_panel, textvariable=self.ai_install_status,
+                 bg=PANEL, fg=MUTED, font=("Segoe UI", 10),
+                 wraplength=760, justify="left").pack(anchor="w", pady=(0, 8))
+        self.ai_launch_button = self.button(ai_panel, "Open AI Assistant",
+                                            self._open_ai_assistant)
+        self.ai_launch_button.pack(anchor="w", pady=(0, 8))
+        self.ai_launch_button.configure(
+            state="normal" if self.ai_enabled_var.get() and is_ai_installed()
+            else "disabled")
+        self.text(ai_panel,
+                  "The model is downloaded only after your approval, verified, "
+                  "and stored privately on this PC. All other Game Grave features "
+                  "work normally without AI.",
+                  9, WARN, wraplength=760).pack(anchor="w")
+        if self.settings.get("ai_assistant_enabled") and not is_ai_installed():
+            self.ai_install_status.set(
+                "AI is not installed. Disable and re-enable to set it up automatically.")
+        if getattr(self, "_ai_setup_running", False):
+            self.ai_toggle.configure(state="disabled")
+            self.ai_install_status.set("AI installation is already underway.")
+
         settings = self.panel(appearance_tab)
         settings.pack(fill="x", pady=(0, 12))
         self.text(settings, "Appearance and navigation", 14, bold=True).pack(anchor="w", pady=(0, 11))
@@ -3588,6 +3634,97 @@ class GameGraveApp(tk.Tk):
         if not update_ready():
             self.text(updates_panel, "Engineering preview: update service not connected. No internet request is made.",
                       9, WARN, wraplength=760).pack(anchor="w", pady=(7, 0))
+
+    def _save_ai_assistant_pref(self):
+        from ai_bundle import INSTALL_MESSAGE, is_ai_installed, install_ai, AiSetupError
+        if getattr(self, "_ai_setup_running", False):
+            self.ai_enabled_var.set(False)
+            return
+        enabled = self.ai_enabled_var.get()
+        if not enabled or is_ai_installed():
+            updated = dict(self.settings)
+            updated["ai_assistant_enabled"] = enabled
+            try:
+                save_settings(updated)
+            except (OSError, ValueError) as exc:
+                self.ai_enabled_var.set(self.settings.get("ai_assistant_enabled") is True)
+                messagebox.showerror("Could not save AI setting", str(exc), parent=self)
+                return
+            self.settings = updated
+            if not enabled:
+                from ai_bundle import stop_ai
+                stop_ai()
+            self.ai_launch_button.configure(
+                state="normal" if enabled and is_ai_installed() else "disabled")
+            self.ai_install_status.set(
+                "AI ready. Everything stays on this PC." if enabled else "AI disabled.")
+            return
+        if not messagebox.askyesno("Install AI Assistant?", INSTALL_MESSAGE, parent=self):
+            self.ai_enabled_var.set(False)
+            return
+        self.ai_enabled_var.set(False)
+        self._ai_setup_running = True
+        self.ai_toggle.configure(state="disabled")
+        self.ai_launch_button.configure(state="disabled")
+        self.ai_install_status.set("Downloading and setting up AI automatically.")
+        self.ai_progress["value"] = 0
+        events = queue.Queue()
+
+        def worker():
+            try:
+                install_ai(lambda stage, amount:
+                           events.put(("progress", (stage, int(amount * 100)))))
+                events.put(("done", (True, "")))
+            except (AiSetupError, OSError, ValueError) as exc:
+                events.put(("done", (False, str(exc))))
+            except Exception:
+                events.put(("done", (False, "Unexpected AI setup error. No files changed.")))
+
+        def poll():
+            while True:
+                try:
+                    kind, data = events.get_nowait()
+                except queue.Empty:
+                    break
+                if kind == "progress":
+                    stage, pct = data
+                    self.ai_install_status.set(stage + " • " + str(pct) + "%")
+                    if self.ai_progress.winfo_exists():
+                        self.ai_progress["value"] = pct
+                else:
+                    success, detail = data
+                    self._ai_setup_running = False
+                    if success:
+                        try:
+                            updated = dict(self.settings)
+                            updated["ai_assistant_enabled"] = True
+                            save_settings(updated)
+                            self.settings = updated
+                            self.ai_enabled_var.set(True)
+                            self.ai_install_status.set("AI installed and ready. Open AI Assistant.")
+                        except (OSError, ValueError) as exc:
+                            success = False
+                            detail = "Could not save AI preference: " + str(exc)
+                    if not success:
+                        self.ai_enabled_var.set(False)
+                        self.ai_install_status.set("AI setup did not finish. Your files are unchanged.")
+                        messagebox.showerror("AI setup incomplete", detail, parent=self)
+                    if self.ai_toggle.winfo_exists():
+                        self.ai_toggle.configure(state="normal")
+                    if self.ai_launch_button.winfo_exists():
+                        self.ai_launch_button.configure(
+                            state="normal" if success and self.ai_enabled_var.get()
+                            else "disabled")
+                    return
+            if self.winfo_exists():
+                self.after(140, poll)
+
+        threading.Thread(target=worker, daemon=True).start()
+        self.after(140, poll)
+
+    def _open_ai_assistant(self):
+        from ai_tk import open_local_ai_dialog
+        open_local_ai_dialog(self)
 
     def _add_screenshot_folder(self):
         folder = filedialog.askdirectory(
