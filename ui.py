@@ -225,11 +225,17 @@ class GameGraveApp(tk.Tk):
         self.nav_canvas.bind("<Configure>", lambda e:
                              self.nav_canvas.itemconfigure(self._nav_window, width=e.width))
         self.nav_buttons = {}
-        items = [("Overview", "▦"), ("Steam Games", "▣"), ("Other Launchers", "▣"), ("Game Mods", "◇"),
-                 ("Old Files", "▤"), ("The Graveyard", "☠"), ("Make Room", "◉"), ("Game DNA", "⌁"),
-                 ("Save Vault", "♡"), ("Undo Center", "↶"), ("Cleanup History", "◷"), ("Settings", "⚙")]
+        # Simple mode shows only primary destinations. Secondary tools remain reachable
+        # from Overview and Settings; advanced mode restores every sidebar link.
+        items = [("Overview", "▦"), ("Steam Games", "▣"), ("Other Launchers", "▣"),
+                 ("Game Mods", "◇"), ("The Graveyard", "☠"), ("Game DNA", "⌁"),
+                 ("Save Vault", "♡"), ("Undo Center", "↶"), ("Settings", "⚙")]
         if self.settings.get("ui_layout") == "advanced":
-            items += [("Storage History", "◷"), ("Automation", "◴")]
+            items = [("Overview", "▦"), ("Steam Games", "▣"), ("Other Launchers", "▣"),
+                     ("Game Mods", "◇"), ("Old Files", "▤"), ("The Graveyard", "☠"),
+                     ("Make Room", "◉"), ("Game DNA", "⌁"), ("Save Vault", "♡"),
+                     ("Undo Center", "↶"), ("Cleanup History", "◷"), ("Storage History", "◷"),
+                     ("Automation", "◴"), ("Settings", "⚙")]
         for title, symbol in items:
             b = tk.Button(self.nav_list, text=f"{symbol}    {title}", anchor="w",
                           font=("Segoe UI", 11), bg=SIDEBAR, fg=MUTED,
@@ -3265,7 +3271,7 @@ class GameGraveApp(tk.Tk):
         extra = self.panel(tools_tab)
         extra.pack(fill="x")
         self.text(extra, "Advanced tools", 13, bold=True).pack(anchor="w", pady=(0, 10))
-        for title in ("Storage History", "Automation", "Activity"):
+        for title in ("Old Files", "Make Room", "Cleanup History", "Storage History", "Automation"):
             self.button(extra, title, lambda page=title: self.show_page(page)).pack(side="left", padx=(0, 8))
         self.text(extra, "Free forever or optional $24.99 lifetime Pro target. No subscriptions or account requirement.",
                   9, MUTED, wraplength=810).pack(anchor="w", pady=(12, 0))
