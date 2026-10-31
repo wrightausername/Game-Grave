@@ -147,7 +147,7 @@ class ScreenMethods:
                 line = QWidget()
                 inner = row(spacing=7)
                 line.setLayout(inner)
-                opening = button(name, lambda _=False, n=name: self.navigate("Games"), kind="link")
+                opening = button(name, lambda _=False, n=name: self._go_launcher(n), kind="link")
                 inner.addWidget(opening)
                 inner.addStretch()
                 amount = (human_size(reported[name]) + " known" if reported[name] else "Size unknown")
@@ -228,6 +228,10 @@ class ScreenMethods:
             "Recycle Bin moves are NOT confirmed free space. No permanent deletion, "
             "automatic screenshot cleanup or fake savings metrics.", "caption", wrap=True))
 
+    def _go_launcher(self, launcher):
+        self._pending_launcher_filter = launcher
+        self.navigate("Games")
+
     def games_page(self):
         page = self._new("Games", "All installed games Game Grave can verify, in one list across supported launchers.")
         if self._not_scanned(page):
@@ -244,6 +248,12 @@ class ScreenMethods:
             g.launcher for g in self.inventory.games
         }))
         self.game_filter.setAccessibleName("Filter by launcher")
+        preferred = getattr(self, "_pending_launcher_filter", None)
+        if preferred is not None:
+            index = self.game_filter.findText(preferred)
+            if index >= 0:
+                self.game_filter.setCurrentIndex(index)
+            self._pending_launcher_filter = None
         filters.addWidget(self.game_filter, 2)
         self.game_sort = QComboBox()
         self.game_sort.addItems(["Largest known size", "Smallest known size",
