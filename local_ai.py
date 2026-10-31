@@ -86,7 +86,7 @@ def ask_local_assistant(question: str, settings: dict, inventory=None) -> str:
             data = {
                 "model": "Game Grave AI",
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT + "\\n" + context_line},
+                    {"role": "system", "content": SYSTEM_PROMPT + "\n" + context_line},
                     {"role": "user", "content": question},
                 ],
                 "temperature": 0.2,
