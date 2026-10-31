@@ -541,13 +541,16 @@ class ScreenMethods:
         self.navigate("Settings")
 
     def _select_eligible(self):
+        from PySide6.QtCore import QItemSelectionModel
         self.grave_table.clearSelection()
+        selector = self.grave_table.selectionModel()
         for i, entry in enumerate(self._shown_graves):
             if entry.can_recycle and entry.old_file is not None and (
                     entry.category != "Old game screenshot") and (
                     not is_protected_path(Path(entry.path),
                                           self.settings.get("never_touch", []))):
-                self.grave_table.selectRow(i)
+                index = self.grave_table.model().index(i, 0)
+                selector.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
 
     def _delete_grave_selected(self):
         selected = self._selected_grave_entries()
