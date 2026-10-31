@@ -1105,8 +1105,27 @@ class ScreenMethods:
             "Make Room, Activity, schedules and advanced options. "
             "This visual preview does not replace the trusted workflow yet.",
             "subtle", wrap=True))
-        stack.addWidget(button("Open classic Game Grave tools",
-                               self._launch_classic_tools, kind="primary"))
+        actions = QWidget()
+        buttons = QGridLayout(actions)
+        buttons.setContentsMargins(0, 5, 0, 4)
+        buttons.setSpacing(9)
+        links = [
+            ("Save Vault: back up a selected folder", self._create_save_backup),
+            ("Create verified Resurrection Kit", self._create_kit),
+            ("Inspect and restore Kit to NEW folder", self._restore_kit),
+            ("Rehearse Kit recovery in isolation", self._rehearse_kit),
+            ("Check Kit missing pieces", self._missing_pieces),
+            ("Compare two Kit snapshots", self._compare_kits),
+            ("Prepare portable PC-to-PC transfer", self._transfer_kit),
+            ("Browse Time Machine snapshots", self._kit_versions),
+        ]
+        for i, (caption, callback) in enumerate(links):
+            buttons.addWidget(button(caption, callback,
+                                     kind="primary" if i == 1 else ""),
+                              i // 2, i % 2)
+        stack.addWidget(actions)
+        stack.addWidget(button("Open classic Mod Organizer, advanced backup and update tools",
+                               self._launch_classic_tools))
         page.content.addWidget(p)
         p, stack = panel()
         stack.addWidget(section_title("What is safe to do here?"))
