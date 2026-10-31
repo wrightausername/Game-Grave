@@ -6,6 +6,72 @@
 
 Game Grave finds games, mod-manager storage, Workshop folders, caches, and leftover installation candidates. It clearly separates *detected data*, *potential review targets*, and *space actually reclaimed*. Scanning never authorizes file deletion.
 
+
+## Crimson Command: native premium UI engineering preview
+
+The owner's approved cinematic crimson-and-cyan UI is now implemented as a
+**separate, opt-in Windows desktop preview**, not as a screenshot or a replacement
+for the tested classic program. It shares Game Grave's existing game discovery,
+mod safety, Graveyard, Never Touch, Recycle Bin, Undo Center, Save Vault and
+Resurrection Kit engines. The classic application and its default entrypoint
+remain available during physical Windows 10/11 and Qt redistribution review.
+
+### Windows user preview
+
+Download the unsigned `GameGrave-Crimson-Preview.exe` artifact from
+[Crimson Command Windows preview workflow](https://github.com/wrightausername/Game-Grave/actions/workflows/windows-crimson-preview.yml).
+The same archive includes **actual Qt screenshots** of Overview, Games,
+Graveyard and Game DNA. An unsigned test executable must not be treated as
+a public stable installer.
+
+To run from source on Windows:
+
+```powershell
+py -m pip install -r ui-preview-requirements.txt
+py launcher.py --ui-preview
+# Or: py -m gg_desktop --ui-preview
+```
+
+The usual `py launcher.py` still opens the classic Tk application.
+Do not run both while carrying out Recycle Bin or restore operations;
+wait until the current operation finishes before changing interfaces.
+
+### What the new preview actually does
+
+- **Overview:** locally rendered crimson-moon ruins art, real Windows drive
+  capacity, launcher counts, actual findings and manual scan/cancel. No
+  fabricated reclaimed-space numbers.
+- **Games:** Steam, Epic, GOG, EA, verified Battle.net/Blizzard publisher
+  entries, Ubisoft, Riot and user-identified launchers appear in **one
+  filterable list** whenever local installation evidence exists. Unsupported
+  providers and missing last-play dates show `Unknown`, not imaginary data.
+  `Uninstall` is restricted to actual Steam app IDs.
+- **Graveyard:** clear protection reason; `Unprotect this item` on **exact
+  user-owned Never Touch rules** after confirmation; inherited folder rules
+  link to Settings; built-in game/mod/save protection remains mandatory.
+  Unprotecting does **not** recycle anything. A separate manual confirmation
+  invokes the existing Windows Shell Recycle Bin safety/Undo worker.
+- **Screenshots:** separate opt-in local bounded preview, no bulk screenshot
+  cleanup or background loading of personal image bytes.
+- **Game DNA/Mods:** evidence-aware relationship cards and read-only Mod Radar.
+- **Old Files/Undo Center:** approved scoped manual cleanup and verified
+  Windows restoration; no permanent-delete fallback.
+- **More Tools:** create a new Save Vault backup, create/inspect/restore a
+  Resurrection Kit, isolated rehearsal, compare kits, detect missing pieces,
+  view kit snapshots and prepare an approved PC-to-PC transfer. Original
+  classic UI remains accessible from source for advanced manager reconnect,
+  scheduled automation and unusual flows.
+
+**Preview limits:** not production code-signed, not approved for the frozen
+closed beta, not yet independently tested with consumer Windows 10/11
+physical hardware, Narrator, all game managers, cross-version upgrades or
+full commercial PySide6/Qt LGPL compliance. Existing `release_gate_status.json`
+still blocks a Game Grave 1.0 release until evidence and human approval.
+
+For detailed component contracts and signoff tests, see
+[UI_REDESIGN_BLUEPRINT.md](UI_REDESIGN_BLUEPRINT.md).
+
+
 ## Installing Game Grave on Windows 10 / 11
 
 **Planned customer experience:** Download a signed, versioned `GameGrave_Setup_v*.exe`, follow the installation wizard, then launch Game Grave from the Start Menu. Python is bundled. The installer creates an Add/Remove Programs entry and an uninstaller; desktop shortcut is optional. **Free installs need no license key or account.**

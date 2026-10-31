@@ -142,6 +142,7 @@ def custom_library_folders(roots: list[str], cancel: Cancel = None) -> list[Laun
 def find_launcher_games(custom_roots=None, cancel: Cancel = None, programdata: Path | None = None):
     found = (epic_games(programdata, cancel) + gog_registry(cancel) +
              riot_games(programdata, cancel) + vendor_registry_games(cancel) +
+             blizzard_uninstall_records(cancel) +
              custom_library_folders(custom_roots or [], cancel))
     unique = {(x.launcher, x.install_path.casefold()): x for x in found}
     return sorted(unique.values(), key=lambda g: (g.launcher, g.name.casefold()))
@@ -224,6 +225,88 @@ def vendor_registry_games(cancel: Cancel = None) -> list[LauncherGame]:
                             continue
                         results.append(LauncherGame(name, launcher, str(path), name, None,
                                         'Launcher registry record; game name may need verification'))
+                except OSError:
+                    continue
+    return results
+
+
+def is_blizzard_install_metadata(name: str, publisher: str) -> bool:
+    """Only credible installed Blizzard game entries, never the Battle.net client."""
+    name = name.strip().casefold() if isinstance(name, str) else ""
+    publisher = publisher.strip().casefold() if isinstance(publisher, str) else ""
+    if (not name or len(name) > 170 or
+            "blizzard entertainment" not in publisher or
+            any(value in name for value in ("battle.net", "battle net", "launcher",
+                                            "agent", "update manager"))):
+        return False
+    # A verified publisher alone does not prove this is a game; use a narrow
+    # recognizable Blizzard product prefix instead of blindly mapping software.
+    names = (
+        "diablo", "overwatch", "world of warcraft", "warcraft iii",
+        "warcraft ii", "starcraft", "heroes of the storm",
+        "hearthstone", "warcraft rumble",
+    )
+    return name.startswith(names)
+
+
+def blizzard_uninstall_records(cancel: Cancel = None) -> list[LauncherGame]:
+    """Conservative read-only fallback for installed Battle.net/Blizzard games.
+
+    Battle.net's Agent product.db is a private binary format; don't pretend to
+    parse it. Windows installed-app publisher+known game name+existing ordinary
+    InstallLocation is useful positive evidence, never proof of a missing game.
+    No generic Windows uninstall program is included in the game inventory.
+    """
+    if os.name != "nt":
+        return []
+    try:
+        import winreg
+    except ImportError:
+        return []
+    keys = (
+        (winreg.HKEY_LOCAL_MACHINE,
+         r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (winreg.HKEY_LOCAL_MACHINE,
+         r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (winreg.HKEY_CURRENT_USER,
+         r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+    )
+    results = []
+    for hive, parent_path in keys:
+        if cancel and cancel():
+            raise InterruptedError("Launcher scan canceled")
+        try:
+            parent = winreg.OpenKey(hive, parent_path, 0, winreg.KEY_READ)
+        except OSError:
+            continue
+        with parent:
+            for i in range(4500):
+                if cancel and cancel():
+                    raise InterruptedError("Launcher scan canceled")
+                try:
+                    name = winreg.EnumKey(parent, i)
+                except OSError:
+                    break
+                try:
+                    with winreg.OpenKey(parent, name, 0, winreg.KEY_READ) as sub:
+                        def text(field):
+                            try:
+                                value = winreg.QueryValueEx(sub, field)[0]
+                                return value if isinstance(value, str) else ""
+                            except OSError:
+                                return ""
+                        display = text("DisplayName")
+                        publisher = text("Publisher")
+                        if not is_blizzard_install_metadata(display, publisher):
+                            continue
+                        location = text("InstallLocation")
+                        folder = _ordinary_install(location)
+                        if folder is None:
+                            continue
+                        results.append(LauncherGame(
+                            display[:170], "Battle.net", str(folder), name,
+                            None, "Blizzard publisher and Windows installation record; "
+                                  "game launch status not independently verified"))
                 except OSError:
                     continue
     return results
