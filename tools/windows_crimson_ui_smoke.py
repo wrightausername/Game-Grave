@@ -26,11 +26,11 @@ def main():
     from PySide6.QtWidgets import QTabWidget
     from PySide6.QtGui import QPalette
     from PIL import Image
+
+    app = QApplication.instance() or QApplication(sys.argv)
     configure_crimson_dialog_palette(app)
     assert app.palette().color(QPalette.Window).lightness() < 90
     assert app.palette().color(QPalette.WindowText).lightness() > 180
-
-    app = QApplication.instance() or QApplication(sys.argv)
     from PySide6.QtGui import QFontDatabase
     families = QFontDatabase.families()
     print("Native Windows Qt font families:", len(families),
