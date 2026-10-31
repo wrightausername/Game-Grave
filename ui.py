@@ -3781,7 +3781,7 @@ class GameGraveApp(tk.Tk):
         def task():
             try:
                 self.events.put(("scan_stage", (0, STAGES[0][0])))
-                games = find_games(games_extra)
+                games = find_games(games_extra, cancel=self._cancel_scan.is_set)
                 self._check_scan_cancel()
                 self.events.put(("scan_stage", (1, STAGES[1][0])))
                 other = find_launcher_games(other_roots, cancel=self._cancel_scan.is_set)
