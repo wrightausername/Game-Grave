@@ -326,6 +326,36 @@ class ScreenMethods:
             table.selectRow(row)
         return row
 
+    def _send_mod_to_graveyard(self, mod):
+        """Make any discovered mod reviewable, even when recently modified."""
+        path = str(getattr(mod, "path", "")).strip()
+        if (not path or
+                not any(str(m.path) == path for m in self.inventory.mods)):
+            self.error("Mod entry changed", "Scan again before selecting this location.")
+            return
+        if not self.confirm(
+            "Review this mod folder in the Graveyard?",
+            "Add the detected mod location to your manual Graveyard review list?\n\n"
+            + path + "\n\n"
+            "Nothing will be removed. It will remain protected by default; "
+            "an Advanced override requires its own typed confirmation."):
+            return
+        updated = dict(self.settings)
+        queue = [x for x in updated.get("graveyard_watchlist", [])
+                 if isinstance(x, str)]
+        if not any(os.path.normcase(x) == os.path.normcase(path) for x in queue):
+            queue.append(path)
+        updated["graveyard_watchlist"] = queue
+        try:
+            save_settings(updated)
+        except (OSError, ValueError) as exc:
+            self.error("Cannot save Graveyard review list", str(exc))
+            return
+        self.settings = updated
+        refresh_graveyard(self.inventory, self.settings)
+        self._pending_grave_key = "mod:" + str(Path(path)).casefold()
+        self.navigate("Graveyard")
+
     def _graveyard_context_menu(self, point):
         row_idx = self._right_clicked_row(self.grave_table, point)
         if row_idx is None or row_idx >= len(self._shown_graves):
@@ -1057,10 +1087,12 @@ class ScreenMethods:
                     lambda: self._set_personal_protection(
                         location, protect=False, return_route="Mods"))
             else:
-                locked = menu.addAction("Game/mod protection cannot be bypassed")
-                locked.setEnabled(False)
+                notice = menu.addAction("Default game/mod protection active")
+                notice.setEnabled(False)
             menu.addSeparator()
-            disabled = menu.addAction("Remove mod folder (not safe from Mod Radar)")
+            menu.addAction("Send to Graveyard for Advanced review…",
+                           lambda: self._send_mod_to_graveyard(item))
+            disabled = menu.addAction("Immediate removal disabled (use Graveyard)")
             disabled.setEnabled(False)
             menu.addAction("Why protected?",
                 lambda: self.info("Mod Radar protection", why +
@@ -1069,6 +1101,13 @@ class ScreenMethods:
         table.setContextMenuPolicy(Qt.CustomContextMenu)
         table.customContextMenuRequested.connect(mod_context_menu)
         tools.addWidget(button("Explain selected source", inspect_selected))
+        def queue_selected_mod():
+            selected = _selected_indices(table)
+            if selected and selected[0] < len(self.inventory.mods):
+                self._send_mod_to_graveyard(self.inventory.mods[selected[0]])
+            else:
+                self.info("Select a mod folder", "Choose a mod location to review.")
+        tools.addWidget(button("Send to Graveyard…", queue_selected_mod))
         tools.addWidget(button("Game DNA", lambda: self.navigate("Game DNA")))
         tools.addWidget(button("Open classic Mod Radar tools",
                                self._launch_classic_tools))
