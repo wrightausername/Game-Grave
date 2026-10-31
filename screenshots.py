@@ -109,10 +109,13 @@ def _read_direct_steam_images(root: Path, days: int, cancel: Cancel,
             if inspected > 10000 or len(found) >= max_matches:
                 break
             path = Path(item.path)
-            if not looks_like_screenshot(path) or item.is_symlink():
+            if not looks_like_screenshot(path) or path.is_symlink():
                 continue
             try:
-                state = item.stat(follow_symlinks=False)
+                # On Windows, os.DirEntry.stat(follow_symlinks=False) can
+                # report different nlink / metadata semantics than Path.stat
+                # for NTFS. Use one explicit non-following path identity check.
+                state = path.lstat()
             except OSError:
                 continue
             if (not stat.S_ISREG(state.st_mode) or state.st_nlink != 1
