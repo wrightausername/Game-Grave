@@ -121,6 +121,23 @@ class GraveyardPresentationTests(unittest.TestCase):
         self.assertNotIn("reclaimed_bytes", totals)
 
 
+class BattleNetDetectionTests(unittest.TestCase):
+    def test_battle_net_game_requires_verified_blizzard_publisher_and_title(self):
+        from launchers import is_blizzard_install_metadata
+        self.assertTrue(is_blizzard_install_metadata("Diablo IV", "Blizzard Entertainment, Inc."))
+        self.assertTrue(is_blizzard_install_metadata("World of Warcraft", "Blizzard Entertainment"))
+        self.assertTrue(is_blizzard_install_metadata("Overwatch 2", "Blizzard Entertainment"))
+        self.assertFalse(is_blizzard_install_metadata("Battle.net", "Blizzard Entertainment"))
+        self.assertFalse(is_blizzard_install_metadata("Blizzard Update Agent", "Blizzard Entertainment"))
+        self.assertFalse(is_blizzard_install_metadata("Diablo IV", "Some Third-Party Launcher"))
+        self.assertFalse(is_blizzard_install_metadata("", "Blizzard Entertainment"))
+
+    def test_blizzard_record_reader_never_crosses_windows_boundary_on_linux(self):
+        from launchers import blizzard_uninstall_records
+        if os.name != "nt":
+            self.assertEqual(blizzard_uninstall_records(), [])
+
+
 class ReadOnlyBackendTests(unittest.TestCase):
     def test_cancelled_scan_does_not_start_any_launcher_reads(self):
         with patch("gg_desktop.backend.find_games") as steam_scan:
