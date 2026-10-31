@@ -1,0 +1,57 @@
+name: M4 disposable Windows UI interaction smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'ui.py'
+      - 'ui_viewport.py'
+      - 'view_options.py'
+      - 'tools/windows_m4_ui_smoke.py'
+      - '.github/workflows/windows-m4-ui-qa.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ui.py'
+      - 'ui_viewport.py'
+      - 'view_options.py'
+      - 'tools/windows_m4_ui_smoke.py'
+      - '.github/workflows/windows-m4-ui-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ui-smoke:
+    name: Native Tk widgets on hosted Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install only existing runtime dependencies
+        shell: pwsh
+        run: python -m pip install "cryptography>=44,<47"
+      - name: Exercise UI with temporary local profile, no real deletion
+        shell: pwsh
+        env:
+          GG_M4_QA_DISPOSABLE: 'YES'
+        run: |
+          python tools/windows_m4_ui_smoke.py
+          if ($LASTEXITCODE -ne 0) {
+            throw 'M4 real-widget smoke failed. Keep usability release gate open.'
+          }
+      - name: Upload counts-only M4 UI result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-M4-UI-Hosted-Windows
+          path: _ci_temp/m4-ui-smoke.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Remaining acceptance
+        shell: pwsh
+        run: |
+          Write-Host 'M4 requires physical Windows 10/11 scaling, screen reader and nontechnical-user acceptance.'
