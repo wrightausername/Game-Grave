@@ -3419,11 +3419,11 @@ class GameGraveApp(tk.Tk):
             ai_panel, text="Enable optional local AI Assistant",
             variable=self.ai_enabled_var, command=self._save_ai_assistant_pref,
             style="Dark.TCheckbutton").pack(anchor="w", pady=(0, 11))
-        self.text(ai_panel, "Local Ollama model (default: qwen2.5:3b):",
+        self.text(ai_panel, "Local Ollama model (default: qwen2.5:1.5b):",
                   10, MUTED).pack(anchor="w")
         model_controls = tk.Frame(ai_panel, bg=PANEL)
         model_controls.pack(anchor="w", pady=(5, 11))
-        self.ai_model_var = tk.StringVar(value=self.settings.get("ai_model", "qwen2.5:3b"))
+        self.ai_model_var = tk.StringVar(value=self.settings.get("ai_model", "qwen2.5:1.5b"))
         tk.Entry(model_controls, textvariable=self.ai_model_var, bg=RAISED, fg=TEXT,
                  insertbackground=TEXT, width=28, relief="flat",
                  font=("Segoe UI", 10)).pack(side="left", padx=(0, 9), ipady=5)
@@ -3433,7 +3433,7 @@ class GameGraveApp(tk.Tk):
         self.ai_launch_button.pack(anchor="w", pady=(0, 8))
         self.ai_launch_button.configure(
             state="normal" if self.ai_enabled_var.get() else "disabled")
-        self.text(ai_panel, "Install Ollama separately, then run: ollama pull qwen2.5:3b. "
+        self.text(ai_panel, "Install Ollama separately, then run: ollama pull qwen2.5:1.5b. "
                   "Questions and anonymous scan counts only reach 127.0.0.1. "
                   "Chats are not saved. AI suggestions cannot bypass file safety.",
                   9, WARN, wraplength=760).pack(anchor="w")
