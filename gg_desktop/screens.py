@@ -16,7 +16,7 @@ from PySide6.QtGui import QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMessageBox, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
+    QMenu, QMessageBox, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 from core import (
@@ -24,7 +24,7 @@ from core import (
     safe_scan_root, save_settings,
 )
 from graveyard import build_graveyard
-from graveyard_protection import protection_action
+from graveyard_protection import protection_action, set_item_protection
 from cleanup_actions import recycle_reviewed_entries, recycle_old_files
 from recovery import get_records, restore as restore_recycled, check_restore
 from screenshot_preview import decode_screenshot_preview
@@ -300,6 +300,8 @@ class ScreenMethods:
         self.game_filter.currentTextChanged.connect(self._fill_games)
         self.game_sort.currentTextChanged.connect(self._fill_games)
         self.game_table.itemSelectionChanged.connect(self._game_details)
+        self.game_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.game_table.customContextMenuRequested.connect(self._games_context_menu)
         self._fill_games()
 
     def _fill_games(self, *_):
@@ -388,6 +390,105 @@ class ScreenMethods:
         if not _safe_open_path(path):
             self.error("Folder unavailable", "The directory is missing, redirected, or refused by Windows.")
 
+    def _set_personal_protection(self, path: str, *, protect: bool, return_route: str):
+        """Explicit user Never Touch action, never a deletion shortcut."""
+        try:
+            action, reason = protection_action(path, list(self.settings.get("never_touch", [])))
+            if action != ("Protect" if protect else "Unprotect"):
+                self.info("Protection unchanged", reason)
+                return
+            if not self.confirm(
+                "Protect this item?" if protect else "Remove your personal protection?",
+                ("Add a Never Touch rule for:\n" if protect else
+                 "Remove only your own exact Never Touch rule for:\n") + path +
+                "\n\nNo files will be moved. Built-in protection cannot be removed."
+            ):
+                return
+            updated = dict(self.settings)
+            updated["never_touch"] = set_item_protection(
+                list(self.settings.get("never_touch", [])), path, protect=protect)
+            save_settings(updated)
+            self.settings = updated
+            refresh_graveyard(self.inventory, self.settings)
+            self.status.setText(
+                "Item protected. Nothing moved." if protect else
+                "Personal rule removed. Deletion still requires separate safety checks.")
+            self.navigate(return_route)
+        except (ValueError, OSError) as exc:
+            self.error("Cannot change item protection", str(exc))
+
+    @staticmethod
+    def _right_clicked_row(table, point):
+        """Preserve a multi-selection if right-click is already inside it."""
+        index = table.indexAt(point)
+        if not index.isValid():
+            return None
+        row = index.row()
+        if row not in _selected_indices(table):
+            table.selectRow(row)
+        return row
+
+    def _graveyard_context_menu(self, point):
+        row_idx = self._right_clicked_row(self.grave_table, point)
+        if row_idx is None or row_idx >= len(self._shown_graves):
+            return
+        entry = self._shown_graves[row_idx]
+        action, reason = protection_action(
+            entry.path, list(self.settings.get("never_touch", [])))
+        menu = QMenu(self.grave_table)
+        menu.addAction("Inspect finding", lambda: self._grave_details())
+        menu.addSeparator()
+        if entry.category == "Old game screenshot":
+            menu.addAction("Preview this screenshot…",
+                           lambda: self._preview_grave_image(entry))
+        else:
+            move = menu.addAction("Move to Recycle Bin…",
+                                  lambda: self._approve_recycle([entry]))
+            move.setEnabled(entry.can_recycle and entry.old_file is not None)
+            if not move.isEnabled():
+                move.setToolTip("Protected or review-only: " + entry.protection)
+        if action == "Protect":
+            menu.addAction("Protect this item (Never Touch)",
+                           lambda: self._set_personal_protection(
+                               entry.path, protect=True, return_route="Graveyard"))
+        elif action == "Unprotect":
+            menu.addAction("Unprotect this item…",
+                           lambda: self._unprotect_grave(entry))
+        elif reason.startswith("A parent folder"):
+            menu.addAction("Manage parent protection…",
+                           lambda: self._manage_parent_rule(entry))
+        else:
+            notice = menu.addAction("Built-in protection: cannot override")
+            notice.setEnabled(False)
+        menu.addSeparator()
+        menu.addAction("Open containing folder",
+                       lambda: self._open_folder(str(Path(entry.path).parent)))
+        menu.addAction("Why is this protected?",
+                       lambda: self.info("Graveyard review status",
+                           entry.protection + "\n\n" + entry.finding +
+                           "\n\n" + reason))
+        menu.exec(self.grave_table.viewport().mapToGlobal(point))
+
+    def _games_context_menu(self, point):
+        row_idx = self._right_clicked_row(self.game_table, point)
+        if row_idx is None or row_idx >= len(self._shown_games):
+            return
+        game = self._shown_games[row_idx]
+        menu = QMenu(self.game_table)
+        menu.addAction("Inspect game and installation evidence", self._game_details)
+        opener = menu.addAction("Open installation folder",
+                  lambda: self._open_folder(game.install_path))
+        opener.setEnabled("open_folder" in game.capabilities)
+        menu.addAction("View Game DNA", lambda: self.navigate("Game DNA"))
+        if ("steam_uninstall" in game.capabilities and game.app_id
+                and game.app_id.isdecimal()):
+            menu.addAction("Uninstall through Steam…",
+                           lambda: self._steam_uninstall(game))
+        else:
+            disabled = menu.addAction("Direct deletion unavailable (protected game)")
+            disabled.setEnabled(False)
+        menu.exec(self.game_table.viewport().mapToGlobal(point))
+
     def _go_grave_item(self, key):
         self._pending_grave_key = key
         self.navigate("Graveyard")
@@ -454,6 +555,8 @@ class ScreenMethods:
         self.grave_type.currentTextChanged.connect(self._fill_graveyard)
         self.grave_state.currentTextChanged.connect(self._fill_graveyard)
         self.grave_table.itemSelectionChanged.connect(self._grave_details)
+        self.grave_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.grave_table.customContextMenuRequested.connect(self._graveyard_context_menu)
         self._fill_graveyard()
 
     def _fill_graveyard(self, *_):
@@ -838,6 +941,37 @@ class ScreenMethods:
                       "\n\nEVIDENCE: " + str(getattr(m, "status", "Unknown")) +
                       "\n\nGame Grave will never delete a mod-manager "
                       "profile or active mod based on an old timestamp.")
+        def mod_context_menu(point):
+            index = self._right_clicked_row(table, point)
+            if index is None or index >= min(len(self.inventory.mods), 400):
+                return
+            item = self.inventory.mods[index]
+            location = str(getattr(item, "path", ""))
+            protection, why = protection_action(
+                location, list(self.settings.get("never_touch", [])))
+            menu = QMenu(table)
+            menu.addAction("Inspect mod location", inspect_selected)
+            menu.addAction("Open mod folder", lambda: self._open_folder(location))
+            if protection == "Protect":
+                menu.addAction("Protect this location",
+                    lambda: self._set_personal_protection(
+                        location, protect=True, return_route="Mods"))
+            elif protection == "Unprotect":
+                menu.addAction("Remove personal protection…",
+                    lambda: self._set_personal_protection(
+                        location, protect=False, return_route="Mods"))
+            else:
+                locked = menu.addAction("Game/mod protection cannot be bypassed")
+                locked.setEnabled(False)
+            menu.addSeparator()
+            disabled = menu.addAction("Remove mod folder (not safe from Mod Radar)")
+            disabled.setEnabled(False)
+            menu.addAction("Why protected?",
+                lambda: self.info("Mod Radar protection", why +
+                "\n\nMod Radar is for review, not deleting active managed mods."))
+            menu.exec(table.viewport().mapToGlobal(point))
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(mod_context_menu)
         tools.addWidget(button("Explain selected source", inspect_selected))
         tools.addWidget(button("Game DNA", lambda: self.navigate("Game DNA")))
         tools.addWidget(button("Open classic Mod Radar tools",
@@ -923,6 +1057,36 @@ class ScreenMethods:
             self.job(lambda _progress: recycle_old_files(
                 selected, rules, session, review_root=reviewed_root,
                 min_age_days=days), complete, error_title="Old Files cleanup blocked")
+        def old_file_context_menu(point):
+            row_idx = self._right_clicked_row(table, point)
+            if row_idx is None or row_idx >= len(rows):
+                return
+            item = rows[row_idx]
+            action, reason = protection_action(
+                item.path, list(self.settings.get("never_touch", [])))
+            menu = QMenu(table)
+            move = menu.addAction("Move to Recycle Bin…", remove)
+            move.setEnabled(not is_protected_path(
+                Path(item.path), self.settings.get("never_touch", [])))
+            if action == "Protect":
+                menu.addAction("Protect this file (Never Touch)",
+                               lambda: self._set_personal_protection(
+                                   item.path, protect=True, return_route="Old Files"))
+            elif action == "Unprotect":
+                menu.addAction("Unprotect this file…",
+                               lambda: self._set_personal_protection(
+                                   item.path, protect=False, return_route="Old Files"))
+            else:
+                locked = menu.addAction("Protection cannot be changed here")
+                locked.setEnabled(False)
+            menu.addSeparator()
+            menu.addAction("Open containing folder",
+                           lambda: self._open_folder(str(Path(item.path).parent)))
+            menu.addAction("Explain protection",
+                           lambda: self.info("Old Files safety", reason))
+            menu.exec(table.viewport().mapToGlobal(point))
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(old_file_context_menu)
         contents.addWidget(button("Move reviewed individual files to Recycle Bin…",
                                   remove, kind="danger"))
         page.content.addWidget(p)
