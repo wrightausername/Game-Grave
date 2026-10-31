@@ -2,7 +2,9 @@
 
 Aging and a missing Steam manifest do not establish abandonment. Only individual
 ordinary files from the explicitly chosen Old Files scan or discovered recording
-folders are eligible for review. Entire games/mod folders are never recyclable here.
+folders are eligible for review. Entire game/mod folders remain protected by default. An explicit one-time
+advanced override on a precisely verified item can request a recoverable
+Windows Recycle Bin move after separate typed confirmation.
 """
 from __future__ import annotations
 
