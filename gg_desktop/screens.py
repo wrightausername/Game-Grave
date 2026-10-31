@@ -34,7 +34,7 @@ from gg_desktop.models import (
     graveyard_protection_decision, graveyard_totals,
 )
 from gg_desktop.widgets import (
-    ActionCard, HeroBanner, MetricCard, ScrollPage, StorageRing,
+    ActionCard, HeroBanner, LandscapeArt, MetricCard, ScrollPage, StorageRing,
     button, column, data_table, label, page_heading, panel, row, section_title,
 )
 
@@ -178,6 +178,7 @@ class ScreenMethods:
         bottom.setLayout(bottom_row)
         capture, cap_col = panel()
         cap_col.addWidget(section_title("Latest Screenshot", "Private and on-device"))
+        cap_col.addWidget(LandscapeArt(136))
         if self.inventory.screenshots:
             latest = max(self.inventory.screenshots, key=lambda x: x.modified)
             cap_col.addWidget(label("▧", "metricValue"))
@@ -210,6 +211,7 @@ class ScreenMethods:
 
         attention, alert_col = panel(kind="alertCard")
         alert_col.addWidget(section_title("Needs Review"))
+        alert_col.addWidget(LandscapeArt(91))
         uncertain = next((m for m in self.inventory.mods if getattr(m, "status", "")), None)
         if uncertain:
             alert_col.addWidget(label(str(getattr(uncertain, "source", "Mod storage")), "sectionTitle", wrap=True))
