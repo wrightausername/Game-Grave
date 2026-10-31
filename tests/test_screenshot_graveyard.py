@@ -64,6 +64,12 @@ class ScreenshotDiscoveryTests(unittest.TestCase):
         external = self.image(steam / "steamapps" / "common" / "Skyrim" / "Data" / "mod.png")
         roots = default_screenshot_roots(home=self.home, steam_roots=[steam])
         self.assertIn(shot.parent, roots)
+        from screenshots import _steam_screenshot_root, _read_direct_steam_images
+        self.assertTrue(_steam_screenshot_root(shot.parent, [steam]),
+                        f"Steam root recognition rejected: {shot.parent.parts!r}")
+        direct = _read_direct_steam_images(shot.parent, 365, None, 100)
+        self.assertEqual([Path(row.path) for row in direct], [shot],
+                         f"Steam direct inventory skipped test image: {shot.stat()!r}")
         records = find_old_screenshots(365, home=self.home, steam_roots=[steam])
         self.assertEqual([Path(r.path) for r in records], [shot])
         self.assertTrue(thumb.exists())
