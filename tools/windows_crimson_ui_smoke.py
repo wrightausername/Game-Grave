@@ -63,6 +63,32 @@ def main():
             window.inventory.files = [old]
             window.inventory.scanned_at = "Synthetic test date"
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
+            # Native reference-dashboard parity: all pictured controls must
+            # exist and be wired to the real app, never static screenshot overlays.
+            from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox
+            from PySide6.QtSvg import QSvgRenderer
+            window.navigate("Overview")
+            app.processEvents()
+            labels = {b.text() for b in window.page.findChildren(QPushButton)}
+            for expected in ("Scan for Old Files", "Review Graveyard",
+                             "Open Undo Center", "Quick Settings",
+                             "Delete Selected", "Restore", "Add to Graveyard",
+                             "Review Files", "Preview actual image"):
+                assert any(expected in t for t in labels), (
+                    f"Missing or unconnected reference dashboard tool: {expected}")
+            combos = window.page.findChildren(QComboBox)
+            drives = [c for c in combos if "local drive" in c.accessibleName().lower()]
+            filters = [c for c in combos if "filter launchers" in c.accessibleName().lower()]
+            assert len(drives) == 1 and drives[0].count() >= 1
+            assert len(filters) == 1 and filters[0].count() >= 9
+            assert filters[0].findText("Steam") >= 0
+            assert window.page.findChildren(QCheckBox), "Missing Graveyard queue checkboxes"
+            for name in ("crimson_hero.svg", "crimson_sunset.svg",
+                         "crimson_fog.svg", "crimson_footer.svg"):
+                asset = root / "gg_desktop" / "assets" / name
+                assert QSvgRenderer(str(asset)).isValid(), (
+                    "Invalid cinematic local visual: " + name)
+            assert oldzip.read_bytes() == b"not an actual mod or game"
             for route in ("Overview", "Games", "Graveyard", "Game DNA",
                           "Mods", "Old Files", "Undo Center", "Settings", "More Tools"):
                 window.navigate(route)
