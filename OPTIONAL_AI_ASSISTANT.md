@@ -5,7 +5,7 @@ Game Grave can use a **separately installed** Ollama local language model to exp
 ## Enable on Windows
 
 1. Install Ollama from its official website: https://ollama.com/download/windows
-2. Open PowerShell and run: ollama pull qwen2.5:3b
+2. Open PowerShell and run: ollama pull qwen2.5:1.5b
 3. Make sure Ollama is running on this PC. If needed, run: ollama serve
 4. Open **Game Grave > Settings > AI Assistant** (classic) or **Settings > Local AI Assistant** (Crimson Qt preview).
 5. Check **Enable optional local AI Assistant**, then click **Open local AI Assistant**.
