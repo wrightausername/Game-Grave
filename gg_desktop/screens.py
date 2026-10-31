@@ -14,7 +14,7 @@ import uuid
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
+    QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
@@ -23,7 +23,7 @@ from core import (
     human_size, age_text, is_game_neglected, is_protected_path, is_unchanged,
     safe_scan_root, save_settings,
 )
-from graveyard import build_graveyard
+from graveyard import GraveyardEntry, build_graveyard
 from graveyard_protection import protection_action, set_item_protection
 from cleanup_actions import recycle_reviewed_entries, recycle_old_files
 from recovery import get_records, restore as restore_recycled, check_restore
@@ -868,10 +868,27 @@ class ScreenMethods:
                   and e.category == "Old game screenshot"), None)
         if e is not None:
             self._preview_grave_image(e)
-        else:
-            self.info("Screenshot not eligible",
-                      "This image is not in the reviewed old-screenshot inventory. "
-                      "Nothing was loaded or deleted.")
+            return
+        if record not in self.inventory.screenshots:
+            self.error("Unknown screenshot", "Scan again before previewing an unrecognized image.")
+            return
+        # A discovered recent screenshot is not an old-file finding, but its
+        # owner can still preview and explicitly review moving that image
+        # through the same protected, reversible backend. No bulk authority.
+        age = max(0, int((datetime.now().timestamp() - record.modified) / 86400))
+        item = GraveyardEntry(
+            key="screenshot:preview:" + str(record.path).casefold(),
+            name=Path(record.path).name, path=record.path,
+            category="Old game screenshot",
+            apparent_bytes=record.size, age_days=age,
+            relationship="Known screenshot folder; image contents not classified",
+            finding="Screenshot found during your manual PC scan. "
+                    "Preview it before choosing what to do. "
+                    "No deletion happens without a separate approval.",
+            protection="Individual preview required; bulk deletion prohibited",
+            can_recycle=False, old_file=record,
+        )
+        self._preview_grave_image(item)
 
     def _preview_grave_image(self, entry):
         if entry.old_file is None or not is_unchanged(entry.old_file):
@@ -1184,6 +1201,101 @@ class ScreenMethods:
         page.content.addWidget(label(
             "File age does not prove disuse. Old Files never removes installed games or "
             "managed profile folders. Recycle Bin is reversible only while Windows holds a matching item.",
+            "warning", wrap=True))
+
+    def screenshots_page(self):
+        """Automatic metadata discovery; preview/deletion still individually authorized."""
+        page = self._new(
+            "Screenshots", "Automatically find in-game captures without browsing your personal photos.")
+        if self._not_scanned(page):
+            return
+        p, col = panel()
+        shots = sorted(self.inventory.screenshots,
+                       key=lambda x: (-x.modified, x.path.casefold()))
+        col.addWidget(section_title("Discovered in-game screenshots",
+                                    str(len(shots)) + " detected"))
+        col.addWidget(label(
+            "Scans check Steam screenshot directories, Windows/Game Bar captures, "
+            "supported gaming capture locations, and dedicated screenshot folders "
+            "for games detected on this PC. Only filenames, file sizes, and dates "
+            "are inspected automatically. Image contents are opened only if you "
+            "choose Preview. Personal photo folders are excluded.",
+            "subtle", wrap=True))
+        bar = QWidget()
+        brow = row(spacing=10)
+        bar.setLayout(brow)
+        brow.addWidget(button("Rescan screenshots", self.start_scan, kind="primary"))
+        brow.addWidget(button("Review old screenshots in Graveyard",
+                              lambda: self.navigate("Graveyard")))
+        brow.addStretch()
+        col.addWidget(bar)
+        table = data_table(["SCREENSHOT", "SIZE", "MODIFIED", "FOLDER"])
+        table.setSelectionMode(QAbstractItemView.SingleSelection)
+        table.setMinimumHeight(460)
+        table.setColumnWidth(0, 310)
+        table.setColumnWidth(1, 105)
+        table.setColumnWidth(2, 140)
+        rows = shots[:700]
+        table.setRowCount(len(rows))
+        for i, shot in enumerate(rows):
+            for c, value in enumerate((
+                    Path(shot.path).name,
+                    human_size(shot.size),
+                    datetime.fromtimestamp(shot.modified).strftime("%Y-%m-%d %H:%M"),
+                    str(Path(shot.path).parent))):
+                _table_text(table, i, c, value)
+            table.setRowHeight(i, 36)
+        col.addWidget(table)
+        if not rows:
+            col.addWidget(label(
+                "No screenshots discovered in supported locations yet. "
+                "Try Scan PC, or add a custom screenshot folder in Settings.",
+                "subtle", wrap=True))
+        def selected_shot():
+            indices = _selected_indices(table)
+            return rows[indices[0]] if indices and indices[0] < len(rows) else None
+        def inspect_shot():
+            shot = selected_shot()
+            if shot is None:
+                self.info("Select a screenshot", "Choose one screenshot row to preview it.")
+                return
+            self._preview_capture(shot)
+        def open_location():
+            shot = selected_shot()
+            if shot is not None:
+                self._open_folder(str(Path(shot.path).parent))
+        controls = QWidget()
+        ctrls = row()
+        controls.setLayout(ctrls)
+        ctrls.addWidget(button("Preview selected screenshot…", inspect_shot,
+                               kind="primary"))
+        ctrls.addWidget(button("Open screenshot folder", open_location))
+        ctrls.addStretch()
+        col.addWidget(controls)
+        def screenshot_context(point):
+            idx = self._right_clicked_row(table, point)
+            if idx is None or idx >= len(rows):
+                return
+            record = rows[idx]
+            menu = QMenu(table)
+            menu.addAction("Preview screenshot / review Recycle Bin move…",
+                           lambda: self._preview_capture(record))
+            menu.addAction("Open containing folder",
+                           lambda: self._open_folder(str(Path(record.path).parent)))
+            menu.addSeparator()
+            status = menu.addAction(
+                "Bulk deletion disabled: individual image review required")
+            status.setEnabled(False)
+            menu.exec(table.viewport().mapToGlobal(point))
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(screenshot_context)
+        table.cellDoubleClicked.connect(
+            lambda idx, _col: self._preview_capture(rows[idx])
+            if 0 <= idx < len(rows) else None)
+        page.content.addWidget(p)
+        page.content.addWidget(label(
+            "No screenshot is deleted automatically. To remove one, preview the "
+            "exact image and separately approve Windows Recycle Bin recovery.",
             "warning", wrap=True))
 
     def undo_page(self):
