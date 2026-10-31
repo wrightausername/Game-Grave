@@ -130,5 +130,75 @@ class UiThreadBoundaryTests(unittest.TestCase):
         worker.assert_not_called()
 
 
+class OldFilesWorkerTests(unittest.TestCase):
+    def make_file(self, root: Path):
+        p = root / "old-download.txt"
+        p.write_bytes(b"disposable old download")
+        stamp = time.time() - 500 * 86400
+        os.utime(p, (stamp, stamp))
+        return p, OldFile(str(p), p.stat().st_size, p.stat().st_mtime)
+
+    def test_refuses_protected_old_file_without_shell_call(self):
+        from cleanup_actions import recycle_old_files
+        with tempfile.TemporaryDirectory() as folder:
+            file, record = self.make_file(Path(folder))
+            with patch("cleanup_actions.log_event"), \
+                 patch("cleanup_actions.recycle_file") as mover:
+                result = recycle_old_files([record], [str(file)], "disposable-qa")
+            self.assertEqual(result["completed"], 0)
+            self.assertEqual(len(result["skipped"]), 1)
+            mover.assert_not_called()
+            self.assertTrue(file.exists())
+
+    def test_failed_windows_undo_probe_never_counts_as_deleted(self):
+        from cleanup_actions import recycle_old_files
+        with tempfile.TemporaryDirectory() as folder:
+            file, record = self.make_file(Path(folder))
+            with patch("cleanup_actions.log_event"), \
+                 patch("cleanup_actions.recycle_file", side_effect=RuntimeError("no recovery")) as mover, \
+                 patch("cleanup_actions.register_recycle") as register:
+                result = recycle_old_files([record], [], "disposable-qa")
+            self.assertEqual(result["completed"], 0)
+            self.assertTrue(result["skipped"])
+            mover.assert_called_once()
+            register.assert_not_called()
+            self.assertTrue(file.is_file())
+
+    def test_success_records_undo_and_progress(self):
+        from cleanup_actions import recycle_old_files
+        with tempfile.TemporaryDirectory() as folder:
+            file, record = self.make_file(Path(folder))
+            updates = []
+            with patch("cleanup_actions.log_event"), \
+                 patch("cleanup_actions.recycle_file", side_effect=lambda p: p.unlink()), \
+                 patch("cleanup_actions.register_recycle", return_value="test-undo") as register:
+                result = recycle_old_files(
+                    [record], [], "disposable-qa",
+                    progress=lambda a, b: updates.append((a, b)))
+            self.assertEqual(result["completed"], 1)
+            self.assertEqual(result["skipped"], [])
+            self.assertEqual(updates, [(1, 1)])
+            register.assert_called_once()
+            self.assertFalse(file.exists())
+
+    def test_old_files_button_queues_work_not_shell_call(self):
+        with tempfile.TemporaryDirectory() as folder:
+            file, record = self.make_file(Path(folder))
+            tree = SimpleNamespace(winfo_exists=lambda: True, selection=lambda: ("row",))
+            fake = SimpleNamespace(file_tree=tree, file_lookup={"row": record},
+                                   settings={"never_touch": []}, cleanup_running=False,
+                                   scanning=False, status_text=SimpleNamespace(set=Mock()),
+                                   scan_button=Mock(), events=Mock())
+            with patch("ui.messagebox.askyesno", return_value=True), \
+                 patch("ui.threading.Thread") as worker, \
+                 patch("ui.recycle_old_files") as mover:
+                GameGraveApp._recycle_selected(fake)
+            self.assertTrue(fake.cleanup_running)
+            worker.assert_called_once()
+            worker.return_value.start.assert_called_once()
+            mover.assert_not_called()
+            self.assertTrue(file.exists())
+
+
 if __name__ == "__main__":
     unittest.main()
