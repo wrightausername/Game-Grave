@@ -162,7 +162,7 @@ class ScreenMethods:
         if not findings:
             recent_col.addWidget(label("No review findings yet. Scan first or adjust the age threshold.", "subtle", wrap=True))
         for item in findings:
-            ctl = button(item.name[:39] + "  ›",
+            ctl = button(item.name[:24] + "  ›",
                          lambda _=False, key=item.key: self._go_grave_item(key), kind="link")
             ctl.setToolTip(item.finding)
             recent_col.addWidget(ctl)
@@ -197,7 +197,7 @@ class ScreenMethods:
         queue_col.addWidget(section_title("Graveyard Review Queue",
                                           f"{len(self.inventory.graveyard)} findings"))
         for item in self.inventory.graveyard[:4]:
-            ctl = button(item.name[:43] + "  ›",
+            ctl = button(item.name[:26] + "  ›",
                          lambda _=False, key=item.key: self._go_grave_item(key), kind="link")
             queue_col.addWidget(ctl)
             queue_col.addWidget(label(item.category + "  •  " +
