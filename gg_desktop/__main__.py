@@ -4,7 +4,7 @@ import sys
 
 
 def main() -> int:
-    if "--ui-preview" not in sys.argv:
+    if "--ui-preview" not in sys.argv and not getattr(sys, "frozen", False):
         print("Crimson Command is an opt-in engineering preview. "
               "Run python -m gg_desktop --ui-preview", file=sys.stderr)
         return 2
