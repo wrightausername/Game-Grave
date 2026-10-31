@@ -85,7 +85,7 @@ def main():
             assert not window.inventory.graveyard[0].can_recycle
             archive = next(e for e in window.inventory.graveyard
                            if e.category == "Possible mod / game download")
-            with patch.object(window, "confirm", return_value=True), \\
+            with patch.object(window, "confirm", return_value=True), \
                  patch("gg_desktop.screens.recycle_reviewed_entries") as recycle:
                 window._unprotect_grave(archive)
                 assert oldzip.is_file()
