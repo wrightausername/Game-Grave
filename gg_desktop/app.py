@@ -10,6 +10,7 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QProgressBar, QVBoxLayout, QWidget, QScrollArea,
@@ -74,6 +75,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.pool = QThreadPool.globalInstance()
         self.current_route = "Overview"
         self.setWindowTitle("Game Grave  |  Crimson Command preview")
+        self.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg")))
         self.setMinimumSize(960, 650)
         self.resize(1450, 900)
         self.setStyleSheet(STYLE)
