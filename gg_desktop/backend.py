@@ -84,7 +84,7 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
     except (OSError, ValueError) as exc:
         staged.warnings.append("Screenshots partially unavailable (" + type(exc).__name__ + ").")
     stage(4, STAGES[4])
-    from save_vault import discover_saves
+    from save_discovery import discover_saves
     staged.saves = discover_saves()
     if canceled():
         raise ScanCanceled("Scan canceled.")
