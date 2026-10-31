@@ -26,6 +26,7 @@ ROUTES = (
     ("Games", "▣"),
     ("Mods", "♜"),
     ("Old Files", "▤"),
+    ("Screenshots", "▧"),
     ("Graveyard", "♱"),
     ("Game DNA", "⌁"),
     ("Undo Center", "↶"),
@@ -36,6 +37,7 @@ ROUTES = (
 ROUTE_ALIASES = {
     "Steam Games": "Games", "Other Launchers": "Games",
     "The Graveyard": "Graveyard", "Game Mods": "Mods",
+    "Game Screenshots": "Screenshots", "In-game Screenshots": "Screenshots",
     "Save Vault": "More Tools", "Resurrection Lab": "More Tools",
     "Cleanup History": "More Tools", "Automation": "More Tools",
     "Make Room": "More Tools", "Storage History": "More Tools",
@@ -172,6 +174,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             "Games": self.games_page,
             "Mods": self.mods_page,
             "Old Files": self.old_files_page,
+            "Screenshots": self.screenshots_page,
             "Graveyard": self.graveyard_page,
             "Game DNA": self.dna_page,
             "Undo Center": self.undo_page,
