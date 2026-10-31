@@ -67,6 +67,15 @@ class ScreenshotDiscoveryTests(unittest.TestCase):
         from screenshots import _steam_screenshot_root, _read_direct_steam_images
         self.assertTrue(_steam_screenshot_root(shot.parent, [steam]),
                         f"Steam root recognition rejected: {shot.parent.parts!r}")
+        from core import _has_reparse_component
+        import stat as _stat
+        debug_state = shot.stat()
+        self.assertTrue(looks_like_screenshot(shot))
+        self.assertFalse(_has_reparse_component(shot),
+                         f"Linked ancestor: {shot}")
+        self.assertTrue(_stat.S_ISREG(debug_state.st_mode))
+        self.assertEqual(debug_state.st_nlink, 1)
+        self.assertLess(debug_state.st_mtime, time.time() - 365 * 86400)
         direct = _read_direct_steam_images(shot.parent, 365, None, 100)
         self.assertEqual([Path(row.path) for row in direct], [shot],
                          f"Steam direct inventory skipped test image: {shot.stat()!r}")
