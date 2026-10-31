@@ -16,7 +16,7 @@ from PySide6.QtGui import QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMenu, QMessageBox, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
+    QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 from core import (
@@ -31,7 +31,7 @@ from screenshot_preview import decode_screenshot_preview
 from gg_desktop.backend import refresh_graveyard, unprotect_exact_personal_item, add_never_touch_path
 from gg_desktop.models import (
     readable_bytes, reported_game_bytes, unique_launcher_counts,
-    graveyard_protection_decision, graveyard_totals,
+    graveyard_protection_decision, graveyard_totals, graveyard_detail_text, game_detail_text,
 )
 from gg_desktop.widgets import (
     ActionCard, HeroBanner, LandscapeArt, MetricCard, ScrollPage, StorageRing,
@@ -300,6 +300,10 @@ class ScreenMethods:
         self.game_filter.currentTextChanged.connect(self._fill_games)
         self.game_sort.currentTextChanged.connect(self._fill_games)
         self.game_table.itemSelectionChanged.connect(self._game_details)
+        self.game_table.cellDoubleClicked.connect(
+            lambda row_idx, _column: self._inspect_game_record(
+                self._shown_games[row_idx])
+            if 0 <= row_idx < len(self._shown_games) else None)
         self.game_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.game_table.customContextMenuRequested.connect(self._games_context_menu)
         self._fill_games()
@@ -369,6 +373,8 @@ class ScreenMethods:
             bar.addWidget(button("Open Steam uninstall…",
                                  lambda _=False, g=game: self._steam_uninstall(g), kind="danger"))
         bar.addStretch()
+        bar.addWidget(button("View complete details…",
+                             lambda _=False, g=game: self._inspect_game_record(g)))
         self.game_details_col.addWidget(actions)
 
     def _steam_uninstall(self, game):
@@ -389,6 +395,48 @@ class ScreenMethods:
     def _open_folder(self, path: str):
         if not _safe_open_path(path):
             self.error("Folder unavailable", "The directory is missing, redirected, or refused by Windows.")
+
+    def _detail_dialog(self, title: str, description: str):
+        """Fully populated, independently scrollable detail view; no blank popups."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Game Grave | " + title)
+        dialog.resize(660, 570)
+        layout = column(spacing=12, margins=(18, 18, 18, 18))
+        dialog.setLayout(layout)
+        layout.addWidget(label(title, "sectionTitle", wrap=True))
+        details = QPlainTextEdit(dialog)
+        details.setReadOnly(True)
+        details.setPlainText(description)
+        details.setAccessibleName("Game Grave item details")
+        layout.addWidget(details, 1)
+        close_button = button("Close", dialog.accept)
+        close_button.setDefault(True)
+        layout.addWidget(close_button)
+        dialog.exec()
+
+    def _inspect_grave_entry(self, entry):
+        self._detail_dialog(
+            str(entry.name), graveyard_detail_text(
+                entry, self.settings.get("never_touch", [])))
+
+    def _inspect_game_record(self, game):
+        self._detail_dialog(str(game.name), game_detail_text(game))
+
+    def _inspect_selected_grave(self):
+        selected = self._selected_grave_entries()
+        if len(selected) == 1:
+            self._inspect_grave_entry(selected[0])
+        elif selected:
+            self.info("Choose one item", "Select one row for complete details.")
+        else:
+            self.info("Choose a finding", "Click a Graveyard row to inspect it.")
+
+    def _inspect_selected_game(self):
+        selected = _selected_indices(self.game_table)
+        if len(selected) == 1 and selected[0] < len(self._shown_games):
+            self._inspect_game_record(self._shown_games[selected[0]])
+        else:
+            self.info("Choose one game", "Select one Games row to inspect it.")
 
     def _set_personal_protection(self, path: str, *, protect: bool, return_route: str):
         """Explicit user Never Touch action, never a deletion shortcut."""
@@ -436,7 +484,8 @@ class ScreenMethods:
         action, reason = protection_action(
             entry.path, list(self.settings.get("never_touch", [])))
         menu = QMenu(self.grave_table)
-        menu.addAction("Inspect finding", lambda: self._grave_details())
+        menu.addAction("View complete details…",
+                       lambda: self._inspect_grave_entry(entry))
         menu.addSeparator()
         if entry.category == "Old game screenshot":
             menu.addAction("Preview this screenshot…",
@@ -475,7 +524,8 @@ class ScreenMethods:
             return
         game = self._shown_games[row_idx]
         menu = QMenu(self.game_table)
-        menu.addAction("Inspect game and installation evidence", self._game_details)
+        menu.addAction("View complete game details…",
+                       lambda: self._inspect_game_record(game))
         opener = menu.addAction("Open installation folder",
                   lambda: self._open_folder(game.install_path))
         opener.setEnabled("open_folder" in game.capabilities)
@@ -579,6 +629,10 @@ class ScreenMethods:
         self.grave_type.currentTextChanged.connect(self._fill_graveyard)
         self.grave_state.currentTextChanged.connect(self._fill_graveyard)
         self.grave_table.itemSelectionChanged.connect(self._grave_details)
+        self.grave_table.cellDoubleClicked.connect(
+            lambda row_idx, _column: self._inspect_grave_entry(
+                self._shown_graves[row_idx])
+            if 0 <= row_idx < len(self._shown_graves) else None)
         self.grave_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.grave_table.customContextMenuRequested.connect(self._graveyard_context_menu)
         self._fill_graveyard()
@@ -658,7 +712,12 @@ class ScreenMethods:
         self.grave_detail.addWidget(label(e.name, "sectionTitle", wrap=True))
         for text in (e.category, human_size(e.apparent_bytes) + " apparent", e.path, e.finding):
             self.grave_detail.addWidget(label(text, "subtle", wrap=True))
-        self.grave_detail.addWidget(label("WHY THIS IS PROTECTED", "eyebrow"))
+        self.grave_detail.addWidget(label(
+            "WHY IT WAS FOUND", "eyebrow"))
+        self.grave_detail.addWidget(label(e.finding, "subtle", wrap=True))
+        self.grave_detail.addWidget(label(
+            "WHY THIS IS PROTECTED" if not e.can_recycle else "REVIEW STATUS",
+            "eyebrow"))
         self.grave_detail.addWidget(label(reason if not e.can_recycle else
                                           "Reviewable only. Nothing is moved without confirmation.",
                                           "warning", wrap=True))
@@ -684,6 +743,8 @@ class ScreenMethods:
             self.grave_detail.addWidget(button(
                 "Review moving this file to Recycle Bin…",
                 lambda _=False, e=e: self._approve_recycle([e]), kind="danger"))
+        self.grave_detail.addWidget(button(
+            "View complete details…", lambda _=False, e=e: self._inspect_grave_entry(e)))
         self.grave_detail.addWidget(button(
             "Open containing folder",
             lambda _=False, e=e: self._open_folder(str(Path(e.path).parent))))
