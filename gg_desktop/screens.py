@@ -14,24 +14,24 @@ import uuid
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
+    QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMessageBox, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
+    QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 from core import (
     human_size, age_text, is_game_neglected, is_protected_path, is_unchanged,
     safe_scan_root, save_settings,
 )
-from graveyard import build_graveyard
-from graveyard_protection import protection_action
+from graveyard import GraveyardEntry, build_graveyard
+from graveyard_protection import protection_action, set_item_protection
 from cleanup_actions import recycle_reviewed_entries, recycle_old_files
 from recovery import get_records, restore as restore_recycled, check_restore
 from screenshot_preview import decode_screenshot_preview
 from gg_desktop.backend import refresh_graveyard, unprotect_exact_personal_item, add_never_touch_path
 from gg_desktop.models import (
     readable_bytes, reported_game_bytes, unique_launcher_counts,
-    graveyard_protection_decision, graveyard_totals,
+    graveyard_protection_decision, graveyard_totals, graveyard_detail_text, game_detail_text,
 )
 from gg_desktop.widgets import (
     ActionCard, HeroBanner, LandscapeArt, MetricCard, ScrollPage, StorageRing,
@@ -88,9 +88,33 @@ class ScreenMethods:
 
     def overview_page(self):
         page = self.page_for("Overview")
-        page.content.addWidget(HeroBanner(
+        hero_row = QWidget()
+        hero_layout = row(spacing=12)
+        hero_row.setLayout(hero_layout)
+        banner = HeroBanner(
             title="YOUR GAMES.", subtitle="A CLEANER TOMORROW.",
-            detail="Find what your games leave behind across launchers. Review everything; keep what matters."))
+            detail="Find what your games leave behind, remove what you don't need, "
+                   "and keep your gaming library in top shape.")
+        hero_layout.addWidget(banner, 7)
+        # A Recycle Bin move is not reclaimed space. Never copy the fictional
+        # "37.8 GB reclaimed" number from the reference mockup.
+        now = datetime.now().astimezone()
+        monthly = []
+        for event in get_records():
+            try:
+                created = datetime.fromisoformat(str(event.get("time", "")))
+                if created.year == now.year and created.month == now.month:
+                    monthly.append(event)
+            except (ValueError, TypeError, AttributeError):
+                continue
+        month_bytes = sum(max(0, int(e.get("size", 0)))
+                          for e in monthly if isinstance(e.get("size"), int))
+        hero_layout.addWidget(MetricCard(
+            "RECYCLE BIN MOVES THIS MONTH",
+            human_size(month_bytes),
+            f"{len(monthly)} recorded • NOT freed space",
+            tone="cyan"), 3)
+        page.content.addWidget(hero_row)
         strip = QWidget()
         grid = QGridLayout(strip)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -104,8 +128,11 @@ class ScreenMethods:
         ]
         compact = self.width() < 1220
         for index, (symbol, title, explanation, action) in enumerate(cards):
-            grid.addWidget(ActionCard(symbol, title, explanation, action),
-                           index // (2 if compact else 4), index % (2 if compact else 4))
+            card = ActionCard(symbol, title, explanation, action)
+            if index == 0:
+                card.setObjectName("actionCardPrimary")
+            grid.addWidget(card, index // (2 if compact else 4),
+                           index % (2 if compact else 4))
         page.content.addWidget(strip)
 
         metrics = QWidget()
@@ -157,7 +184,20 @@ class ScreenMethods:
                 bar.setTextVisible(False)
                 bar.setMaximum(max(1, max(counts.values())))
                 bar.setValue(count)
-                bar.setFixedHeight(5)
+                bar.setFixedHeight(6)
+                color = {
+                    "Steam": "#27A6E5",
+                    "Xbox": "#53CA64",
+                    "Epic Games": "#B788EC",
+                    "EA App": "#FF714D",
+                    "Ubisoft Connect": "#8A9BFF",
+                    "GOG Galaxy": "#D46ADB",
+                    "Battle.net": "#56B9EC",
+                }.get(name, "#91A5B6")
+                bar.setStyleSheet(
+                    "QProgressBar { background:#25303A; border:0; border-radius:3px; }"
+                    "QProgressBar::chunk { background:" + color +
+                    "; border-radius:3px; }")
                 bar.setAccessibleName(f"{name}: {count} recorded installations, "
                                       "bar relative to launcher with most installs, "
                                       "not actual disk usage.")
@@ -190,7 +230,14 @@ class ScreenMethods:
         bottom_row = row(spacing=12)
         bottom.setLayout(bottom_row)
         capture, cap_col = panel()
-        cap_col.addWidget(section_title("Latest Screenshot", "Private and on-device"))
+        cap_title = QWidget()
+        cap_top = row(spacing=5)
+        cap_title.setLayout(cap_top)
+        cap_top.addWidget(label("Latest Screenshot", "sectionTitle"))
+        cap_top.addStretch()
+        cap_top.addWidget(button("View all  ›", lambda: self.navigate("Screenshots"),
+                                 kind="link"))
+        cap_col.addWidget(cap_title)
         cap_col.addWidget(LandscapeArt(136))
         if self.inventory.screenshots:
             latest = max(self.inventory.screenshots, key=lambda x: x.modified)
@@ -201,7 +248,7 @@ class ScreenMethods:
             cap_col.addWidget(button("Preview this image", lambda _=False, e=latest: self._preview_capture(e)))
         else:
             cap_col.addWidget(label(
-                "No old in-game screenshots recorded. Personal photos are never browsed by default.",
+                "No game screenshots found in supported locations. Scan PC or add a screenshot folder.",
                 "subtle", wrap=True))
         cap_col.addStretch()
         bottom_row.addWidget(capture, 2)
@@ -209,17 +256,45 @@ class ScreenMethods:
         queue, queue_col = panel()
         queue_col.addWidget(section_title("Graveyard Review Queue",
                                           f"{len(self.inventory.graveyard)} findings"))
+        queue_checks = []
         for item in self.inventory.graveyard[:4]:
-            ctl = button(item.name[:26] + "  ›",
-                         lambda _=False, key=item.key: self._go_grave_item(key), kind="link")
-            queue_col.addWidget(ctl)
-            queue_col.addWidget(label(item.category + "  •  " +
-                                      human_size(item.apparent_bytes) +
-                                      " apparent, not reclaimed", "caption", wrap=True))
+            line = QWidget()
+            inner = row(spacing=5)
+            line.setLayout(inner)
+            checkbox = QCheckBox()
+            checkbox.setAccessibleName("Select " + item.name + " for Recycle Bin review")
+            checkbox.setEnabled(item.can_recycle and item.old_file is not None)
+            checkbox.setToolTip(
+                "Safe review only; requires separate confirmation." if checkbox.isEnabled()
+                else "Protected or information only. Right-click in Graveyard for the reason.")
+            inner.addWidget(checkbox)
+            ctl = button(item.name[:24] + "  ›",
+                         lambda _=False, e=item: self._inspect_grave_entry(e),
+                         kind="link")
+            ctl.setToolTip(item.finding)
+            inner.addWidget(ctl, 1)
+            queue_col.addWidget(line)
+            queue_col.addWidget(label(
+                item.category + "  •  " +
+                human_size(item.apparent_bytes) + " apparent", "caption", wrap=True))
+            if checkbox.isEnabled():
+                queue_checks.append((checkbox, item))
         if not self.inventory.graveyard:
-            queue_col.addWidget(label("Nothing queued. No cleanup is ever automatic.", "subtle", wrap=True))
+            queue_col.addWidget(label(
+                "Nothing queued. No cleanup is automatic.", "subtle", wrap=True))
         queue_col.addStretch()
-        queue_col.addWidget(button("Review all findings", lambda: self.navigate("Graveyard"), kind="primary"))
+        queue_actions = QWidget()
+        actions_layout = row(spacing=6)
+        queue_actions.setLayout(actions_layout)
+        actions_layout.addWidget(button(
+            "See all", lambda: self.navigate("Graveyard"), kind="primary"))
+        recycle_button = button("Recycle selected…",
+            lambda: self._approve_recycle(
+                [entry for checkbox, entry in queue_checks if checkbox.isChecked()]),
+            kind="danger")
+        recycle_button.setEnabled(bool(queue_checks))
+        actions_layout.addWidget(recycle_button)
+        queue_col.addWidget(queue_actions)
         bottom_row.addWidget(queue, 2)
 
         attention, alert_col = panel(kind="alertCard")
@@ -300,6 +375,12 @@ class ScreenMethods:
         self.game_filter.currentTextChanged.connect(self._fill_games)
         self.game_sort.currentTextChanged.connect(self._fill_games)
         self.game_table.itemSelectionChanged.connect(self._game_details)
+        self.game_table.cellDoubleClicked.connect(
+            lambda row_idx, _column: self._inspect_game_record(
+                self._shown_games[row_idx])
+            if 0 <= row_idx < len(self._shown_games) else None)
+        self.game_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.game_table.customContextMenuRequested.connect(self._games_context_menu)
         self._fill_games()
 
     def _fill_games(self, *_):
@@ -335,6 +416,8 @@ class ScreenMethods:
         if rows and len(rows) > len(self._shown_games):
             self.status.setText(
                 f"Showing first 500 of {len(rows)} filtered games. Narrow the search for later results.")
+        if self._shown_games and not _selected_indices(self.game_table):
+            self.game_table.selectRow(0)
         self._game_details()
 
     def _game_details(self):
@@ -367,6 +450,8 @@ class ScreenMethods:
             bar.addWidget(button("Open Steam uninstall…",
                                  lambda _=False, g=game: self._steam_uninstall(g), kind="danger"))
         bar.addStretch()
+        bar.addWidget(button("View complete details…",
+                             lambda _=False, g=game: self._inspect_game_record(g)))
         self.game_details_col.addWidget(actions)
 
     def _steam_uninstall(self, game):
@@ -387,6 +472,149 @@ class ScreenMethods:
     def _open_folder(self, path: str):
         if not _safe_open_path(path):
             self.error("Folder unavailable", "The directory is missing, redirected, or refused by Windows.")
+
+    def _detail_dialog(self, title: str, description: str):
+        """Fully populated, independently scrollable detail view; no blank popups."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Game Grave | " + title)
+        dialog.resize(660, 570)
+        layout = column(spacing=12, margins=(18, 18, 18, 18))
+        dialog.setLayout(layout)
+        layout.addWidget(label(title, "sectionTitle", wrap=True))
+        details = QPlainTextEdit(dialog)
+        details.setReadOnly(True)
+        details.setPlainText(description)
+        details.setAccessibleName("Game Grave item details")
+        layout.addWidget(details, 1)
+        close_button = button("Close", dialog.accept)
+        close_button.setDefault(True)
+        layout.addWidget(close_button)
+        dialog.exec()
+
+    def _inspect_grave_entry(self, entry):
+        self._detail_dialog(
+            str(entry.name), graveyard_detail_text(
+                entry, self.settings.get("never_touch", [])))
+
+    def _inspect_game_record(self, game):
+        self._detail_dialog(str(game.name), game_detail_text(game))
+
+    def _inspect_selected_grave(self):
+        selected = self._selected_grave_entries()
+        if len(selected) == 1:
+            self._inspect_grave_entry(selected[0])
+        elif selected:
+            self.info("Choose one item", "Select one row for complete details.")
+        else:
+            self.info("Choose a finding", "Click a Graveyard row to inspect it.")
+
+    def _inspect_selected_game(self):
+        selected = _selected_indices(self.game_table)
+        if len(selected) == 1 and selected[0] < len(self._shown_games):
+            self._inspect_game_record(self._shown_games[selected[0]])
+        else:
+            self.info("Choose one game", "Select one Games row to inspect it.")
+
+    def _set_personal_protection(self, path: str, *, protect: bool, return_route: str):
+        """Explicit user Never Touch action, never a deletion shortcut."""
+        try:
+            action, reason = protection_action(path, list(self.settings.get("never_touch", [])))
+            if action != ("Protect" if protect else "Unprotect"):
+                self.info("Protection unchanged", reason)
+                return
+            if not self.confirm(
+                "Protect this item?" if protect else "Remove your personal protection?",
+                ("Add a Never Touch rule for:\n" if protect else
+                 "Remove only your own exact Never Touch rule for:\n") + path +
+                "\n\nNo files will be moved. Built-in protection cannot be removed."
+            ):
+                return
+            updated = dict(self.settings)
+            updated["never_touch"] = set_item_protection(
+                list(self.settings.get("never_touch", [])), path, protect=protect)
+            save_settings(updated)
+            self.settings = updated
+            refresh_graveyard(self.inventory, self.settings)
+            self.status.setText(
+                "Item protected. Nothing moved." if protect else
+                "Personal rule removed. Deletion still requires separate safety checks.")
+            self.navigate(return_route)
+        except (ValueError, OSError) as exc:
+            self.error("Cannot change item protection", str(exc))
+
+    @staticmethod
+    def _right_clicked_row(table, point):
+        """Preserve a multi-selection if right-click is already inside it."""
+        index = table.indexAt(point)
+        if not index.isValid():
+            return None
+        row = index.row()
+        if row not in _selected_indices(table):
+            table.selectRow(row)
+        return row
+
+    def _graveyard_context_menu(self, point):
+        row_idx = self._right_clicked_row(self.grave_table, point)
+        if row_idx is None or row_idx >= len(self._shown_graves):
+            return
+        entry = self._shown_graves[row_idx]
+        action, reason = protection_action(
+            entry.path, list(self.settings.get("never_touch", [])))
+        menu = QMenu(self.grave_table)
+        menu.addAction("View complete details…",
+                       lambda: self._inspect_grave_entry(entry))
+        menu.addSeparator()
+        if entry.category == "Old game screenshot":
+            menu.addAction("Preview this screenshot…",
+                           lambda: self._preview_grave_image(entry))
+        else:
+            move = menu.addAction("Move to Recycle Bin…",
+                                  lambda: self._approve_recycle([entry]))
+            move.setEnabled(entry.can_recycle and entry.old_file is not None)
+            if not move.isEnabled():
+                move.setToolTip("Protected or review-only: " + entry.protection)
+        if action == "Protect":
+            menu.addAction("Protect this item (Never Touch)",
+                           lambda: self._set_personal_protection(
+                               entry.path, protect=True, return_route="Graveyard"))
+        elif action == "Unprotect":
+            menu.addAction("Unprotect this item…",
+                           lambda: self._unprotect_grave(entry))
+        elif reason.startswith("A parent folder"):
+            menu.addAction("Manage parent protection…",
+                           lambda: self._manage_parent_rule(entry))
+        else:
+            notice = menu.addAction("Built-in protection: cannot override")
+            notice.setEnabled(False)
+        menu.addSeparator()
+        menu.addAction("Open containing folder",
+                       lambda: self._open_folder(str(Path(entry.path).parent)))
+        menu.addAction("Why is this protected?",
+                       lambda: self.info("Graveyard review status",
+                           entry.protection + "\n\n" + entry.finding +
+                           "\n\n" + reason))
+        menu.exec(self.grave_table.viewport().mapToGlobal(point))
+
+    def _games_context_menu(self, point):
+        row_idx = self._right_clicked_row(self.game_table, point)
+        if row_idx is None or row_idx >= len(self._shown_games):
+            return
+        game = self._shown_games[row_idx]
+        menu = QMenu(self.game_table)
+        menu.addAction("View complete game details…",
+                       lambda: self._inspect_game_record(game))
+        opener = menu.addAction("Open installation folder",
+                  lambda: self._open_folder(game.install_path))
+        opener.setEnabled("open_folder" in game.capabilities)
+        menu.addAction("View Game DNA", lambda: self.navigate("Game DNA"))
+        if ("steam_uninstall" in game.capabilities and game.app_id
+                and game.app_id.isdecimal()):
+            menu.addAction("Uninstall through Steam…",
+                           lambda: self._steam_uninstall(game))
+        else:
+            disabled = menu.addAction("Direct deletion unavailable (protected game)")
+            disabled.setEnabled(False)
+        menu.exec(self.game_table.viewport().mapToGlobal(point))
 
     def _go_grave_item(self, key):
         self._pending_grave_key = key
@@ -447,6 +675,33 @@ class ScreenMethods:
         self.grave_detail = detail_col
         cr.addWidget(detail, 3)
         page.content.addWidget(content)
+        guidance, guidance_col = panel(padding=12)
+        reviewable = sum(e.can_recycle and e.old_file is not None
+                         for e in self.inventory.graveyard)
+        guidance_col.addWidget(label(
+            f"{reviewable} ordinary file(s) available for safe Recycle Bin review. "
+            "Installed games, managed mods and saves stay protected. "
+            "Right-click any row for item-specific actions.",
+            "subtle", wrap=True))
+        guidance_col.addWidget(button(
+            "Why won't these files recycle?",
+            lambda: self.info(
+                "Graveyard and Recycle Bin",
+                "The Graveyard reviews older files in the folder you selected, "
+                "game-related archives, and recordings. Other findings show "
+                "protected game/mod data for inspection only.\n\n"
+                "To recycle: right-click a REVIEWABLE ordinary file, choose "
+                "'Move to Recycle Bin', and approve it. "
+                "If none are eligible, visit Old Files to change the reviewed folder. "
+                "For an exact personal Never Touch rule, right-click and Unprotect.\n\n"
+                "Game Grave also runs a real, reversible Windows recovery check "
+                "before touching any approved file. If that check fails, no "
+                "user data is moved; use Windows File Explorer instead. "
+                "Installed games should be uninstalled in their launcher.")))
+        guidance_col.addWidget(button(
+            "Test Windows Recycle Bin with a disposable file…",
+            self._test_recycle_bin_safely))
+        page.content.addWidget(guidance)
         page.content.addWidget(label(
             "IMPORTANT: User-added protection can be removed here. Built-in game/save/mod safeguards "
             "cannot. No permanent-delete fallback. Images require individual preview.", "warning", wrap=True))
@@ -454,6 +709,12 @@ class ScreenMethods:
         self.grave_type.currentTextChanged.connect(self._fill_graveyard)
         self.grave_state.currentTextChanged.connect(self._fill_graveyard)
         self.grave_table.itemSelectionChanged.connect(self._grave_details)
+        self.grave_table.cellDoubleClicked.connect(
+            lambda row_idx, _column: self._inspect_grave_entry(
+                self._shown_graves[row_idx])
+            if 0 <= row_idx < len(self._shown_graves) else None)
+        self.grave_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.grave_table.customContextMenuRequested.connect(self._graveyard_context_menu)
         self._fill_graveyard()
 
     def _fill_graveyard(self, *_):
@@ -502,6 +763,8 @@ class ScreenMethods:
                     self.grave_table.scrollToItem(self.grave_table.item(i, 0))
                     break
             self._pending_grave_key = None
+        if self._shown_graves and not _selected_indices(self.grave_table):
+            self.grave_table.selectRow(0)
         self._grave_details()
 
     def _selected_grave_entries(self):
@@ -531,7 +794,12 @@ class ScreenMethods:
         self.grave_detail.addWidget(label(e.name, "sectionTitle", wrap=True))
         for text in (e.category, human_size(e.apparent_bytes) + " apparent", e.path, e.finding):
             self.grave_detail.addWidget(label(text, "subtle", wrap=True))
-        self.grave_detail.addWidget(label("WHY THIS IS PROTECTED", "eyebrow"))
+        self.grave_detail.addWidget(label(
+            "WHY IT WAS FOUND", "eyebrow"))
+        self.grave_detail.addWidget(label(e.finding, "subtle", wrap=True))
+        self.grave_detail.addWidget(label(
+            "WHY THIS IS PROTECTED" if not e.can_recycle else "REVIEW STATUS",
+            "eyebrow"))
         self.grave_detail.addWidget(label(reason if not e.can_recycle else
                                           "Reviewable only. Nothing is moved without confirmation.",
                                           "warning", wrap=True))
@@ -557,6 +825,8 @@ class ScreenMethods:
             self.grave_detail.addWidget(button(
                 "Review moving this file to Recycle Bin…",
                 lambda _=False, e=e: self._approve_recycle([e]), kind="danger"))
+        self.grave_detail.addWidget(button(
+            "View complete details…", lambda _=False, e=e: self._inspect_grave_entry(e)))
         self.grave_detail.addWidget(button(
             "Open containing folder",
             lambda _=False, e=e: self._open_folder(str(Path(e.path).parent))))
@@ -589,6 +859,35 @@ class ScreenMethods:
                 self._focus_never_touch_rule = rule
                 break
         self.navigate("Settings")
+
+    def _test_recycle_bin_safely(self):
+        """Verify desktop recovery without selecting or touching user files."""
+        if self.cleaning or self.scanning:
+            self.info("Finish the current operation", "Try the safe test after scanning ends.")
+            return
+        root = Path(str(self.settings.get("scan_folder", "")))
+        if not self.confirm(
+            "Run disposable Windows Recycle Bin test?",
+            "Game Grave will create ONE tiny test file inside:\n" + str(root) +
+            "\n\nIt will attempt to recycle and restore only those exact disposable "
+            "bytes, then clean up its own test file if safe. "
+            "No personal game, mod, save, or screenshot is selected. "
+            "Results will explain whether verified cleanup is available on this PC."
+        ):
+            return
+        self.status.setText("Testing Windows Recycle Bin using disposable data only…")
+        def run(_emit):
+            from safety_selftest import check_disposable_undo
+            return check_disposable_undo(
+                root, tuple(self.settings.get("never_touch", [])))
+        def finished(outcome):
+            self.status.setText("Verified disposable Recycle Bin + Undo round trip passed.")
+            self.info("Recycle Bin verification passed",
+                "Windows successfully recycled and restored a tiny Game Grave "
+                "test file with byte-identical content. No user files were touched.\n\n"
+                "A successful test does not override protection for installed games "
+                "or guarantee every future file will recycle; each file is checked again.")
+        self.job(run, finished, error_title="Recycle Bin test failed: no user data moved")
 
     def _select_eligible(self):
         from PySide6.QtCore import QItemSelectionModel
@@ -659,7 +958,19 @@ class ScreenMethods:
                       f"{report['recovery_warnings']} Undo log warnings. "
                       "\n\nRecycle Bin may still occupy space."
                       + ("\n\n" + "\n".join(report["skipped"][:6]) if report["skipped"] else ""))
-        self.job(lambda _emitter: recycle_reviewed_entries(reviewed, rules, session),
+        reviewed_root = str(self.settings.get("scan_folder", ""))
+        min_age_days = max(
+            int(self.settings.get("files_stale_days", 180)),
+            int(self.settings.get("graveyard_days", 365)))
+        protected_ownership = tuple(
+            str(row.install_path) for row in self.inventory.games
+            if getattr(row, "install_path", None))
+        protected_ownership += tuple(
+            str(row.path) for row in self.inventory.mods
+            if getattr(row, "path", None))
+        self.job(lambda _emitter: recycle_reviewed_entries(
+            reviewed, rules, session, review_root=reviewed_root,
+            min_age_days=min_age_days, managed_roots=protected_ownership),
                  success, error_title="Recycling failed")
 
     def _remove_missing_inventory(self):
@@ -674,10 +985,27 @@ class ScreenMethods:
                   and e.category == "Old game screenshot"), None)
         if e is not None:
             self._preview_grave_image(e)
-        else:
-            self.info("Screenshot not eligible",
-                      "This image is not in the reviewed old-screenshot inventory. "
-                      "Nothing was loaded or deleted.")
+            return
+        if record not in self.inventory.screenshots:
+            self.error("Unknown screenshot", "Scan again before previewing an unrecognized image.")
+            return
+        # A discovered recent screenshot is not an old-file finding, but its
+        # owner can still preview and explicitly review moving that image
+        # through the same protected, reversible backend. No bulk authority.
+        age = max(0, int((datetime.now().timestamp() - record.modified) / 86400))
+        item = GraveyardEntry(
+            key="screenshot:preview:" + str(record.path).casefold(),
+            name=Path(record.path).name, path=record.path,
+            category="Old game screenshot",
+            apparent_bytes=record.size, age_days=age,
+            relationship="Known screenshot folder; image contents not classified",
+            finding="Screenshot found during your manual PC scan. "
+                    "Preview it before choosing what to do. "
+                    "No deletion happens without a separate approval.",
+            protection="Individual preview required; bulk deletion prohibited",
+            can_recycle=False, old_file=record,
+        )
+        self._preview_grave_image(item)
 
     def _preview_grave_image(self, entry):
         if entry.old_file is None or not is_unchanged(entry.old_file):
@@ -838,6 +1166,37 @@ class ScreenMethods:
                       "\n\nEVIDENCE: " + str(getattr(m, "status", "Unknown")) +
                       "\n\nGame Grave will never delete a mod-manager "
                       "profile or active mod based on an old timestamp.")
+        def mod_context_menu(point):
+            index = self._right_clicked_row(table, point)
+            if index is None or index >= min(len(self.inventory.mods), 400):
+                return
+            item = self.inventory.mods[index]
+            location = str(getattr(item, "path", ""))
+            protection, why = protection_action(
+                location, list(self.settings.get("never_touch", [])))
+            menu = QMenu(table)
+            menu.addAction("Inspect mod location", inspect_selected)
+            menu.addAction("Open mod folder", lambda: self._open_folder(location))
+            if protection == "Protect":
+                menu.addAction("Protect this location",
+                    lambda: self._set_personal_protection(
+                        location, protect=True, return_route="Mods"))
+            elif protection == "Unprotect":
+                menu.addAction("Remove personal protection…",
+                    lambda: self._set_personal_protection(
+                        location, protect=False, return_route="Mods"))
+            else:
+                locked = menu.addAction("Game/mod protection cannot be bypassed")
+                locked.setEnabled(False)
+            menu.addSeparator()
+            disabled = menu.addAction("Remove mod folder (not safe from Mod Radar)")
+            disabled.setEnabled(False)
+            menu.addAction("Why protected?",
+                lambda: self.info("Mod Radar protection", why +
+                "\n\nMod Radar is for review, not deleting active managed mods."))
+            menu.exec(table.viewport().mapToGlobal(point))
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(mod_context_menu)
         tools.addWidget(button("Explain selected source", inspect_selected))
         tools.addWidget(button("Game DNA", lambda: self.navigate("Game DNA")))
         tools.addWidget(button("Open classic Mod Radar tools",
@@ -923,12 +1282,137 @@ class ScreenMethods:
             self.job(lambda _progress: recycle_old_files(
                 selected, rules, session, review_root=reviewed_root,
                 min_age_days=days), complete, error_title="Old Files cleanup blocked")
+        def old_file_context_menu(point):
+            row_idx = self._right_clicked_row(table, point)
+            if row_idx is None or row_idx >= len(rows):
+                return
+            item = rows[row_idx]
+            action, reason = protection_action(
+                item.path, list(self.settings.get("never_touch", [])))
+            menu = QMenu(table)
+            move = menu.addAction("Move to Recycle Bin…", remove)
+            move.setEnabled(not is_protected_path(
+                Path(item.path), self.settings.get("never_touch", [])))
+            if action == "Protect":
+                menu.addAction("Protect this file (Never Touch)",
+                               lambda: self._set_personal_protection(
+                                   item.path, protect=True, return_route="Old Files"))
+            elif action == "Unprotect":
+                menu.addAction("Unprotect this file…",
+                               lambda: self._set_personal_protection(
+                                   item.path, protect=False, return_route="Old Files"))
+            else:
+                locked = menu.addAction("Protection cannot be changed here")
+                locked.setEnabled(False)
+            menu.addSeparator()
+            menu.addAction("Open containing folder",
+                           lambda: self._open_folder(str(Path(item.path).parent)))
+            menu.addAction("Explain protection",
+                           lambda: self.info("Old Files safety", reason))
+            menu.exec(table.viewport().mapToGlobal(point))
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(old_file_context_menu)
         contents.addWidget(button("Move reviewed individual files to Recycle Bin…",
                                   remove, kind="danger"))
         page.content.addWidget(p)
         page.content.addWidget(label(
             "File age does not prove disuse. Old Files never removes installed games or "
             "managed profile folders. Recycle Bin is reversible only while Windows holds a matching item.",
+            "warning", wrap=True))
+
+    def screenshots_page(self):
+        """Automatic metadata discovery; preview/deletion still individually authorized."""
+        page = self._new(
+            "Screenshots", "Automatically find in-game captures without browsing your personal photos.")
+        if self._not_scanned(page):
+            return
+        p, col = panel()
+        shots = sorted(self.inventory.screenshots,
+                       key=lambda x: (-x.modified, x.path.casefold()))
+        col.addWidget(section_title("Discovered in-game screenshots",
+                                    str(len(shots)) + " detected"))
+        col.addWidget(label(
+            "Scans check Steam screenshot directories, Windows/Game Bar captures, "
+            "supported gaming capture locations, and dedicated screenshot folders "
+            "for games detected on this PC. Only filenames, file sizes, and dates "
+            "are inspected automatically. Image contents are opened only if you "
+            "choose Preview. Personal photo folders are excluded.",
+            "subtle", wrap=True))
+        bar = QWidget()
+        brow = row(spacing=10)
+        bar.setLayout(brow)
+        brow.addWidget(button("Rescan screenshots", self.start_scan, kind="primary"))
+        brow.addWidget(button("Review old screenshots in Graveyard",
+                              lambda: self.navigate("Graveyard")))
+        brow.addStretch()
+        col.addWidget(bar)
+        table = data_table(["SCREENSHOT", "SIZE", "MODIFIED", "FOLDER"])
+        table.setSelectionMode(QAbstractItemView.SingleSelection)
+        table.setMinimumHeight(460)
+        table.setColumnWidth(0, 310)
+        table.setColumnWidth(1, 105)
+        table.setColumnWidth(2, 140)
+        rows = shots[:700]
+        table.setRowCount(len(rows))
+        for i, shot in enumerate(rows):
+            for c, value in enumerate((
+                    Path(shot.path).name,
+                    human_size(shot.size),
+                    datetime.fromtimestamp(shot.modified).strftime("%Y-%m-%d %H:%M"),
+                    str(Path(shot.path).parent))):
+                _table_text(table, i, c, value)
+            table.setRowHeight(i, 36)
+        col.addWidget(table)
+        if not rows:
+            col.addWidget(label(
+                "No screenshots discovered in supported locations yet. "
+                "Try Scan PC, or add a custom screenshot folder in Settings.",
+                "subtle", wrap=True))
+        def selected_shot():
+            indices = _selected_indices(table)
+            return rows[indices[0]] if indices and indices[0] < len(rows) else None
+        def inspect_shot():
+            shot = selected_shot()
+            if shot is None:
+                self.info("Select a screenshot", "Choose one screenshot row to preview it.")
+                return
+            self._preview_capture(shot)
+        def open_location():
+            shot = selected_shot()
+            if shot is not None:
+                self._open_folder(str(Path(shot.path).parent))
+        controls = QWidget()
+        ctrls = row()
+        controls.setLayout(ctrls)
+        ctrls.addWidget(button("Preview selected screenshot…", inspect_shot,
+                               kind="primary"))
+        ctrls.addWidget(button("Open screenshot folder", open_location))
+        ctrls.addStretch()
+        col.addWidget(controls)
+        def screenshot_context(point):
+            idx = self._right_clicked_row(table, point)
+            if idx is None or idx >= len(rows):
+                return
+            record = rows[idx]
+            menu = QMenu(table)
+            menu.addAction("Preview screenshot / review Recycle Bin move…",
+                           lambda: self._preview_capture(record))
+            menu.addAction("Open containing folder",
+                           lambda: self._open_folder(str(Path(record.path).parent)))
+            menu.addSeparator()
+            status = menu.addAction(
+                "Bulk deletion disabled: individual image review required")
+            status.setEnabled(False)
+            menu.exec(table.viewport().mapToGlobal(point))
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(screenshot_context)
+        table.cellDoubleClicked.connect(
+            lambda idx, _col: self._preview_capture(rows[idx])
+            if 0 <= idx < len(rows) else None)
+        page.content.addWidget(p)
+        page.content.addWidget(label(
+            "No screenshot is deleted automatically. To remove one, preview the "
+            "exact image and separately approve Windows Recycle Bin recovery.",
             "warning", wrap=True))
 
     def undo_page(self):
@@ -1132,6 +1616,126 @@ class ScreenMethods:
         br.addWidget(button("Add game capture folder", lambda: modify_shots()))
         br.addWidget(button("Remove selected", lambda: modify_shots(True)))
         stack.addWidget(buttons)
+        page.content.addWidget(p)
+
+        p, ai_stack = panel()
+        ai_stack.addWidget(section_title("AI Assistant", "Optional • fully automatic setup"))
+        ai_stack.addWidget(label(
+            "When you enable AI, Game Grave downloads and installs the local AI engine "
+            "and model for you. No extra program, terminal, or account required. "
+            "AI remains off by default, runs on this PC, and cannot delete files.",
+            "subtle", wrap=True))
+        from ai_bundle import INSTALL_MESSAGE, is_ai_installed
+        from PySide6.QtWidgets import QProgressBar
+        ai_status = label("AI installed." if is_ai_installed() else
+                          "Not installed. Around 1.2 GB on first enable.", "subtle", wrap=True)
+        ai_bar = QProgressBar()
+        ai_bar.setRange(0, 100)
+        ai_bar.setValue(0)
+        ai_bar.hide()
+        ai_toggle = QCheckBox("Enable AI Assistant")
+        ai_toggle.setChecked(self.settings.get("ai_assistant_enabled") is True)
+        def open_ai_chat():
+            from gg_desktop.ai_dialog import open_local_ai_dialog
+            open_local_ai_dialog(self)
+        ai_open = button("Open AI Assistant", open_ai_chat)
+        ai_open.setEnabled(ai_toggle.isChecked() and is_ai_installed())
+        ai_stack.addWidget(ai_toggle)
+        ai_stack.addWidget(ai_status)
+        ai_stack.addWidget(ai_bar)
+        ai_stack.addWidget(ai_open)
+        ai_stack.addWidget(label(
+            "The optional model is downloaded only with your permission, checked "
+            "for integrity, and stored under your local Game Grave data folder. "
+            "Normal cleanup and scans never depend on AI.",
+            "subtle", wrap=True))
+        def restore_toggle(value):
+            ai_toggle.blockSignals(True)
+            ai_toggle.setChecked(value)
+            ai_toggle.blockSignals(False)
+        def save_enabled(value):
+            changed = dict(self.settings)
+            changed["ai_assistant_enabled"] = bool(value)
+            save_settings(changed)
+            self.settings = changed
+        def still_visible():
+            # Navigating away destroys the Qt Settings page during long model downloads.
+            # Keep the approved background operation valid even when its widgets vanish.
+            try:
+                from shiboken6 import isValid
+                return all(isValid(w) for w in (ai_toggle, ai_status, ai_bar, ai_open))
+            except (RuntimeError, ImportError):
+                return False
+        def setup_finished(result):
+            ok, detail = result
+            if ok:
+                try:
+                    save_enabled(True)
+                except (OSError, ValueError) as exc:
+                    ok, detail = False, str(exc)
+            if still_visible():
+                ai_bar.hide()
+                ai_toggle.setEnabled(True)
+                restore_toggle(bool(ok))
+                ai_open.setEnabled(bool(ok))
+                ai_status.setText(
+                    "AI installed and ready. Open the assistant to begin." if ok else
+                    "AI not installed. Normal Game Grave features are unchanged.")
+            if not ok:
+                self.error("AI setup could not finish", detail)
+            elif not still_visible():
+                self.status.setText("AI installed and ready. Open Settings to use it.")
+        def set_ai_enabled(checked):
+            if not checked:
+                try:
+                    save_enabled(False)
+                except (OSError, ValueError) as exc:
+                    restore_toggle(True)
+                    self.error("Could not disable AI", str(exc))
+                    return
+                from ai_bundle import stop_ai
+                stop_ai()
+                ai_open.setEnabled(False)
+                ai_status.setText("AI disabled. You can enable it any time.")
+                return
+            if is_ai_installed():
+                try:
+                    save_enabled(True)
+                except (OSError, ValueError) as exc:
+                    restore_toggle(False)
+                    self.error("Could not enable AI", str(exc))
+                    return
+                ai_open.setEnabled(True)
+                ai_status.setText("AI ready. All processing stays on this PC.")
+                return
+            if not self.confirm("Install AI Assistant?", INSTALL_MESSAGE):
+                restore_toggle(False)
+                return
+            restore_toggle(False)
+            ai_toggle.setEnabled(False)
+            ai_open.setEnabled(False)
+            ai_bar.setValue(0)
+            ai_bar.show()
+            ai_status.setText("Installing AI automatically. Do not close Game Grave.")
+            def work(emit):
+                from ai_bundle import AiSetupError, install_ai
+                try:
+                    install_ai(lambda stage, fraction:
+                               emit(int(fraction * 100), stage))
+                    return True, ""
+                except (AiSetupError, OSError, ValueError) as exc:
+                    return False, str(exc)
+                except Exception:
+                    return False, "Unexpected installation error. Existing files remain unchanged."
+            def show_progress(percent, stage):
+                if still_visible():
+                    ai_bar.setValue(percent)
+                    ai_status.setText(stage + " • " + str(percent) + "%")
+            self.job(work, setup_finished, progress=show_progress,
+                     error_title="AI setup failed")
+        ai_toggle.toggled.connect(set_ai_enabled)
+        if self.settings.get("ai_assistant_enabled") and not is_ai_installed():
+            ai_status.setText("AI not installed. Disable and re-enable to set up automatically.")
         page.content.addWidget(p)
 
         p, stack = panel()

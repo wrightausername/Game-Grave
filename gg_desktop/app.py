@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from core import load_settings
 from gg_desktop.backend import Inventory, scan_inventory, ScanCanceled
 from gg_desktop.theme import STYLE
-from gg_desktop.widgets import label, button, row, column, ScrollPage
+from gg_desktop.widgets import label, button, row, column, ScrollPage, LandscapeArt
 from gg_desktop.screens import ScreenMethods
 
 ROUTES = (
@@ -26,6 +26,7 @@ ROUTES = (
     ("Games", "▣"),
     ("Mods", "♜"),
     ("Old Files", "▤"),
+    ("Screenshots", "▧"),
     ("Graveyard", "♱"),
     ("Game DNA", "⌁"),
     ("Undo Center", "↶"),
@@ -36,6 +37,7 @@ ROUTES = (
 ROUTE_ALIASES = {
     "Steam Games": "Games", "Other Launchers": "Games",
     "The Graveyard": "Graveyard", "Game Mods": "Mods",
+    "Game Screenshots": "Screenshots", "In-game Screenshots": "Screenshots",
     "Save Vault": "More Tools", "Resurrection Lab": "More Tools",
     "Cleanup History": "More Tools", "Automation": "More Tools",
     "Make Room": "More Tools", "Storage History": "More Tools",
@@ -93,16 +95,29 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
         rail = QFrame()
         rail.setObjectName("navRail")
-        rail.setFixedWidth(219)
+        rail.setFixedWidth(238)
         r = column(spacing=7, margins=(12, 23, 12, 18))
         rail.setLayout(r)
-        brand = label("♱   GAME GRAVE", "brand")
-        brand.setStyleSheet("color:#FFFFFF; font-size:20px; font-weight:900;")
-        r.addWidget(brand)
-        kicker = label("CLEANER GAMES.  A LIGHTER PC.", "brandKicker")
+        brand_holder = QWidget()
+        brand_layout = row(spacing=9)
+        brand_holder.setLayout(brand_layout)
+        glyph = QLabel()
+        glyph.setPixmap(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg"))
+                        .pixmap(54, 69))
+        glyph.setFixedSize(54, 69)
+        glyph.setAccessibleName("Game Grave crimson emblem")
+        brand_layout.addWidget(glyph)
+        brand_name = label("GAME\nGRAVE", "brand")
+        brand_name.setStyleSheet(
+            "color:#F5F7FB; font-size:21px; font-weight:900; line-height:1;")
+        brand_layout.addWidget(brand_name, 1)
+        r.addWidget(brand_holder)
+        kicker = label("CLEANER GAMES\nBRIGHTER WORLDS", "brandKicker")
         kicker.setWordWrap(True)
+        kicker.setStyleSheet(
+            "color:#8CA0B3; font-size:9px; letter-spacing:1px;")
         r.addWidget(kicker)
-        r.addSpacing(24)
+        r.addSpacing(15)
         self.nav_buttons = {}
         for route, icon in ROUTES:
             control = button(icon + "    " + route,
@@ -114,6 +129,11 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             r.addWidget(control)
             self.nav_buttons[route] = control
         r.addStretch()
+        # Decorative local artwork remains separate from scan findings and
+        # disappears on shorter screens so every navigation control stays usable.
+        self.sidebar_art = LandscapeArt(114)
+        self.sidebar_art.setVisible(self.height() >= 870)
+        r.addWidget(self.sidebar_art)
         motto = label("SAME GAMES.\nA CLEANER TOMORROW.", "subtle", wrap=True)
         motto.setStyleSheet("color:#A1B2C2;font-size:12px;letter-spacing:1px;")
         r.addWidget(motto)
@@ -150,6 +170,11 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         base.addWidget(self.stack_holder, 1)
         outer.addWidget(main, 1)
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "sidebar_art"):
+            self.sidebar_art.setVisible(event.size().height() >= 870)
+
     def page_for(self, title: str) -> ScrollPage:
         if self.page is not None:
             self.stack_layout.removeWidget(self.page)
@@ -172,6 +197,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             "Games": self.games_page,
             "Mods": self.mods_page,
             "Old Files": self.old_files_page,
+            "Screenshots": self.screenshots_page,
             "Graveyard": self.graveyard_page,
             "Game DNA": self.dna_page,
             "Undo Center": self.undo_page,

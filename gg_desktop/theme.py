@@ -24,6 +24,23 @@ QFrame#panel, QFrame#metricCard, QFrame#actionCard, QFrame#infoCard, QFrame#hero
     background: #111922; border: 1px solid #2A3541; border-radius: 11px;
 }
 QFrame#actionCard:hover, QFrame#metricCard:hover { border: 1px solid #415569; background: #18232E; }
+QFrame#actionCardPrimary {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #36141F, stop:0.72 #19131D, stop:1 #10141C);
+    border: 1px solid #E0364E; border-radius: 11px;
+}
+QFrame#actionCardPrimary:hover { border: 1px solid #FF5969; background: #381B27; }
+QMenu {
+    background: #131D28; color: #E6F1FC;
+    border: 1px solid #445263; border-radius: 7px; padding: 6px;
+}
+QMenu::item { padding: 9px 28px 9px 15px; border-radius: 5px; }
+QMenu::item:selected { background: #393042; color: #FFFFFF; }
+QMenu::item:disabled { color: #7C8794; background: transparent; }
+QMenu::separator { height: 1px; background: #34404B; margin: 7px 5px; }
+QPlainTextEdit { background: #0D141D; color: #E4EFF9;
+                 border: 1px solid #425469; border-radius: 8px;
+                 padding: 11px; font-size: 12px; }
 QFrame#alertCard { background: #20151D; border: 1px solid #9D3548; border-radius: 12px; }
 QFrame#hero { background: #111923; border-radius: 11px; }
 QLabel#brand { font-size: 22px; font-weight: 900; letter-spacing: 1px; }
