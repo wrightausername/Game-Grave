@@ -3404,6 +3404,39 @@ class GameGraveApp(tk.Tk):
         tabs.add(protected_tab, text="Never Touch")
         tabs.add(tools_tab, text="More tools")
         tabs.add(edition_tab, text="Free / Pro")
+        ai_tab = tk.Frame(tabs, bg=BG)
+        tabs.add(ai_tab, text="AI Assistant")
+        ai_panel = self.panel(ai_tab)
+        ai_panel.pack(fill="x", pady=(0, 12))
+        self.text(ai_panel, "Optional local AI Assistant", 14, bold=True).pack(anchor="w", pady=(0, 9))
+        self.text(ai_panel, "Off by default. AI runs only through an Ollama model "
+                  "you separately install on this PC. No cloud requests, no "
+                  "automatic file or screenshot uploads, and no AI-driven deletion.",
+                  10, MUTED, wraplength=760).pack(anchor="w", pady=(0, 11))
+        self.ai_enabled_var = tk.BooleanVar(
+            value=self.settings.get("ai_assistant_enabled") is True)
+        ttk.Checkbutton(
+            ai_panel, text="Enable optional local AI Assistant",
+            variable=self.ai_enabled_var, command=self._save_ai_assistant_pref,
+            style="Dark.TCheckbutton").pack(anchor="w", pady=(0, 11))
+        self.text(ai_panel, "Local Ollama model (default: qwen2.5:3b):",
+                  10, MUTED).pack(anchor="w")
+        model_controls = tk.Frame(ai_panel, bg=PANEL)
+        model_controls.pack(anchor="w", pady=(5, 11))
+        self.ai_model_var = tk.StringVar(value=self.settings.get("ai_model", "qwen2.5:3b"))
+        tk.Entry(model_controls, textvariable=self.ai_model_var, bg=RAISED, fg=TEXT,
+                 insertbackground=TEXT, width=28, relief="flat",
+                 font=("Segoe UI", 10)).pack(side="left", padx=(0, 9), ipady=5)
+        self.button(model_controls, "Save model", self._save_ai_model).pack(side="left")
+        self.ai_launch_button = self.button(ai_panel, "Open local AI Assistant",
+                                            self._open_ai_assistant)
+        self.ai_launch_button.pack(anchor="w", pady=(0, 8))
+        self.ai_launch_button.configure(
+            state="normal" if self.ai_enabled_var.get() else "disabled")
+        self.text(ai_panel, "Install Ollama separately, then run: ollama pull qwen2.5:3b. "
+                  "Questions and anonymous scan counts only reach 127.0.0.1. "
+                  "Chats are not saved. AI suggestions cannot bypass file safety.",
+                  9, WARN, wraplength=760).pack(anchor="w")
         settings = self.panel(appearance_tab)
         settings.pack(fill="x", pady=(0, 12))
         self.text(settings, "Appearance and navigation", 14, bold=True).pack(anchor="w", pady=(0, 11))
@@ -3588,6 +3621,37 @@ class GameGraveApp(tk.Tk):
         if not update_ready():
             self.text(updates_panel, "Engineering preview: update service not connected. No internet request is made.",
                       9, WARN, wraplength=760).pack(anchor="w", pady=(7, 0))
+
+    def _save_ai_assistant_pref(self):
+        enabled = self.ai_enabled_var.get()
+        updated = dict(self.settings)
+        updated["ai_assistant_enabled"] = enabled
+        try:
+            save_settings(updated)
+        except (OSError, ValueError) as exc:
+            self.ai_enabled_var.set(self.settings.get("ai_assistant_enabled") is True)
+            messagebox.showerror("AI preference not saved", str(exc), parent=self)
+            return
+        self.settings = updated
+        self.ai_launch_button.configure(state="normal" if enabled else "disabled")
+
+    def _save_ai_model(self):
+        from local_ai import AssistantUnavailable, _model_name
+        model = self.ai_model_var.get().strip()
+        try:
+            _model_name({"ai_model": model})
+            updated = dict(self.settings)
+            updated["ai_model"] = model
+            save_settings(updated)
+        except (AssistantUnavailable, OSError, ValueError) as exc:
+            messagebox.showerror("AI model not saved", str(exc), parent=self)
+            return
+        self.settings = updated
+        self.status_text.set("Local AI model preference saved. No model was downloaded.")
+
+    def _open_ai_assistant(self):
+        from ai_tk import open_local_ai_dialog
+        open_local_ai_dialog(self)
 
     def _add_screenshot_folder(self):
         folder = filedialog.askdirectory(
