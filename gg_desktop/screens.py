@@ -1156,3 +1156,217 @@ class ScreenMethods:
             self.status.setText("Opened the existing classic Game Grave tools.")
         except OSError as exc:
             self.error("Unable to start classic tools", str(exc))
+
+    def _kit_manifest_picker(self, title="Choose a verified Resurrection Kit manifest"):
+        chosen, _ = QFileDialog.getOpenFileName(
+            self, title, "", "Game Grave Kits (*.ggkit.json);;JSON (*.json)")
+        return Path(chosen) if chosen else None
+
+    def _start_safe_backup_task(self, name, fn, *, target: str):
+        if self.cleaning or self.scanning:
+            self.info("Operation busy", "Finish the current scan or backup first.")
+            return
+        self.cleaning = True
+        self.status.setText(name + "… Existing game, mod and save files stay untouched.")
+        def finish(report):
+            self.cleaning = False
+            self.status.setText(name + " complete. Original files untouched.")
+            # Reports contain on-device user file names; never upload any result.
+            lines = [f"{key}: {val}" for key, val in report.items()
+                     if isinstance(val, (int, float, bool, str))]
+            self.info(name + " completed",
+                      "\n".join(lines[:14])[:1800] +
+                      "\n\nYour existing game/mod/save files were not modified.")
+        self.job(lambda _progress: fn(), finish, error_title=name + " failed")
+
+    def _create_save_backup(self):
+        from save_vault import create_backup
+        if self.scanning or self.cleaning:
+            self.info("Game Grave is busy", "Finish the current operation first.")
+            return
+        source = QFileDialog.getExistingDirectory(self,
+            "Choose exact save / game profile folder to preserve")
+        if not source:
+            return
+        output, _ = QFileDialog.getSaveFileName(
+            self, "Create a NEW verified Save Vault ZIP",
+            str(Path(source).parent / (Path(source).name + "_SaveVault.zip")),
+            "ZIP archives (*.zip)")
+        if not output:
+            return
+        if not output.casefold().endswith(".zip"):
+            output += ".zip"
+        if not self.confirm("Back up this selected save or profile folder?",
+            "Source: " + source + "\n\nNew ZIP: " + output +
+            "\n\nOnly this one folder is copied. The destination must not exist. "
+            "Game Grave will never delete or overwrite source files. "
+            "Close the game first for a consistent snapshot."):
+            return
+        self._start_safe_backup_task(
+            "Save Vault backup", lambda: create_backup(Path(source), Path(output)),
+            target=output)
+
+    def _create_kit(self):
+        from resurrection_v2 import create_complete_kit
+        if self.scanning or self.cleaning:
+            self.info("Game Grave is busy", "Finish the current operation first.")
+            return
+        game, okay = QInputDialog.getText(
+            self, "Preserve a gaming setup", "Game title (for the kit manifest):")
+        if not okay or not game.strip():
+            return
+        save = QFileDialog.getExistingDirectory(
+            self, "Choose exact Saves or Profile folder for the kit")
+        if not save:
+            return
+        sources = {"Saves": Path(save)}
+        if self.confirm("Include your mod setup?",
+                        "Do you want to preserve one additional Mods folder? "
+                        "The kit will only contain folders you explicitly choose."):
+            mod = QFileDialog.getExistingDirectory(
+                self, "Choose your exact mod or mod-manager profile folder")
+            if not mod:
+                return
+            sources["Mods"] = Path(mod)
+        output, _ = QFileDialog.getSaveFileName(
+            self, "Save a NEW Resurrection Kit ZIP",
+            str(Path(save).parent / (game.strip().replace("/", "_") + "_Resurrection.zip")),
+            "ZIP archives (*.zip)")
+        if not output:
+            return
+        if not output.casefold().endswith(".zip"):
+            output += ".zip"
+        folders = "\n".join(f"• {role}: {path}" for role, path in sources.items())
+        if not self.confirm("Create verified Resurrection Kit?",
+            f"Game: {game.strip()}\n\n" + folders + "\n\nZIP: " + output +
+            "\n\nThis archives ONLY the selected folders. It does not include "
+            "game installation binaries or automatically activate mods. "
+            "Existing files are untouched. Continue?"):
+            return
+        self._start_safe_backup_task(
+            "Verified Resurrection Kit",
+            lambda: create_complete_kit(game.strip(), sources, Path(output)),
+            target=output)
+
+    def _restore_kit(self):
+        from resurrection_v2 import inspect_restore, restore_kit
+        if self.scanning or self.cleaning:
+            self.info("Game Grave is busy", "Finish the current operation first.")
+            return
+        manifest = self._kit_manifest_picker("Inspect a Resurrection Kit before safe restore")
+        if manifest is None:
+            return
+        destination = QFileDialog.getExistingDirectory(
+            self, "Choose parent folder for a NEW restored setup (existing files are never overwritten)")
+        if not destination:
+            return
+        self.status.setText("Verifying kit archive digest and safe NEW restore destination…")
+        def ready(plan):
+            target = str(plan.get("target", "new unique restore folder"))
+            message = ("This will restore the verified kit into a BRAND-NEW folder:\n" +
+                       target + "\n\nExisting game, save and mod files are not overwritten. "
+                       "No mod manager is automatically reconfigured or activated. "
+                       "The restore is separate from game installation. Continue?")
+            if not self.confirm("Approve restoring this checked kit?", message):
+                self.status.setText("Restore canceled. No files changed.")
+                return
+            self._start_safe_backup_task("Staged Resurrection recovery",
+                lambda: restore_kit(manifest, Path(destination), approved=True),
+                target=target)
+        self.job(lambda _progress: inspect_restore(manifest, Path(destination)),
+                 ready, error_title="Kit cannot be safely restored")
+
+    def _rehearse_kit(self):
+        from resurrection_lab import rehearse_kit
+        if self.scanning or self.cleaning:
+            self.info("Game Grave is busy", "Finish the current operation first.")
+            return
+        manifest = self._kit_manifest_picker("Choose kit to rehearse safely")
+        if manifest is None:
+            return
+        dest = QFileDialog.getExistingDirectory(
+            self, "Choose ordinary folder for isolated temporary rehearsal")
+        if not dest:
+            return
+        if not self.confirm("Rehearse without touching active game files?",
+            "Kit: " + str(manifest) + "\n\nTemporary rehearsal location: " + dest +
+            "\n\nGame Grave creates and deletes ONLY its own disposable rehearsal "
+            "files, then compares extracted byte hashes. "
+            "No live saves, profiles or game installs are changed."):
+            return
+        self._start_safe_backup_task("Isolated Resurrection rehearsal",
+            lambda: rehearse_kit(manifest, Path(dest), record=False), target=dest)
+
+    def _missing_pieces(self):
+        from resurrection_lab import missing_pieces
+        manifest = self._kit_manifest_picker("Check the kit's missing dependencies")
+        if manifest is None:
+            return
+        self.status.setText("Inspecting verified kit manifest and dependencies…")
+        def present(report):
+            import json
+            # Display-only. Avoid hidden side effects and keep output bounded.
+            self.info("Missing Pieces (diagnostic, not proof of completeness)",
+                json.dumps(report, indent=2, ensure_ascii=False)[:2200] +
+                "\n\nEven a verified ZIP may not represent a complete working game setup.")
+        self.job(lambda _progress: missing_pieces(manifest), present,
+                 error_title="Kit dependency check failed")
+
+    def _compare_kits(self):
+        from resurrection_lab import compare_kits
+        older = self._kit_manifest_picker("Choose the older kit manifest")
+        if older is None:
+            return
+        newer = self._kit_manifest_picker("Choose the newer kit manifest")
+        if newer is None:
+            return
+        self.status.setText("Comparing kit manifests and verified archive content…")
+        def present(report):
+            import json
+            self.info("Time Machine: verified kit comparison",
+                      json.dumps(report, indent=2, ensure_ascii=False)[:2800] +
+                      "\n\nNo game files were changed.")
+        self.job(lambda _progress: compare_kits(older, newer), present,
+                 error_title="Kit comparison failed")
+
+    def _kit_versions(self):
+        from resurrection_lab import list_snapshots
+        folder = QFileDialog.getExistingDirectory(self, "Choose folder containing your saved kit versions")
+        if not folder:
+            return
+        def present(rows):
+            if not rows:
+                self.info("Time Machine", "No verified Kit manifests found in this folder.")
+            else:
+                lines = []
+                for rec in rows[:25]:
+                    lines.append(str(rec.get("game", "Unknown game")) +
+                                 "  •  " + str(rec.get("manifest", "Manifest")) +
+                                 "  •  " + str(rec.get("modified", "")))
+                self.info("Verified kit snapshots (newest first)",
+                          "\n\n".join(lines)[:2600] +
+                          "\n\nSelecting a snapshot never performs a live rollback.")
+        self.job(lambda _progress: list_snapshots(Path(folder)), present,
+                 error_title="Cannot list kit versions")
+
+    def _transfer_kit(self):
+        from resurrection_lab import prepare_pc_transfer
+        if self.scanning or self.cleaning:
+            self.info("Game Grave is busy", "Finish the current operation first.")
+            return
+        manifest = self._kit_manifest_picker("Choose kit to prepare for another PC")
+        if manifest is None:
+            return
+        dest = QFileDialog.getExistingDirectory(self,
+                    "Choose an EMPTY destination parent for a new portable transfer folder")
+        if not dest:
+            return
+        if not self.confirm("Prepare a new portable PC-to-PC kit folder?",
+            f"Kit: {manifest}\n\nTransfer parent: {dest}\n\n"
+            "A separate new folder with verified ZIP and manifest will be created. "
+            "Nothing is copied to a cloud service or sent over a network. "
+            "Game binaries and licensed storefront installs are NOT included."):
+            return
+        self._start_safe_backup_task("Portable Kit transfer",
+            lambda: prepare_pc_transfer(manifest, Path(dest), approved=True),
+            target=dest)
