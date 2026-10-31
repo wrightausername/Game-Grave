@@ -49,8 +49,9 @@ def looks_like_recording(path: Path, root: Path, *, user_selected: bool = False)
         return True
     if CAPTURE_NAME_HINT.search(path.stem):
         return True
-    # Dated captures stored under a game-specific subfolder of Videos.
-    if len(relative.parts) > 1 and TIMESTAMP_HINT.search(path.stem):
+    # OBS and similar recorders often save date-stamped clips directly in
+    # Videos rather than a Captures folder. Treat as *possible* clips only.
+    if TIMESTAMP_HINT.search(path.stem):
         return True
     return False
 
