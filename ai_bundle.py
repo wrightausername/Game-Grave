@@ -159,7 +159,7 @@ def _extract_runtime(archive: Path, destination: Path) -> Path:
             name = entry.filename.replace("\\", "/")
             parts = PurePosixPath(name).parts
             if (not parts or name.startswith("/") or ".." in parts
-                    or ":" in name or not name.endswith(("/", ".dll", ".exe", ".json", ".txt", ".md"))):
+                    or ":" in name or not name.strip()):
                 raise AiSetupError("Unexpected file in AI runtime archive.")
             if (entry.external_attr >> 16) & 0o170000 == 0o120000:
                 raise AiSetupError("Linked files are not allowed in AI runtime.")
@@ -230,12 +230,16 @@ def install_ai(notify=None) -> None:
         staging = root / ("runtime-stage-" + uuid.uuid4().hex)
         try:
             server = _extract_runtime(archive, staging)
-            if _hash_file(server) == "":
-                raise AiSetupError("Invalid AI executable.")
+            if server.stat().st_size < 100_000:
+                raise AiSetupError("Unexpected local AI executable.")
             if runtime.exists():
-                # Do not silently delete a pre-existing user-controlled folder.
-                raise AiSetupError("Existing AI runtime needs manual repair.")
-            os.replace(staging, runtime)
+                current = list(runtime.rglob(SERVER_NAME))
+                if (len(current) != 1 or not _safe_regular_file(current[0])
+                        or _hash_file(current[0]) != _hash_file(server)):
+                    raise AiSetupError("Existing AI runtime needs manual repair.")
+                # Reuse our byte-identical runtime after an interrupted model download.
+            else:
+                os.replace(staging, runtime)
         finally:
             if staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
