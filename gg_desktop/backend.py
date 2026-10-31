@@ -72,7 +72,8 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
                int(settings.get("graveyard_days", 365)))
     try:
         staged.recordings = find_old_recordings(
-            days, list(settings.get("recording_roots", [])), cancel=canceled)
+            days, list(settings.get("recording_roots", [])),
+            cancel=canceled, include_recent=True)
     except (OSError, ValueError) as exc:
         staged.warnings.append("Recordings partially unavailable (" + type(exc).__name__ + ").")
     if canceled():
