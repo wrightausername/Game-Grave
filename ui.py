@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import zipfile
+from dataclasses import replace
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,8 @@ from cleanup_actions import recycle_reviewed_entries, recycle_old_files
 from safety_selftest import check_disposable_undo, SafetySelfCheckError
 from graveyard_protection import protection_action, set_item_protection
 from recordings import find_old_recordings, RECORDING_EXTENSIONS
+from screenshots import find_old_screenshots, looks_like_screenshot
+from screenshot_preview import decode_screenshot_preview
 from duplicates import inspect_duplicate_archives
 from ui_presets import (MAX_PRESETS, capture_presentation, normalize_color, validate_name,
                         read_preset_file, sanitize_local_presets, write_preset_file)
@@ -143,6 +146,7 @@ class GameGraveApp(tk.Tk):
         self.mod_folders: list[ModFolder] = []
         self.old_files: list[OldFile] = []
         self.recordings: list[OldFile] = []
+        self.screenshots: list[OldFile] = []
         self.save_findings = []
         self.profile_report = None
         self._scan_started = 0.0
@@ -1421,7 +1425,8 @@ class GameGraveApp(tk.Tk):
             self.games, self.mod_folders, self.old_files,
             self.settings.get("graveyard_days", 365), self.settings.get("never_touch", []),
             watched_mods=self.settings.get("graveyard_watchlist", []),
-            recordings=getattr(self, "recordings", []))
+            recordings=getattr(self, "recordings", []),
+            screenshots=getattr(self, "screenshots", []))
 
         search_row = tk.Frame(self.content, bg=BG)
         search_row.pack(fill="x", pady=(0, 8))
@@ -1513,7 +1518,8 @@ class GameGraveApp(tk.Tk):
                   wraplength=800).pack(anchor="w", pady=(4, 0))
         self.text(note, "Select one file below. Delete moves it to Windows Recycle Bin after approval. "
                   "Protect prevents deleting that item; Unprotect removes only your own rule. "
-                  "Installed games and managed mods remain protected.",
+                  "Installed games and managed mods remain protected. "
+                  "Screenshots require previewing each image before individual cleanup.",
                   9, MUTED, wraplength=830).pack(anchor="w", pady=(4, 0))
 
         area = self.panel(pad=8)
@@ -1523,7 +1529,7 @@ class GameGraveApp(tk.Tk):
             ("SELECT", "FILE OR GAME", "TYPE", "LAST MODIFIED", "SIZE", "STATUS"),
             (54, 235, 160, 112, 108, 146))
         self.grave_tree.tag_configure("protected", foreground=WARN)
-        self.grave_tree.bind("<Double-1>", lambda _e: self._grave_details())
+        self.grave_tree.bind("<Double-1>", self._grave_double_click)
         self.grave_tree.bind("<Button-1>", self._grave_toggle_click)
         self.grave_tree.bind("<space>", self._grave_toggle_keyboard)
         self.grave_tree.bind("<Button-3>", self._grave_context_click)
@@ -1544,6 +1550,8 @@ class GameGraveApp(tk.Tk):
         self.grave_delete_button.pack(side="left")
         self.grave_protection_button = self.button(actions, "Protect selected", self._grave_toggle_protection)
         self.grave_protection_button.pack(side="left", padx=(8, 0))
+        self.button(actions, "Preview screenshot", self._grave_preview_screenshot).pack(
+            side="left", padx=(8, 0))
         self.button(actions, "Open folder", self._grave_open_folder).pack(side="left", padx=(8, 0))
         self.button(actions, "Why is this here?", self._grave_details).pack(side="left", padx=(8, 0))
         bulk = tk.Frame(self.content, bg=BG)
@@ -1631,7 +1639,10 @@ class GameGraveApp(tk.Tk):
             if entry is None:
                 self.grave_selection_var.set("Select a finding to see available actions.")
             else:
-                status = ("Ready for reviewed deletion" if entry.can_recycle else
+                status = ("Preview individually before deletion"
+                          if entry.category == "Old game screenshot" and
+                          not is_protected_path(Path(entry.path), self.settings.get("never_touch", []))
+                          else "Ready for reviewed deletion" if entry.can_recycle else
                           reason if reason else entry.protection)
                 self.grave_selection_var.set(f"Selected: {entry.name}  •  {status}")
 
@@ -1658,7 +1669,9 @@ class GameGraveApp(tk.Tk):
                 item.name, item.category, f"{item.age_days} days" if item.age_days is not None else "Unknown",
                 human_size(item.apparent_bytes),
                 "Ready to delete" if item.can_recycle else
-                ("Protected by you" if override else "Review only / protected")),
+                ("Preview individually" if item.category == "Old game screenshot"
+                 and not is_protected_path(Path(item.path), self.settings.get("never_touch", []))
+                 else "Protected by you" if override else "Review only / protected")),
                 tags=() if item.can_recycle else ("protected",))
         still_selected = [key for key in selected if key in self._grave_page_keys]
         if still_selected:
@@ -1902,7 +1915,8 @@ class GameGraveApp(tk.Tk):
             self.games, self.mod_folders, self.old_files,
             self.settings.get("graveyard_days", 365), updated,
             watched_mods=self.settings.get("graveyard_watchlist", []),
-            recordings=getattr(self, "recordings", []))
+            recordings=getattr(self, "recordings", []),
+            screenshots=getattr(self, "screenshots", []))
         if action == "Protect":
             self.grave_checked.discard(entry.key)
         self._populate_graveyard()
@@ -1941,6 +1955,8 @@ class GameGraveApp(tk.Tk):
         menu = tk.Menu(self.grave_tree, tearoff=False)
         menu.add_command(label="Details", command=self._grave_details)
         menu.add_command(label="Open folder", command=self._grave_open_folder)
+        if entry.category == "Old game screenshot":
+            menu.add_command(label="Preview screenshot…", command=self._grave_preview_screenshot)
         menu.add_command(label=action or "Protected by Game Grave",
                          command=self._grave_toggle_protection,
                          state="normal" if action else "disabled")
@@ -3846,6 +3862,7 @@ class GameGraveApp(tk.Tk):
         mod_roots = list(self.settings.get("mod_extra_roots", []))
         other_roots = list(self.settings.get("other_library_roots", []))
         recording_roots = list(self.settings.get("recording_roots", []))
+        screenshot_roots = list(self.settings.get("screenshot_roots", []))
         recording_days = min(file_days, self.settings.get("graveyard_days", 365))
 
         def task():
@@ -3875,10 +3892,20 @@ class GameGraveApp(tk.Tk):
                     recordings = []
                     warning += ("; " if warning else "") + "Recordings: " + str(exc)
                 self._check_scan_cancel()
+                try:
+                    screenshots = find_old_screenshots(
+                        recording_days, screenshot_roots,
+                        extra_steam_roots=games_extra,
+                        cancel=self._cancel_scan.is_set)
+                except (ValueError, OSError) as exc:
+                    screenshots = []
+                    warning += ("; " if warning else "") + "Screenshots: " + str(exc)
+                self._check_scan_cancel()
                 self.events.put(("scan_stage", (4, STAGES[4][0])))
                 saves = discover_saves()
                 self._check_scan_cancel()
-                self.events.put(("scan_complete", (games, other, mods, files, recordings, saves, warning)))
+                self.events.put(("scan_complete", (
+                    games, other, mods, files, recordings, screenshots, saves, warning)))
             except Exception as exc:
                 self.events.put(("scan_error", str(exc)))
         threading.Thread(target=task, daemon=True).start()
@@ -3894,7 +3921,7 @@ class GameGraveApp(tk.Tk):
                     if self._cancel_scan.is_set():
                         self._scan_canceled_status()
                         continue
-                    self.games, self.other_games, self.mod_folders, self.old_files, self.recordings, self.save_findings, warning = payload
+                    self.games, self.other_games, self.mod_folders, self.old_files, self.recordings, self.screenshots, self.save_findings, warning = payload
                     self.profile_report = None  # Profiles must be re-inspected after inventory changes.
                     self.scan_percent.set(100)
                     self.scan_progress_text.set("Scan complete · 100%")
@@ -3908,7 +3935,7 @@ class GameGraveApp(tk.Tk):
                               (f"; Files warning: {warning}" if warning else ""))
                     self.scanning = False
                     self.last_scan = datetime.now().strftime("%I:%M %p").lstrip("0")
-                    self.status_text.set(f"Scan finished at {self.last_scan}  •  {len(self.games) + len(self.other_games)} games, {len(self.mod_folders)} mods, {len(self.old_files)} old files, {len(self.recordings)} possible game clips" +
+                    self.status_text.set(f"Scan finished at {self.last_scan}  •  {len(self.games) + len(self.other_games)} games, {len(self.mod_folders)} mods, {len(self.old_files)} old files, {len(self.recordings)} possible game clips, {len(self.screenshots)} possible screenshots" +
                                          ("  •  File folder unavailable" if warning else ""))
                     self.scan_button.configure(state="normal", bg=ACCENT)
                     self.cancel_button.configure(state="disabled")
