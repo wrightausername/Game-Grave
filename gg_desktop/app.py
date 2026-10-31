@@ -95,8 +95,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
         rail = QFrame()
         rail.setObjectName("navRail")
-        rail.setFixedWidth(238)
-        r = column(spacing=7, margins=(12, 23, 12, 18))
+        rail.setFixedWidth(220)
+        r = column(spacing=5, margins=(10, 20, 10, 12))
         rail.setLayout(r)
         brand_holder = QWidget()
         brand_layout = row(spacing=9)
@@ -117,7 +117,11 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         kicker.setStyleSheet(
             "color:#8CA0B3; font-size:9px; letter-spacing:1px;")
         r.addWidget(kicker)
-        r.addSpacing(15)
+        edition = label("CRIMSON COMMAND", "brandEdition")
+        edition.setStyleSheet("color:#FF4056;font-size:10px;font-weight:800;"
+                              "letter-spacing:1px;")
+        r.addWidget(edition)
+        r.addSpacing(13)
         self.nav_buttons = {}
         for route, icon in ROUTES:
             control = button(icon + "    " + route,
@@ -131,25 +135,26 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         r.addStretch()
         # Decorative local artwork remains separate from scan findings and
         # disappears on shorter screens so every navigation control stays usable.
-        self.sidebar_art = LandscapeArt(114)
-        self.sidebar_art.setVisible(self.height() >= 870)
+        self.sidebar_art = LandscapeArt(224, scene="footer")
+        footer_layout = column(margins=(14, 22, 12, 4))
+        self.sidebar_art.setLayout(footer_layout)
+        motto = label('“SAME GAMES.\nA CLEANER\nTOMORROW.”', "subtle", wrap=True)
+        motto.setStyleSheet("color:#D7E1EC;font-size:12px;letter-spacing:2px;")
+        footer_layout.addWidget(motto)
+        footer_layout.addStretch()
+        self.sidebar_art.setVisible(self.height() >= 920)
         r.addWidget(self.sidebar_art)
-        motto = label("SAME GAMES.\nA CLEANER TOMORROW.", "subtle", wrap=True)
-        motto.setStyleSheet("color:#A1B2C2;font-size:12px;letter-spacing:1px;")
-        r.addWidget(motto)
-        r.addSpacing(15)
-        policy = label("LOCAL FIRST  •  RECYCLE BIN ONLY", "caption", wrap=True)
-        r.addWidget(policy)
         outer.addWidget(rail)
 
         main = QWidget()
         base = column(spacing=6, margins=(0, 0, 0, 0))
         main.setLayout(base)
         top = QWidget()
-        topbox = row(spacing=10, margins=(20, 13, 20, 9))
+        topbox = row(spacing=8, margins=(18, 5, 18, 4))
         top.setLayout(topbox)
         self.status = label("No scan yet. Choose Scan PC to begin.", "subtle", wrap=True)
         topbox.addWidget(self.status, 1)
+        top.setMaximumHeight(39)
         self.cancel_button = button("Cancel scan", self.cancel_scan)
         self.cancel_button.setEnabled(False)
         topbox.addWidget(self.cancel_button)
@@ -173,7 +178,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, "sidebar_art"):
-            self.sidebar_art.setVisible(event.size().height() >= 870)
+            self.sidebar_art.setVisible(event.size().height() >= 920)
 
     def page_for(self, title: str) -> ScrollPage:
         if self.page is not None:
