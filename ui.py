@@ -1020,7 +1020,7 @@ class GameGraveApp(tk.Tk):
             "next time you play, which can cause longer loading or temporary stutter.\n\n"
             "Files go to the Windows Recycle Bin, so disk space may not be freed immediately.\n"
             "No saves, mods, installed game files, or shared GPU caches will be removed.\n\n"
-            "Recycle ONLY these verified shader-cache files?",
+            "Delete ONLY these verified shader-cache files?",
             parent=self,
         ):
             return
@@ -1836,7 +1836,7 @@ class GameGraveApp(tk.Tk):
                          command=self._grave_toggle_protection,
                          state="normal" if action else "disabled")
         menu.add_separator()
-        menu.add_command(label="Delete (to Recycle Bin)…", command=self._grave_recycle_one,
+        menu.add_command(label="Delete…", command=self._grave_recycle_one,
                          state="normal" if entry.can_recycle else "disabled")
         try:
             menu.tk_popup(x, y)
@@ -2039,7 +2039,7 @@ class GameGraveApp(tk.Tk):
         if not items:
             messagebox.showinfo("No files selected", "Select the files you want to delete.")
             return
-        if not messagebox.askyesno("Recycle these files?",
+        if not messagebox.askyesno("Delete selected files?",
                                    f"Send {len(items)} selected files ({human_size(sum(f.size for f in items))}) "
                                    "to the Windows Recycle Bin?\n\nYou can restore them from there until the bin is emptied."):
             return
@@ -2076,7 +2076,7 @@ class GameGraveApp(tk.Tk):
         self.text(settings, "Sunday at 12:00 PM  •  Windows Task Scheduler  •  initially OFF", 10, MUTED).pack(anchor="w")
         cfg = tk.Frame(settings, bg=PANEL)
         cfg.pack(fill="x", pady=(19, 12))
-        self.text(cfg, "Recycle files older than", 11).pack(side="left")
+        self.text(cfg, "Delete files older than", 11).pack(side="left")
         self.auto_days_var = tk.StringVar(value=str(self.settings["auto_days"]))
         age = ttk.Combobox(cfg, textvariable=self.auto_days_var, values=("180", "365", "730"),
                            state="readonly", style="Dark.TCombobox", width=7)
