@@ -75,3 +75,34 @@ A reviewer should reproduce and classify each report. An unverified claim is not
 - Link the final anonymized aggregate analysis and manual sign-off evidence to [M6 issue #15](https://github.com/wrightausername/Game-Grave/issues/15). Only then consider M7 1.0.0 stable.
 
 **Release gate:** BETA NOT STARTED. Completing this document is planning, not recruitment, beta execution, QA certification, or release approval.
+
+
+## Frozen Q1 responses and offline aggregate analyzer (prepared, not launched)
+
+The exact T01–T12 tasks and Q01–Q12 wording above remain unchanged. For each
+tester's optional **local** structured result, run
+`python tools/beta_feedback.py --blank-form new-response.json`. Complete
+`os`, every `tasks.T01`–`tasks.T12`, every `ratings.Q01`–`ratings.Q10`,
+and `q11` after the **signed**, owner-approved beta test. Use task outcomes
+`succeeded without assistance`, `succeeded with assistance`, `failed`,
+or `not applicable`. For ratings use integer 1–5, or `N/A` only where
+applicable. Issue entries use the five fixed report fields
+`task_id`, `expected`, `actual`, `steps_disposable`, `severity`
+(P0–P3). Do not put usernames, account IDs or other personal data into results.
+
+Once an authorized coordinator has redacted and collected the completed files,
+create one local JSON object `{"schema":1,"responses":[...completed records...]}`
+and run `python tools/beta_feedback.py --analyze completed.json --output aggregate.json`.
+The analyzer refuses mismatched build identifiers and questionnaire versions,
+missing ratings, malformed scales, duplicate JSON keys or oversized input. It
+produces task outcome counts, Q01–Q10 distributions and medians, Q11 counts,
+issue severity/task counts and OS coverage only, **not** any free-text responses
+or user paths. Aggregate totals cannot establish independent testers by
+themselves. The CLI never uploads or sends messages. A new output never
+overwrites an existing report.
+
+The analyzer always marks `m6_beta_complete=false` and
+`m7_1_0_release_authorized=false`. Human reviewers must approve a tester
+count, success thresholds, P0/P1 issue dispositions, privacy retention policy
+and final signed candidate before changing the release gates. The prepared
+tool is not permission to recruit testers or declare M6 complete.
