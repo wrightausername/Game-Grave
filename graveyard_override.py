@@ -89,17 +89,46 @@ def _critical_path(target: Path) -> bool:
                for protected in roots)
 
 
+def manual_game_entry(game: Any):
+    """Produce a protected review row from an existing, verified Games record."""
+    from graveyard import GraveyardEntry
+    return GraveyardEntry(
+        key="manual-game:" + str(game.key),
+        name=str(game.name),
+        path=str(game.install_path),
+        category="Installed game (manual override)",
+        apparent_bytes=max(0, game.size_bytes or 0),
+        age_days=None, relationship=str(game.status),
+        finding="Manually selected installed game. " + str(game.install_evidence),
+        protection="Installed game: protected by default; launcher uninstall recommended",
+        can_recycle=False,
+    )
+
+
 def override_eligibility(entry: Any, inventory: Any) -> tuple[bool, str]:
     """Authorize ONLY an exact current scan row, never arbitrary typed paths."""
     if entry is None or inventory is None:
         return False, "Run Scan PC and select an actual Graveyard finding first."
     known = getattr(inventory, "graveyard", ())
-    if not any(
+    in_graveyard = any(
         e == entry and getattr(e, "key", None) == getattr(entry, "key", None)
         and _same_path(getattr(e, "path", ""), getattr(entry, "path", ""))
         for e in known
-    ):
-        return False, "This exact item is not in the current Graveyard scan. Scan again."
+    )
+    # Games view can deliberately select a CURRENT verified installation for
+    # advanced review even if the game has not reached the "neglected" age.
+    from_game_row = (
+        getattr(entry, "category", "") == "Installed game (manual override)"
+        and any(
+            manual_game_entry(g) == entry
+            and "open_folder" in getattr(g, "capabilities", ())
+            and str(getattr(g, "status", "")).startswith("Installed")
+            and len(getattr(g, "claimed_by", ())) == 1
+            for g in getattr(inventory, "games", ())
+        )
+    )
+    if not in_graveyard and not from_game_row:
+        return False, "This exact item is not in the current verified scan. Scan again."
     raw_path = str(getattr(entry, "path", ""))
     path = Path(raw_path)
     if not raw_path or len(raw_path) > MAX_PATH_LENGTH:
@@ -115,7 +144,9 @@ def override_eligibility(entry: Any, inventory: Any) -> tuple[bool, str]:
     # Installed games and managed mod folders require an exact match to live
     # inventory evidence: a folder merely containing 'mods' is not enough.
     if path.is_dir():
-        if getattr(entry, "category", "") == "Neglected installed game":
+        if getattr(entry, "category", "") == "Installed game (manual override)":
+            present = from_game_row
+        elif getattr(entry, "category", "") == "Neglected installed game":
             present = any(_same_path(g.install_path, path)
                           for g in getattr(inventory, "steam", ())
                           if getattr(g, "install_path", None))
