@@ -153,6 +153,19 @@ class ScreenMethods:
                 amount = (human_size(reported[name]) + " known" if reported[name] else "Size unknown")
                 inner.addWidget(label(f"{count}  •  {amount}", "caption"))
                 launcher_col.addWidget(line)
+                bar = QProgressBar()
+                bar.setTextVisible(False)
+                bar.setMaximum(max(1, max(counts.values())))
+                bar.setValue(count)
+                bar.setFixedHeight(5)
+                bar.setAccessibleName(f"{name}: {count} recorded installations, "
+                                      "bar relative to launcher with most installs, "
+                                      "not actual disk usage.")
+                bar.setToolTip(
+                    f"{count} observed installations out of "
+                    f"{max(1, max(counts.values()))} in the most represented launcher. "
+                    "This is NOT a disk-space chart.")
+                launcher_col.addWidget(bar)
         launcher_col.addStretch()
         r.addWidget(launcher, 3)
 
@@ -467,7 +480,20 @@ class ScreenMethods:
             for c, value in enumerate((e.name, e.category,
                                        human_size(e.apparent_bytes), status)):
                 _table_text(self.grave_table, i, c, value)
-            self.grave_table.setRowHeight(i, 37)
+            if protection == "Unprotect":
+                unlock = button(
+                    "Unprotect this item",
+                    lambda _checked=False, entry=e: self._unprotect_grave(entry))
+                unlock.setAccessibleName("Unprotect your personal rule for " + e.name)
+                unlock.setToolTip(
+                    "Removes only your exact personal Never Touch rule after confirmation. "
+                    "No file will be deleted.")
+                self.grave_table.setCellWidget(i, 3, unlock)
+                self.grave_table.setRowHeight(i, 45)
+            elif protection is None and status == "Protected / inspect":
+                self.grave_table.setRowHeight(i, 37)
+            else:
+                self.grave_table.setRowHeight(i, 37)
         selected_key = getattr(self, "_pending_grave_key", None)
         if selected_key is not None:
             for i, e in enumerate(self._shown_graves):
