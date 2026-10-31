@@ -1174,26 +1174,33 @@ class ScreenMethods:
             changed["ai_assistant_enabled"] = bool(value)
             save_settings(changed)
             self.settings = changed
+        def still_visible():
+            # Navigating away destroys the Qt Settings page during long model downloads.
+            # Keep the approved background operation valid even when its widgets vanish.
+            try:
+                from shiboken6 import isValid
+                return all(isValid(w) for w in (ai_toggle, ai_status, ai_bar, ai_open))
+            except (RuntimeError, ImportError):
+                return False
         def setup_finished(result):
             ok, detail = result
-            ai_bar.hide()
-            ai_toggle.setEnabled(True)
             if ok:
                 try:
                     save_enabled(True)
                 except (OSError, ValueError) as exc:
-                    restore_toggle(False)
-                    ai_open.setEnabled(False)
-                    self.error("AI preference could not be saved", str(exc))
-                    return
-                restore_toggle(True)
-                ai_open.setEnabled(True)
-                ai_status.setText("AI installed and ready. Open the assistant to begin.")
-            else:
-                restore_toggle(False)
-                ai_open.setEnabled(False)
-                ai_status.setText("AI not installed. Your other tools are unaffected.")
+                    ok, detail = False, str(exc)
+            if still_visible():
+                ai_bar.hide()
+                ai_toggle.setEnabled(True)
+                restore_toggle(bool(ok))
+                ai_open.setEnabled(bool(ok))
+                ai_status.setText(
+                    "AI installed and ready. Open the assistant to begin." if ok else
+                    "AI not installed. Normal Game Grave features are unchanged.")
+            if not ok:
                 self.error("AI setup could not finish", detail)
+            elif not still_visible():
+                self.status.setText("AI installed and ready. Open Settings to use it.")
         def set_ai_enabled(checked):
             if not checked:
                 try:
@@ -1235,8 +1242,9 @@ class ScreenMethods:
                 except Exception:
                     return False, "Unexpected installation error. Existing files remain unchanged."
             def show_progress(percent, stage):
-                ai_bar.setValue(percent)
-                ai_status.setText(stage + " • " + str(percent) + "%")
+                if still_visible():
+                    ai_bar.setValue(percent)
+                    ai_status.setText(stage + " • " + str(percent) + "%")
             self.job(work, setup_finished, progress=show_progress,
                      error_title="AI setup failed")
         ai_toggle.toggled.connect(set_ai_enabled)
