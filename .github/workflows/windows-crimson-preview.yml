@@ -56,6 +56,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
+      - name: Upload actual Qt screen captures for design review
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Crimson-Rendered-UI-Screenshots
+          path: _ci_temp/crimson-*-1440.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Build standalone unsigned Qt EXE
         shell: pwsh
         run: |
