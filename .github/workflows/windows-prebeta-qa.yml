@@ -1,0 +1,60 @@
+name: M1-M5 local pre-beta field diagnostic (disposable Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'prebeta_qa.py'
+      - 'tools/windows_prebeta_qa.py'
+      - 'tools/windows_m3_disposable_qa.py'
+      - '.github/workflows/windows-prebeta-qa.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'prebeta_qa.py'
+      - 'tools/windows_prebeta_qa.py'
+      - 'tools/windows_m3_disposable_qa.py'
+      - '.github/workflows/windows-prebeta-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-private-field-qa:
+    name: Run path-free prebeta report on hosted Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run read-only launcher metadata and fabricated multi-root recovery QA
+        shell: pwsh
+        run: |
+          $scratch = Join-Path $env:GITHUB_WORKSPACE '_ci_temp'
+          New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+          $report = Join-Path $scratch 'prebeta-private-summary.json'
+          python tools/windows_prebeta_qa.py --execute --folder "$scratch" --report "$report"
+          if ($LASTEXITCODE -ne 0) { throw 'Synthetic local field QA did not complete.' }
+          $result = Get-Content $report -Raw | ConvertFrom-Json
+          if ($result.m2_read_only_scan -ne 'PASS' -or
+              -not $result.m3_disposable_tests.all_passed -or
+              $result.m3_disposable_tests.executed -lt 7 -or
+              $result.m1_disposable_recycle_undo -ne 'NOT_RUN' -or
+              $result.m6_beta_authorized -ne $false -or
+              $result.m7_1_0_release_approved -ne $false) {
+            throw 'Private field QA emitted invalid, unsafe or incomplete statuses.'
+          }
+          Write-Host 'PASS: synthetic field report has no release authorization.'
+      - name: Retain counts-only diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-M1-M5-Private-Field-Diagnostic
+          path: _ci_temp/prebeta-private-summary.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+# A hosted Windows runner is NOT a Windows 10/11 interactive human QA pass.
+# The shell never runs the optional one-file real Recycle Bin check.

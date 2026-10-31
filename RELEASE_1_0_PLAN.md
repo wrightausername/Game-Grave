@@ -36,3 +36,29 @@
 Each milestone uses its linked GitHub issue for concrete subtasks, PRs, CI results, Windows QA run records and manual evidence. `release_gate_status.json` starts blocked; `tools/release_audit.py` checks it and the release-tag workflow refuses a 1.0 candidate while any gate remains open. This file is a tracker, not a substitute for independently validating the evidence.
 
 **Current engineering work:** M1 and M2 have received substantial safety/detection hardening but still need representative Windows human QA. M3 continues with exact-sha recovery, conservative path checks and fault injection. M6 beta is planned, not started, and M7 stays blocked. Do not count overlapping engineering progress as completed acceptance gates.
+
+
+## Engineering progress on 2026-10-31 (NOT milestone acceptance)
+
+All linked code below is integrated through reviewed GitHub pull requests and
+automated disposable tests. **Zero M1–M7 human release gates have been marked
+passed.** Never confuse a green Windows Server GitHub runner with interactive
+consumer Windows 10/11 sign-off. The authoritative block is
+[`release_gate_status.json`](release_gate_status.json) and
+`python tools/release_audit.py --strict`.
+
+| Track | Engineering built and automatically checked | Still needs real-world evidence / external approval |
+|---|---|---|
+| **M1** | Background Graveyard/Old Files cleanup ([#47](https://github.com/wrightausername/Game-Grave/pull/47), [#48](https://github.com/wrightausername/Game-Grave/pull/48)), opt-in byte-exact Undo self-test ([#54](https://github.com/wrightausername/Game-Grave/pull/54)), scan-time file identity and approved folder/age confinement ([#58](https://github.com/wrightausername/Game-Grave/pull/58)) | Installed Windows 10 and 11, localized Recycle Bin, UAC, deleted-path conflict, independent user data and recovery safety |
+| **M2** | Opt-in exact duplicate archive hashing without delete rights ([#49](https://github.com/wrightausername/Game-Grave/pull/49)); Ghost Watch omissions, linked/hidden/deep files now count as incomplete ([#59](https://github.com/wrightausername/Game-Grave/pull/59)) | Compare actual Steam/Epic/GOG, Vortex and MO2 UI inventories; moved libraries, shared mods, hardlinks, ownership disagreements |
+| **M3** | Seven-part native Windows disposable multi-root kit, rehearsal, immutable version, Time Machine, transfer and tamper CI ([#50](https://github.com/wrightausername/Game-Grave/pull/50)) | Real clean MO2 instance reconnect and manual multi-PC game setup restoration with separate backups |
+| **M4** | Windows Tk controls, Graveyard Protect/Unprotect, canceled Delete, visual panel and 100–200% scaled UI exercised in CI ([#51](https://github.com/wrightausername/Game-Grave/pull/51)); Steam manifest/account scan accepts in-flight Cancel ([#60](https://github.com/wrightausername/Game-Grave/pull/60)) | Physical monitors and Narrator/screen-reader; keyboard-only and nontechnical user walkthrough; large real library latency |
+| **M5** | Signed release verifier and strict provenance ([#53](https://github.com/wrightausername/Game-Grave/pull/53)); safe legacy settings migration ([#55](https://github.com/wrightausername/Game-Grave/pull/55)); actual unsigned EXE launch, install/reinstall/uninstall CI ([#56](https://github.com/wrightausername/Game-Grave/pull/56)); opt-in signed-size-and-SHA installer download, never auto-run ([#62](https://github.com/wrightausername/Game-Grave/pull/62)) | Owner-supplied production Authenticode credentials, signed endpoint, payment/legitimate lifetime Pro service, legal/privacy review, consumer Windows installer and cross-version upgrade |
+| **M6** | Frozen Q01–Q12 and T01–T12 privacy-safe beta response analysis prepared ([#52](https://github.com/wrightausername/Game-Grave/pull/52)) | Real independent tester cohort and fixed survey, bug triage, thresholds, signed regression acceptance. No beta has started |
+| **M7** | Plain-English user and release/rollback/support runbooks prepared ([#57](https://github.com/wrightausername/Game-Grave/pull/57)) | Signed immutable 1.0.0 artifact, customer support infrastructure, owner authorization and GA publication |
+| **Field QA** | One-command optional privacy-safe local Windows evidence tool ([#61](https://github.com/wrightausername/Game-Grave/pull/61)), run as a non-authorizing disposable native Windows CI smoke ([#63](https://github.com/wrightausername/Game-Grave/pull/63)) | Execute on privately controlled consumer Windows PCs with explicit approval, compare with launcher/mod manager UIs and retain redacted evidence |
+
+The owner-requested identical beta questionnaire is unchanged. There is no
+automatic beta enrollment, paid Pro key issuer or authorized production
+release. Deferring real-world acceptance is a safety requirement, not
+permission for a green CI run to mark the product stable.
