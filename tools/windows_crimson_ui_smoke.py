@@ -63,6 +63,39 @@ def main():
             window.inventory.files = [old]
             window.inventory.scanned_at = "Synthetic test date"
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
+            # Native reference-dashboard parity: all pictured controls must
+            # exist and be wired to the real app, never static screenshot overlays.
+            from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox, QLabel
+            from PySide6.QtSvg import QSvgRenderer
+            from gg_desktop.widgets import ActionCard
+            window.navigate("Overview")
+            app.processEvents()
+            buttons = {b.text() for b in window.page.findChildren(QPushButton)}
+            labels = {b.text() for b in window.page.findChildren(QLabel)}
+            cards = window.page.findChildren(ActionCard)
+            assert len(cards) == 4, "Four clickable top-level action cards are required"
+            assert all(callable(card._action) for card in cards)
+            for expected in ("Scan for Old Files", "Review Graveyard",
+                             "Open Undo Center", "Quick Settings"):
+                assert any(expected in t for t in labels), (
+                    f"Missing text label inside actionable reference card: {expected}")
+            for expected in ("Delete Selected", "Restore", "Add to Graveyard",
+                             "Review Files", "Preview actual image"):
+                assert any(expected in t for t in buttons), (
+                    f"Missing or unconnected reference dashboard button: {expected}")
+            combos = window.page.findChildren(QComboBox)
+            drives = [c for c in combos if "local drive" in c.accessibleName().lower()]
+            filters = [c for c in combos if "filter launchers" in c.accessibleName().lower()]
+            assert len(drives) == 1 and drives[0].count() >= 1
+            assert len(filters) == 1 and filters[0].count() >= 9
+            assert filters[0].findText("Steam") >= 0
+            assert window.page.findChildren(QCheckBox), "Missing Graveyard queue checkboxes"
+            for name in ("crimson_hero.svg", "crimson_sunset.svg",
+                         "crimson_fog.svg", "crimson_footer.svg"):
+                asset = root / "gg_desktop" / "assets" / name
+                assert QSvgRenderer(str(asset)).isValid(), (
+                    "Invalid cinematic local visual: " + name)
+            assert oldzip.read_bytes() == b"not an actual mod or game"
             for route in ("Overview", "Games", "Graveyard", "Game DNA",
                           "Mods", "Old Files", "Undo Center", "Settings", "More Tools"):
                 window.navigate(route)
@@ -119,9 +152,17 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
-            print("PASS: Qt Crimson Overview and 9 interactive pages, mixed-launcher "
-                  "Games, inline exact-rule Unprotect without deletion, "
-                  "four screenshots and original hero asset.")
+            # Full-height capture preserves all three bands of the reference
+            # dashboard. The 900px legacy capture deliberately tests scrolling.
+            window.navigate("Overview")
+            window.resize(1440, 1080)
+            app.processEvents()
+            full = root / "_ci_temp" / "crimson-desktop-full-1440.png"
+            assert window.grab().save(str(full)), "Cannot render full reference dashboard"
+            assert full.stat().st_size > 15000, "Full-height overview appears blank"
+            print("PASS: Qt Crimson dashboard, all pictured controls, original art, "
+                  "9 interactive pages, mixed-launcher data, protected Graveyard, "
+                  "and full-height screenshot without changing user data.")
         finally:
             window.close()
             app.processEvents()
