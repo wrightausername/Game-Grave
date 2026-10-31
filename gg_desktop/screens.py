@@ -1151,9 +1151,10 @@ class ScreenMethods:
         ai_bar.hide()
         ai_toggle = QCheckBox("Enable AI Assistant")
         ai_toggle.setChecked(self.settings.get("ai_assistant_enabled") is True)
-        ai_open = button("Open AI Assistant",
-            lambda: __import__("gg_desktop.ai_dialog", fromlist=["open_local_ai_dialog"])
-                .open_local_ai_dialog(self))
+        def open_ai_chat():
+            from gg_desktop.ai_dialog import open_local_ai_dialog
+            open_local_ai_dialog(self)
+        ai_open = button("Open AI Assistant", open_ai_chat)
         ai_open.setEnabled(ai_toggle.isChecked() and is_ai_installed())
         ai_stack.addWidget(ai_toggle)
         ai_stack.addWidget(ai_status)
@@ -1231,6 +1232,8 @@ class ScreenMethods:
                     return True, ""
                 except (AiSetupError, OSError, ValueError) as exc:
                     return False, str(exc)
+                except Exception:
+                    return False, "Unexpected installation error. Existing files remain unchanged."
             def show_progress(percent, stage):
                 ai_bar.setValue(percent)
                 ai_status.setText(stage + " • " + str(percent) + "%")
