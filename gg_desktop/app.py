@@ -196,6 +196,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         return self.page
 
     def navigate(self, route: str):
+        # Legacy links to the recording viewer open Captures on its Video tab.
+        self._show_capture_videos = route in ("Videos", "Recordings", "Game Recordings")
         route = ROUTE_ALIASES.get(route, route)
         if route not in self.nav_buttons:
             route = "More Tools"
