@@ -3651,6 +3651,9 @@ class GameGraveApp(tk.Tk):
                 messagebox.showerror("Could not save AI setting", str(exc), parent=self)
                 return
             self.settings = updated
+            if not enabled:
+                from ai_bundle import stop_ai
+                stop_ai()
             self.ai_launch_button.configure(
                 state="normal" if enabled and is_ai_installed() else "disabled")
             self.ai_install_status.set(
