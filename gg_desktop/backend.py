@@ -80,7 +80,8 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
     try:
         staged.screenshots = find_old_screenshots(
             days, list(settings.get("screenshot_roots", [])),
-            extra_steam_roots=list(settings.get("steam_extra_roots", [])), cancel=canceled)
+            extra_steam_roots=list(settings.get("steam_extra_roots", [])),
+            games=staged.games, include_recent=True, cancel=canceled)
     except (OSError, ValueError) as exc:
         staged.warnings.append("Screenshots partially unavailable (" + type(exc).__name__ + ").")
     stage(4, STAGES[4])
