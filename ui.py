@@ -4213,7 +4213,8 @@ class GameGraveApp(tk.Tk):
                 self._check_scan_cancel()
                 try:
                     recordings = find_old_recordings(recording_days, recording_roots,
-                                                     cancel=self._cancel_scan.is_set)
+                                                     cancel=self._cancel_scan.is_set,
+                                                     include_recent=True)
                 except (ValueError, OSError) as exc:
                     recordings = []
                     warning += ("; " if warning else "") + "Recordings: " + str(exc)
