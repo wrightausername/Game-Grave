@@ -128,8 +128,11 @@ class ScreenMethods:
         ]
         compact = self.width() < 1220
         for index, (symbol, title, explanation, action) in enumerate(cards):
-            grid.addWidget(ActionCard(symbol, title, explanation, action),
-                           index // (2 if compact else 4), index % (2 if compact else 4))
+            card = ActionCard(symbol, title, explanation, action)
+            if index == 0:
+                card.setObjectName("actionCardPrimary")
+            grid.addWidget(card, index // (2 if compact else 4),
+                           index % (2 if compact else 4))
         page.content.addWidget(strip)
 
         metrics = QWidget()
@@ -181,7 +184,20 @@ class ScreenMethods:
                 bar.setTextVisible(False)
                 bar.setMaximum(max(1, max(counts.values())))
                 bar.setValue(count)
-                bar.setFixedHeight(5)
+                bar.setFixedHeight(6)
+                color = {
+                    "Steam": "#27A6E5",
+                    "Xbox": "#53CA64",
+                    "Epic Games": "#B788EC",
+                    "EA App": "#FF714D",
+                    "Ubisoft Connect": "#8A9BFF",
+                    "GOG Galaxy": "#D46ADB",
+                    "Battle.net": "#56B9EC",
+                }.get(name, "#91A5B6")
+                bar.setStyleSheet(
+                    "QProgressBar { background:#25303A; border:0; border-radius:3px; }"
+                    "QProgressBar::chunk { background:" + color +
+                    "; border-radius:3px; }")
                 bar.setAccessibleName(f"{name}: {count} recorded installations, "
                                       "bar relative to launcher with most installs, "
                                       "not actual disk usage.")
