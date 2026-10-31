@@ -25,11 +25,10 @@ def open_local_ai_dialog(window) -> None:
     layout = QVBoxLayout(dialog)
 
     notice = QLabel(
-        "Optional local AI. Questions are sent only to Ollama on this PC. "
-        "Only anonymous scan counts are included automatically. "
-        "Nothing is deleted, and chats are not saved. "
-        "Install Ollama and run: ollama pull "
-        + str(window.settings.get("ai_model", "qwen2.5:1.5b"))
+        "Built-in private AI. Game Grave installs the model automatically "
+        "after your permission in Settings. Only anonymous scan counts are "
+        "included automatically. No cloud AI or automatic deletion. "
+        "Chat is not saved."
     )
     notice.setWordWrap(True)
     layout.addWidget(notice)
