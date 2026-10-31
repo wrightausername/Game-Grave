@@ -416,6 +416,8 @@ class ScreenMethods:
         if rows and len(rows) > len(self._shown_games):
             self.status.setText(
                 f"Showing first 500 of {len(rows)} filtered games. Narrow the search for later results.")
+        if self._shown_games and not _selected_indices(self.game_table):
+            self.game_table.selectRow(0)
         self._game_details()
 
     def _game_details(self):
@@ -761,6 +763,8 @@ class ScreenMethods:
                     self.grave_table.scrollToItem(self.grave_table.item(i, 0))
                     break
             self._pending_grave_key = None
+        if self._shown_graves and not _selected_indices(self.grave_table):
+            self.grave_table.selectRow(0)
         self._grave_details()
 
     def _selected_grave_entries(self):
