@@ -18,6 +18,7 @@ from graveyard import build_graveyard, looks_like_game_archive
 from cleanup_actions import recycle_reviewed_entries, recycle_old_files
 from graveyard_protection import protection_action, set_item_protection
 from recordings import find_old_recordings, RECORDING_EXTENSIONS
+from duplicates import inspect_duplicate_archives
 from ui_presets import (MAX_PRESETS, capture_presentation, normalize_color, validate_name,
                         read_preset_file, sanitize_local_presets, write_preset_file)
 from view_options import (GRAVE_SORT_KEYS, SORT_DIRECTIONS, GRAVE_STATES, GRAVE_SIZES,
@@ -1483,6 +1484,13 @@ class GameGraveApp(tk.Tk):
         self.button(views, "Save", self._grave_save_view).pack(side="left", padx=(0, 6))
         self.button(views, "Remove", self._grave_remove_view).pack(side="left", padx=(0, 6))
         self.button(views, "Reset", self._grave_reset_view).pack(side="left")
+        dedup = tk.Frame(self.grave_extra_filters, bg=BG)
+        dedup.pack(fill="x", pady=(0, 9))
+        self.button(dedup, "Find exact duplicate archives", self._inspect_duplicates).pack(side="left")
+        self.button(dedup, "Cancel duplicate check", self._cancel_duplicate_check).pack(
+            side="left", padx=(8, 0))
+        self.text(dedup, "On-demand SHA-256 comparison, read-only. No deletion suggested.",
+                  9, MUTED).pack(side="left", padx=(10, 0))
 
         note = self.panel(pad=12)
         note.pack(fill="x", pady=(0, 9))
@@ -1539,6 +1547,53 @@ class GameGraveApp(tk.Tk):
                   "It does not free space until you empty the bin. Max 160 files per approval.",
                   9, MUTED, wraplength=820).pack(anchor="w", pady=(10, 0))
         self._grave_sync_actions()
+
+    def _inspect_duplicates(self):
+        """Opt-in content read on a worker; never scan whole disks implicitly."""
+        if getattr(self, "_dupe_busy", False):
+            messagebox.showinfo("Already checking", "Duplicate inspection is running.")
+            return
+        if self.scanning or getattr(self, "cleanup_running", False):
+            messagebox.showinfo("Finish current task", "Finish the scan or cleanup first.")
+            return
+        candidates = tuple(self.old_files)
+        if not candidates:
+            messagebox.showinfo("Scan first",
+                "Run Scan PC first. Duplicate inspection only checks old archives "
+                "from your selected Old Files folder.")
+            return
+        if not messagebox.askyesno("Compare archive contents?",
+                "Game Grave will read up to 600 previously scanned archives and "
+                "compare complete SHA-256 hashes for likely duplicates. "
+                "Reading file contents may take time, but nothing is moved or changed. "
+                "No deletion is authorized by matching hashes. Continue?"):
+            return
+        self._dupe_busy = True
+        self._dupe_cancel = threading.Event()
+        rules = tuple(self.settings.get("never_touch", ()))
+        self.status_text.set("Checking matching-size old game archives. Read-only…")
+        def work():
+            try:
+                report = inspect_duplicate_archives(
+                    candidates, rules, cancel=self._dupe_cancel.is_set)
+                self.events.put(("duplicates_found", report))
+            except InterruptedError:
+                self.events.put(("duplicates_canceled", None))
+            except Exception as exc:
+                self.events.put(("duplicates_error", str(exc)[:250]))
+        try:
+            threading.Thread(target=work, daemon=True).start()
+        except RuntimeError as exc:
+            self._dupe_busy = False
+            messagebox.showerror("Could not inspect", str(exc))
+
+    def _cancel_duplicate_check(self):
+        event = getattr(self, "_dupe_cancel", None)
+        if not getattr(self, "_dupe_busy", False) or event is None:
+            messagebox.showinfo("No comparison running", "There is no active duplicate check.")
+            return
+        event.set()
+        self.status_text.set("Cancel requested; stopping after the current chunk…")
 
     def _grave_toggle_advanced(self):
         if self.grave_extra_filters.winfo_manager():
@@ -3800,6 +3855,34 @@ class GameGraveApp(tk.Tk):
                     messagebox.showerror(
                         "Deletion interrupted", payload +
                         "\n\nSome items may already have moved. Check Windows Recycle Bin and Undo Center.")
+                elif name == "duplicates_found":
+                    self._dupe_busy = False
+                    report = payload
+                    count = len(report.groups)
+                    self.status_text.set(f"Read-only duplicate check: {count} exact group(s), "
+                                         f"{report.hashed_files} file(s) compared.")
+                    lines = []
+                    for group in report.groups[:8]:
+                        sample = ", ".join(Path(path).name for path in group.paths[:3])
+                        lines.append(f"• {len(group.paths)} exact copies ({human_size(group.size_bytes)} each): {sample}")
+                    messagebox.showinfo("Exact duplicate archive evidence",
+                        f"{count} identical archive group(s) in {report.hashed_files} files hashed.\n"
+                        f"Total compared: {human_size(report.hashed_bytes)}\n"
+                        f"Potential redundant apparent size: "
+                        f"{human_size(report.potential_redundant_apparent_bytes)}\n"
+                        "Verified reclaimable space: 0 (not measured).\n"
+                        + ("\n".join(lines) if lines else "\nNo identical groups found.")
+                        + ("\n\nPartial scan: some items were skipped or a limit was reached."
+                           if report.truncated else "")
+                        + "\n\nIdentical bytes do not prove a file is unused or safe to delete. "
+                          "Nothing changed. Use the file's owning game or manager to review.")
+                elif name == "duplicates_canceled":
+                    self._dupe_busy = False
+                    self.status_text.set("Duplicate check canceled. Nothing changed.")
+                elif name == "duplicates_error":
+                    self._dupe_busy = False
+                    self.status_text.set("Duplicate check incomplete. Nothing changed.")
+                    messagebox.showwarning("Duplicate inspection incomplete", payload)
                 elif name == "manager_profiles_result":
                     self.profile_report = payload
                     self.status_text.set(
