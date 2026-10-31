@@ -16,6 +16,7 @@ from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
 from graveyard import build_graveyard, looks_like_game_archive
 from graveyard_protection import protection_action, set_item_protection
+from recordings import find_old_recordings, RECORDING_EXTENSIONS
 from ui_presets import (MAX_PRESETS, capture_presentation, normalize_color, validate_name,
                         read_preset_file, sanitize_local_presets, write_preset_file)
 from view_options import (GRAVE_SORT_KEYS, SORT_DIRECTIONS, GRAVE_STATES, GRAVE_SIZES,
@@ -136,6 +137,7 @@ class GameGraveApp(tk.Tk):
         self.other_games: list[LauncherGame] = []
         self.mod_folders: list[ModFolder] = []
         self.old_files: list[OldFile] = []
+        self.recordings: list[OldFile] = []
         self.save_findings = []
         self.profile_report = None
         self._scan_started = 0.0
@@ -223,11 +225,17 @@ class GameGraveApp(tk.Tk):
         self.nav_canvas.bind("<Configure>", lambda e:
                              self.nav_canvas.itemconfigure(self._nav_window, width=e.width))
         self.nav_buttons = {}
-        items = [("Overview", "▦"), ("Steam Games", "▣"), ("Other Launchers", "▣"), ("Game Mods", "◇"),
-                 ("Old Files", "▤"), ("The Graveyard", "☠"), ("Make Room", "◉"), ("Game DNA", "⌁"),
-                 ("Save Vault", "♡"), ("Undo Center", "↶"), ("Cleanup History", "◷"), ("Settings", "⚙")]
+        # Simple mode shows only primary destinations. Secondary tools remain reachable
+        # from Overview and Settings; advanced mode restores every sidebar link.
+        items = [("Overview", "▦"), ("Steam Games", "▣"), ("Other Launchers", "▣"),
+                 ("Game Mods", "◇"), ("The Graveyard", "☠"), ("Game DNA", "⌁"),
+                 ("Save Vault", "♡"), ("Undo Center", "↶"), ("Settings", "⚙")]
         if self.settings.get("ui_layout") == "advanced":
-            items += [("Storage History", "◷"), ("Automation", "◴")]
+            items = [("Overview", "▦"), ("Steam Games", "▣"), ("Other Launchers", "▣"),
+                     ("Game Mods", "◇"), ("Old Files", "▤"), ("The Graveyard", "☠"),
+                     ("Make Room", "◉"), ("Game DNA", "⌁"), ("Save Vault", "♡"),
+                     ("Undo Center", "↶"), ("Cleanup History", "◷"), ("Storage History", "◷"),
+                     ("Automation", "◴"), ("Settings", "⚙")]
         for title, symbol in items:
             b = tk.Button(self.nav_list, text=f"{symbol}    {title}", anchor="w",
                           font=("Segoe UI", 11), bg=SIDEBAR, fg=MUTED,
@@ -460,11 +468,12 @@ class GameGraveApp(tk.Tk):
         metrics.pack(fill="x", pady=(0, 13))
         stale = [g for g in self.games if is_game_neglected(g, self.settings["game_stale_days"])]
         unknown = [g for g in self.games if g.last_played is None]
+        reviewable_files = {f.path: f.size for f in (*self.old_files, *self.recordings)}
         values = [
             ("GAMES FOUND", str(len(self.games) + len(self.other_games)), "Steam + discovered launchers"),
             ("LONG UNPLAYED", str(len(stale)), f"{self.settings['game_stale_days']}+ days, where known"),
             ("MOD FINDINGS", str(len(self.mod_folders)), "Steam / Workshop / mod managers"),
-            ("REVIEWABLE SIZE", human_size(sum(g.size for g in stale) + sum(f.size for f in self.old_files)),
+            ("REVIEWABLE SIZE", human_size(sum(g.size for g in stale) + sum(reviewable_files.values())),
              "not free space yet"),
         ]
         if not self.last_scan:
@@ -484,7 +493,7 @@ class GameGraveApp(tk.Tk):
              "View games", lambda: self.show_page("Steam Games")),
             ("2", "Review hidden game and mod storage", f"{len(self.mod_folders)} findings across game folders, Steam Workshop and mod managers.",
              "Review mods", lambda: self.show_page("Game Mods")),
-            ("3", "Check old downloads", f"{len(self.old_files)} old files found in your chosen folder.",
+            ("3", "Check old downloads and game clips", f"{len(self.old_files)} old files; {len(self.recordings)} possible old recordings.",
              "View files", lambda: self.show_page("Old Files")),
             ("4", "Make room for a game", "Enter a storage target and preview your review options.",
              "Make room", lambda: self.show_page("Make Room")),
@@ -554,99 +563,145 @@ class GameGraveApp(tk.Tk):
         return tree
 
     def _game_dna_page(self):
-        self.header("Game DNA", "Understand game/mod relationships and inspect changes. Nothing is deleted.")
+        """Simple relationship view first; technical tools available when requested."""
+        self.header("Game DNA", "See which games, mods and saves belong together. Nothing is deleted.")
         dna = build_game_dna(self.games, self.other_games, self.mod_folders, self.save_findings,
                              manager_profiles=(self.profile_report or {}).get("profiles", []))
-        controls = self.panel(pad=13)
-        controls.pack(fill="x", pady=(0, 12))
-        self.text(controls, "Gaming intelligence · read-only preview", 14, ACCENT, True).pack(anchor="w")
-        self.text(controls, "Game associations need installation records or Steam Workshop IDs. "
-                  "Unmatched mod folders and saves stay protected. Scan PC first to update the inventory.",
-                  10, MUTED, wraplength=820).pack(anchor="w", pady=6)
-        row = tk.Frame(controls, bg=PANEL)
-        row.pack(fill="x", pady=(8, 0))
-        self.button(row, "Capture / compare changes", self._capture_intelligence, primary=True).pack(side="left")
-        self.button(row, "Exodus checklist", self._preview_exodus).pack(side="left", padx=9)
-        row2 = tk.Frame(controls, bg=PANEL)
-        row2.pack(fill="x", pady=(6, 0))
-        self.button(row2, "Inspect manager profiles", self._inspect_manager_profiles).pack(side="left")
-        self.button(row2, "Mod Radar audit", self._show_mod_radar_audit).pack(side="left", padx=9)
-        dna_tools = tk.Frame(controls, bg=PANEL)
-        dna_tools.pack(fill="x", pady=(8, 0))
-        self.button(dna_tools, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(side="left")
-        self.button(dna_tools, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=9)
-        dna_tools2 = tk.Frame(controls, bg=PANEL)
-        dna_tools2.pack(fill="x", pady=(6, 0))
-        self.button(dna_tools2, "View visual map", lambda: self._open_dna_visual_map(dna)).pack(side="left")
-        self.button(dna_tools2, "Export QA", self._export_private_m2_qa).pack(side="left", padx=9)
-        previous = load_observation()
-        if previous:
-            self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
-                      10, MUTED).pack(anchor="w", pady=(10, 0))
+        summary = self.panel(pad=15)
+        summary.pack(fill="x", pady=(0, 12))
+        if not self.last_scan:
+            self.text(summary, "STEP 1  Scan your PC", 15, bold=True).pack(anchor="w")
+            self.text(summary, "Choose Scan PC in the top right. Game Grave will look for games "
+                      "and possible mod connections without changing files.",
+                      10, MUTED, wraplength=800).pack(anchor="w", pady=(5, 0))
         else:
-            self.text(controls, "No mod baseline yet. Capturing one records metadata, not file contents.",
-                      10, MUTED).pack(anchor="w", pady=(10, 0))
+            self.text(summary, "Your gaming setup at a glance", 15, bold=True).pack(anchor="w")
+            self.text(summary,
+                      f"{len(dna['games'])} games found   •   "
+                      f"{len(dna['unresolved'])} files or folders need review",
+                      12, ACCENT, True).pack(anchor="w", pady=(9, 4))
+            self.text(summary, "A connection is based on available installation records. "
+                      "Unmatched does not mean abandoned or safe to delete.",
+                      10, MUTED, wraplength=800).pack(anchor="w")
+
+        guide = self.panel(pad=15)
+        guide.pack(fill="x", pady=(0, 12))
+        self.text(guide, "STEP 2  Pick a game", 15, bold=True).pack(anchor="w", pady=(0, 7))
+        self.text(guide, "Choose a game to see how many mod-storage locations are linked to it.",
+                  10, MUTED, wraplength=780).pack(anchor="w", pady=(0, 8))
+        self._dna_game_options = {
+            f"{g['game']}  ·  {g['launcher']}  (#{i + 1})": g
+            for i, g in enumerate(dna["games"])
+        }
+        self.dna_pick_var = tk.StringVar(
+            value=next(iter(self._dna_game_options), "No games found yet"))
+        selector = ttk.Combobox(guide, textvariable=self.dna_pick_var,
+                                values=tuple(self._dna_game_options),
+                                state="readonly", style="Dark.TCombobox", width=55)
+        selector.pack(anchor="w", pady=(0, 9))
+        selector.bind("<<ComboboxSelected>>", lambda _event: self._dna_selected_game())
+        self.dna_explanation_var = tk.StringVar()
+        self._dna_selected_game()
+        self.text(guide, "", 11, textvariable=self.dna_explanation_var,
+                  wraplength=790).pack(anchor="w", pady=(0, 10))
+        self.button(guide, "View visual relationship map",
+                    lambda: self._open_dna_visual_map(dna)).pack(anchor="w")
+
+        next_steps = self.panel(pad=15)
+        next_steps.pack(fill="x", pady=(0, 12))
+        self.text(next_steps, "STEP 3  Check for changes", 15, bold=True).pack(anchor="w")
+        self.text(next_steps, "Save a snapshot of your mod-folder information. The next time "
+                  "you check, Game Grave shows what looks different. No mod files are edited.",
+                  10, MUTED, wraplength=790).pack(anchor="w", pady=(5, 9))
+        self.button(next_steps, "Check what changed", self._capture_intelligence,
+                    primary=True).pack(anchor="w")
+        previous = load_observation()
+        self.text(next_steps, "Previous snapshot: " +
+                  (str(previous.get("time", "date unknown")) if previous else "None yet"),
+                  9, MUTED).pack(anchor="w", pady=(9, 0))
         if getattr(self, "_intel_report", None):
             report = self._intel_report
-            self.text(controls, f"Ghost Watch: {report.get('count', 0)} changes, "
-                      f"{report.get('patch_review', 0)} mod/config files to review. "
-                      "This does not prove what caused a crash.",
-                      11, WARN, True, wraplength=800).pack(anchor="w", pady=(8, 0))
+            self.text(next_steps, f"{report.get('count', 0)} changes detected. "
+                      "Changes are clues, not proof of a broken mod.",
+                      10, WARN, True, wraplength=780).pack(anchor="w", pady=(7, 0))
             for message in what_broke_my_game(report)[:3]:
-                self.text(controls, "• " + message, 9, MUTED, wraplength=820).pack(anchor="w")
-        summary = self.panel(pad=13)
-        summary.pack(fill="both", expand=True)
-        palette = {"panel": PANEL, "raised": RAISED, "text": TEXT,
-                   "muted": MUTED, "line": LINE, "blue": BLUE,
-                   "accent": ACCENT, "warn": WARN}
-        # Keep manager profile tables accessible on smaller monitors.
-        # The full-size diagram is always one click away via "View visual map".
-        if self.winfo_height() >= 830:
-            dna_visual(summary, dna, palette=palette, scanned=bool(self.last_scan)).pack(
-                fill="x", pady=(0, 12))
-        self.text(summary, f"{len(dna['games'])} recorded games · "
-                  f"{len(dna['unresolved'])} unresolved mod/save locations",
-                  14, bold=True).pack(anchor="w", pady=(0, 10))
-        for game in dna["games"][:10]:
-            self.text(summary, f"• {game['game']} ({game['launcher']}): "
-                      f"{len(game['assets'])} associated mod-storage location(s)",
-                      10, MUTED, wraplength=820).pack(anchor="w", pady=3)
-        if len(dna["games"]) > 10:
-            self.text(summary, f"Showing the first 10 of {len(dna['games'])} games.",
-                      9, MUTED).pack(anchor="w", pady=6)
-        report = self.profile_report
-        if report is not None:
-            self.text(summary, f"Read-only manager profiles: {report['count']}",
-                      12, bold=True).pack(anchor="w", pady=(8, 4))
-            profile_rows = report["profiles"]
-            if profile_rows:
-                area = tk.Frame(summary, bg=PANEL, height=180)
+                self.text(next_steps, "• " + message, 9, MUTED,
+                          wraplength=760).pack(anchor="w", pady=2)
+
+        advanced_toggle = tk.Frame(self.content, bg=BG)
+        advanced_toggle.pack(fill="x", pady=(0, 6))
+        self.button(advanced_toggle, "Advanced tools and mod-manager profiles",
+                    self._dna_toggle_advanced).pack(side="left")
+        self.text(advanced_toggle, "Optional: backups, migration, deeper diagnostics",
+                  9, MUTED).pack(side="left", padx=(10, 0))
+        self.dna_advanced_panel = self.panel(pad=15)
+        self.text(self.dna_advanced_panel, "Advanced tools", 14, bold=True).pack(anchor="w", pady=(0, 9))
+        tools1 = tk.Frame(self.dna_advanced_panel, bg=PANEL)
+        tools1.pack(fill="x", pady=(0, 7))
+        self.button(tools1, "Inspect mod-manager profiles", self._inspect_manager_profiles).pack(side="left")
+        self.button(tools1, "Mod ownership audit", self._show_mod_radar_audit).pack(side="left", padx=8)
+        tools2 = tk.Frame(self.dna_advanced_panel, bg=PANEL)
+        tools2.pack(fill="x", pady=(0, 7))
+        self.button(tools2, "Find setup for backup", self._start_auto_kit).pack(side="left")
+        self.button(tools2, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(
+            side="left", padx=8)
+        tools3 = tk.Frame(self.dna_advanced_panel, bg=PANEL)
+        tools3.pack(fill="x", pady=(0, 9))
+        self.button(tools3, "Moving to another PC?", self._preview_exodus).pack(side="left")
+        self.button(tools3, "Export private QA report", self._export_private_m2_qa).pack(
+            side="left", padx=8)
+        profiles = self.profile_report
+        if profiles is not None:
+            self.text(self.dna_advanced_panel,
+                      f"Mod-manager profiles inspected: {profiles['count']}",
+                      12, bold=True).pack(anchor="w", pady=(6, 6))
+            if profiles["profiles"]:
+                area = tk.Frame(self.dna_advanced_panel, bg=PANEL, height=180)
                 area.pack(fill="both", expand=True, pady=(0, 6))
                 self.profile_tree = self._tree(
                     area, ("manager", "profile", "game", "enabled", "disabled", "status"),
-                    ("MANAGER", "PROFILE", "MATCHED GAME", "ENABLED", "DISABLED", "RECORD STATUS"),
-                    (115, 130, 190, 75, 80, 185))
+                    ("MANAGER", "PROFILE", "GAME", "ON", "OFF", "DATA STATUS"),
+                    (115, 130, 190, 65, 65, 170))
                 self.profile_lookup = {}
-                for idx, profile in enumerate(profile_rows):
+                for idx, profile in enumerate(profiles["profiles"]):
                     stats = summarize_manager_profile(profile)
                     self.profile_lookup[str(idx)] = profile
-                    game = profile.get("verified_game") or "Unverified"
-                    status = ("Stale snapshot" if profile.get("stale") else
-                              "Incomplete" if stats["incomplete"] else "Recorded only")
+                    name = profile.get("verified_game") or "Unverified"
+                    status = ("Outdated snapshot" if profile.get("stale") else
+                              "Incomplete" if stats["incomplete"] else "Recorded data")
                     self.profile_tree.insert("", "end", iid=str(idx),
-                        values=(profile["manager"], profile["profile"], game,
+                        values=(profile["manager"], profile["profile"], name,
                                 stats["enabled"], stats["disabled"], status))
                 self.profile_tree.bind("<Double-1>", lambda _event: self._view_manager_profile())
-                self.button(summary, "View selected profile details",
+                self.button(self.dna_advanced_panel, "View selected profile",
                             self._view_manager_profile).pack(anchor="w", pady=(2, 8))
-            for note in report.get("warnings", [])[:2]:
-                self.text(summary, "• " + note, 9, WARN, wraplength=810).pack(anchor="w", pady=2)
+            for warning in profiles.get("warnings", [])[:2]:
+                self.text(self.dna_advanced_panel, "• " + warning, 9, WARN,
+                          wraplength=780).pack(anchor="w")
+        self.text(self.dna_advanced_panel,
+                  "Unknown associations always stay protected. These tools only inspect "
+                  "available records until you explicitly approve a separate action.",
+                  9, MUTED, wraplength=780).pack(anchor="w", pady=(9, 0))
+        if getattr(self, "_dna_advanced_open", False):
+            self.dna_advanced_panel.pack(fill="x", pady=(0, 12))
+
+    def _dna_selected_game(self):
+        game = self._dna_game_options.get(self.dna_pick_var.get())
+        if game is None:
+            self.dna_explanation_var.set("Run Scan PC to start. No games are listed yet.")
+            return
+        count = len(game["assets"])
+        self.dna_explanation_var.set(
+            f"{game['game']}  •  {game['launcher']}\n"
+            f"{count} mod-storage location(s) linked using available records. "
+            "A link is not permission to delete anything.")
+
+    def _dna_toggle_advanced(self):
+        self._dna_advanced_open = not getattr(self, "_dna_advanced_open", False)
+        if self._dna_advanced_open:
+            self.dna_advanced_panel.pack(fill="x", pady=(0, 12))
         else:
-            self.text(summary, "Inspect manager profiles to read MO2 modlists and Vortex backup metadata.",
-                      10, MUTED, wraplength=800).pack(anchor="w", pady=6)
-        self.text(summary, "Unresolved does not mean abandoned. Association does not mean safe to delete. "
-                  "For full folder evidence, use File Detective in Game Mods or The Graveyard.",
-                  9, WARN, wraplength=820).pack(anchor="w", pady=(12, 0))
+            self.dna_advanced_panel.pack_forget()
 
     def _open_dna_visual_map(self, dna):
         """Readable, zoomable native diagram; never launches any file action."""
@@ -966,7 +1021,7 @@ class GameGraveApp(tk.Tk):
             "next time you play, which can cause longer loading or temporary stutter.\n\n"
             "Files go to the Windows Recycle Bin, so disk space may not be freed immediately.\n"
             "No saves, mods, installed game files, or shared GPU caches will be removed.\n\n"
-            "Recycle ONLY these verified shader-cache files?",
+            "Delete ONLY these verified shader-cache files?",
             parent=self,
         ):
             return
@@ -1308,133 +1363,179 @@ class GameGraveApp(tk.Tk):
 
 
     def _graveyard_page(self):
-        """The user controls presentation; protection is independent of the view."""
-        self.header("The Graveyard", "Find old game-related content. Customize, save and reuse your review views.")
+        """Clear review workflow, with advanced filters available on demand."""
+        self.header("The Graveyard", "Find forgotten gaming files and clips. Review before deleting.")
+        # Tk destroys widgets on navigation, but Python attributes otherwise survive.
+        # Clear old buttons before populating the new page and refreshing their states.
+        for old_button in ("grave_delete_button", "grave_protection_button",
+                           "grave_delete_checked_button"):
+            if hasattr(self, old_button):
+                delattr(self, old_button)
         self._applying_grave_preset = False
         saved = sanitize_saved_views(self.settings.get("graveyard_saved_views", {}))
         self.settings["graveyard_saved_views"] = saved
-        toolbar = tk.Frame(self.content, bg=BG)
-        toolbar.pack(fill="x", pady=(0, 5))
-        self.text(toolbar, "Age", 9, MUTED).pack(side="left")
-        self.grave_days_var = tk.StringVar(value=str(self.settings.get("graveyard_days", 365)))
-        age = ttk.Combobox(toolbar, textvariable=self.grave_days_var,
-                           values=("180", "365", "730", "1095"), state="readonly",
-                           style="Dark.TCombobox", width=5)
-        age.pack(side="left", padx=(6, 14))
-        age.bind("<<ComboboxSelected>>", self._change_grave_days)
-        self.text(toolbar, "Category", 9, MUTED).pack(side="left")
         self.graveyard_entries = build_graveyard(
             self.games, self.mod_folders, self.old_files,
             self.settings.get("graveyard_days", 365), self.settings.get("never_touch", []),
-            watched_mods=self.settings.get("graveyard_watchlist", []))
+            watched_mods=self.settings.get("graveyard_watchlist", []),
+            recordings=getattr(self, "recordings", []))
+
+        search_row = tk.Frame(self.content, bg=BG)
+        search_row.pack(fill="x", pady=(0, 8))
+        self.text(search_row, "Find", 10, MUTED).pack(side="left")
+        self.grave_search_var = tk.StringVar(value=self.settings.get("graveyard_search", ""))
+        tk.Entry(search_row, textvariable=self.grave_search_var, bg=PANEL, fg=TEXT,
+                 insertbackground=TEXT, relief="flat", font=("Segoe UI", 11), width=32).pack(
+                 side="left", padx=(8, 15), ipady=7)
+        self.text(search_row, "Older than", 10, MUTED).pack(side="left")
+        self.grave_days_var = tk.StringVar(value=str(self.settings.get("graveyard_days", 365)))
+        days = ttk.Combobox(search_row, textvariable=self.grave_days_var,
+                            values=("180", "365", "730", "1095"), state="readonly",
+                            style="Dark.TCombobox", width=6)
+        days.pack(side="left", padx=(7, 13))
+        days.bind("<<ComboboxSelected>>", self._change_grave_days)
+        self.button(search_row, "More filters", self._grave_toggle_advanced).pack(side="left")
+        self.grave_search_var.trace_add("write", lambda *_: self._grave_view_changed())
+
+        self.grave_extra_filters = tk.Frame(self.content, bg=BG)
+        row = tk.Frame(self.grave_extra_filters, bg=BG)
+        row.pack(fill="x", pady=(0, 6))
         categories = ("All types", *sorted({e.category for e in self.graveyard_entries}))
         current_cat = self.settings.get("graveyard_category", "All types")
-        # A category may be absent after a different scan. Show all, don't silently hide results.
         if current_cat not in categories:
             current_cat = "All types"
+        self.text(row, "Type", 9, MUTED).pack(side="left")
         self.grave_category_var = tk.StringVar(value=current_cat)
-        category = ttk.Combobox(toolbar, textvariable=self.grave_category_var,
-                                values=categories, state="readonly", style="Dark.TCombobox", width=23)
+        category = ttk.Combobox(row, textvariable=self.grave_category_var, values=categories,
+                                state="readonly", style="Dark.TCombobox", width=24)
         category.pack(side="left", padx=(6, 14))
         category.bind("<<ComboboxSelected>>", self._grave_view_changed)
-        self.text(toolbar, "Safety", 9, MUTED).pack(side="left")
-        self.grave_status_var = tk.StringVar(value=self.settings.get("graveyard_status", "All findings"))
-        safety = ttk.Combobox(toolbar, textvariable=self.grave_status_var,
-                              values=GRAVE_STATES, state="readonly", style="Dark.TCombobox", width=23)
+        self.text(row, "Status", 9, MUTED).pack(side="left")
+        self.grave_status_var = tk.StringVar(
+            value=("Ready to delete" if self.settings.get("graveyard_status") == "Reviewable archives"
+                   else self.settings.get("graveyard_status", "All findings")))
+        safety = ttk.Combobox(row, textvariable=self.grave_status_var, values=GRAVE_STATES,
+                              state="readonly", style="Dark.TCombobox", width=23)
         safety.pack(side="left", padx=(6, 0))
         safety.bind("<<ComboboxSelected>>", self._grave_view_changed)
-
-        toolbar2 = tk.Frame(self.content, bg=BG)
-        toolbar2.pack(fill="x", pady=(0, 5))
-        self.text(toolbar2, "Search", 9, MUTED).pack(side="left")
-        self.grave_search_var = tk.StringVar(value=self.settings.get("graveyard_search", ""))
-        tk.Entry(toolbar2, textvariable=self.grave_search_var, bg=PANEL, fg=TEXT,
-                 insertbackground=TEXT, relief="flat", font=("Segoe UI", 10), width=23).pack(
-                 side="left", padx=(6, 12), ipady=5)
-        self.grave_search_var.trace_add("write", lambda *_: self._grave_view_changed())
-        self.text(toolbar2, "Minimum", 9, MUTED).pack(side="left")
+        row2 = tk.Frame(self.grave_extra_filters, bg=BG)
+        row2.pack(fill="x", pady=(0, 6))
+        self.text(row2, "Minimum size", 9, MUTED).pack(side="left")
         self.grave_min_size_var = tk.StringVar(value=self.settings.get("graveyard_min_size", "Any size"))
-        minimum = ttk.Combobox(toolbar2, textvariable=self.grave_min_size_var,
-                               values=tuple(GRAVE_SIZES), state="readonly", style="Dark.TCombobox", width=10)
-        minimum.pack(side="left", padx=(6, 12))
+        minimum = ttk.Combobox(row2, textvariable=self.grave_min_size_var,
+                               values=tuple(GRAVE_SIZES), state="readonly",
+                               style="Dark.TCombobox", width=11)
+        minimum.pack(side="left", padx=(6, 14))
         minimum.bind("<<ComboboxSelected>>", self._grave_view_changed)
-        self.text(toolbar2, "Sort", 9, MUTED).pack(side="left")
+        self.text(row2, "Sort by", 9, MUTED).pack(side="left")
         self.grave_sort_var = tk.StringVar(value=self.settings.get("graveyard_sort", "Size"))
-        sort = ttk.Combobox(toolbar2, textvariable=self.grave_sort_var,
-                            values=GRAVE_SORT_KEYS, state="readonly", style="Dark.TCombobox", width=10)
-        sort.pack(side="left", padx=(6, 8))
+        sort = ttk.Combobox(row2, textvariable=self.grave_sort_var, values=GRAVE_SORT_KEYS,
+                            state="readonly", style="Dark.TCombobox", width=11)
+        sort.pack(side="left", padx=(6, 9))
         sort.bind("<<ComboboxSelected>>", self._grave_view_changed)
         self.grave_order_var = tk.StringVar(value=self.settings.get("graveyard_order", "Descending"))
-        direction = ttk.Combobox(toolbar2, textvariable=self.grave_order_var,
-                                 values=SORT_DIRECTIONS, state="readonly", style="Dark.TCombobox", width=12)
+        direction = ttk.Combobox(row2, textvariable=self.grave_order_var,
+                                 values=SORT_DIRECTIONS, state="readonly",
+                                 style="Dark.TCombobox", width=13)
         direction.pack(side="left")
         direction.bind("<<ComboboxSelected>>", self._grave_view_changed)
 
-        toolbar3 = tk.Frame(self.content, bg=BG)
-        toolbar3.pack(fill="x", pady=(0, 9))
-        self.text(toolbar3, "Saved views", 9, MUTED).pack(side="left")
+        views = tk.Frame(self.grave_extra_filters, bg=BG)
+        views.pack(fill="x", pady=(0, 7))
+        self.text(views, "Saved view", 9, MUTED).pack(side="left")
         self.grave_preset_var = tk.StringVar(value="Custom")
-        self.grave_preset_selector = ttk.Combobox(toolbar3, textvariable=self.grave_preset_var,
-                            values=("Custom", *sorted(saved)), state="readonly",
-                            style="Dark.TCombobox", width=24)
+        self.grave_preset_selector = ttk.Combobox(
+            views, textvariable=self.grave_preset_var, values=("Custom", *sorted(saved)),
+            state="readonly", style="Dark.TCombobox", width=22)
         self.grave_preset_selector.pack(side="left", padx=(6, 9))
         self.grave_preset_selector.bind("<<ComboboxSelected>>", self._grave_load_view)
-        self.button(toolbar3, "Save view", self._grave_save_view).pack(side="left", padx=(0, 8))
-        self.button(toolbar3, "Remove saved view", self._grave_remove_view).pack(side="left", padx=(0, 8))
-        self.button(toolbar3, "Reset filters", self._grave_reset_view).pack(side="left")
+        self.button(views, "Save", self._grave_save_view).pack(side="left", padx=(0, 6))
+        self.button(views, "Remove", self._grave_remove_view).pack(side="left", padx=(0, 6))
+        self.button(views, "Reset", self._grave_reset_view).pack(side="left")
 
-        note = self.panel(pad=9)
-        note.pack(fill="x", pady=(0, 8))
+        note = self.panel(pad=12)
+        note.pack(fill="x", pady=(0, 9))
+        self.grave_count_panel = note
         self.grave_count_var = tk.StringVar()
-        self.text(note, "", 10, bold=True, textvariable=self.grave_count_var).pack(anchor="w")
-        self.text(note,
-                  "Tick files you want to recycle. Installed games, mod folders, saves and profiles "
-                  "cannot be removed here. You may override your own Never Touch setting for an "
-                  "ordinary archive, but only after an extra confirmation.",
-                  9, WARN, wraplength=850).pack(anchor="w", pady=(5, 0))
+        self.text(note, "", 11, bold=True, textvariable=self.grave_count_var).pack(anchor="w")
+        self.grave_selection_var = tk.StringVar(value="Select a finding to see available actions.")
+        self.text(note, "", 10, textvariable=self.grave_selection_var,
+                  wraplength=800).pack(anchor="w", pady=(4, 0))
+        self.text(note, "Select one file below. Delete moves it to Windows Recycle Bin after approval. "
+                  "Protect prevents deleting that item; Unprotect removes only your own rule. "
+                  "Installed games and managed mods remain protected.",
+                  9, MUTED, wraplength=830).pack(anchor="w", pady=(4, 0))
+
         area = self.panel(pad=8)
         area.pack(fill="both", expand=True)
         self.grave_tree = self._tree(area,
             ("check", "name", "category", "age", "size", "decision"),
-            ("✓", "FINDING", "CATEGORY", "AGE SIGNAL", "APPARENT SIZE", "ACTION"),
-            (38, 210, 170, 92, 105, 140))
+            ("SELECT", "FILE OR GAME", "TYPE", "LAST MODIFIED", "SIZE", "STATUS"),
+            (54, 235, 160, 112, 108, 146))
         self.grave_tree.tag_configure("protected", foreground=WARN)
         self.grave_tree.bind("<Double-1>", lambda _e: self._grave_details())
         self.grave_tree.bind("<Button-1>", self._grave_toggle_click)
         self.grave_tree.bind("<space>", self._grave_toggle_keyboard)
-        # Mouse and keyboard menus must target the selected row, not a stale item.
         self.grave_tree.bind("<Button-3>", self._grave_context_click)
         self.grave_tree.bind("<Shift-F10>", self._grave_context_keyboard)
         self.grave_tree.bind("<Menu>", self._grave_context_keyboard)
-        self.grave_tree.heading("name", command=lambda: self._grave_column_sort("Name"))
-        self.grave_tree.heading("category", command=lambda: self._grave_column_sort("Category"))
-        self.grave_tree.heading("age", command=lambda: self._grave_column_sort("Age"))
-        self.grave_tree.heading("size", command=lambda: self._grave_column_sort("Size"))
-        self.grave_tree.heading("decision", command=lambda: self._grave_column_sort("Safety"))
+        self.grave_tree.bind("<<TreeviewSelect>>", lambda _e: self._grave_sync_actions())
+        for column, sort_key in (("name", "Name"), ("category", "Category"),
+                                 ("age", "Age"), ("size", "Size"), ("decision", "Safety")):
+            self.grave_tree.heading(column, command=lambda key=sort_key: self._grave_column_sort(key))
         self.graveyard_lookup = {}
         self._grave_page_keys = set()
         self._add_page_controls("grave", self._populate_graveyard)
         self._populate_graveyard()
+
         actions = tk.Frame(self.content, bg=BG)
-        actions.pack(fill="x", pady=(8, 0))
-        self.button(actions, "Why is this here?", self._grave_details).pack(side="left")
-        self.button(actions, "Check eligible on page", self._grave_select_eligible).pack(side="left", padx=(7, 0))
-        self.button(actions, "Check page", self._grave_select_all).pack(side="left", padx=(7, 0))
-        self.button(actions, "Clear checks", self._grave_clear_checks).pack(side="left", padx=(7, 0))
-        cleanup_actions = tk.Frame(self.content, bg=BG)
-        cleanup_actions.pack(fill="x", pady=(5, 0))
-        self.button(cleanup_actions, "Recycle one", self._grave_recycle_one).pack(side="left")
-        self.button(cleanup_actions, "Recycle checked (max 160)", self._grave_recycle_selected, primary=True).pack(side="left", padx=(7, 0))
-        self.button(cleanup_actions, "Recycle eligible on page", self._grave_recycle_all, danger=True).pack(side="left", padx=(7, 0))
-        utilities = tk.Frame(self.content, bg=BG)
-        utilities.pack(fill="x", pady=(6, 0))
-        self.button(utilities, "Open Folder", self._grave_open_folder).pack(side="left")
-        self.button(utilities, "Protect / Unprotect", self._grave_toggle_protection).pack(side="left", padx=(7, 0))
-        self.text(self.content, "Checks persist when you change pages within this filtered view. 'Check page' "
-                  "and 'Recycle eligible on page' affect only the displayed page. Cleanup is limited "
-                  "to 160 entries per explicit approval, with protected files blocked. "
-                  "Recycle Bin storage is NOT freed disk space.",
-                  9, MUTED, wraplength=850).pack(anchor="w", pady=(7, 0))
+        actions.pack(fill="x", pady=(9, 0))
+        self.grave_delete_button = self.button(actions, "Delete selected", self._grave_recycle_one, primary=True)
+        self.grave_delete_button.pack(side="left")
+        self.grave_protection_button = self.button(actions, "Protect selected", self._grave_toggle_protection)
+        self.grave_protection_button.pack(side="left", padx=(8, 0))
+        self.button(actions, "Open folder", self._grave_open_folder).pack(side="left", padx=(8, 0))
+        self.button(actions, "Why is this here?", self._grave_details).pack(side="left", padx=(8, 0))
+        bulk = tk.Frame(self.content, bg=BG)
+        bulk.pack(fill="x", pady=(7, 0))
+        self.button(bulk, "Check eligible", self._grave_select_eligible).pack(side="left")
+        self.button(bulk, "Check page", self._grave_select_all).pack(side="left", padx=(7, 0))
+        self.button(bulk, "Clear checks", self._grave_clear_checks).pack(side="left", padx=(7, 0))
+        self.grave_delete_checked_button = self.button(bulk, "Delete checked", self._grave_recycle_selected, danger=True)
+        self.grave_delete_checked_button.pack(side="left", padx=(7, 0))
+        self.text(self.content,
+                  "Delete is reversible through Windows Recycle Bin when recovery is available. "
+                  "It does not free space until you empty the bin. Max 160 files per approval.",
+                  9, MUTED, wraplength=820).pack(anchor="w", pady=(10, 0))
+        self._grave_sync_actions()
+
+    def _grave_toggle_advanced(self):
+        if self.grave_extra_filters.winfo_manager():
+            self.grave_extra_filters.pack_forget()
+        else:
+            self.grave_extra_filters.pack(fill="x", pady=(0, 8), before=self.grave_count_panel)
+
+    def _grave_sync_actions(self):
+        entry = self._grave_selected_entry()
+        action, reason = protection_action(
+            entry.path, self.settings.get("never_touch", [])) if (
+                entry and entry.old_file is not None) else (None, "")
+        if hasattr(self, "grave_delete_button"):
+            self.grave_delete_button.configure(state="normal" if entry and entry.can_recycle else "disabled")
+        if hasattr(self, "grave_protection_button"):
+            self.grave_protection_button.configure(
+                text=(action + " selected") if action else "Protected by Game Grave",
+                state="normal" if action else "disabled")
+        if hasattr(self, "grave_delete_checked_button"):
+            self.grave_delete_checked_button.configure(
+                state="normal" if self.grave_checked else "disabled")
+        if hasattr(self, "grave_selection_var"):
+            if entry is None:
+                self.grave_selection_var.set("Select a finding to see available actions.")
+            else:
+                status = ("Ready for reviewed deletion" if entry.can_recycle else
+                          reason if reason else entry.protection)
+                self.grave_selection_var.set(f"Selected: {entry.name}  •  {status}")
 
     def _populate_graveyard(self):
         if not hasattr(self, "grave_tree") or not self.grave_tree.winfo_exists():
@@ -1458,8 +1559,8 @@ class GameGraveApp(tk.Tk):
                 "☑" if item.key in self.grave_checked else "☐",
                 item.name, item.category, f"{item.age_days} days" if item.age_days is not None else "Unknown",
                 human_size(item.apparent_bytes),
-                "Recycle after review" if item.can_recycle else
-                ("Override possible" if override else "Protected: no direct delete")),
+                "Ready to delete" if item.can_recycle else
+                ("Protected by you" if override else "Review only / protected")),
                 tags=() if item.can_recycle else ("protected",))
         still_selected = [key for key in selected if key in self._grave_page_keys]
         if still_selected:
@@ -1469,6 +1570,8 @@ class GameGraveApp(tk.Tk):
             f"  •  {sum(entry.can_recycle for entry in visible)} eligible across pages")
         self._update_inventory_page("grave", page)
         self._grave_update_count()
+        if hasattr(self, "grave_delete_button"):
+            self._grave_sync_actions()
 
     def _grave_view_changed(self, event=None):
         if self._applying_grave_preset:
@@ -1580,6 +1683,9 @@ class GameGraveApp(tk.Tk):
             return
         key = self.grave_tree.identify_row(event.y)
         self._grave_toggle(key)
+        if key:
+            self.grave_tree.selection_set(key)
+            self.grave_tree.focus(key)
         return "break"
 
     def _grave_toggle_keyboard(self, event=None):
@@ -1601,6 +1707,8 @@ class GameGraveApp(tk.Tk):
             self.grave_checked.add(key)
         self.grave_tree.set(key, "check", "☑" if key in self.grave_checked else "☐")
         self._grave_update_count()
+        if hasattr(self, "grave_delete_checked_button"):
+            self._grave_sync_actions()
 
     def _grave_select_all(self):
         # "Check page" must not silently select thousands of other findings.
@@ -1621,6 +1729,8 @@ class GameGraveApp(tk.Tk):
         for key in self._grave_page_keys:
             self.grave_tree.set(key, "check", "☑" if key in self.grave_checked else "☐")
         self._grave_update_count()
+        if hasattr(self, "grave_delete_checked_button"):
+            self._grave_sync_actions()
 
     def _grave_details(self):
         ids = self.grave_tree.selection()
@@ -1663,27 +1773,42 @@ class GameGraveApp(tk.Tk):
     def _grave_toggle_protection(self):
         entry = self._grave_selected_entry()
         if entry is None:
-            messagebox.showinfo("Select one", "Select one Graveyard finding first.")
+            messagebox.showinfo("Choose a file", "Click an individual file in the Graveyard first.")
+            return
+        if entry.old_file is None:
+            messagebox.showinfo("Managed file protection",
+                "Installed games and managed folders are protected by Game Grave.")
             return
         action, reason = protection_action(entry.path, self.settings.get("never_touch", []))
         if action is None:
             messagebox.showinfo("Protected by Game Grave", reason)
             return
-        if action == "Unprotect" and not messagebox.askyesno("Remove personal protection?",
-                f"Stop protecting this specific item?\n\n{entry.path}\n\n"
-                "No files will be deleted. Built-in safety rules still apply."):
+        if action == "Unprotect" and not messagebox.askyesno(
+                "Unprotect this file?",
+                f"Remove only your Never Touch rule for this file?\n\n{entry.path}\n\n"
+                "No files will be deleted. Built-in protection remains enabled."):
             return
-        updated = set_item_protection(self.settings.get("never_touch", []), entry.path,
-                                      protect=(action == "Protect"))
-        self.settings["never_touch"] = updated
-        save_settings(self.settings)
-        # Recompute can_recycle; never reuse stale eligibility after a protection change.
+        try:
+            updated = set_item_protection(self.settings.get("never_touch", []), entry.path,
+                                          protect=(action == "Protect"))
+            self.settings["never_touch"] = updated
+            save_settings(self.settings)
+        except (ValueError, OSError) as exc:
+            messagebox.showerror("Protection unchanged", str(exc))
+            return
         self.graveyard_entries = build_graveyard(
             self.games, self.mod_folders, self.old_files,
             self.settings.get("graveyard_days", 365), updated,
-            watched_mods=self.settings.get("graveyard_watchlist", []))
+            watched_mods=self.settings.get("graveyard_watchlist", []),
+            recordings=getattr(self, "recordings", []))
+        if action == "Protect":
+            self.grave_checked.discard(entry.key)
         self._populate_graveyard()
-        self.status_text.set(f"{action} applied. No files were deleted.")
+        self.status_text.set(f"{entry.name}: {action} succeeded. No files were deleted.")
+        messagebox.showinfo("Protection changed", f"{entry.name}\n\n" +
+            ("Now protected. Delete is disabled." if action == "Protect" else
+             "Personal protection removed. Deletion still requires explicit approval.") +
+            "\n\nNo files were deleted.")
 
     def _grave_context_click(self, event):
         key = self.grave_tree.identify_row(event.y)
@@ -1709,16 +1834,17 @@ class GameGraveApp(tk.Tk):
         entry = self._grave_selected_entry()
         if entry is None:
             return
-        action, _reason = protection_action(entry.path, self.settings.get("never_touch", []))
+        action, _reason = (protection_action(entry.path, self.settings.get("never_touch", []))
+                           if entry.old_file is not None else (None, "Managed item"))
         menu = tk.Menu(self.grave_tree, tearoff=False)
         menu.add_command(label="Details", command=self._grave_details)
-        menu.add_command(label="Open Folder", command=self._grave_open_folder)
+        menu.add_command(label="Open folder", command=self._grave_open_folder)
         menu.add_command(label=action or "Protected by Game Grave",
                          command=self._grave_toggle_protection,
                          state="normal" if action else "disabled")
         menu.add_separator()
-        menu.add_command(label="Move to Recycle Bin…", command=self._grave_recycle_one,
-                         state="normal" if entry.can_recycle or self._grave_can_override(entry) else "disabled")
+        menu.add_command(label="Delete…", command=self._grave_recycle_one,
+                         state="normal" if entry.can_recycle else "disabled")
         try:
             menu.tk_popup(x, y)
         finally:
@@ -1734,11 +1860,14 @@ class GameGraveApp(tk.Tk):
     def _grave_recycle_one(self):
         ids = self.grave_tree.selection()
         if len(ids) != 1:
-            messagebox.showinfo("Select one", "Select exactly one eligible archive to recycle.")
+            messagebox.showinfo("Select one", "Select exactly one file to delete.")
             return
         self._grave_recycle_ids(ids)
 
     def _grave_recycle_selected(self):
+        if not self.grave_checked:
+            messagebox.showinfo("Nothing checked", "Tick files in the leftmost column first.")
+            return
         self._grave_recycle_ids(list(self.grave_checked))
 
     def _grave_recycle_all(self):
@@ -1748,89 +1877,82 @@ class GameGraveApp(tk.Tk):
 
     def _grave_recycle_ids(self, ids):
         import uuid
-        # Fail closed before any override or recycle prompt if too many items.
-        # No invisible cross-page batch can become a massive destructive task.
         if len(ids) > DEFAULT_PAGE_SIZE:
-            messagebox.showwarning(
-                "Limit this cleanup to 160 files",
-                f"{len(ids)} items are checked across pages. A single cleanup "
-                f"can contain at most {DEFAULT_PAGE_SIZE} files. Narrow your filters, "
-                "clear checks, or select a smaller set. Nothing was moved.")
+            messagebox.showwarning("Too many files selected",
+                f"Select at most {DEFAULT_PAGE_SIZE} files per cleanup. "
+                "Narrow your filters or clear checks. Nothing was deleted.")
             return
         chosen = [self.graveyard_lookup[k] for k in ids if k in self.graveyard_lookup]
-        blocked = [e for e in chosen if not e.can_recycle and not self._grave_can_override(e)]
-        if blocked:
-            messagebox.showwarning("Protected items cannot be deleted here",
-                f"{len(blocked)} selection(s) are installed games, managed mods, saves, "
-                "or uncertain folders. Use the owning game or mod manager to remove them. "
-                "Nothing was changed.")
-            return
         if not chosen:
-            messagebox.showinfo("Nothing checked", "Check one or more individual archives to recycle.")
+            messagebox.showinfo("No files selected", "Choose a file or tick eligible files first.")
             return
-        overrides = [e for e in chosen if self._grave_can_override(e)]
-        if overrides:
-            names = "\n".join("• " + e.name for e in overrides[:6])
-            if not messagebox.askyesno("Override your Never Touch protection?",
-                f"{len(overrides)} file(s) are on YOUR Never Touch list.\n\n{names}\n\n"
-                "Overrides apply only to these individually selected archives. "
-                "This does not permit deleting game folders, saves, profiles, or system files.\n\n"
-                "Do you want to remove these protections for this cleanup only?"):
-                return
-            typed = simpledialog.askstring("Extra confirmation required",
-                "Type DELETE to confirm overriding protected archives:", parent=self)
-            if typed != "DELETE":
-                messagebox.showinfo("Nothing removed", "Override confirmation was not entered.")
-                return
+        blocked = [e for e in chosen if not e.can_recycle]
+        if blocked:
+            messagebox.showwarning("Protected: deletion blocked",
+                f"{len(blocked)} selected item(s) cannot be deleted here. "
+                "A personally protected file must be Unprotected first. "
+                "Installed games, saves, profiles and mod folders stay protected. "
+                "Nothing was deleted.")
+            return
         total = sum(e.apparent_bytes for e in chosen)
         preview = "\n".join("• " + e.name for e in chosen[:7])
         if len(chosen) > 7:
             preview += f"\n…and {len(chosen)-7} more"
-        if not messagebox.askyesno("Confirm Game Grave cleanup",
-                f"Send {len(chosen)} file(s) ({human_size(total)} apparent size) to the "
+        if not messagebox.askyesno("Delete selected files?",
+                f"Move {len(chosen)} file(s) ({human_size(total)} apparent size) to the "
                 "Windows Recycle Bin?\n\n" + preview +
-                "\n\nThese archives may be needed for reinstalling mods. "
-                "This does not immediately free disk space. Recovery is not guaranteed."):
+                "\n\nCheck recordings and mod archives before deleting. "
+                "No permanent delete is performed. Space is not freed until the "
+                "Recycle Bin is emptied. Recovery is not guaranteed."):
             return
         session = str(uuid.uuid4())
-        log_event("Cleanup started", f"Graveyard selected {len(chosen)} items", session_id=session,
-                  source="The Graveyard")
-        completed = 0
-        skipped = []
+        log_event("Cleanup started", f"Graveyard selected {len(chosen)} items",
+                  session_id=session, source="The Graveyard")
+        completed, skipped = 0, []
         for entry in chosen:
             f = entry.old_file
             try:
                 if f is None or not is_unchanged(f):
-                    raise ValueError("File changed since scan or isn't an ordinary archive")
-                if is_protected_path(Path(f.path), []):
-                    raise ValueError("Protected game, save or system location")
-                if is_protected_path(Path(f.path), self.settings.get("never_touch", [])) and entry not in overrides:
-                    raise ValueError("User-protected file without override")
-                if not Path(f.path).is_file() or not looks_like_game_archive(Path(f.path)):
-                    raise ValueError("No longer recognized as a game-related archive")
-                recycle_file(Path(f.path))
+                    raise ValueError("File changed since scan; rescan before deleting.")
+                path = Path(f.path)
+                if is_protected_path(path, self.settings.get("never_touch", [])):
+                    raise ValueError("Protected by Game Grave or your Never Touch list.")
+                eligible = (looks_like_game_archive(path) or
+                            (entry.category == "Old game recording" and
+                             path.suffix.casefold() in RECORDING_EXTENSIONS))
+                if not path.is_file() or not eligible:
+                    raise ValueError("This is no longer a recognized reviewable file.")
+                recycle_file(path)
                 try:
-                    rid = register_recycle(Path(f.path), f.size, "Graveyard")
+                    rid = register_recycle(path, f.size, "Graveyard")
                 except OSError:
                     rid = None
-                    log_event("Recovery warning", "Undo Center entry not saved", session_id=session,
-                              path=str(f.path), source="The Graveyard")
-                log_event("Manual recycled", "Graveyard archive recycled", session_id=session,
-                          path=str(f.path), size_bytes=f.size, source="The Graveyard",
-                          result="Recycled", recovery_id=rid)
+                    log_event("Recovery warning", "Undo Center entry not saved",
+                              session_id=session, path=str(path), source="The Graveyard")
+                log_event("Manual recycled", "Graveyard file sent to Recycle Bin",
+                          session_id=session, path=str(path), size_bytes=f.size,
+                          source="The Graveyard", result="Recycled", recovery_id=rid)
                 completed += 1
             except (OSError, ValueError, RuntimeError) as exc:
                 skipped.append(f"{entry.name}: {exc}")
-                log_event("Cleanup skipped", str(exc), session_id=session, path=entry.path,
-                          source="The Graveyard", result="Skipped")
-        log_event("Cleanup finished", f"Graveyard: {completed} recycled, {len(skipped)} skipped. "
-                  "Recycle Bin may still occupy space.", session_id=session, source="The Graveyard")
-        self.status_text.set(f"Graveyard: {completed} files sent to Recycle Bin")
+                log_event("Cleanup skipped", str(exc), session_id=session,
+                          path=entry.path, source="The Graveyard", result="Skipped")
+        log_event("Cleanup finished",
+                  f"Graveyard: {completed} recycled, {len(skipped)} skipped. "
+                  "Recycle Bin may still occupy space.", session_id=session,
+                  source="The Graveyard")
+        self.status_text.set(f"Graveyard: {completed} moved to Recycle Bin; {len(skipped)} not moved")
         self.grave_checked.clear()
         self.scan_all()
-        messagebox.showinfo("Graveyard cleanup", f"{completed} file(s) recycled; "
-                            f"{len(skipped)} skipped.\n\n" + "\n".join(skipped[:5]) +
-                            "\n\nEmpty the Recycle Bin separately to actually free space.")
+        outcome = (f"{completed} moved to Recycle Bin. {len(skipped)} not moved.\n\n" +
+                   "\n".join(skipped[:6]) +
+                   "\n\nIf Windows could not verify a recoverable Recycle Bin, "
+                   "Game Grave blocked deletion. Use File Explorer to investigate. "
+                   "Empty Recycle Bin separately when ready to free space.")
+        if skipped:
+            messagebox.showwarning("Deletion blocked for some files", outcome)
+        else:
+            messagebox.showinfo("Delete complete", outcome)
 
     def _files_page(self):
         self.header("Old Files", "Review files by last-modified date. Multi-select and send only what you choose to Recycle Bin.")
@@ -1863,7 +1985,7 @@ class GameGraveApp(tk.Tk):
         self._populate_files()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(14, 0))
-        self.button(actions, "Send selected to Recycle Bin", self._recycle_selected, primary=True).pack(side="left")
+        self.button(actions, "Delete selected", self._recycle_selected, primary=True).pack(side="left")
         self.button(actions, "Select all shown", lambda: self.file_tree.selection_set(self.file_tree.get_children())).pack(
             side="left", padx=12)
         self.button(actions, "Open containing folder", self._open_file_folder).pack(side="left")
@@ -1922,9 +2044,9 @@ class GameGraveApp(tk.Tk):
             return
         items = [self.file_lookup[k] for k in self.file_tree.selection() if k in self.file_lookup]
         if not items:
-            messagebox.showinfo("No files selected", "Select the files you want to recycle.")
+            messagebox.showinfo("No files selected", "Select the files you want to delete.")
             return
-        if not messagebox.askyesno("Recycle these files?",
+        if not messagebox.askyesno("Delete selected files?",
                                    f"Send {len(items)} selected files ({human_size(sum(f.size for f in items))}) "
                                    "to the Windows Recycle Bin?\n\nYou can restore them from there until the bin is emptied."):
             return
@@ -1948,8 +2070,8 @@ class GameGraveApp(tk.Tk):
         self.status_text.set(f"{success} files sent to Recycle Bin")
         self.scan_all()
         if errors:
-            messagebox.showwarning("Some files were skipped",
-                                   f"Recycled: {success}. Skipped: {len(errors)}.\n\n" + "\n".join(errors[:7]))
+            messagebox.showwarning("Some files could not be deleted",
+                                   f"Moved to Recycle Bin: {success}. Not moved: {len(errors)}.\n\n" + "\n".join(errors[:7]))
         else:
             messagebox.showinfo("Cleanup complete", f"{success} files sent to Recycle Bin. Empty it later to reclaim space.")
 
@@ -1961,7 +2083,7 @@ class GameGraveApp(tk.Tk):
         self.text(settings, "Sunday at 12:00 PM  •  Windows Task Scheduler  •  initially OFF", 10, MUTED).pack(anchor="w")
         cfg = tk.Frame(settings, bg=PANEL)
         cfg.pack(fill="x", pady=(19, 12))
-        self.text(cfg, "Recycle files older than", 11).pack(side="left")
+        self.text(cfg, "Delete files older than", 11).pack(side="left")
         self.auto_days_var = tk.StringVar(value=str(self.settings["auto_days"]))
         age = ttk.Combobox(cfg, textvariable=self.auto_days_var, values=("180", "365", "730"),
                            state="readonly", style="Dark.TCombobox", width=7)
@@ -3169,10 +3291,31 @@ class GameGraveApp(tk.Tk):
         extra = self.panel(tools_tab)
         extra.pack(fill="x")
         self.text(extra, "Advanced tools", 13, bold=True).pack(anchor="w", pady=(0, 10))
-        for title in ("Storage History", "Automation", "Activity"):
+        for title in ("Old Files", "Make Room", "Cleanup History", "Storage History", "Automation"):
             self.button(extra, title, lambda page=title: self.show_page(page)).pack(side="left", padx=(0, 8))
         self.text(extra, "Free forever or optional $24.99 lifetime Pro target. No subscriptions or account requirement.",
                   9, MUTED, wraplength=810).pack(anchor="w", pady=(12, 0))
+        recording_panel = self.panel(tools_tab)
+        recording_panel.pack(fill="x", pady=(12, 0))
+        self.text(recording_panel, "Old game recordings", 14, bold=True).pack(anchor="w", pady=(0, 5))
+        self.text(recording_panel,
+                  "On Scan PC, Game Grave checks common local Videos folders for possible "
+                  "Game Bar, OBS, ShadowPlay and similar clips. Video contents are never opened. "
+                  "Add a folder if you record somewhere else. Clips only appear for review; "
+                  "nothing is automatically deleted.",
+                  10, MUTED, wraplength=770).pack(anchor="w", pady=(0, 8))
+        self.recording_root_list = tk.Listbox(
+            recording_panel, bg=RAISED, fg=TEXT, selectbackground=ACCENT,
+            selectforeground=ON_ACCENT, relief="flat", height=3, font=("Segoe UI", 10))
+        self.recording_root_list.pack(fill="x", pady=(0, 7))
+        for folder in self.settings.get("recording_roots", []):
+            self.recording_root_list.insert("end", folder)
+        capture_actions = tk.Frame(recording_panel, bg=PANEL)
+        capture_actions.pack(fill="x")
+        self.button(capture_actions, "Add capture folder", self._add_recordings_folder).pack(side="left")
+        self.button(capture_actions, "Remove selected folder", self._remove_recordings_folder).pack(
+            side="left", padx=(8, 0))
+
         updates_panel = self.panel(tools_tab)
         updates_panel.pack(fill="x", pady=(12, 0))
         self.text(updates_panel, "Verified updates", 14, bold=True).pack(anchor="w", pady=(0, 8))
@@ -3185,6 +3328,41 @@ class GameGraveApp(tk.Tk):
         if not update_ready():
             self.text(updates_panel, "Engineering preview: update service not connected. No internet request is made.",
                       9, WARN, wraplength=760).pack(anchor="w", pady=(7, 0))
+
+    def _add_recordings_folder(self):
+        folder = filedialog.askdirectory(title="Choose a game recording folder")
+        if not folder:
+            return
+        path = Path(folder)
+        if not safe_scan_root(path):
+            messagebox.showwarning("Folder not allowed",
+                "Choose a local capture folder, not a drive root, system folder or game installation.")
+            return
+        roots = list(self.settings.get("recording_roots", []))
+        if os.path.normcase(os.path.abspath(folder)) in {
+                os.path.normcase(os.path.abspath(existing)) for existing in roots}:
+            messagebox.showinfo("Already included", "That recording folder is already selected.")
+            return
+        roots.append(str(path))
+        self.settings["recording_roots"] = roots
+        save_settings(self.settings)
+        self.recording_root_list.insert("end", str(path))
+        self.status_text.set("Recording folder added. Choose Scan PC to look for older clips.")
+
+    def _remove_recordings_folder(self):
+        selected = self.recording_root_list.curselection()
+        if not selected:
+            messagebox.showinfo("Choose a folder", "Select a custom recordings folder to remove.")
+            return
+        index = selected[0]
+        roots = list(self.settings.get("recording_roots", []))
+        if index >= len(roots):
+            return
+        roots.pop(index)
+        self.settings["recording_roots"] = roots
+        save_settings(self.settings)
+        self.recording_root_list.delete(index)
+        self.status_text.set("Custom recording folder removed. Existing files were not touched.")
 
     def _choose_custom_accent(self):
         current = self.settings.get("ui_custom_accent", "#50DCC5")
@@ -3449,6 +3627,8 @@ class GameGraveApp(tk.Tk):
         file_days = self.settings["files_stale_days"]
         mod_roots = list(self.settings.get("mod_extra_roots", []))
         other_roots = list(self.settings.get("other_library_roots", []))
+        recording_roots = list(self.settings.get("recording_roots", []))
+        recording_days = min(file_days, self.settings.get("graveyard_days", 365))
 
         def task():
             try:
@@ -3470,10 +3650,17 @@ class GameGraveApp(tk.Tk):
                     files = []
                     warning = str(exc)
                 self._check_scan_cancel()
+                try:
+                    recordings = find_old_recordings(recording_days, recording_roots,
+                                                     cancel=self._cancel_scan.is_set)
+                except (ValueError, OSError) as exc:
+                    recordings = []
+                    warning += ("; " if warning else "") + "Recordings: " + str(exc)
+                self._check_scan_cancel()
                 self.events.put(("scan_stage", (4, STAGES[4][0])))
                 saves = discover_saves()
                 self._check_scan_cancel()
-                self.events.put(("scan_complete", (games, other, mods, files, saves, warning)))
+                self.events.put(("scan_complete", (games, other, mods, files, recordings, saves, warning)))
             except Exception as exc:
                 self.events.put(("scan_error", str(exc)))
         threading.Thread(target=task, daemon=True).start()
@@ -3489,7 +3676,7 @@ class GameGraveApp(tk.Tk):
                     if self._cancel_scan.is_set():
                         self._scan_canceled_status()
                         continue
-                    self.games, self.other_games, self.mod_folders, self.old_files, self.save_findings, warning = payload
+                    self.games, self.other_games, self.mod_folders, self.old_files, self.recordings, self.save_findings, warning = payload
                     self.profile_report = None  # Profiles must be re-inspected after inventory changes.
                     self.scan_percent.set(100)
                     self.scan_progress_text.set("Scan complete · 100%")
@@ -3503,7 +3690,7 @@ class GameGraveApp(tk.Tk):
                               (f"; Files warning: {warning}" if warning else ""))
                     self.scanning = False
                     self.last_scan = datetime.now().strftime("%I:%M %p").lstrip("0")
-                    self.status_text.set(f"Scan finished at {self.last_scan}  •  {len(self.games) + len(self.other_games)} games, {len(self.mod_folders)} mod/storage findings, {len(self.old_files)} old files" +
+                    self.status_text.set(f"Scan finished at {self.last_scan}  •  {len(self.games) + len(self.other_games)} games, {len(self.mod_folders)} mods, {len(self.old_files)} old files, {len(self.recordings)} possible game clips" +
                                          ("  •  File folder unavailable" if warning else ""))
                     self.scan_button.configure(state="normal", bg=ACCENT)
                     self.cancel_button.configure(state="disabled")

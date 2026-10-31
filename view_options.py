@@ -9,7 +9,8 @@ from pathlib import Path
 
 GRAVE_SORT_KEYS = ("Size", "Age", "Name", "Category", "Safety")
 SORT_DIRECTIONS = ("Descending", "Ascending")
-GRAVE_STATES = ("All findings", "Reviewable archives", "Protected / review only")
+GRAVE_STATES = ("All findings", "Ready to delete", "Protected / review only")
+LEGACY_READY_STATUS = "Reviewable archives"
 GRAVE_SIZES = {"Any size": 0, "100 MB+": 100 * 1024**2,
                "1 GB+": 1024**3, "10 GB+": 10 * 1024**3}
 GAMES_SORT_OPTIONS = ("Oldest first", "Newest first", "Largest first", "Smallest first",
@@ -33,6 +34,8 @@ def filter_sort_graveyard(entries, *, search="", category="All types",
     """Filter by evidence, then sort stably. Unknown ages always appear last."""
     sort = validated_choice(sort, GRAVE_SORT_KEYS, "Size")
     order = validated_choice(order, SORT_DIRECTIONS, "Descending")
+    if status == LEGACY_READY_STATUS:
+        status = "Ready to delete"
     status = validated_choice(status, GRAVE_STATES, "All findings")
     minimum = validated_choice(minimum, tuple(GRAVE_SIZES), "Any size")
     query = (search if isinstance(search, str) else "").strip().casefold()
@@ -40,7 +43,7 @@ def filter_sort_graveyard(entries, *, search="", category="All types",
     for entry in entries:
         if category != "All types" and entry.category != category:
             continue
-        if status == "Reviewable archives" and not entry.can_recycle:
+        if status == "Ready to delete" and not entry.can_recycle:
             continue
         if status == "Protected / review only" and entry.can_recycle:
             continue
@@ -127,7 +130,9 @@ def sanitize_saved_views(saved):
             "graveyard_sort": validated_choice(data.get("graveyard_sort"), GRAVE_SORT_KEYS, "Size"),
             "graveyard_order": validated_choice(data.get("graveyard_order"), SORT_DIRECTIONS, "Descending"),
             "graveyard_category": str(data.get("graveyard_category", "All types"))[:100],
-            "graveyard_status": validated_choice(data.get("graveyard_status"), GRAVE_STATES, "All findings"),
+            "graveyard_status": validated_choice(
+                "Ready to delete" if data.get("graveyard_status") == LEGACY_READY_STATUS
+                else data.get("graveyard_status"), GRAVE_STATES, "All findings"),
             "graveyard_min_size": validated_choice(data.get("graveyard_min_size"), tuple(GRAVE_SIZES), "Any size"),
             "graveyard_search": str(data.get("graveyard_search", ""))[:120],
             "graveyard_days": days,

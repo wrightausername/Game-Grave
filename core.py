@@ -64,6 +64,7 @@ def default_settings() -> dict:
         "scan_on_launch": False,
         "save_review_paths": [],
         "graveyard_watchlist": [],
+        "recording_roots": [],  # Optional user-chosen capture folders, read-only scan
     }
 
 
