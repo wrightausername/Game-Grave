@@ -2143,6 +2143,8 @@ class GameGraveApp(tk.Tk):
         session = str(uuid.uuid4())
         selected = tuple(items)
         protected = tuple(self.settings.get("never_touch", ()))
+        reviewed_root = Path(self.settings.get("scan_folder", str(downloads_dir())))
+        reviewed_age = int(self.settings.get("files_stale_days", 180))
         self.cleanup_running = True
         self.scan_button.configure(state="disabled", bg=RAISED)
         self.status_text.set(f"Delete started: verifying {len(selected)} file(s)…")
@@ -2152,7 +2154,8 @@ class GameGraveApp(tk.Tk):
                 outcome = recycle_old_files(
                     selected, protected, session,
                     progress=lambda done, count: self.events.put(
-                        ("old_cleanup_progress", (done, count))))
+                        ("old_cleanup_progress", (done, count))),
+                    review_root=reviewed_root, min_age_days=reviewed_age)
                 self.events.put(("old_cleanup_complete", outcome))
             except Exception as exc:
                 self.events.put(("old_cleanup_error", str(exc)[:350]))
