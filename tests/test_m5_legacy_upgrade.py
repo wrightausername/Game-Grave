@@ -77,6 +77,36 @@ class LegacySettingsUpgradeTests(unittest.TestCase):
         self.assertEqual(result["ui_theme"], "light")
         self.assertNotIn("not_real_feature", result)
 
+    def test_save_uses_its_own_unique_temp_file(self):
+        self.current_root.mkdir()
+        previous = self.current_root / "settings.tmp"
+        previous.write_bytes(b"unrelated data")
+        with patch("core.config_dir", return_value=self.current_root):
+            core.save_settings(core.default_settings())
+        self.assertEqual(previous.read_bytes(), b"unrelated data")
+        self.assertTrue(self.current_file.exists())
+
+    def test_failed_publish_keeps_existing_preferences(self):
+        self.current_root.mkdir()
+        original = b'{"ui_theme":"light"}'
+        self.current_file.write_bytes(original)
+        with patch("core.config_dir", return_value=self.current_root), \
+             patch("core.os.replace", side_effect=OSError("failed")):
+            with self.assertRaises(OSError):
+                core.save_settings(core.default_settings())
+        self.assertEqual(self.current_file.read_bytes(), original)
+        self.assertFalse(list(self.current_root.glob(".gg-settings-*.tmp")))
+
+    def test_oversized_preferences_refused(self):
+        self.current_root.mkdir()
+        self.current_file.write_bytes(b"original")
+        data = core.default_settings()
+        data["graveyard_search"] = "X" * (core.MAX_SETTINGS_BYTES + 1)
+        with patch("core.config_dir", return_value=self.current_root):
+            with self.assertRaises(ValueError):
+                core.save_settings(data)
+        self.assertEqual(self.current_file.read_bytes(), b"original")
+
     def test_linked_legacy_file_is_never_followed(self):
         alternate = self.base / "external-settings.json"
         alternate.write_text(json.dumps({"ui_theme": "light"}))
