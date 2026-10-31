@@ -1364,6 +1364,12 @@ class GameGraveApp(tk.Tk):
     def _graveyard_page(self):
         """Clear review workflow, with advanced filters available on demand."""
         self.header("The Graveyard", "Find forgotten gaming files and clips. Review before deleting.")
+        # Tk destroys widgets on navigation, but Python attributes otherwise survive.
+        # Clear old buttons before populating the new page and refreshing their states.
+        for old_button in ("grave_delete_button", "grave_protection_button",
+                           "grave_delete_checked_button"):
+            if hasattr(self, old_button):
+                delattr(self, old_button)
         self._applying_grave_preset = False
         saved = sanitize_saved_views(self.settings.get("graveyard_saved_views", {}))
         self.settings["graveyard_saved_views"] = saved
