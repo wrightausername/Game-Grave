@@ -16,7 +16,7 @@ from PySide6.QtGui import QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
+    QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTabWidget, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 from core import (
@@ -1248,100 +1248,266 @@ class ScreenMethods:
             "managed profile folders. Recycle Bin is reversible only while Windows holds a matching item.",
             "warning", wrap=True))
 
-    def screenshots_page(self):
-        """Automatic metadata discovery; preview/deletion still individually authorized."""
+    def captures_page(self):
+        """One Captures destination with distinct Screenshots and Videos panels.
+
+        The normal scan discovers both automatically in known gaming locations.
+        Filenames, sizes and times are metadata; no screenshot or video pixels
+        are sent to any network service, and videos are not decoded by scanners.
+        """
         page = self._new(
-            "Screenshots", "Automatically find in-game captures without browsing your personal photos.")
+            "Captures", "Your gaming screenshots and recordings, organized separately.")
         if self._not_scanned(page):
             return
-        p, col = panel()
         shots = sorted(self.inventory.screenshots,
                        key=lambda x: (-x.modified, x.path.casefold()))
-        col.addWidget(section_title("Discovered in-game screenshots",
-                                    str(len(shots)) + " detected"))
-        col.addWidget(label(
-            "Scans check Steam screenshot directories, Windows/Game Bar captures, "
-            "supported gaming capture locations, and dedicated screenshot folders "
-            "for games detected on this PC. Only filenames, file sizes, and dates "
-            "are inspected automatically. Image contents are opened only if you "
-            "choose Preview. Personal photo folders are excluded.",
-            "subtle", wrap=True))
-        bar = QWidget()
-        brow = row(spacing=10)
-        bar.setLayout(brow)
-        brow.addWidget(button("Rescan screenshots", self.start_scan, kind="primary"))
-        brow.addWidget(button("Review old screenshots in Graveyard",
-                              lambda: self.navigate("Graveyard")))
-        brow.addStretch()
-        col.addWidget(bar)
-        table = data_table(["SCREENSHOT", "SIZE", "MODIFIED", "FOLDER"])
-        table.setSelectionMode(QAbstractItemView.SingleSelection)
-        table.setMinimumHeight(460)
-        table.setColumnWidth(0, 310)
-        table.setColumnWidth(1, 105)
-        table.setColumnWidth(2, 140)
-        rows = shots[:700]
-        table.setRowCount(len(rows))
-        for i, shot in enumerate(rows):
-            for c, value in enumerate((
-                    Path(shot.path).name,
-                    human_size(shot.size),
-                    datetime.fromtimestamp(shot.modified).strftime("%Y-%m-%d %H:%M"),
-                    str(Path(shot.path).parent))):
-                _table_text(table, i, c, value)
-            table.setRowHeight(i, 36)
-        col.addWidget(table)
-        if not rows:
-            col.addWidget(label(
-                "No screenshots discovered in supported locations yet. "
-                "Try Scan PC, or add a custom screenshot folder in Settings.",
+        recordings = sorted(self.inventory.recordings,
+                            key=lambda x: (-x.modified, x.path.casefold()))
+        counts = QWidget()
+        statrow = row(spacing=10)
+        counts.setLayout(statrow)
+        statrow.addWidget(MetricCard(
+            "SCREENSHOTS", str(len(shots)),
+            "Recognized game captures • metadata only", tone="cyan"))
+        statrow.addWidget(MetricCard(
+            "VIDEOS / RECORDINGS", str(len(recordings)),
+            "Known capture sources • metadata only", tone="text"))
+        page.content.addWidget(counts)
+
+        tabs = QTabWidget()
+        tabs.setObjectName("captureTabs")
+        tabs.setDocumentMode(True)
+        tabs.setTabPosition(QTabWidget.North)
+        tabs.setAccessibleName("Separate screenshot and video capture panels")
+        page.content.addWidget(tabs)
+
+        def build_panel(title, description):
+            tab = QWidget()
+            stack = column(spacing=12, margins=(12, 14, 12, 14))
+            tab.setLayout(stack)
+            header, body = panel(padding=16)
+            header.setObjectName("dashboardPanel")
+            body.addWidget(section_title(title))
+            body.addWidget(label(description, "subtle", wrap=True))
+            stack.addWidget(header)
+            tabs.addTab(tab, title)
+            return stack, body
+
+        # ---------- SCREENSHOT PANEL ----------
+        screenshot_stack, photo_col = build_panel(
+            f"▧  Screenshots  ({len(shots)})",
+            "Game Grave automatically finds game screenshots in supported Steam, "
+            "launcher, capture and game-named screenshot folders. "
+            "The dashboard shows your newest actual image. "
+            "No personal Pictures-folder crawl; photos are decoded locally only "
+            "for previews. Every Recycle Bin move requires separate approval.")
+        actions = QWidget()
+        controls = row(spacing=9)
+        actions.setLayout(controls)
+        controls.addWidget(button("Scan PC again", self.start_scan, kind="primary"))
+        controls.addWidget(button("Review old screenshots in Graveyard",
+                                  lambda: self.navigate("Graveyard")))
+        controls.addStretch()
+        photo_col.addWidget(actions)
+        photos = shots[:700]
+        photo_table = data_table(["SCREENSHOT", "SIZE", "MODIFIED", "LOCATION"])
+        photo_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        photo_table.setMinimumHeight(350)
+        photo_table.setColumnWidth(0, 285)
+        photo_table.setColumnWidth(1, 105)
+        photo_table.setColumnWidth(2, 135)
+        photo_table.setRowCount(len(photos))
+        for i, shot in enumerate(photos):
+            for colno, value in enumerate((
+                Path(shot.path).name, human_size(shot.size),
+                datetime.fromtimestamp(shot.modified).strftime("%Y-%m-%d %H:%M"),
+                str(Path(shot.path).parent),
+            )):
+                _table_text(photo_table, i, colno, value)
+            photo_table.setRowHeight(i, 37)
+        photo_col.addWidget(photo_table)
+        if not shots:
+            photo_col.addWidget(label(
+                "No in-game screenshots found yet. Scan PC or add a specific "
+                "capture folder under Settings. No sample image will be substituted.",
                 "subtle", wrap=True))
-        def selected_shot():
-            indices = _selected_indices(table)
-            return rows[indices[0]] if indices and indices[0] < len(rows) else None
-        def inspect_shot():
-            shot = selected_shot()
-            if shot is None:
-                self.info("Select a screenshot", "Choose one screenshot row to preview it.")
+
+        def current_photo():
+            indices = _selected_indices(photo_table)
+            return photos[indices[0]] if indices and indices[0] < len(photos) else None
+
+        def preview_photo():
+            record = current_photo()
+            if record is None:
+                self.info("Choose one screenshot", "Select a screenshot before previewing it.")
+            else:
+                self._preview_capture(record)
+
+        def folder_photo():
+            record = current_photo()
+            if record is not None:
+                self._open_folder(str(Path(record.path).parent))
+
+        photo_buttons = QWidget()
+        photo_buttons_row = row(spacing=8)
+        photo_buttons.setLayout(photo_buttons_row)
+        photo_buttons_row.addWidget(button(
+            "Preview selected screenshot…", preview_photo, kind="primary"))
+        photo_buttons_row.addWidget(button("Open folder", folder_photo))
+        photo_buttons_row.addStretch()
+        photo_col.addWidget(photo_buttons)
+        photo_table.cellDoubleClicked.connect(
+            lambda index, _column: self._preview_capture(photos[index])
+            if 0 <= index < len(photos) else None)
+
+        def photo_menu(point):
+            index = self._right_clicked_row(photo_table, point)
+            if index is None or index >= len(photos):
                 return
-            self._preview_capture(shot)
-        def open_location():
-            shot = selected_shot()
-            if shot is not None:
-                self._open_folder(str(Path(shot.path).parent))
-        controls = QWidget()
-        ctrls = row()
-        controls.setLayout(ctrls)
-        ctrls.addWidget(button("Preview selected screenshot…", inspect_shot,
-                               kind="primary"))
-        ctrls.addWidget(button("Open screenshot folder", open_location))
-        ctrls.addStretch()
-        col.addWidget(controls)
-        def screenshot_context(point):
-            idx = self._right_clicked_row(table, point)
-            if idx is None or idx >= len(rows):
-                return
-            record = rows[idx]
-            menu = QMenu(table)
-            menu.addAction("Preview screenshot / review Recycle Bin move…",
-                           lambda: self._preview_capture(record))
+            item = photos[index]
+            menu = QMenu(photo_table)
+            menu.addAction("Preview screenshot and review Recycle Bin move…",
+                           lambda: self._preview_capture(item))
             menu.addAction("Open containing folder",
-                           lambda: self._open_folder(str(Path(record.path).parent)))
+                           lambda: self._open_folder(str(Path(item.path).parent)))
+            action, reason = protection_action(
+                item.path, list(self.settings.get("never_touch", [])))
+            if action in ("Protect", "Unprotect"):
+                menu.addAction(
+                    "Protect screenshot" if action == "Protect" else "Remove personal protection…",
+                    lambda: self._set_personal_protection(
+                        item.path, protect=(action == "Protect"), return_route="Captures"))
+            else:
+                locked = menu.addAction("Protection cannot be changed here")
+                locked.setEnabled(False)
             menu.addSeparator()
-            status = menu.addAction(
-                "Bulk deletion disabled: individual image review required")
-            status.setEnabled(False)
-            menu.exec(table.viewport().mapToGlobal(point))
-        table.setContextMenuPolicy(Qt.CustomContextMenu)
-        table.customContextMenuRequested.connect(screenshot_context)
-        table.cellDoubleClicked.connect(
-            lambda idx, _col: self._preview_capture(rows[idx])
-            if 0 <= idx < len(rows) else None)
-        page.content.addWidget(p)
-        page.content.addWidget(label(
-            "No screenshot is deleted automatically. To remove one, preview the "
-            "exact image and separately approve Windows Recycle Bin recovery.",
-            "warning", wrap=True))
+            notice = menu.addAction("Bulk image deletion unavailable: preview individually")
+            notice.setEnabled(False)
+            menu.exec(photo_table.viewport().mapToGlobal(point))
+        photo_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        photo_table.customContextMenuRequested.connect(photo_menu)
+
+        # ---------- VIDEO PANEL ----------
+        video_stack, video_col = build_panel(
+            f"▣  Videos / Recordings  ({len(recordings)})",
+            "Game Grave detects gaming clips, highlights and recordings from "
+            "recognized capture locations, including recent files. "
+            "Videos stay in their original folders; click Open in player "
+            "to use your Windows default media app. No video bytes are "
+            "decoded or uploaded during scanning.")
+        video_actions = QWidget()
+        va = row(spacing=8)
+        video_actions.setLayout(va)
+        va.addWidget(button("Scan PC again", self.start_scan, kind="primary"))
+        va.addWidget(button("Review old recordings in Graveyard",
+                            lambda: self.navigate("Graveyard")))
+        va.addStretch()
+        video_col.addWidget(video_actions)
+
+        clips = recordings[:700]
+        video_table = data_table(["VIDEO / RECORDING", "SIZE", "MODIFIED", "LOCATION"])
+        video_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        video_table.setMinimumHeight(350)
+        video_table.setColumnWidth(0, 285)
+        video_table.setColumnWidth(1, 105)
+        video_table.setColumnWidth(2, 135)
+        video_table.setRowCount(len(clips))
+        for i, clip in enumerate(clips):
+            for colno, value in enumerate((
+                Path(clip.path).name, human_size(clip.size),
+                datetime.fromtimestamp(clip.modified).strftime("%Y-%m-%d %H:%M"),
+                str(Path(clip.path).parent),
+            )):
+                _table_text(video_table, i, colno, value)
+            video_table.setRowHeight(i, 37)
+        video_col.addWidget(video_table)
+        if not recordings:
+            video_col.addWidget(label(
+                "No game recordings detected yet. Scan PC or add a capture "
+                "folder in Settings. Personal videos are not categorized as games "
+                "based only on file extension.",
+                "subtle", wrap=True))
+
+        def current_clip():
+            indices = _selected_indices(video_table)
+            return clips[indices[0]] if indices and indices[0] < len(clips) else None
+
+        def open_clip(clip):
+            from recordings import RECORDING_EXTENSIONS
+            from core import _has_reparse_component
+            file = Path(clip.path)
+            if (clip not in self.inventory.recordings
+                    or not is_unchanged(clip)
+                    or _has_reparse_component(file)
+                    or file.suffix.casefold() not in RECORDING_EXTENSIONS):
+                self.error("Recording changed", "Scan PC again before opening this recording.")
+                return
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(file))):
+                self.error("Could not open recording",
+                           "Windows could not open the recording in its default video player.")
+
+        def selected_video():
+            item = current_clip()
+            if item is None:
+                self.info("Select a recording", "Choose a video row first.")
+            else:
+                open_clip(item)
+
+        def selected_folder():
+            item = current_clip()
+            if item is not None:
+                self._open_folder(str(Path(item.path).parent))
+
+        clip_controls = QWidget()
+        clip_buttons = row(spacing=8)
+        clip_controls.setLayout(clip_buttons)
+        clip_buttons.addWidget(button("Open recording in player…", selected_video,
+                                       kind="primary"))
+        clip_buttons.addWidget(button("Open folder", selected_folder))
+        clip_buttons.addStretch()
+        video_col.addWidget(clip_controls)
+        video_table.cellDoubleClicked.connect(
+            lambda index, _column: open_clip(clips[index])
+            if 0 <= index < len(clips) else None)
+
+        def video_menu(point):
+            index = self._right_clicked_row(video_table, point)
+            if index is None or index >= len(clips):
+                return
+            item = clips[index]
+            menu = QMenu(video_table)
+            menu.addAction("Open in default video player…", lambda: open_clip(item))
+            menu.addAction("Open containing folder",
+                           lambda: self._open_folder(str(Path(item.path).parent)))
+            action, reason = protection_action(
+                item.path, list(self.settings.get("never_touch", [])))
+            if action in ("Protect", "Unprotect"):
+                menu.addAction(
+                    "Protect this recording" if action == "Protect" else
+                    "Remove personal protection…",
+                    lambda: self._set_personal_protection(
+                        item.path, protect=(action == "Protect"), return_route="Captures"))
+            else:
+                notice = menu.addAction("Protection cannot be changed here")
+                notice.setEnabled(False)
+            menu.addSeparator()
+            note = menu.addAction("Cleanup requires Graveyard review and confirmation")
+            note.setEnabled(False)
+            menu.exec(video_table.viewport().mapToGlobal(point))
+        video_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        video_table.customContextMenuRequested.connect(video_menu)
+
+        # The two media types are intentionally separate panels/tabs.
+        # A previous route alias can select the appropriate panel on entry.
+        if getattr(self, "_show_capture_videos", False):
+            tabs.setCurrentIndex(1)
+            self._show_capture_videos = False
+        else:
+            tabs.setCurrentIndex(0)
+
+    def screenshots_page(self):
+        """Backwards-compatible method for existing screenshot navigation."""
+        return self.captures_page()
 
     def undo_page(self):
         page = self._new("Undo Center",
