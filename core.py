@@ -68,18 +68,45 @@ def default_settings() -> dict:
     }
 
 
+MAX_SETTINGS_BYTES = 128 * 1024
+
+
+def _settings_no_duplicate_keys(pairs):
+    fields = {}
+    for key, value in pairs:
+        if key in fields:
+            raise ValueError("Duplicate settings key.")
+        fields[key] = value
+    return fields
+
+
 def load_settings() -> dict:
+    """Read current settings, or legacy DustOff settings if no new file exists.
+
+    Legacy settings are never modified or removed. Once a user changes a
+    setting, save_settings persists a new Game Grave copy. Never interpret
+    a failed current-file read as permission to replace it with old data.
+    """
     result = default_settings()
+    current = config_dir() / "settings.json"
+    legacy = config_dir().parent / "DustOff" / "settings.json"
+    chosen = current if current.exists() or current.is_symlink() else legacy
     try:
-        config = config_dir() / "settings.json"
-        if not config.exists():
-            config = config_dir().parent / "Game Grave" / "settings.json"
-        data = json.loads(config.read_text(encoding="utf-8"))
+        if _has_reparse_component(chosen) or not chosen.is_file():
+            return result
+        if chosen.stat().st_size > MAX_SETTINGS_BYTES:
+            return result
+        with chosen.open("rb") as stream:
+            raw = stream.read(MAX_SETTINGS_BYTES + 1)
+        if len(raw) > MAX_SETTINGS_BYTES:
+            return result
+        data = json.loads(raw.decode("utf-8"),
+                          object_pairs_hook=_settings_no_duplicate_keys)
         if isinstance(data, dict):
-            for key in result:
-                if key in data and isinstance(data[key], type(result[key])):
+            for key, original in result.items():
+                if key in data and type(data[key]) is type(original):
                     result[key] = data[key]
-    except (OSError, ValueError, TypeError):
+    except (OSError, ValueError, TypeError, UnicodeError):
         pass
     return result
 
