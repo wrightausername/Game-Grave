@@ -255,7 +255,7 @@ def render_dashboard(window):
     mid.setContentsMargins(0, 0, 0, 0)
     mid.setSpacing(10)
 
-    disk_card, disk_col = panel(padding=14, spacing=8)
+    disk_card, disk_col = panel(padding=12, spacing=5)
     disk_card.setObjectName("dashboardPanel")
     drive_head = QWidget()
     drive_line = row(spacing=7)
@@ -364,7 +364,7 @@ def render_dashboard(window):
     update_drive()
     mid.addWidget(disk_card, 39)
 
-    launch_card, launch_col = panel(padding=13, spacing=4)
+    launch_card, launch_col = panel(padding=11, spacing=3)
     launch_card.setObjectName("dashboardPanel")
     la_head = QWidget()
     la_row = row(spacing=5)
@@ -388,7 +388,7 @@ def render_dashboard(window):
         else:
             reported[src] += game.size_bytes
     launch_list = QWidget()
-    launch_stack = column(spacing=5)
+    launch_stack = column(spacing=3)
     launch_list.setLayout(launch_stack)
     launch_col.addWidget(launch_list, 1)
 
@@ -403,7 +403,7 @@ def render_dashboard(window):
             line = QWidget()
             layout = row(spacing=6)
             line.setLayout(layout)
-            logo = _art_badge(name, size=28, launcher=True,
+            logo = _art_badge(name, size=25, launcher=True,
                               fallback=icon, color=color)
             logo.setToolTip(name)
             layout.addWidget(logo)
@@ -468,7 +468,7 @@ def render_dashboard(window):
     cap_col.addWidget(_heading(
         "Latest Screenshot", lambda: window.navigate("Screenshots"),
         action_text="View All  ›"))
-    image = LandscapeArt(169, scene="sunset")
+    image = LandscapeArt(155, scene="sunset")
     cap_col.addWidget(image)
     shot_title = label("", "findingTitle", wrap=True)
     shot_caption = label("", "caption", wrap=True)
@@ -643,7 +643,7 @@ def render_dashboard(window):
         alert_col.addWidget(label(
             "No unresolved mod locations. Protected game content remains untouched.",
             "subtle", wrap=True))
-    alert_col.addWidget(LandscapeArt(112, scene="fog"))
+    alert_col.addWidget(LandscapeArt(102, scene="fog"))
     alert_controls = QWidget()
     alert_row = row(spacing=7)
     alert_controls.setLayout(alert_row)
