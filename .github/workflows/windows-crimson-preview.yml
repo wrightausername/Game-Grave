@@ -80,7 +80,7 @@ jobs:
           name: GameGrave-Crimson-Qt-Preview-Unsigned
           path: |
             dist/GameGrave-Crimson-Preview.exe
-            _ci_temp/crimson-desktop-1440.png
+            _ci_temp/crimson-*-1440.png
           if-no-files-found: error
           retention-days: 14
 
