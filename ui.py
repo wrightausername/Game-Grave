@@ -3545,6 +3545,32 @@ class GameGraveApp(tk.Tk):
         self.button(capture_actions, "Remove selected folder", self._remove_recordings_folder).pack(
             side="left", padx=(8, 0))
 
+        screenshot_panel = self.panel(tools_tab)
+        screenshot_panel.pack(fill="x", pady=(12, 0))
+        self.text(screenshot_panel, "In-game screenshots", 14, bold=True).pack(
+            anchor="w", pady=(0, 5))
+        self.text(screenshot_panel,
+                  "Scan PC finds old images in Steam's per-game screenshot "
+                  "folders and known local Game Bar capture folders. "
+                  "General Pictures and camera photos are NOT searched. "
+                  "Add a separate screenshot folder if needed. Screenshots "
+                  "stay protected against bulk cleanup until you preview "
+                  "each image and separately approve its Recycle Bin move.",
+                  10, MUTED, wraplength=770).pack(anchor="w", pady=(0, 8))
+        self.screenshot_root_list = tk.Listbox(
+            screenshot_panel, bg=RAISED, fg=TEXT,
+            selectbackground=ACCENT, selectforeground=ON_ACCENT,
+            relief="flat", height=3, font=("Segoe UI", 10))
+        self.screenshot_root_list.pack(fill="x", pady=(0, 7))
+        for folder in self.settings.get("screenshot_roots", []):
+            self.screenshot_root_list.insert("end", folder)
+        shot_buttons = tk.Frame(screenshot_panel, bg=PANEL)
+        shot_buttons.pack(fill="x")
+        self.button(shot_buttons, "Add screenshot folder",
+                    self._add_screenshot_folder).pack(side="left")
+        self.button(shot_buttons, "Remove selected folder",
+                    self._remove_screenshot_folder).pack(side="left", padx=(8, 0))
+
         updates_panel = self.panel(tools_tab)
         updates_panel.pack(fill="x", pady=(12, 0))
         self.text(updates_panel, "Verified updates", 14, bold=True).pack(anchor="w", pady=(0, 8))
@@ -3562,6 +3588,50 @@ class GameGraveApp(tk.Tk):
         if not update_ready():
             self.text(updates_panel, "Engineering preview: update service not connected. No internet request is made.",
                       9, WARN, wraplength=760).pack(anchor="w", pady=(7, 0))
+
+    def _add_screenshot_folder(self):
+        folder = filedialog.askdirectory(
+            title="Choose an existing folder containing game screenshots")
+        if not folder:
+            return
+        path = Path(folder)
+        if not safe_scan_root(path) or is_protected_path(path):
+            messagebox.showwarning("Folder not allowed",
+                "Choose an ordinary local screenshot folder, not a drive "
+                "root, system folder, game installation, mod manager or save location.")
+            return
+        roots = list(self.settings.get("screenshot_roots", []))
+        if len(roots) >= 30:
+            messagebox.showwarning("Screenshot folder limit",
+                "Remove a folder before adding another.")
+            return
+        if os.path.normcase(os.path.abspath(folder)) in {
+                os.path.normcase(os.path.abspath(existing))
+                for existing in roots if isinstance(existing, str)}:
+            messagebox.showinfo("Already included",
+                "That screenshot folder is already in the local scan list.")
+            return
+        roots.append(str(path))
+        self.settings["screenshot_roots"] = roots
+        save_settings(self.settings)
+        self.screenshot_root_list.insert("end", str(path))
+        self.status_text.set("Screenshot folder added. Run Scan PC to review older images.")
+
+    def _remove_screenshot_folder(self):
+        selected = self.screenshot_root_list.curselection()
+        if not selected:
+            messagebox.showinfo("Choose a folder",
+                "Select a custom screenshot folder to remove.")
+            return
+        index = selected[0]
+        roots = list(self.settings.get("screenshot_roots", []))
+        if index >= len(roots):
+            return
+        roots.pop(index)
+        self.settings["screenshot_roots"] = roots
+        save_settings(self.settings)
+        self.screenshot_root_list.delete(index)
+        self.status_text.set("Screenshot folder removed from discovery. Files unchanged.")
 
     def _add_recordings_folder(self):
         folder = filedialog.askdirectory(title="Choose a game recording folder")
