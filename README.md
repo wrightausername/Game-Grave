@@ -2,7 +2,7 @@
 
 **Status:** Engineering preview, **NOT Game Grave 1.0 stable and NOT ready to sell**. The unsigned Windows EXE and Inno Setup development installer build, Free/lifetime-Pro licensing foundation, and automated safety checks are available; production signing, real Windows installer/recovery QA, billing infrastructure and closed beta are not complete. See [the seven-milestone 1.0 release acceptance plan](RELEASE_1_0_PLAN.md).
 
-For a simple walkthrough without developer jargon, use the [Game Grave user guide](USER_GUIDE.md). The [1.0 release operations, rollback and support checklist](RELEASE_OPERATIONS_1_0.md) documents the remaining independently approved publishing steps. Neither document means this engineering preview is ready for commercial distribution.
+**UI redesign approved:** The selected cinematic crimson-and-cyan concept is specified in the [Crimson Command UI Implementation Blueprint](UI_REDESIGN_BLUEPRINT.md). It defines the new all-launchers Games page, direct personal Never Touch unprotect controls in Graveyard, screen components, Qt/Tk migration and safety gates. This is an implementation plan, not a shipped UI.\n\nFor a simple walkthrough without developer jargon, use the [Game Grave user guide](USER_GUIDE.md). The [1.0 release operations, rollback and support checklist](RELEASE_OPERATIONS_1_0.md) documents the remaining independently approved publishing steps. Neither document means this engineering preview is ready for commercial distribution.
 
 Game Grave finds games, mod-manager storage, Workshop folders, caches, and leftover installation candidates. It clearly separates *detected data*, *potential review targets*, and *space actually reclaimed*. Scanning never authorizes file deletion.
 
