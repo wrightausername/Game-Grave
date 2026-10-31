@@ -58,7 +58,7 @@ def validate_response(response: dict) -> dict:
     never written back to output or included in errors.
     """
     _exact_keys(response, {"schema", "questionnaire_version", "build_id", "os",
-                           "tasks", "ratings", "q11", "issues"}, {"q12"})
+                           "tasks", "ratings", "q11", "issues"}, optional={"q12"})
     if response["schema"] != SCHEMA or isinstance(response["schema"], bool):
         raise ValueError("Unsupported beta response schema")
     if response["questionnaire_version"] != QUESTIONNAIRE_VERSION:
