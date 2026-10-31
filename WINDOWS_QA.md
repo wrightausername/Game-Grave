@@ -192,3 +192,40 @@ existing saves/mods/game libraries and does not add synthetic items to the
 user's actual Undo Center history. Repeat it on a dedicated disposable
 Windows 10 and Windows 11 beta/QA machine and log only privacy-redacted
 pass/fail and OS build to issue #10 before human M1 acceptance.
+
+
+## Pre-beta field evidence in one command (still requires human review)
+
+There is an opt-in, **local-only** field diagnostic intended for your own
+Windows 10/11 QA computer. It examines actual local launcher and mod-manager
+metadata read-only, rehearses the Resurrection Kit pipeline with tiny fabricated
+files and, only if separately requested, tests a new disposable file's Windows
+Recycle Bin → Undo round-trip. It does **not** install or modify games.
+
+Create an ordinary empty directory such as `C:\GameGraveQA` outside saved
+games, mod managers and protected folders. From the checked-out Game Grave
+source on that Windows computer, run:
+
+```powershell
+python tools/windows_prebeta_qa.py --execute --folder "C:\GameGraveQA" --report "C:\GameGraveQA\qa-summary.json" --run-undo-check
+```
+
+Omit `--run-undo-check` to avoid even the disposable Recycle Bin test. The
+command refuses existing reports and non-Windows systems. A cleanup self-test
+may leave its **own tiny test file in Recycle Bin** if Windows refuses restore.
+The synthetic archive tests use temporary files and preserve all real games,
+mods, saves and profile data.
+
+The saved `qa-summary.json` contains only OS build, known category totals
+and PASS/FAIL/NOT_RUN statuses. It never exports user file paths, game titles,
+mod/profile names, usernames, license keys or log lines. Optional diagnostic
+failure descriptions are restricted to error class names, not filenames.
+You must still cross-check real Steam/Epic/GOG and MO2/Vortex UI records,
+restore a separate disposable game setup, try physical 100–200% display
+scaling, install and uninstall the actual signed build, and document
+pass/fail/N/A with human review for each M1–M5 test.
+
+A green field diagnostic or CI run **never** changes a milestone's status or
+allows M6/M7 to proceed. Do not run this on someone else's computer or collect
+their report without informed consent. Beta responses still use the frozen
+standardized [BETA_TEST_PROTOCOL.md](BETA_TEST_PROTOCOL.md) questionnaire.
