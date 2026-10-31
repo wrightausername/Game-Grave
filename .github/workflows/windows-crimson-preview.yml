@@ -32,7 +32,7 @@ jobs:
     runs-on: windows-latest
     env:
       GG_CRIMSON_QA_DISPOSABLE: 'YES'
-      QT_QPA_PLATFORM: offscreen
+      QT_QPA_PLATFORM: windows
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
