@@ -1,0 +1,149 @@
+name: Crimson Command Qt desktop preview (unsigned)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'gg_desktop/**'
+      - 'ui-preview-requirements.txt'
+      - 'tests/test_gg_desktop_models.py'
+      - 'tools/windows_crimson_ui_smoke.py'
+      - '.github/workflows/windows-crimson-preview.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'gg_desktop/**'
+      - 'ui-preview-requirements.txt'
+      - 'tests/test_gg_desktop_models.py'
+      - 'tools/windows_crimson_ui_smoke.py'
+      - '.github/workflows/windows-crimson-preview.yml'
+
+concurrency:
+  group: crimson-command-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Render and package Crimson Command on Windows
+    runs-on: windows-latest
+    env:
+      GG_CRIMSON_QA_DISPOSABLE: 'YES'
+      QT_QPA_PLATFORM: windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install preview and packaging dependencies
+        run: python -m pip install -r build-requirements.txt -r ui-preview-requirements.txt
+      - name: Create isolated temp folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force '_ci_temp' | Out-Null
+          $p = (Resolve-Path '_ci_temp').Path
+          "TEMP=$p" | Out-File $env:GITHUB_ENV -Append
+          "TMP=$p" | Out-File $env:GITHUB_ENV -Append
+      - name: Compile new Python modules
+        run: python -m compileall -q gg_desktop
+      - name: Pure model tests and source UI smoke
+        shell: pwsh
+        run: |
+          python -m unittest tests.test_gg_desktop_models -v
+          if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
+          python tools/windows_crimson_ui_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
+      - name: Upload actual Qt screen captures for design review
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Crimson-Rendered-UI-Screenshots
+          path: _ci_temp/crimson-*-1440.png
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build standalone unsigned Qt EXE
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name GameGrave-Crimson-Preview --collect-all PySide6 --add-data "gg_desktop/assets;gg_desktop/assets" gg_desktop/__main__.py
+          if ($LASTEXITCODE -ne 0) { throw 'Qt PyInstaller failed.' }
+          if (-not (Test-Path 'dist/GameGrave-Crimson-Preview.exe')) { throw 'Missing Qt EXE' }
+      - name: Launch packaged Qt EXE with disposable isolated settings profile
+        shell: pwsh
+        run: |
+          $testData = Join-Path (Resolve-Path '_ci_temp').Path 'StandaloneUser'
+          New-Item -ItemType Directory -Force $testData | Out-Null
+          $env:LOCALAPPDATA = $testData
+          $env:APPDATA = $testData
+          $binary = (Resolve-Path 'dist/GameGrave-Crimson-Preview.exe').Path
+          $p = Start-Process -FilePath $binary -PassThru
+          Start-Sleep -Seconds 6
+          try {
+            if ($p.HasExited) { throw 'Packaged Qt EXE quit immediately.' }
+            Write-Host 'Packaged Crimson Qt UI launched without changing game files.'
+          } finally {
+            if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          }
+      - name: Install Inno Setup 6 for distinct preview installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot install Inno Setup' }
+          }
+      - name: Build separate unsigned Crimson installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          & $iscc /Qp 'installer/GameGraveCrimsonPreview.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Crimson preview installer compilation failed' }
+          if (-not (Test-Path 'release/GameGrave-Crimson-Preview-Setup.exe')) { throw 'Preview installer missing' }
+          $hash = (Get-FileHash 'release/GameGrave-Crimson-Preview-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path 'release/GameGrave-Crimson-Preview-Setup.sha256' -Value "$hash  GameGrave-Crimson-Preview-Setup.exe"
+          Write-Host 'Built isolated, unsigned preview installer with independently verifiable SHA-256.'
+      - name: Test isolated install and uninstall without touching any user settings
+        shell: pwsh
+        run: |
+          $root = (Resolve-Path '_ci_temp').Path
+          $local = Join-Path $root 'PreviewUserLocal'
+          $installed = Join-Path $local 'CrimsonInstall'
+          New-Item -ItemType Directory -Force -Path $local | Out-Null
+          $sentinel = Join-Path $local 'sentinel-settings.json'
+          Set-Content -Path $sentinel -Value '{"never_touch":["KEEP THIS"]}'
+          $setup = (Resolve-Path 'release/GameGrave-Crimson-Preview-Setup.exe').Path
+          $install = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installed") -PassThru -Wait
+          if ($install.ExitCode -ne 0) { throw 'Crimson isolated installation failed' }
+          $exe = Join-Path $installed 'GameGrave-Crimson-Preview.exe'
+          if (-not (Test-Path $exe)) { throw 'Crimson installed EXE missing' }
+          $env:LOCALAPPDATA = $local
+          $env:APPDATA = $local
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 5
+          try {
+            if ($p.HasExited) { throw 'Installed Crimson UI exited immediately' }
+          } finally {
+            if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          }
+          $uninstaller = Join-Path $installed 'unins000.exe'
+          if (-not (Test-Path $uninstaller)) { throw 'Preview uninstaller missing' }
+          $removed = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -PassThru -Wait
+          if ($removed.ExitCode -ne 0) { throw 'Preview uninstaller failed' }
+          if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
+          if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
+          Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
+      - name: Upload Crimson screenshot and Windows engineering EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Crimson-Qt-Preview-Unsigned
+          path: |
+            dist/GameGrave-Crimson-Preview.exe
+            _ci_temp/crimson-*-1440.png
+            release/GameGrave-Crimson-Preview-Setup.exe
+            release/GameGrave-Crimson-Preview-Setup.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+# NOT a signed 1.0 release; LGPL/Qt redistributable obligations,
+# full UI feature parity, physical Windows human tests and beta remain open.

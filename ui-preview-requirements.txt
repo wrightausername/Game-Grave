@@ -1,0 +1,6 @@
+# Optional local Crimson Command preview. Not included in existing Tk installer.
+# Qt/PySide6 commercial redistributable/LGPL obligations require separate review
+# before the Qt executable becomes the default 1.0 shipping version.
+PySide6>=6.8,<6.12
+cryptography>=44,<47
+Pillow>=11.1,<13
