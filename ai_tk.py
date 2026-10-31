@@ -48,7 +48,7 @@ def open_local_ai_dialog(app):
     entry.pack(side="left", fill="x", expand=True, padx=(0, 9))
     action = ttk.Button(bar, text="Ask local AI")
     action.pack(side="right")
-    status_var = tk.StringVar(value="Local model: " + app.settings.get("ai_model", "qwen2.5:3b"))
+    status_var = tk.StringVar(value="Local model: " + app.settings.get("ai_model", "qwen2.5:1.5b"))
     ttk.Label(body, textvariable=status_var, wraplength=590).pack(anchor="w", pady=(8, 0))
 
     responses = queue.Queue()
