@@ -60,6 +60,8 @@ from activity_history import group_activity, session_caption
 from licensing import (LicenseError, activation_ready, activate_key, read_edition,
                        remove_local_activation)
 from updates import UpdateError, check_for_updates, update_ready
+from update_download import download_verified_installer
+from update_config import UPDATE_DOWNLOAD_HOST
 
 from core import (
     APP_NAME, AUTO_BASE_EXTENSIONS, AUTO_EXTRA_EXTENSIONS, GAME_AGE_OPTIONS, TASK_NAME,
@@ -159,6 +161,8 @@ class GameGraveApp(tk.Tk):
         self.scanning = False
         self.cleanup_running = False
         self._selfcheck_busy = False
+        self._update_download_active = False
+        self._update_download_cancel = threading.Event()
         self.last_scan: str | None = None
         self.status_text = tk.StringVar(value="Ready. Choose Scan PC to begin. No background scan is running.")
         self.events: queue.Queue = queue.Queue()
@@ -173,6 +177,11 @@ class GameGraveApp(tk.Tk):
             self.after(250, self.scan_all)
 
     def _close_safely(self):
+        if self._update_download_active:
+            messagebox.showinfo("Update download running",
+                "Cancel or finish the installer download before closing. "
+                "Game Grave never installs it automatically.")
+            return
         if self.cleanup_running or self._selfcheck_busy:
             messagebox.showinfo("Cleanup still running",
                                 "Wait for the current Windows Recycle Bin check to finish. "
@@ -3419,9 +3428,14 @@ class GameGraveApp(tk.Tk):
         self.text(updates_panel,
                   "Only your click can start an update check. Game Grave first verifies a "
                   "release signature, exact download host and installer SHA-256 metadata. "
-                  "This screen never downloads or installs files automatically.",
+                  "A separately approved download is checked against the signed SHA-256. "
+                  "No installer is ever launched automatically.",
                   10, MUTED, wraplength=750).pack(anchor="w", pady=(0, 8))
-        self.button(updates_panel, "Check for signed updates", self._check_updates_clicked).pack(anchor="w")
+        update_actions = tk.Frame(updates_panel, bg=PANEL)
+        update_actions.pack(fill="x")
+        self.button(update_actions, "Check for signed updates", self._check_updates_clicked).pack(side="left")
+        self.button(update_actions, "Cancel update download", self._cancel_verified_download).pack(
+            side="left", padx=(8, 0))
         if not update_ready():
             self.text(updates_panel, "Engineering preview: update service not connected. No internet request is made.",
                       9, WARN, wraplength=760).pack(anchor="w", pady=(7, 0))
@@ -3622,6 +3636,9 @@ class GameGraveApp(tk.Tk):
 
     def _check_updates_clicked(self):
         """Never make a network request unless the user explicitly clicks."""
+        if getattr(self, "_update_download_active", False):
+            messagebox.showinfo("Download running", "Finish or cancel the current download first.")
+            return
         if not update_ready():
             messagebox.showinfo(
                 "Update service not connected",
@@ -3641,6 +3658,59 @@ class GameGraveApp(tk.Tk):
             except UpdateError as exc:
                 self.events.put(("update_check_error", str(exc)))
         threading.Thread(target=worker, daemon=True).start()
+
+    def _cancel_verified_download(self):
+        if not self._update_download_active:
+            messagebox.showinfo("No download running",
+                "There is no installer download to cancel.", parent=self)
+            return
+        self._update_download_cancel.set()
+        self.status_text.set("Stopping installer download and cleaning up test staging…")
+
+    def _begin_verified_download(self, release):
+        if self._update_download_active or getattr(self, "_update_check_active", False):
+            messagebox.showinfo("Update operation running",
+                "Finish or cancel the current update operation before starting another.")
+            return
+        if not messagebox.askyesno(
+            "Download verified stable installer?",
+            f"Stable version: {release.version}\n"
+            f"Download URL: {release.download_url}\n"
+            f"Expected size: {human_size(release.size_bytes)}\n"
+            f"Signed manifest SHA-256: {release.installer_sha256}\n\n"
+            "Download and verify these exact bytes into a NEW local file? "
+            "Game Grave will NOT open or install it. Windows publisher "
+            "signature validation is a separate requirement.",
+            parent=self):
+            return
+        chosen = filedialog.asksaveasfilename(
+            parent=self, title="Save verified Windows installer",
+            defaultextension=".exe", filetypes=[("Windows installer", "*.exe")],
+            initialfile=Path(release.download_url).name)
+        if not chosen:
+            return
+        self._update_download_cancel.clear()
+        self._update_download_active = True
+        self.status_text.set("Downloading approved stable installer and checking SHA-256…")
+        def worker():
+            try:
+                outcome = download_verified_installer(
+                    release, Path(chosen), download_host=UPDATE_DOWNLOAD_HOST,
+                    approved=True, canceled=self._update_download_cancel.is_set,
+                    progress=lambda current, total: self.events.put(
+                        ("update_download_progress", (current, total))))
+                self.events.put(("update_download_result", outcome))
+            except (UpdateError, OSError, ValueError, PermissionError,
+                    InterruptedError, FileExistsError) as exc:
+                self.events.put(("update_download_error", type(exc).__name__))
+            except Exception:
+                self.events.put(("update_download_error", "UnexpectedError"))
+        try:
+            threading.Thread(target=worker, daemon=True).start()
+        except RuntimeError:
+            self._update_download_active = False
+            messagebox.showerror("Download not started",
+                "Windows could not start the update worker. Nothing was downloaded.")
 
     def _activate_pro(self):
         if not activation_ready():
@@ -4212,17 +4282,8 @@ class GameGraveApp(tk.Tk):
                 elif name == "update_check_result":
                     self._update_check_active = False
                     if payload.status == "available":
-                        self.status_text.set("A newer signed release was verified. No files were downloaded.")
-                        messagebox.showinfo(
-                            "Verified update available",
-                            f"Installed release: {payload.installed_version}\n"
-                            f"New stable release: {payload.release.version}\n\n"
-                            f"Verified metadata download URL:\n{payload.release.download_url}\n\n"
-                            f"Published installer SHA-256:\n{payload.release.installer_sha256}\n\n"
-                            "Game Grave did NOT download, run, or install the update. "
-                            "Installer Authenticode and byte checksum verification "
-                            "are separate release requirements.",
-                            parent=self)
+                        self.status_text.set("A newer signed stable release was verified.")
+                        self._begin_verified_download(payload.release)
                     else:
                         self.status_text.set("No newer signed stable release was advertised.")
                         messagebox.showinfo(
@@ -4231,6 +4292,27 @@ class GameGraveApp(tk.Tk):
                             "The verified metadata did not advertise a newer version. "
                             "No files were changed.",
                             parent=self)
+                elif name == "update_download_progress":
+                    current, total = payload
+                    self.status_text.set(
+                        f"Downloading stable installer: {human_size(current)} of "
+                        f"{human_size(total)} signed bytes…")
+                elif name == "update_download_result":
+                    self._update_download_active = False
+                    self.status_text.set("Stable installer downloaded and SHA-256 verified; not installed.")
+                    messagebox.showinfo("Verified installer saved",
+                        f"File: {payload['saved_path']}\n"
+                        f"Verified SHA-256: {payload['sha256']}\n\n"
+                        "The installer was NOT opened or installed. "
+                        "Confirm its Windows Authenticode publisher signature "
+                        "before manually executing this file.", parent=self)
+                elif name == "update_download_error":
+                    self._update_download_active = False
+                    self.status_text.set("Installer download canceled or not verified. Existing app unchanged.")
+                    messagebox.showwarning("Update download did not complete",
+                        f"The installer was not accepted ({payload}). "
+                        "The current Game Grave installation remains untouched. "
+                        "Do not execute any unverified partial file.", parent=self)
                 elif name == "update_check_error":
                     self._update_check_active = False
                     self.status_text.set("Signed update check incomplete. Game Grave remains offline-capable.")

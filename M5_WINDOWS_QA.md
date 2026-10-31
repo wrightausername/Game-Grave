@@ -99,3 +99,28 @@ must remain preserved through upgrade and uninstall.
 Synthetic Windows/Linux tests prove these preferences migration rules but
 **not** a true installer upgrade from a prior signed release. That
 cross-version acceptance test remains M5-04 OPEN.
+
+
+## Explicit signed-manifest installer download (prepared, never automatic)
+
+The update settings flow can now offer a **second, separate approval**
+after a verified HTTPS stable-release manifest is received. The user chooses
+a NEW `.exe` filename. The download worker requires the exact pinned
+download host, refuses redirects, streams no more than the signed byte count,
+compares full SHA-256 with the publisher-signed manifest, and publishes only
+after exact-size and digest verification. It never overwrites an existing file
+and never opens, runs or installs an EXE. Cancel discards only its temporary
+owned staging file. Incorrect hashes, canceled transfers and disallowed paths
+fail closed, with the installed version left untouched.
+
+This is **not** an Authenticode check. The user must still verify that the
+downloaded installer has the reviewed Windows code-signing publisher and
+timestamp before manually running it. The separate signed-release operator
+tool in this document checks that identity and human release gates.
+
+In the engineering preview, `update_config.py` public fields are intentionally
+empty, so the app cannot contact a hypothetical update service or download
+anything. Live HTTPS origin ownership, signing key custody, malicious response
+injection, split-download/network failures and the full signed Windows
+upgrade/downgrade path must be tested before M5 acceptance. No forced account,
+silent background polling, auto-installer launch, or automatic rollback exists.
