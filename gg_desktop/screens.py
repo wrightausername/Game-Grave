@@ -163,7 +163,7 @@ class ScreenMethods:
             recent_col.addWidget(label("No review findings yet. Scan first or adjust the age threshold.", "subtle", wrap=True))
         for item in findings:
             ctl = button(item.name[:39] + "  ›",
-                         lambda _=False: self.navigate("Graveyard"), kind="link")
+                         lambda _=False, key=item.key: self._go_grave_item(key), kind="link")
             ctl.setToolTip(item.finding)
             recent_col.addWidget(ctl)
             recent_col.addWidget(label(
@@ -197,7 +197,7 @@ class ScreenMethods:
                                           f"{len(self.inventory.graveyard)} findings"))
         for item in self.inventory.graveyard[:4]:
             ctl = button(item.name[:43] + "  ›",
-                         lambda _=False: self.navigate("Graveyard"), kind="link")
+                         lambda _=False, key=item.key: self._go_grave_item(key), kind="link")
             queue_col.addWidget(ctl)
             queue_col.addWidget(label(item.category + "  •  " +
                                       human_size(item.apparent_bytes) +
@@ -373,6 +373,10 @@ class ScreenMethods:
         if not _safe_open_path(path):
             self.error("Folder unavailable", "The directory is missing, redirected, or refused by Windows.")
 
+    def _go_grave_item(self, key):
+        self._pending_grave_key = key
+        self.navigate("Graveyard")
+
     def graveyard_page(self):
         page = self._new("Graveyard",
                          "Review apparent storage, understand protections, and approve individual Recycle Bin moves.")
@@ -462,6 +466,14 @@ class ScreenMethods:
                                        human_size(e.apparent_bytes), status)):
                 _table_text(self.grave_table, i, c, value)
             self.grave_table.setRowHeight(i, 37)
+        selected_key = getattr(self, "_pending_grave_key", None)
+        if selected_key is not None:
+            for i, e in enumerate(self._shown_graves):
+                if e.key == selected_key:
+                    self.grave_table.selectRow(i)
+                    self.grave_table.scrollToItem(self.grave_table.item(i, 0))
+                    break
+            self._pending_grave_key = None
         self._grave_details()
 
     def _selected_grave_entries(self):
