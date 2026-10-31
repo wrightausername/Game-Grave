@@ -1,8 +1,8 @@
 """Optional, private AI chat. Never scans files or authorizes cleanup.
 
-Requires a user-installed local Ollama model. Not bundled with Game Grave.
-Only the user's question and anonymous aggregate scan counts are sent to
-127.0.0.1, with system proxy settings explicitly disabled.
+Prefers Game Grave's optional, automatically installed local inference runtime.
+Existing users may still use locally installed Ollama as a compatibility fallback.
+Only the question and anonymous aggregate scan counts are passed to localhost.
 """
 from __future__ import annotations
 
@@ -77,6 +77,46 @@ def ask_local_assistant(question: str, settings: dict, inventory=None) -> str:
     context = aggregate_scan_context(inventory)
     context_line = ("Current aggregate scan counts: " + json.dumps(context, sort_keys=True)
                     if context else "No scan counts available.")
+    # Use our signed-hash-pinned, automatically installed local engine first.
+    # Backwards compatible with existing user-installed Ollama installations.
+    from ai_bundle import is_ai_installed, local_server, AiSetupError
+    if is_ai_installed():
+        try:
+            url, token = local_server()
+            data = {
+                "model": "Game Grave AI",
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT + "\\n" + context_line},
+                    {"role": "user", "content": question},
+                ],
+                "temperature": 0.2,
+                "max_tokens": 450,
+                "stream": False,
+            }
+            request = urllib.request.Request(
+                url + "/v1/chat/completions",
+                data=json.dumps(data).encode("utf-8"),
+                headers={"Content-Type": "application/json",
+                         "Authorization": "Bearer " + token},
+                method="POST",
+            )
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(request, timeout=120) as response:
+                body = response.read(128 * 1024 + 1)
+            if len(body) > 128 * 1024:
+                raise AssistantUnavailable("Local AI returned too much text.")
+            parsed = json.loads(body.decode("utf-8"))
+            reply = parsed["choices"][0]["message"]["content"]
+            if not isinstance(reply, str) or not reply.strip():
+                raise AssistantUnavailable("The local AI model returned no answer.")
+            return reply.strip()[:MAX_REPLY]
+        except AiSetupError as exc:
+            raise AssistantUnavailable(str(exc)) from None
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError,
+                IndexError, TypeError, UnicodeError):
+            raise AssistantUnavailable(
+                "Built-in local AI could not respond. No files were changed."
+            ) from None
     payload = {
         "model": model,
         "stream": False,
