@@ -14,7 +14,7 @@ from core import OldFile
 from graveyard import GraveyardEntry
 from graveyard_override import (
     ACKNOWLEDGEMENT, OverrideRefused, _critical_path,
-    _metadata_fingerprint, override_eligibility, recycle_selected_override,
+    _metadata_fingerprint, manual_game_entry, override_eligibility, recycle_selected_override,
 )
 
 
@@ -73,6 +73,44 @@ class ProtectedItemOverrideTests(unittest.TestCase):
         entry = snapshot_entry(path, kind="game")
         allowed, reason = override_eligibility(entry, inventory_for(entry, "game"))
         self.assertTrue(allowed, reason)
+
+    def test_owner_can_review_current_installed_game_from_games_page(self):
+        folder = self.root / "Recently Played Game"
+        folder.mkdir()
+        (folder / "game.exe").write_bytes(b"safe synthetic test")
+        game = SimpleNamespace(
+            key="Epic:123:test", name="Recently Played Game", launcher="Epic",
+            install_path=str(folder), install_evidence="Verified Epic install",
+            size_bytes=100, status="Installed (launcher evidence)",
+            claimed_by=("Epic",), capabilities=("inspect", "open_folder"),
+        )
+        entry = manual_game_entry(game)
+        inventory = SimpleNamespace(
+            games=[game], graveyard=[], steam=[], mods=[], files=[], screenshots=[],
+            recordings=[]
+        )
+        allowed, reason = override_eligibility(entry, inventory)
+        self.assertTrue(allowed, reason)
+        forged = replace(entry, name="Different unverified item")
+        self.assertFalse(override_eligibility(forged, inventory)[0])
+
+    def test_ambiguous_or_unverified_installed_game_not_eligible(self):
+        folder = self.root / "UnknownGame"
+        folder.mkdir()
+        game = SimpleNamespace(
+            key="custom:test", name="UnknownGame", install_path=str(folder),
+            install_evidence="Unverified custom folder", size_bytes=None,
+            status="Unverified folder", capabilities=("inspect",),
+            claimed_by=("Custom library",),
+        )
+        inv = SimpleNamespace(
+            games=[game], graveyard=[], steam=[], mods=[], files=[],
+            screenshots=[], recordings=[])
+        self.assertFalse(override_eligibility(manual_game_entry(game), inv)[0])
+        game.status = "Installed (multiple launchers)"
+        game.capabilities = ("inspect", "open_folder")
+        game.claimed_by = ("Steam", "Epic")
+        self.assertFalse(override_eligibility(manual_game_entry(game), inv)[0])
 
     def test_owner_can_override_protected_scanned_file(self):
         path = self.root / "Mods"
