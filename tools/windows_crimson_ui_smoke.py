@@ -65,17 +65,24 @@ def main():
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
             # Native reference-dashboard parity: all pictured controls must
             # exist and be wired to the real app, never static screenshot overlays.
-            from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox
+            from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox, QLabel
             from PySide6.QtSvg import QSvgRenderer
+            from gg_desktop.widgets import ActionCard
             window.navigate("Overview")
             app.processEvents()
-            labels = {b.text() for b in window.page.findChildren(QPushButton)}
+            buttons = {b.text() for b in window.page.findChildren(QPushButton)}
+            labels = {b.text() for b in window.page.findChildren(QLabel)}
+            cards = window.page.findChildren(ActionCard)
+            assert len(cards) == 4, "Four clickable top-level action cards are required"
+            assert all(callable(card._action) for card in cards)
             for expected in ("Scan for Old Files", "Review Graveyard",
-                             "Open Undo Center", "Quick Settings",
-                             "Delete Selected", "Restore", "Add to Graveyard",
-                             "Review Files", "Preview actual image"):
+                             "Open Undo Center", "Quick Settings"):
                 assert any(expected in t for t in labels), (
-                    f"Missing or unconnected reference dashboard tool: {expected}")
+                    f"Missing text label inside actionable reference card: {expected}")
+            for expected in ("Delete Selected", "Restore", "Add to Graveyard",
+                             "Review Files", "Preview actual image"):
+                assert any(expected in t for t in buttons), (
+                    f"Missing or unconnected reference dashboard button: {expected}")
             combos = window.page.findChildren(QComboBox)
             drives = [c for c in combos if "local drive" in c.accessibleName().lower()]
             filters = [c for c in combos if "filter launchers" in c.accessibleName().lower()]
