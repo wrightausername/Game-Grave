@@ -1326,6 +1326,12 @@ class ScreenMethods:
                 _table_text(photo_table, i, colno, value)
             photo_table.setRowHeight(i, 37)
         photo_col.addWidget(photo_table)
+        from gg_desktop.capture_image import ScreenshotImage, request_screenshot
+        photo_col.addWidget(label(
+            "SELECTED SCREENSHOT  •  ACTUAL IMAGE FROM YOUR PC",
+            "eyebrow"))
+        selected_photo_image = ScreenshotImage(height=215)
+        photo_col.addWidget(selected_photo_image)
         if not shots:
             photo_col.addWidget(label(
                 "No in-game screenshots found yet. Scan PC or add a specific "
@@ -1335,6 +1341,16 @@ class ScreenMethods:
         def current_photo():
             indices = _selected_indices(photo_table)
             return photos[indices[0]] if indices and indices[0] < len(photos) else None
+
+        def update_photo_thumbnail():
+            item = current_photo()
+            if item is None:
+                selected_photo_image.set_status("Choose a screenshot to see its real thumbnail")
+            else:
+                request_screenshot(self, item, selected_photo_image)
+        photo_table.itemSelectionChanged.connect(update_photo_thumbnail)
+        if photos:
+            photo_table.selectRow(0)
 
         def preview_photo():
             record = current_photo()
