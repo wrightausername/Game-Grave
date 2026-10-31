@@ -72,6 +72,7 @@ def download_verified_installer(
     stream = opener or urllib.request.build_opener(_NoRedirect()).open
     owned = None
     published = False
+    succeeded = False
     owned_identity = None
     try:
         fd, raw = tempfile.mkstemp(prefix=".gg-update-", suffix=".partial", dir=parent)
@@ -126,6 +127,7 @@ def download_verified_installer(
         if (target.stat().st_size != total or
                 digest2.hexdigest() != expected):
             raise UpdateError("Published installer failed final SHA-256 check.")
+        succeeded = True
         return {
             "saved_path": str(target),
             "bytes": total,
@@ -139,14 +141,14 @@ def download_verified_installer(
     finally:
         # Only unlink paths belonging to this exact uniquely created file.
         # Do not delete unrelated outputs that another program created.
-        if published:
+        if published and not succeeded:
             try:
                 state = target.lstat()
                 if (state.st_dev, state.st_ino) == owned_identity and (
                         not target.is_symlink()):
-                    # On success leave the verified target alone. On error,
-                    # caller must inspect the target; do not hide ambiguity.
-                    pass
+                    # Only our own newly published bytes, never a preexisting
+                    # installer or another process's replacement.
+                    target.unlink()
             except OSError:
                 pass
         if owned is not None:
