@@ -68,10 +68,22 @@ def ai_root() -> Path:
 
 
 def _validate_folder(folder: Path) -> None:
-    if _has_reparse_component(folder):
+    # Core's link checker deliberately treats *nonexistent* paths as unsafe.
+    # Check the closest existing ancestor first, then create and recheck each
+    # new path. Otherwise a first-run setup could never create its data folder.
+    ancestor = folder
+    while not ancestor.exists() and not ancestor.is_symlink():
+        parent = ancestor.parent
+        if parent == ancestor:
+            raise AiSetupError("No safe location exists for optional AI files.")
+        ancestor = parent
+    if _has_reparse_component(ancestor):
         raise AiSetupError("The AI storage path contains a link or Windows reparse point.")
-    folder.mkdir(parents=True, exist_ok=True)
-    if _has_reparse_component(folder):
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise AiSetupError("Could not create the optional AI data folder.") from exc
+    if not folder.is_dir() or _has_reparse_component(folder):
         raise AiSetupError("The AI storage path changed during setup.")
 
 
