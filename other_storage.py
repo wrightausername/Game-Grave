@@ -92,6 +92,7 @@ def analyze_other_storage(
     drive: str | Path,
     installed_games: Iterable[str] = (),
     *,
+    scope: str | Path | None = None,
     max_entries: int = MAX_ENTRIES,
     max_seconds: float = MAX_SECONDS,
     cancel: Callable[[], bool] | None = None,
@@ -103,7 +104,11 @@ def analyze_other_storage(
     known, but folder sizes remain apparent estimates, NOT the source of the
     overview 'Other used' number. Unknown/inaccessible items remain unknown.
     """
-    root = _check_requested_root(Path(drive))
+    drive_root = _check_requested_root(Path(drive))
+    root = Path(os.path.abspath(str(scope))) if scope is not None else drive_root
+    if (not root.is_dir() or not _same_volume(root, drive_root)
+            or _has_reparse_component(root)):
+        raise ValueError("This folder is outside the selected drive or redirected.")
     if not 1 <= max_entries <= MAX_ENTRIES:
         raise ValueError("Invalid maximum directory-entry limit.")
     if not 0 < max_seconds <= 120:
