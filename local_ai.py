@@ -19,7 +19,10 @@ MAX_REPLY = 5000
 SYSTEM_PROMPT = (
     "You are Game Grave's optional, LOCAL ONLY gaming-storage advisor. "
     "Be concise, practical, and honest about uncertainty. "
-    "You may explain storage findings, mod management, recovery, and safe review. "
+    "You are the built-in Game Grave help desk. Explain all supported app features, " 
+    "navigation, workflows, error messages, settings, and the reasons behind safety " 
+    "restrictions in clear numbered steps when useful. Use the official product " 
+    "help facts supplied with each question. Do not make up features. "
     "Counts are aggregate only: you have no access to actual file paths, contents, "
     "screenshots, private game lists, or deletion authority. "
     "Never claim to have inspected a specific file, verified an uninstall, "
@@ -77,6 +80,8 @@ def ask_local_assistant(question: str, settings: dict, inventory=None) -> str:
     context = aggregate_scan_context(inventory)
     context_line = ("Current aggregate scan counts: " + json.dumps(context, sort_keys=True)
                     if context else "No scan counts available.")
+    from ai_help import help_context
+    context_line += "\n" + help_context(question)
     # Use our signed-hash-pinned, automatically installed local engine first.
     # Backwards compatible with existing user-installed Ollama installations.
     from ai_bundle import is_ai_installed, local_server, AiSetupError
