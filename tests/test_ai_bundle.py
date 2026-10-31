@@ -74,6 +74,7 @@ class LocalAiSetupSafetyTests(unittest.TestCase):
             archive = base / "bad.zip"
             with zipfile.ZipFile(archive, "w") as z:
                 z.writestr("../outside.txt", "bad")
+            (base / "stage").mkdir()
             with self.assertRaisesRegex(AiSetupError, "Unexpected file"):
                 _extract_runtime(archive, base / "stage")
             self.assertFalse((base / "outside.txt").exists())
@@ -84,6 +85,7 @@ class LocalAiSetupSafetyTests(unittest.TestCase):
             archive = base / "fake.zip"
             with zipfile.ZipFile(archive, "w") as z:
                 z.writestr("README", "No server here")
+            (base / "stage").mkdir()
             with self.assertRaisesRegex(AiSetupError, "expected server"):
                 _extract_runtime(archive, base / "stage")
 
