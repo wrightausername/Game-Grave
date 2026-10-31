@@ -1779,11 +1779,14 @@ class GameGraveApp(tk.Tk):
     def _grave_recycle_one(self):
         ids = self.grave_tree.selection()
         if len(ids) != 1:
-            messagebox.showinfo("Select one", "Select exactly one eligible archive to recycle.")
+            messagebox.showinfo("Select one", "Select exactly one file to delete.")
             return
         self._grave_recycle_ids(ids)
 
     def _grave_recycle_selected(self):
+        if not self.grave_checked:
+            messagebox.showinfo("Nothing checked", "Tick files in the leftmost column first.")
+            return
         self._grave_recycle_ids(list(self.grave_checked))
 
     def _grave_recycle_all(self):
@@ -1793,89 +1796,82 @@ class GameGraveApp(tk.Tk):
 
     def _grave_recycle_ids(self, ids):
         import uuid
-        # Fail closed before any override or recycle prompt if too many items.
-        # No invisible cross-page batch can become a massive destructive task.
         if len(ids) > DEFAULT_PAGE_SIZE:
-            messagebox.showwarning(
-                "Limit this cleanup to 160 files",
-                f"{len(ids)} items are checked across pages. A single cleanup "
-                f"can contain at most {DEFAULT_PAGE_SIZE} files. Narrow your filters, "
-                "clear checks, or select a smaller set. Nothing was moved.")
+            messagebox.showwarning("Too many files selected",
+                f"Select at most {DEFAULT_PAGE_SIZE} files per cleanup. "
+                "Narrow your filters or clear checks. Nothing was deleted.")
             return
         chosen = [self.graveyard_lookup[k] for k in ids if k in self.graveyard_lookup]
-        blocked = [e for e in chosen if not e.can_recycle and not self._grave_can_override(e)]
-        if blocked:
-            messagebox.showwarning("Protected items cannot be deleted here",
-                f"{len(blocked)} selection(s) are installed games, managed mods, saves, "
-                "or uncertain folders. Use the owning game or mod manager to remove them. "
-                "Nothing was changed.")
-            return
         if not chosen:
-            messagebox.showinfo("Nothing checked", "Check one or more individual archives to recycle.")
+            messagebox.showinfo("No files selected", "Choose a file or tick eligible files first.")
             return
-        overrides = [e for e in chosen if self._grave_can_override(e)]
-        if overrides:
-            names = "\n".join("• " + e.name for e in overrides[:6])
-            if not messagebox.askyesno("Override your Never Touch protection?",
-                f"{len(overrides)} file(s) are on YOUR Never Touch list.\n\n{names}\n\n"
-                "Overrides apply only to these individually selected archives. "
-                "This does not permit deleting game folders, saves, profiles, or system files.\n\n"
-                "Do you want to remove these protections for this cleanup only?"):
-                return
-            typed = simpledialog.askstring("Extra confirmation required",
-                "Type DELETE to confirm overriding protected archives:", parent=self)
-            if typed != "DELETE":
-                messagebox.showinfo("Nothing removed", "Override confirmation was not entered.")
-                return
+        blocked = [e for e in chosen if not e.can_recycle]
+        if blocked:
+            messagebox.showwarning("Protected: deletion blocked",
+                f"{len(blocked)} selected item(s) cannot be deleted here. "
+                "A personally protected file must be Unprotected first. "
+                "Installed games, saves, profiles and mod folders stay protected. "
+                "Nothing was deleted.")
+            return
         total = sum(e.apparent_bytes for e in chosen)
         preview = "\n".join("• " + e.name for e in chosen[:7])
         if len(chosen) > 7:
             preview += f"\n…and {len(chosen)-7} more"
-        if not messagebox.askyesno("Confirm Game Grave cleanup",
-                f"Send {len(chosen)} file(s) ({human_size(total)} apparent size) to the "
+        if not messagebox.askyesno("Delete selected files?",
+                f"Move {len(chosen)} file(s) ({human_size(total)} apparent size) to the "
                 "Windows Recycle Bin?\n\n" + preview +
-                "\n\nThese archives may be needed for reinstalling mods. "
-                "This does not immediately free disk space. Recovery is not guaranteed."):
+                "\n\nCheck recordings and mod archives before deleting. "
+                "No permanent delete is performed. Space is not freed until the "
+                "Recycle Bin is emptied. Recovery is not guaranteed."):
             return
         session = str(uuid.uuid4())
-        log_event("Cleanup started", f"Graveyard selected {len(chosen)} items", session_id=session,
-                  source="The Graveyard")
-        completed = 0
-        skipped = []
+        log_event("Cleanup started", f"Graveyard selected {len(chosen)} items",
+                  session_id=session, source="The Graveyard")
+        completed, skipped = 0, []
         for entry in chosen:
             f = entry.old_file
             try:
                 if f is None or not is_unchanged(f):
-                    raise ValueError("File changed since scan or isn't an ordinary archive")
-                if is_protected_path(Path(f.path), []):
-                    raise ValueError("Protected game, save or system location")
-                if is_protected_path(Path(f.path), self.settings.get("never_touch", [])) and entry not in overrides:
-                    raise ValueError("User-protected file without override")
-                if not Path(f.path).is_file() or not looks_like_game_archive(Path(f.path)):
-                    raise ValueError("No longer recognized as a game-related archive")
-                recycle_file(Path(f.path))
+                    raise ValueError("File changed since scan; rescan before deleting.")
+                path = Path(f.path)
+                if is_protected_path(path, self.settings.get("never_touch", [])):
+                    raise ValueError("Protected by Game Grave or your Never Touch list.")
+                eligible = (looks_like_game_archive(path) or
+                            (entry.category == "Old game recording" and
+                             path.suffix.casefold() in RECORDING_EXTENSIONS))
+                if not path.is_file() or not eligible:
+                    raise ValueError("This is no longer a recognized reviewable file.")
+                recycle_file(path)
                 try:
-                    rid = register_recycle(Path(f.path), f.size, "Graveyard")
+                    rid = register_recycle(path, f.size, "Graveyard")
                 except OSError:
                     rid = None
-                    log_event("Recovery warning", "Undo Center entry not saved", session_id=session,
-                              path=str(f.path), source="The Graveyard")
-                log_event("Manual recycled", "Graveyard archive recycled", session_id=session,
-                          path=str(f.path), size_bytes=f.size, source="The Graveyard",
-                          result="Recycled", recovery_id=rid)
+                    log_event("Recovery warning", "Undo Center entry not saved",
+                              session_id=session, path=str(path), source="The Graveyard")
+                log_event("Manual recycled", "Graveyard file sent to Recycle Bin",
+                          session_id=session, path=str(path), size_bytes=f.size,
+                          source="The Graveyard", result="Recycled", recovery_id=rid)
                 completed += 1
             except (OSError, ValueError, RuntimeError) as exc:
                 skipped.append(f"{entry.name}: {exc}")
-                log_event("Cleanup skipped", str(exc), session_id=session, path=entry.path,
-                          source="The Graveyard", result="Skipped")
-        log_event("Cleanup finished", f"Graveyard: {completed} recycled, {len(skipped)} skipped. "
-                  "Recycle Bin may still occupy space.", session_id=session, source="The Graveyard")
-        self.status_text.set(f"Graveyard: {completed} files sent to Recycle Bin")
+                log_event("Cleanup skipped", str(exc), session_id=session,
+                          path=entry.path, source="The Graveyard", result="Skipped")
+        log_event("Cleanup finished",
+                  f"Graveyard: {completed} recycled, {len(skipped)} skipped. "
+                  "Recycle Bin may still occupy space.", session_id=session,
+                  source="The Graveyard")
+        self.status_text.set(f"Graveyard: {completed} moved to Recycle Bin; {len(skipped)} not moved")
         self.grave_checked.clear()
         self.scan_all()
-        messagebox.showinfo("Graveyard cleanup", f"{completed} file(s) recycled; "
-                            f"{len(skipped)} skipped.\n\n" + "\n".join(skipped[:5]) +
-                            "\n\nEmpty the Recycle Bin separately to actually free space.")
+        outcome = (f"{completed} moved to Recycle Bin. {len(skipped)} not moved.\n\n" +
+                   "\n".join(skipped[:6]) +
+                   "\n\nIf Windows could not verify a recoverable Recycle Bin, "
+                   "Game Grave blocked deletion. Use File Explorer to investigate. "
+                   "Empty Recycle Bin separately when ready to free space.")
+        if skipped:
+            messagebox.showwarning("Deletion blocked for some files", outcome)
+        else:
+            messagebox.showinfo("Delete complete", outcome)
 
     def _files_page(self):
         self.header("Old Files", "Review files by last-modified date. Multi-select and send only what you choose to Recycle Bin.")
