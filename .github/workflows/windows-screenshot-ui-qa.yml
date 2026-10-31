@@ -32,8 +32,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install only local image decoding dependency
-        run: python -m pip install "Pillow>=11.1,<13"
+      - name: Install application and local image preview dependencies
+        run: python -m pip install -r build-requirements.txt
       - name: Render real Tk screenshot preview on disposable Windows fixture
         shell: pwsh
         env:
