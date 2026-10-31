@@ -38,6 +38,10 @@ def aggregate_scan_context(inventory=None) -> dict[str, int]:
     """Only anonymous counts, never file names, locations or user records."""
     if inventory is None:
         return {}
+    if isinstance(inventory, dict):
+        allowed = ("games", "mods", "files", "recordings", "screenshots", "saves", "graveyard")
+        return {name: min(inventory[name], 1000000) for name in allowed
+                if type(inventory.get(name)) is int and inventory[name] >= 0}
     result = {}
     for name in ("games", "mods", "files", "recordings", "screenshots", "saves", "graveyard"):
         items = getattr(inventory, name, None)
