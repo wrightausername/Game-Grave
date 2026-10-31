@@ -149,6 +149,38 @@ class HeroBanner(QFrame):
         painter.drawRoundedRect(target.adjusted(.5, .5, -.5, -.5), 11, 11)
 
 
+class LandscapeArt(QFrame):
+    """Original local placeholder artwork, NOT the user's actual game screenshot."""
+    def __init__(self, height=154):
+        super().__init__()
+        self.setMinimumHeight(height)
+        self.setMaximumHeight(height)
+        self.setAccessibleName("Original decorative Game Grave landscape artwork. Screenshot not loaded.")
+        from PySide6.QtSvg import QSvgRenderer
+        self.renderer = QSvgRenderer(
+            str(Path(__file__).parent / "assets" / "crimson_ruins.svg"))
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        area = QRectF(0, 0, self.width(), self.height())
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor("#111922"))
+        painter.drawRoundedRect(area, 10, 10)
+        painter.setClipRect(area)
+        if self.renderer.isValid():
+            self.renderer.render(painter, QRectF(
+                -self.width() * .3, -42, self.width() * 1.6,
+                self.height() + 125))
+        painter.fillRect(QRectF(0, self.height() - 41, self.width(), 41),
+                         QColor(6, 10, 17, 212))
+        painter.setPen(QColor("#C4D4E1"))
+        painter.setFont(QFont("Segoe UI", 9))
+        painter.drawText(QRectF(12, self.height() - 35, self.width() - 24, 25),
+                         Qt.AlignLeft | Qt.AlignVCenter,
+                         "Local illustration  •  Click Preview to inspect your actual image")
+
+
 class StorageRing(QWidget):
     """Only real OS-reported used/free disk usage; no fake reclaimed segment."""
     def __init__(self, parent=None):
