@@ -1843,6 +1843,95 @@ class GameGraveApp(tk.Tk):
         if hasattr(self, "grave_delete_checked_button"):
             self._grave_sync_actions()
 
+
+    def _grave_double_click(self, event=None):
+        entry = self._grave_selected_entry()
+        if entry and entry.category == "Old game screenshot":
+            self._grave_preview_screenshot()
+        else:
+            self._grave_details()
+
+    def _grave_preview_screenshot(self):
+        """Only individual, explicitly selected local images are decoded."""
+        entry = self._grave_selected_entry()
+        if entry is None or entry.category != "Old game screenshot":
+            messagebox.showinfo("Choose a screenshot",
+                "Select an old game screenshot finding first.")
+            return
+        if self.scanning or self.cleanup_running or getattr(self, "_screenshot_preview_busy", False):
+            messagebox.showinfo("Game Grave is busy",
+                "Finish the current scan, preview or cleanup first.")
+            return
+        if entry.old_file is None or not is_unchanged(entry.old_file):
+            messagebox.showwarning("Image changed",
+                "This screenshot is no longer identical to the scan result. Scan again.")
+            return
+        self._screenshot_preview_busy = True
+        self.status_text.set("Opening an individual screenshot preview locally…")
+        def work():
+            try:
+                image = decode_screenshot_preview(entry.old_file)
+                self.events.put(("screenshot_preview_ready", (entry, image)))
+            except Exception as exc:
+                self.events.put(("screenshot_preview_error", str(exc)[:250]))
+        try:
+            threading.Thread(target=work, daemon=True).start()
+        except RuntimeError:
+            self._screenshot_preview_busy = False
+            messagebox.showerror("Preview unavailable",
+                "Could not start the local image decoder.")
+
+    def _display_screenshot_preview(self, entry, image):
+        """Tk image creation and dialogs must run on the main UI thread."""
+        try:
+            from PIL import ImageTk
+            image_token = ImageTk.PhotoImage(image, master=self)
+        except (ImportError, ValueError, RuntimeError) as exc:
+            messagebox.showerror("Preview unavailable", str(exc))
+            return
+        window = tk.Toplevel(self)
+        window.title("Game Grave | Review screenshot")
+        window.configure(bg=BG)
+        window.transient(self)
+        window.resizable(True, True)
+        window.minsize(360, 260)
+        # PhotoImage MUST remain referenced for the entire Toplevel lifetime.
+        window._gg_screenshot_photo = image_token
+        self.text(window, "SCREENSHOT REVIEW  •  NO AUTOMATIC CLEANUP",
+                  12, ACCENT, True).pack(anchor="w", padx=17, pady=(15, 4))
+        tk.Label(window, image=image_token, bg=BG).pack(
+            fill="both", expand=True, padx=15, pady=(2, 8))
+        self.text(window,
+                  f"{entry.name}  •  {human_size(entry.apparent_bytes)}  •  "
+                  f"{entry.age_days} days since modification",
+                  10, TEXT, True, wraplength=800).pack(anchor="w", padx=17, pady=(0, 5))
+        self.text(window,
+                  "Screenshot location is a hint, not proof this image is unimportant. "
+                  "Look carefully. Only THIS image may be reviewed for Recycle Bin "
+                  "cleanup. Nothing has been moved.",
+                  9, MUTED, wraplength=800).pack(anchor="w", padx=17, pady=(0, 13))
+        buttons = tk.Frame(window, bg=BG)
+        buttons.pack(fill="x", padx=15, pady=(0, 16))
+        protected = is_protected_path(
+            Path(entry.path), self.settings.get("never_touch", []))
+        def approve_one():
+            if not window.winfo_exists():
+                return
+            # The actual approval dialog and Windows recovery preflight live
+            # in the existing Graveyard worker. Never recycle from preview.
+            window.destroy()
+            self._grave_recycle_ids([entry.key], screenshot_reviewed_key=entry.key)
+        action = self.button(
+            buttons, "Review moving THIS image to Recycle Bin", approve_one,
+            danger=True)
+        action.configure(state="disabled" if protected else "normal")
+        action.pack(side="left")
+        self.button(buttons, "Keep screenshot", window.destroy).pack(
+            side="left", padx=(10, 0))
+        if protected:
+            self.text(window, "Never Touch protection is active. Deletion is disabled.",
+                      9, WARN).pack(anchor="w", padx=17, pady=(0, 12))
+
     def _grave_details(self):
         ids = self.grave_tree.selection()
         if not ids:
@@ -1993,7 +2082,7 @@ class GameGraveApp(tk.Tk):
             [key for key in self._grave_page_keys
              if self.graveyard_lookup[key].can_recycle])
 
-    def _grave_recycle_ids(self, ids):
+    def _grave_recycle_ids(self, ids, *, screenshot_reviewed_key=None):
         """Confirm on the Tk thread, then process slow Windows Shell work off-UI."""
         import uuid
         if getattr(self, "cleanup_running", False) or getattr(self, "scanning", False):
@@ -2006,6 +2095,23 @@ class GameGraveApp(tk.Tk):
                 "Narrow your filters or clear checks. Nothing was deleted.")
             return
         chosen = [self.graveyard_lookup[k] for k in ids if k in self.graveyard_lookup]
+        if screenshot_reviewed_key is not None:
+            # Only one image actually displayed in the preview window can
+            # cross from protected review into this exact deletion action.
+            if (len(ids) != 1 or len(chosen) != 1 or
+                    chosen[0].key != screenshot_reviewed_key or
+                    chosen[0].category != "Old game screenshot" or
+                    chosen[0].old_file is None or
+                    not looks_like_screenshot(Path(chosen[0].path)) or
+                    not is_unchanged(chosen[0].old_file) or
+                    is_protected_path(Path(chosen[0].path),
+                                      self.settings.get("never_touch", []))):
+                messagebox.showwarning("Screenshot not eligible",
+                    "This exact screenshot was changed, protected or is no "
+                    "longer in the review list. Nothing was deleted.")
+                return
+            chosen = [replace(chosen[0], can_recycle=True,
+                              screenshot_reviewed=True)]
         if not chosen:
             messagebox.showinfo("No files selected", "Choose a file or tick eligible files first.")
             return
@@ -2022,7 +2128,8 @@ class GameGraveApp(tk.Tk):
         if not messagebox.askyesno("Delete selected files?",
                 f"Move {len(chosen)} file(s) ({human_size(total)} apparent size) to the "
                 "Windows Recycle Bin?\n\n" + preview +
-                "\n\nCheck recordings and archives before deleting. Each file needs "
+                "\n\nScreenshots require a preview of each image. "
+                "Check recordings and archives before deleting. Each file needs "
                 "Windows recovery verification, which may take a little time. "
                 "Nothing is permanently deleted. Disk space is not reclaimed "
                 "until the Recycle Bin is emptied."):
@@ -3940,6 +4047,15 @@ class GameGraveApp(tk.Tk):
                     self.scan_button.configure(state="normal", bg=ACCENT)
                     self.cancel_button.configure(state="disabled")
                     self.show_page(self.active)
+                elif name == "screenshot_preview_ready":
+                    self._screenshot_preview_busy = False
+                    entry, picture = payload
+                    self.status_text.set("Screenshot decoded locally. Nothing was deleted.")
+                    self._display_screenshot_preview(entry, picture)
+                elif name == "screenshot_preview_error":
+                    self._screenshot_preview_busy = False
+                    self.status_text.set("Screenshot preview unavailable. No file was changed.")
+                    messagebox.showwarning("Screenshot preview unavailable", payload)
                 elif name == "grave_cleanup_progress":
                     completed, total = payload
                     self.status_text.set(
