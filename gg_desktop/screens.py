@@ -88,9 +88,33 @@ class ScreenMethods:
 
     def overview_page(self):
         page = self.page_for("Overview")
-        page.content.addWidget(HeroBanner(
+        hero_row = QWidget()
+        hero_layout = row(spacing=12)
+        hero_row.setLayout(hero_layout)
+        banner = HeroBanner(
             title="YOUR GAMES.", subtitle="A CLEANER TOMORROW.",
-            detail="Find what your games leave behind across launchers. Review everything; keep what matters."))
+            detail="Find what your games leave behind, remove what you don't need, "
+                   "and keep your gaming library in top shape.")
+        hero_layout.addWidget(banner, 7)
+        # A Recycle Bin move is not reclaimed space. Never copy the fictional
+        # "37.8 GB reclaimed" number from the reference mockup.
+        now = datetime.now().astimezone()
+        monthly = []
+        for event in get_records():
+            try:
+                created = datetime.fromisoformat(str(event.get("time", "")))
+                if created.year == now.year and created.month == now.month:
+                    monthly.append(event)
+            except (ValueError, TypeError, AttributeError):
+                continue
+        month_bytes = sum(max(0, int(e.get("size", 0)))
+                          for e in monthly if isinstance(e.get("size"), int))
+        hero_layout.addWidget(MetricCard(
+            "RECYCLE BIN MOVES THIS MONTH",
+            human_size(month_bytes),
+            f"{len(monthly)} recorded • NOT freed space",
+            tone="cyan"), 3)
+        page.content.addWidget(hero_row)
         strip = QWidget()
         grid = QGridLayout(strip)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -190,7 +214,14 @@ class ScreenMethods:
         bottom_row = row(spacing=12)
         bottom.setLayout(bottom_row)
         capture, cap_col = panel()
-        cap_col.addWidget(section_title("Latest Screenshot", "Private and on-device"))
+        cap_title = QWidget()
+        cap_top = row(spacing=5)
+        cap_title.setLayout(cap_top)
+        cap_top.addWidget(label("Latest Screenshot", "sectionTitle"))
+        cap_top.addStretch()
+        cap_top.addWidget(button("View all  ›", lambda: self.navigate("Screenshots"),
+                                 kind="link"))
+        cap_col.addWidget(cap_title)
         cap_col.addWidget(LandscapeArt(136))
         if self.inventory.screenshots:
             latest = max(self.inventory.screenshots, key=lambda x: x.modified)
@@ -201,7 +232,7 @@ class ScreenMethods:
             cap_col.addWidget(button("Preview this image", lambda _=False, e=latest: self._preview_capture(e)))
         else:
             cap_col.addWidget(label(
-                "No old in-game screenshots recorded. Personal photos are never browsed by default.",
+                "No game screenshots found in supported locations. Scan PC or add a screenshot folder.",
                 "subtle", wrap=True))
         cap_col.addStretch()
         bottom_row.addWidget(capture, 2)
@@ -209,17 +240,45 @@ class ScreenMethods:
         queue, queue_col = panel()
         queue_col.addWidget(section_title("Graveyard Review Queue",
                                           f"{len(self.inventory.graveyard)} findings"))
+        queue_checks = []
         for item in self.inventory.graveyard[:4]:
-            ctl = button(item.name[:26] + "  ›",
-                         lambda _=False, key=item.key: self._go_grave_item(key), kind="link")
-            queue_col.addWidget(ctl)
-            queue_col.addWidget(label(item.category + "  •  " +
-                                      human_size(item.apparent_bytes) +
-                                      " apparent, not reclaimed", "caption", wrap=True))
+            line = QWidget()
+            inner = row(spacing=5)
+            line.setLayout(inner)
+            checkbox = QCheckBox()
+            checkbox.setAccessibleName("Select " + item.name + " for Recycle Bin review")
+            checkbox.setEnabled(item.can_recycle and item.old_file is not None)
+            checkbox.setToolTip(
+                "Safe review only; requires separate confirmation." if checkbox.isEnabled()
+                else "Protected or information only. Right-click in Graveyard for the reason.")
+            inner.addWidget(checkbox)
+            ctl = button(item.name[:24] + "  ›",
+                         lambda _=False, e=item: self._inspect_grave_entry(e),
+                         kind="link")
+            ctl.setToolTip(item.finding)
+            inner.addWidget(ctl, 1)
+            queue_col.addWidget(line)
+            queue_col.addWidget(label(
+                item.category + "  •  " +
+                human_size(item.apparent_bytes) + " apparent", "caption", wrap=True))
+            if checkbox.isEnabled():
+                queue_checks.append((checkbox, item))
         if not self.inventory.graveyard:
-            queue_col.addWidget(label("Nothing queued. No cleanup is ever automatic.", "subtle", wrap=True))
+            queue_col.addWidget(label(
+                "Nothing queued. No cleanup is automatic.", "subtle", wrap=True))
         queue_col.addStretch()
-        queue_col.addWidget(button("Review all findings", lambda: self.navigate("Graveyard"), kind="primary"))
+        queue_actions = QWidget()
+        actions_layout = row(spacing=6)
+        queue_actions.setLayout(actions_layout)
+        actions_layout.addWidget(button(
+            "See all", lambda: self.navigate("Graveyard"), kind="primary"))
+        recycle_button = button("Recycle selected…",
+            lambda: self._approve_recycle(
+                [entry for checkbox, entry in queue_checks if checkbox.isChecked()]),
+            kind="danger")
+        recycle_button.setEnabled(bool(queue_checks))
+        actions_layout.addWidget(recycle_button)
+        queue_col.addWidget(queue_actions)
         bottom_row.addWidget(queue, 2)
 
         attention, alert_col = panel(kind="alertCard")
