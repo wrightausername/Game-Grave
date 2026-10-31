@@ -3866,15 +3866,15 @@ class GameGraveApp(tk.Tk):
                         sample = ", ".join(Path(path).name for path in group.paths[:3])
                         lines.append(f"• {len(group.paths)} exact copies ({human_size(group.size_bytes)} each): {sample}")
                     messagebox.showinfo("Exact duplicate archive evidence",
-                        f"{count} identical archive group(s) in {report.hashed_files} files hashed.\\n"
-                        f"Total compared: {human_size(report.hashed_bytes)}\\n"
+                        f"{count} identical archive group(s) in {report.hashed_files} files hashed.\n"
+                        f"Total compared: {human_size(report.hashed_bytes)}\n"
                         f"Potential redundant apparent size: "
-                        f"{human_size(report.potential_redundant_apparent_bytes)}\\n"
-                        "Verified reclaimable space: 0 (not measured).\\n"
-                        + ("\\n".join(lines) if lines else "\\nNo identical groups found.")
-                        + ("\\n\\nPartial scan: some items were skipped or a limit was reached."
+                        f"{human_size(report.potential_redundant_apparent_bytes)}\n"
+                        "Verified reclaimable space: 0 (not measured).\n"
+                        + ("\n".join(lines) if lines else "\nNo identical groups found.")
+                        + ("\n\nPartial scan: some items were skipped or a limit was reached."
                            if report.truncated else "")
-                        + "\\n\\nIdentical bytes do not prove a file is unused or safe to delete. "
+                        + "\n\nIdentical bytes do not prove a file is unused or safe to delete. "
                           "Nothing changed. Use the file's owning game or manager to review.")
                 elif name == "duplicates_canceled":
                     self._dupe_busy = False
