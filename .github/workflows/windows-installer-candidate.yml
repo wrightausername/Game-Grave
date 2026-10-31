@@ -1,13 +1,26 @@
-name: Windows installer candidate (unsigned; manual)
+name: Windows installer candidate (unsigned engineering QA)
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
+      - '*.py'
+      - 'tests/**/*.py'
+      - 'tools/**/*.py'
+      - 'build-requirements.txt'
       - 'build_installer.ps1'
       - 'installer/GameGrave.iss'
-      - 'tools/windows_installer_ci_smoke.ps1'
+      - '.github/workflows/windows-installer-candidate.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '*.py'
+      - 'tests/**/*.py'
+      - 'tools/**/*.py'
+      - 'build-requirements.txt'
+      - 'build_installer.ps1'
+      - 'installer/GameGrave.iss'
       - '.github/workflows/windows-installer-candidate.yml'
 
 permissions:

@@ -106,6 +106,53 @@ function Invoke-UnsignedInstaller([string]$label) {
 Invoke-UnsignedInstaller 'FirstInstall'
 Invoke-UnsignedInstaller 'RepeatInstall'
 # This tests repeat install of the SAME version, not cross-version migration.
+
+# Exercise the ACTUAL INSTALLED GUI executable on the ephemeral CI Windows desktop.
+# An isolated environment prevents opening or scanning an existing profile.
+$profileForLaunch = Join-Path $testRoot 'IsolatedAppProfile'
+$localForLaunch = Join-Path $profileForLaunch 'Local'
+$roamingForLaunch = Join-Path $profileForLaunch 'Roaming'
+New-Item -ItemType Directory -Force $localForLaunch, $roamingForLaunch | Out-Null
+$oldLocalAppData = $env:LOCALAPPDATA
+$oldAppData = $env:APPDATA
+$legacyPath = Join-Path $localForLaunch 'DustOff'
+New-Item -ItemType Directory -Force $legacyPath | Out-Null
+$legacyFile = Join-Path $legacyPath 'settings.json'
+$legacyBytes = [Text.Encoding]::UTF8.GetBytes('{"ui_theme":"light","auto_enabled":false,"scan_on_launch":false}')
+[IO.File]::WriteAllBytes($legacyFile, $legacyBytes)
+$legacyHash = (Get-FileHash -LiteralPath $legacyFile -Algorithm SHA256).Hash
+$appProcess = $null
+try {
+    $env:LOCALAPPDATA = $localForLaunch
+    $env:APPDATA = $roamingForLaunch
+    $installedExe = Join-Path $installDir 'GameGrave.exe'
+    $appProcess = Start-Process -FilePath $installedExe -WorkingDirectory $installDir -PassThru
+    Start-Sleep -Seconds 5
+    $appProcess.Refresh()
+    if ($appProcess.HasExited) {
+        throw "Installed Game Grave app exited during GUI smoke (code $($appProcess.ExitCode))."
+    }
+    Write-Host 'PASS: installed GUI executable stayed running under disposable local profile.'
+} finally {
+    if ($null -ne $appProcess) {
+        try {
+            $appProcess.Refresh()
+            if (-not $appProcess.HasExited) {
+                Stop-Process -Id $appProcess.Id -Force -ErrorAction Stop
+                $appProcess.WaitForExit(10000) | Out-Null
+            }
+        } catch {
+            Write-Host 'QA-only app process exit was not clean; no user files selected.'
+        }
+    }
+    $env:LOCALAPPDATA = $oldLocalAppData
+    $env:APPDATA = $oldAppData
+}
+if ((Get-FileHash -LiteralPath $legacyFile -Algorithm SHA256).Hash -ne $legacyHash) {
+    throw 'Installed app changed the legacy preferences during first GUI launch.'
+}
+Write-Host 'PASS: legacy settings remained byte-identical through actual installed GUI launch.'
+
 $uninstallers = @(Get-ChildItem -LiteralPath $installDir -Filter 'unins*.exe' -File)
 if ($uninstallers.Count -ne 1) {
     throw 'Expected precisely one uninstall executable in the CI-only install.'
