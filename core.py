@@ -387,21 +387,28 @@ def _valid_timestamp(raw: object) -> float | None:
     return None
 
 
-def local_play_history(steam_roots: list[Path]) -> dict[str, float]:
+def local_play_history(steam_roots: list[Path],
+                       cancel: Callable[[], bool] | None = None) -> dict[str, float]:
     """Newest known LastPlayed across accounts on this machine; unknown is unknown."""
     result: dict[str, float] = {}
     for root in steam_roots:
+        if cancel and cancel():
+            raise InterruptedError("Steam scan canceled")
         try:
             configs = list((root / "userdata").glob("*/config/localconfig.vdf"))
         except OSError:
             continue
         for config in configs:
+            if cancel and cancel():
+                raise InterruptedError("Steam scan canceled")
             data = read_vdf(config)
             try:
                 apps = data["userlocalconfigstore"]["software"]["valve"]["steam"]["apps"]
                 if not isinstance(apps, dict):
                     continue
                 for app_id, details in apps.items():
+                    if cancel and cancel():
+                        raise InterruptedError("Steam scan canceled")
                     if not isinstance(details, dict):
                         continue
                     ts = _valid_timestamp(details.get("lastplayed"))
@@ -431,12 +438,19 @@ def is_game_neglected(game: SteamGame, days: int, now: float | None = None) -> b
     return game.last_played <= at - days * 86400
 
 
-def find_games(extra_roots: list[str] | None = None) -> list[SteamGame]:
+def find_games(extra_roots: list[str] | None = None,
+               cancel: Callable[[], bool] | None = None) -> list[SteamGame]:
+    if cancel and cancel():
+        raise InterruptedError("Steam scan canceled")
     roots = _steam_roots(extra_roots)
-    histories = local_play_history(roots)
+    histories = local_play_history(roots, cancel=cancel)
     result: dict[str, SteamGame] = {}
     for lib in steam_libraries(roots):
+        if cancel and cancel():
+            raise InterruptedError("Steam scan canceled")
         for manifest in (lib / "steamapps").glob("appmanifest_*.acf"):
+            if cancel and cancel():
+                raise InterruptedError("Steam scan canceled")
             # A manifest can be stale, malformed, spoofed or redirected. These
             # are read-only hints; never present a phantom install as active.
             if _has_reparse_component(manifest):
