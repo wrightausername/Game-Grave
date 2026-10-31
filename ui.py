@@ -1006,6 +1006,10 @@ class GameGraveApp(tk.Tk):
 
     def _clear_game_shader_cache(self):
         """Only Steam's verified per-app cache for a selected installed game."""
+        if getattr(self, "cleanup_running", False) or self.scanning:
+            messagebox.showinfo("Game Grave is busy",
+                                "Finish the current scan or cleanup before clearing shaders.")
+            return
         game = self._selected_game()
         if game is None:
             return
@@ -1019,6 +1023,10 @@ class GameGraveApp(tk.Tk):
         threading.Thread(target=inspect, daemon=True).start()
 
     def _confirm_shader_cache(self, game, cache):
+        if getattr(self, "cleanup_running", False) or self.scanning:
+            messagebox.showinfo("Game Grave is busy",
+                                "Finish the current scan or cleanup before clearing shaders.")
+            return
         if cache is None or not cache.files:
             messagebox.showinfo("No shader cache found",
                                 f"No eligible Steam shader files were found for {game.name}.\n\n"
@@ -1036,7 +1044,9 @@ class GameGraveApp(tk.Tk):
             parent=self,
         ):
             return
-        self.status_text.set(f"Recycling verified shader files for {game.name}…")
+        self.cleanup_running = True
+        self.scan_button.configure(state="disabled", bg=RAISED)
+        self.status_text.set(f"Deleting verified shader files for {game.name}…")
         def cleanup():
             import uuid
             session = str(uuid.uuid4())
@@ -4015,6 +4025,7 @@ class GameGraveApp(tk.Tk):
                     game, cache = payload
                     self._confirm_shader_cache(game, cache)
                 elif name == "shader_result":
+                    self.cleanup_running = False
                     game_name, removed, skipped = payload
                     self.status_text.set(f"{game_name}: {removed} shader-cache files recycled")
                     messagebox.showinfo("Shader cleanup finished",
@@ -4023,6 +4034,7 @@ class GameGraveApp(tk.Tk):
                         "Shader files may rebuild at the next launch. Empty the Recycle Bin "
                         "separately if you need to reclaim disk space.\n\n" +
                         "\n".join(skipped[:5]))
+                    self.scan_all()
                 elif name == "shader_error":
                     self.status_text.set("Shader cache check incomplete. Nothing was removed.")
                     messagebox.showwarning("Shader cache check incomplete", payload)
