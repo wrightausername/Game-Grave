@@ -14,7 +14,7 @@ import uuid
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
+    QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMessageBox, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
@@ -1132,6 +1132,44 @@ class ScreenMethods:
         br.addWidget(button("Add game capture folder", lambda: modify_shots()))
         br.addWidget(button("Remove selected", lambda: modify_shots(True)))
         stack.addWidget(buttons)
+        page.content.addWidget(p)
+
+        p, ai_stack = panel()
+        ai_stack.addWidget(section_title("Local AI Assistant", "Optional, off by default"))
+        ai_stack.addWidget(label(
+            "Ask questions about storage, mods and recovery using a model installed "
+            "on this PC through Ollama. AI does not scan file contents, upload "
+            "private paths, use cloud inference, change protection or delete files. "
+            "Only aggregate scan counts are shared with the local model.",
+            "subtle", wrap=True))
+        ai_toggle = QCheckBox("Enable optional local AI Assistant")
+        ai_toggle.setChecked(self.settings.get("ai_assistant_enabled") is True)
+        def set_ai_enabled(checked):
+            updated = dict(self.settings)
+            updated["ai_assistant_enabled"] = bool(checked)
+            try:
+                save_settings(updated)
+            except (OSError, ValueError) as exc:
+                ai_toggle.blockSignals(True)
+                ai_toggle.setChecked(self.settings.get("ai_assistant_enabled") is True)
+                ai_toggle.blockSignals(False)
+                self.error("Could not save AI preference", str(exc))
+                return
+            self.settings = updated
+            ai_open.setEnabled(checked)
+        ai_toggle.toggled.connect(set_ai_enabled)
+        ai_stack.addWidget(ai_toggle)
+        ai_stack.addWidget(label(
+            "Requires a separately installed Ollama model. Default: qwen2.5:3b. "
+            "Run 'ollama pull qwen2.5:3b' once, then use the assistant. "
+            "No installation or download happens automatically.",
+            "subtle", wrap=True))
+        def show_ai():
+            from gg_desktop.ai_dialog import open_local_ai_dialog
+            open_local_ai_dialog(self)
+        ai_open = button("Open local AI Assistant", show_ai)
+        ai_open.setEnabled(ai_toggle.isChecked())
+        ai_stack.addWidget(ai_open)
         page.content.addWidget(p)
 
         p, stack = panel()
