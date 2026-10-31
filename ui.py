@@ -1076,7 +1076,17 @@ class GameGraveApp(tk.Tk):
                       f"{len(skipped)} skipped. Recycle Bin may still occupy disk space.",
                       session_id=session, source="Steam per-game shader cache")
             self.events.put(("shader_result", (game.name, removed, skipped)))
-        threading.Thread(target=cleanup, daemon=True).start()
+        def guarded_cleanup():
+            try:
+                cleanup()
+            except Exception as exc:
+                self.events.put(("shader_cleanup_error", str(exc)[:350]))
+        try:
+            threading.Thread(target=guarded_cleanup, daemon=True).start()
+        except RuntimeError as exc:
+            self.cleanup_running = False
+            self.scan_button.configure(state="normal", bg=ACCENT)
+            messagebox.showerror("Shader deletion could not start", str(exc))
 
     def _add_steam_library(self):
         folder = filedialog.askdirectory(title="Select Steam install or SteamLibrary folder")
@@ -4034,6 +4044,14 @@ class GameGraveApp(tk.Tk):
                         "Shader files may rebuild at the next launch. Empty the Recycle Bin "
                         "separately if you need to reclaim disk space.\n\n" +
                         "\n".join(skipped[:5]))
+                    self.scan_all()
+                elif name == "shader_cleanup_error":
+                    self.cleanup_running = False
+                    self.status_text.set("Shader deletion was interrupted. Check Recycle Bin and Undo Center.")
+                    self.scan_button.configure(state="normal", bg=ACCENT)
+                    messagebox.showwarning("Shader deletion interrupted",
+                        payload + "\n\nSome files may already have moved. "
+                        "Check Recycle Bin and Undo Center before trying again.")
                     self.scan_all()
                 elif name == "shader_error":
                     self.status_text.set("Shader cache check incomplete. Nothing was removed.")
