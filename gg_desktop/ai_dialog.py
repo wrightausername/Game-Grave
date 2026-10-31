@@ -29,7 +29,7 @@ def open_local_ai_dialog(window) -> None:
         "Only anonymous scan counts are included automatically. "
         "Nothing is deleted, and chats are not saved. "
         "Install Ollama and run: ollama pull "
-        + str(window.settings.get("ai_model", "qwen2.5:3b"))
+        + str(window.settings.get("ai_model", "qwen2.5:1.5b"))
     )
     notice.setWordWrap(True)
     layout.addWidget(notice)
