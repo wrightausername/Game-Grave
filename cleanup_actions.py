@@ -8,8 +8,12 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Callable, Iterable
+import time
 
-from core import OldFile, is_protected_path, is_unchanged, log_event, recycle_file
+from core import (
+    OldFile, _has_reparse_component, is_protected_path, is_unchanged,
+    log_event, recycle_file, safe_scan_root,
+)
 from graveyard import GraveyardEntry, looks_like_game_archive
 from recordings import RECORDING_EXTENSIONS
 from recovery import register_recycle
@@ -84,6 +88,9 @@ def recycle_old_files(
     never_touch: Iterable[str],
     session: str,
     progress: Callable[[int, int], None] | None = None,
+    *,
+    review_root: str | Path | None = None,
+    min_age_days: int = 0,
 ) -> dict:
     """Perform a confirmed Old Files deletion using only reversible Windows Shell.
 
@@ -92,6 +99,12 @@ def recycle_old_files(
     """
     chosen = tuple(files)
     protected = list(never_touch)
+    # A real UI supplies its original scan root and age threshold. This
+    # prevents a different folder, stale page, moved root or symlink swap
+    # from quietly becoming part of the reviewed batch.
+    root = Path(review_root).absolute() if review_root is not None else None
+    if not 0 <= min_age_days <= 10000:
+        raise ValueError("Invalid reviewed age threshold")
     completed = 0
     skipped: list[str] = []
     recovery_warnings = 0
@@ -100,6 +113,17 @@ def recycle_old_files(
     for index, file in enumerate(chosen, 1):
         path = Path(file.path)
         try:
+            if root is not None:
+                if not safe_scan_root(root) or _has_reparse_component(root):
+                    raise ValueError("Original reviewed folder is unavailable or redirected")
+                if _has_reparse_component(path):
+                    raise ValueError("A linked or redirected file is not eligible")
+                try:
+                    path.absolute().relative_to(root)
+                except ValueError:
+                    raise ValueError("File lies outside the reviewed Old Files folder")
+            if min_age_days and file.modified > time.time() - min_age_days * 86400:
+                raise ValueError("File no longer meets the reviewed age threshold")
             if not is_unchanged(file):
                 raise ValueError("File changed since scan; refresh before deleting")
             if is_protected_path(path, protected):
