@@ -1,3 +1,6 @@
 # Windows packaging dependencies. Not required to use the Free source app.
 pyinstaller>=6.12,<7
 cryptography>=44,<47
+
+# Local thumbnail preview for individually user-reviewed game screenshots.
+Pillow>=11.1,<13

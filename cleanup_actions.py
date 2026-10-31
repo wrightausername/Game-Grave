@@ -16,6 +16,8 @@ from core import (
 )
 from graveyard import GraveyardEntry, looks_like_game_archive
 from recordings import RECORDING_EXTENSIONS
+from screenshots import looks_like_screenshot
+from screenshot_preview import MAX_IMAGE_BYTES
 from recovery import register_recycle
 
 
@@ -49,9 +51,18 @@ def recycle_reviewed_entries(
             path = Path(file.path)
             if is_protected_path(path, protected):
                 raise ValueError("Protected by Game Grave or your Never Touch list")
-            allowed = (looks_like_game_archive(path) or
-                       (entry.category == "Old game recording" and
-                        path.suffix.casefold() in RECORDING_EXTENSIONS))
+            if entry.category == "Old game screenshot":
+                # Screenshot cleanup is strictly one-by-one after the user
+                # displayed its actual image in the preview window. A bulk
+                # selection, plain image extension, or old timestamp is NOT
+                # sufficient deletion authority.
+                allowed = (entry.screenshot_reviewed and
+                           looks_like_screenshot(path) and
+                           0 < file.size <= MAX_IMAGE_BYTES)
+            else:
+                allowed = (looks_like_game_archive(path) or
+                           (entry.category == "Old game recording" and
+                            path.suffix.casefold() in RECORDING_EXTENSIONS))
             if not path.is_file() or not allowed:
                 raise ValueError("No longer a recognized reviewable file")
             # Includes the mandatory disposable byte-exact recovery canary.

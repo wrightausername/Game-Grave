@@ -12,6 +12,7 @@ import re
 import time
 
 from core import OldFile, ModFolder, SteamGame, is_game_neglected, is_protected_path
+from screenshots import looks_like_screenshot
 
 ARCHIVE_EXTENSIONS = frozenset({".zip", ".7z", ".rar", ".oiv", ".mrpack"})
 GAME_HINTS = frozenset({
@@ -37,6 +38,7 @@ class GraveyardEntry:
     protection: str
     can_recycle: bool
     old_file: OldFile | None = None
+    screenshot_reviewed: bool = False
 
 
 def looks_like_game_archive(path: Path) -> bool:
@@ -53,7 +55,8 @@ def looks_like_game_archive(path: Path) -> bool:
 def build_graveyard(games: list[SteamGame], mods: list[ModFolder], old_files: list[OldFile],
                     min_days: int = 365, never_touch: list[str] | None = None,
                     now: float | None = None, watched_mods: list[str] | None = None,
-                    recordings: list[OldFile] | None = None) -> list[GraveyardEntry]:
+                    recordings: list[OldFile] | None = None,
+                    screenshots: list[OldFile] | None = None) -> list[GraveyardEntry]:
     """Create an evidence-led snapshot. Does NOT change any file on disk."""
     if min_days < 1:
         raise ValueError("Choose a positive age threshold")
@@ -99,6 +102,29 @@ def build_graveyard(games: list[SteamGame], mods: list[ModFolder], old_files: li
                      "This might be a personal video. Preview it before deletion."),
             protection="Never Touch / protected location" if protected else "Review before deleting",
             can_recycle=not protected, old_file=f,
+        ))
+    for f in screenshots or []:
+        path = Path(f.path)
+        if not looks_like_screenshot(path):
+            continue
+        age = max(0, int((now - f.modified) / 86400))
+        if age < min_days:
+            continue
+        key = str(path).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        protected = is_protected_path(path, never_touch)
+        results.append(GraveyardEntry(
+            key=f"screenshot:{key}", name=path.name, path=str(path),
+            category="Old game screenshot", apparent_bytes=max(0, f.size),
+            age_days=age, relationship="Possible game capture; contents not verified",
+            finding=(f"Screenshot location and image extension; modified {age} days ago. "
+                     "This may be a treasured screenshot or personal image. "
+                     "Preview THIS image before choosing an individual Recycle Bin action."),
+            protection=("Never Touch / protected location" if protected else
+                        "Preview required; bulk cleanup disabled"),
+            can_recycle=False, old_file=f,
         ))
     for g in games:
         if not is_game_neglected(g, min_days, now):
