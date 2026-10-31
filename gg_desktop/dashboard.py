@@ -46,7 +46,7 @@ def _heading(name: str, action=None, action_text="See All  ›", count: int | No
     box.setLayout(line)
     line.addWidget(label(name, "sectionTitle"), 1)
     if count is not None:
-        pill = label(str(count) + " items", "queuePill")
+        pill = label(str(count) + (" item" if count == 1 else " items"), "queuePill")
         line.addWidget(pill)
     if action is not None:
         line.addWidget(button(action_text, action, kind="link"))
@@ -239,7 +239,6 @@ def render_dashboard(window):
     drive_picker.setMinimumWidth(120)
     drive_line.addWidget(drive_picker)
     disk_col.addWidget(drive_head)
-    disk_col.addWidget(QFrame()) if False else None
 
     disk_visual = QWidget()
     disk_row = row(spacing=8)
@@ -306,7 +305,7 @@ def render_dashboard(window):
             usage = shutil.disk_usage(drive)
         except (OSError, ValueError):
             usage = None
-        if usage is None:
+        if usage is None or usage.total <= 0:
             ring.update_amounts(0, 0, 0)
             for amount, percent in legends:
                 amount.setText("Unknown")
@@ -328,8 +327,8 @@ def render_dashboard(window):
             legends):
             amount.setText(text)
             percent.setText(str(round(fraction * 100)) + "%")
-        strip.setMaximum(max(1, usage.total // 1024))
-        strip.setValue(usage.used // 1024)
+        strip.setMaximum(1000)
+        strip.setValue(round(1000 * usage.used / usage.total))
         strip.setAccessibleName(f"{human_size(usage.used)} used of {human_size(usage.total)}")
     drive_picker.currentIndexChanged.connect(update_drive)
     update_drive()
