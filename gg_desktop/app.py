@@ -79,7 +79,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.setWindowTitle("Game Grave  |  Crimson Command preview")
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg")))
         self.setMinimumSize(960, 650)
-        self.resize(1450, 900)
+        self.resize(1450, 1000)
         self.setStyleSheet(STYLE)
         self._create_shell()
         self.navigate("Overview")
@@ -142,7 +142,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         motto.setStyleSheet("color:#D7E1EC;font-size:12px;letter-spacing:2px;")
         footer_layout.addWidget(motto)
         footer_layout.addStretch()
-        self.sidebar_art.setVisible(self.height() >= 920)
+        self.sidebar_art.setVisible(self.height() >= 795)
         r.addWidget(self.sidebar_art)
         outer.addWidget(rail)
 
@@ -178,7 +178,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, "sidebar_art"):
-            self.sidebar_art.setVisible(event.size().height() >= 920)
+            self.sidebar_art.setVisible(event.size().height() >= 795)
 
     def page_for(self, title: str) -> ScrollPage:
         if self.page is not None:
