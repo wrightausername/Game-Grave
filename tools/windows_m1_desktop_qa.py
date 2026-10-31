@@ -14,6 +14,7 @@ import platform
 import sys
 import tempfile
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -190,6 +191,32 @@ def run_checks(scratch: Path) -> dict:
                     "FAIL", type(exc).__name__)
                 # Do not tamper with anything in Windows Recycle Bin.
                 # The single test file can be restored manually if needed.
+
+        # The actual Graveyard UI uses a background thread so Windows Shell
+        # safety checks do not freeze Tk. Test that exact threading constraint,
+        # not merely the historical main-thread Recycle Bin round trip.
+        with patch.object(core, "config_dir", return_value=qa_settings), \
+                patch.object(recovery, "config_dir", return_value=qa_settings):
+            threaded_file = folder / ("GG-ThreadUndo-" + uuid.uuid4().hex + ".txt")
+            marker = b"Game Grave disposable background-thread restore check"
+            threaded_file.write_bytes(marker)
+            try:
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    executor.submit(core.recycle_file, threaded_file).result(timeout=100)
+                if threaded_file.exists():
+                    raise AssertionError("Background Windows Shell move was not verified")
+                undo_id = recovery.register_recycle(threaded_file, len(marker), "M1 threaded QA")
+                if recovery.check_restore(undo_id) != "AVAILABLE":
+                    raise AssertionError("Background-moved item not discoverable in Recycle Bin")
+                if recovery.restore(undo_id) != "RESTORED":
+                    raise AssertionError("Background-moved item was not restored")
+                if threaded_file.read_bytes() != marker:
+                    raise AssertionError("Recovered bytes differ from original disposable marker")
+                add("Background-worker Recycle Bin plus Undo byte-for-byte", "PASS")
+            except (OSError, ValueError, AssertionError, RuntimeError, TimeoutError) as exc:
+                add("Background-worker Recycle Bin plus Undo byte-for-byte",
+                    "FAIL", type(exc).__name__)
+                # Fail closed; never touch other Recycle Bin entries.
 
     result["automated_disposable_checks_passed"] = bool(result["results"]) and all(
         row["state"] == "PASS" for row in result["results"])
