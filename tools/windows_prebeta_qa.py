@@ -91,9 +91,13 @@ def main(argv=None) -> int:
 
     win = platform.win32_ver()
     build = win[1]
-    major = ("Windows 11" if build.isdecimal() and int(build) >= 22000
-             else "Windows 10" if build.isdecimal() and int(build) > 0
-             else "Unknown Windows")
+    edition = platform.win32_edition()
+    # Hosted Windows Server build numbers overlap consumer Windows 10/11.
+    # Report them as unknown, never as a passed consumer-desktop test.
+    major = ("Unknown Windows" if "server" in edition.casefold() else
+             "Windows 11" if build.isdecimal() and int(build) >= 22000 else
+             "Windows 10" if build.isdecimal() and int(build) > 0 else
+             "Unknown Windows")
     report = build_prebeta_report(
         os_release=major, os_build=build,
         m1_status=m1, m2_report=m2, m3_report=m3, errors=errors)
