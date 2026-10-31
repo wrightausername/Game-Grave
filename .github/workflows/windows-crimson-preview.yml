@@ -1,0 +1,88 @@
+name: Crimson Command Qt desktop preview (unsigned)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'gg_desktop/**'
+      - 'ui-preview-requirements.txt'
+      - 'tests/test_gg_desktop_models.py'
+      - 'tools/windows_crimson_ui_smoke.py'
+      - '.github/workflows/windows-crimson-preview.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'gg_desktop/**'
+      - 'ui-preview-requirements.txt'
+      - 'tests/test_gg_desktop_models.py'
+      - 'tools/windows_crimson_ui_smoke.py'
+      - '.github/workflows/windows-crimson-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Render and package Crimson Command on Windows
+    runs-on: windows-latest
+    env:
+      GG_CRIMSON_QA_DISPOSABLE: 'YES'
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install preview and packaging dependencies
+        run: python -m pip install -r build-requirements.txt -r ui-preview-requirements.txt
+      - name: Create isolated temp folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force '_ci_temp' | Out-Null
+          $p = (Resolve-Path '_ci_temp').Path
+          "TEMP=$p" | Out-File $env:GITHUB_ENV -Append
+          "TMP=$p" | Out-File $env:GITHUB_ENV -Append
+      - name: Compile new Python modules
+        run: python -m compileall -q gg_desktop
+      - name: Pure model tests and source UI smoke
+        shell: pwsh
+        run: |
+          python -m unittest tests.test_gg_desktop_models -v
+          if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
+          python tools/windows_crimson_ui_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
+      - name: Build standalone unsigned Qt EXE
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name GameGrave-Crimson-Preview --collect-all PySide6 --add-data "gg_desktop/assets;gg_desktop/assets" gg_desktop/__main__.py
+          if ($LASTEXITCODE -ne 0) { throw 'Qt PyInstaller failed.' }
+          if (-not (Test-Path 'dist/GameGrave-Crimson-Preview.exe')) { throw 'Missing Qt EXE' }
+      - name: Launch packaged Qt EXE with disposable isolated settings profile
+        shell: pwsh
+        run: |
+          $testData = Join-Path (Resolve-Path '_ci_temp').Path 'StandaloneUser'
+          New-Item -ItemType Directory -Force $testData | Out-Null
+          $env:LOCALAPPDATA = $testData
+          $env:APPDATA = $testData
+          $binary = (Resolve-Path 'dist/GameGrave-Crimson-Preview.exe').Path
+          $p = Start-Process -FilePath $binary -PassThru
+          Start-Sleep -Seconds 6
+          try {
+            if ($p.HasExited) { throw 'Packaged Qt EXE quit immediately.' }
+            Write-Host 'Packaged Crimson Qt UI launched without changing game files.'
+          } finally {
+            if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          }
+      - name: Upload Crimson screenshot and Windows engineering EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Crimson-Qt-Preview-Unsigned
+          path: |
+            dist/GameGrave-Crimson-Preview.exe
+            _ci_temp/crimson-desktop-1440.png
+          if-no-files-found: error
+          retention-days: 14
+
+# NOT a signed 1.0 release; LGPL/Qt redistributable obligations,
+# full UI feature parity, physical Windows human tests and beta remain open.
