@@ -230,7 +230,7 @@ class StorageRing(QWidget):
         self.capacity = 0
         self.free = 0
         self.known_games = 0
-        self.setMinimumSize(154, 174)
+        self.setMinimumSize(146, 158)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setAccessibleName("Storage usage chart. Scan the PC to load details.")
 
