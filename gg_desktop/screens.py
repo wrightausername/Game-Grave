@@ -548,6 +548,30 @@ class ScreenMethods:
         self.grave_detail = detail_col
         cr.addWidget(detail, 3)
         page.content.addWidget(content)
+        guidance, guidance_col = panel(padding=12)
+        reviewable = sum(e.can_recycle and e.old_file is not None
+                         for e in self.inventory.graveyard)
+        guidance_col.addWidget(label(
+            f"{reviewable} ordinary file(s) available for safe Recycle Bin review. "
+            "Installed games, managed mods and saves stay protected. "
+            "Right-click any row for item-specific actions.",
+            "subtle", wrap=True))
+        guidance_col.addWidget(button(
+            "Why won't these files recycle?",
+            lambda: self.info(
+                "Graveyard and Recycle Bin",
+                "The Graveyard reviews older files in the folder you selected, "
+                "game-related archives, and recordings. Other findings show "
+                "protected game/mod data for inspection only.\n\n"
+                "To recycle: right-click a REVIEWABLE ordinary file, choose "
+                "'Move to Recycle Bin', and approve it. "
+                "If none are eligible, visit Old Files to change the reviewed folder. "
+                "For an exact personal Never Touch rule, right-click and Unprotect.\n\n"
+                "Game Grave also runs a real, reversible Windows recovery check "
+                "before touching any approved file. If that check fails, no "
+                "user data is moved; use Windows File Explorer instead. "
+                "Installed games should be uninstalled in their launcher.")))
+        page.content.addWidget(guidance)
         page.content.addWidget(label(
             "IMPORTANT: User-added protection can be removed here. Built-in game/save/mod safeguards "
             "cannot. No permanent-delete fallback. Images require individual preview.", "warning", wrap=True))
@@ -762,7 +786,13 @@ class ScreenMethods:
                       f"{report['recovery_warnings']} Undo log warnings. "
                       "\n\nRecycle Bin may still occupy space."
                       + ("\n\n" + "\n".join(report["skipped"][:6]) if report["skipped"] else ""))
-        self.job(lambda _emitter: recycle_reviewed_entries(reviewed, rules, session),
+        reviewed_root = str(self.settings.get("scan_folder", ""))
+        min_age_days = max(
+            int(self.settings.get("files_stale_days", 180)),
+            int(self.settings.get("graveyard_days", 365)))
+        self.job(lambda _emitter: recycle_reviewed_entries(
+            reviewed, rules, session, review_root=reviewed_root,
+            min_age_days=min_age_days),
                  success, error_title="Recycling failed")
 
     def _remove_missing_inventory(self):
