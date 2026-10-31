@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from other_storage import (
     analyze_other_storage, category_for_folder, _same_volume,
@@ -17,6 +18,14 @@ class OtherStorageTests(unittest.TestCase):
         self.addCleanup(t.cleanup)
         self.disk = Path(t.name) / "TestDrive"
         self.disk.mkdir()
+        if os.name == "nt":
+            # Production requires a fixed drive root. Unit fixtures are
+            # deliberately isolated subfolders rather than the tester's C:.
+            mocked_drive = patch(
+                "other_storage._check_requested_root",
+                side_effect=lambda requested: Path(requested))
+            mocked_drive.start()
+            self.addCleanup(mocked_drive.stop)
         self.apps = self.disk / "Program Files" / "Game Grave Test"
         self.apps.mkdir(parents=True)
         (self.apps / "app-data.bin").write_bytes(b"APPTEST123")
