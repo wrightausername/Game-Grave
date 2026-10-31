@@ -1487,8 +1487,8 @@ class GameGraveApp(tk.Tk):
                 "☑" if item.key in self.grave_checked else "☐",
                 item.name, item.category, f"{item.age_days} days" if item.age_days is not None else "Unknown",
                 human_size(item.apparent_bytes),
-                "Recycle after review" if item.can_recycle else
-                ("Override possible" if override else "Protected: no direct delete")),
+                "Ready to delete" if item.can_recycle else
+                ("Protected by you" if override else "Review only / protected")),
                 tags=() if item.can_recycle else ("protected",))
         still_selected = [key for key in selected if key in self._grave_page_keys]
         if still_selected:
@@ -1498,6 +1498,8 @@ class GameGraveApp(tk.Tk):
             f"  •  {sum(entry.can_recycle for entry in visible)} eligible across pages")
         self._update_inventory_page("grave", page)
         self._grave_update_count()
+        if hasattr(self, "grave_delete_button"):
+            self._grave_sync_actions()
 
     def _grave_view_changed(self, event=None):
         if self._applying_grave_preset:
@@ -1609,6 +1611,9 @@ class GameGraveApp(tk.Tk):
             return
         key = self.grave_tree.identify_row(event.y)
         self._grave_toggle(key)
+        if key:
+            self.grave_tree.selection_set(key)
+            self.grave_tree.focus(key)
         return "break"
 
     def _grave_toggle_keyboard(self, event=None):
@@ -1630,6 +1635,8 @@ class GameGraveApp(tk.Tk):
             self.grave_checked.add(key)
         self.grave_tree.set(key, "check", "☑" if key in self.grave_checked else "☐")
         self._grave_update_count()
+        if hasattr(self, "grave_delete_checked_button"):
+            self._grave_sync_actions()
 
     def _grave_select_all(self):
         # "Check page" must not silently select thousands of other findings.
@@ -1650,6 +1657,8 @@ class GameGraveApp(tk.Tk):
         for key in self._grave_page_keys:
             self.grave_tree.set(key, "check", "☑" if key in self.grave_checked else "☐")
         self._grave_update_count()
+        if hasattr(self, "grave_delete_checked_button"):
+            self._grave_sync_actions()
 
     def _grave_details(self):
         ids = self.grave_tree.selection()
