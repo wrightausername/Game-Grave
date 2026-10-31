@@ -15,6 +15,7 @@ from pathlib import Path
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
 from graveyard import build_graveyard, looks_like_game_archive
+from cleanup_actions import recycle_reviewed_entries
 from graveyard_protection import protection_action, set_item_protection
 from recordings import find_old_recordings, RECORDING_EXTENSIONS
 from ui_presets import (MAX_PRESETS, capture_presentation, normalize_color, validate_name,
@@ -154,6 +155,7 @@ class GameGraveApp(tk.Tk):
         self._pager_controls = {}
         self.active = "Overview"
         self.scanning = False
+        self.cleanup_running = False
         self.last_scan: str | None = None
         self.status_text = tk.StringVar(value="Ready. Choose Scan PC to begin. No background scan is running.")
         self.events: queue.Queue = queue.Queue()
@@ -163,8 +165,17 @@ class GameGraveApp(tk.Tk):
         self._install_keyboard_shortcuts()
         self.show_page("Overview")
         self.after(120, self._poll)
+        self.protocol("WM_DELETE_WINDOW", self._close_safely)
         if self.settings.get("scan_on_launch", False):
             self.after(250, self.scan_all)
+
+    def _close_safely(self):
+        if self.cleanup_running:
+            messagebox.showinfo("Cleanup still running",
+                                "Wait for the current Windows Recycle Bin check to finish. "
+                                "Closing now could interrupt recovery records.")
+            return
+        self.destroy()
 
     def _ui_style(self):
         style = ttk.Style(self)
@@ -1517,18 +1528,19 @@ class GameGraveApp(tk.Tk):
 
     def _grave_sync_actions(self):
         entry = self._grave_selected_entry()
+        busy = getattr(self, "cleanup_running", False)
         action, reason = protection_action(
             entry.path, self.settings.get("never_touch", [])) if (
                 entry and entry.old_file is not None) else (None, "")
         if hasattr(self, "grave_delete_button"):
-            self.grave_delete_button.configure(state="normal" if entry and entry.can_recycle else "disabled")
+            self.grave_delete_button.configure(state="normal" if entry and entry.can_recycle and not busy else "disabled")
         if hasattr(self, "grave_protection_button"):
             self.grave_protection_button.configure(
                 text=(action + " selected") if action else "Protected by Game Grave",
-                state="normal" if action else "disabled")
+                state="normal" if action and not busy else "disabled")
         if hasattr(self, "grave_delete_checked_button"):
             self.grave_delete_checked_button.configure(
-                state="normal" if self.grave_checked else "disabled")
+                state="normal" if self.grave_checked and not busy else "disabled")
         if hasattr(self, "grave_selection_var"):
             if entry is None:
                 self.grave_selection_var.set("Select a finding to see available actions.")
@@ -1771,6 +1783,10 @@ class GameGraveApp(tk.Tk):
             messagebox.showerror("Could not open folder", str(exc))
 
     def _grave_toggle_protection(self):
+        if getattr(self, "cleanup_running", False):
+            messagebox.showinfo("Cleanup in progress",
+                                "Finish the current deletion before changing protection.")
+            return
         entry = self._grave_selected_entry()
         if entry is None:
             messagebox.showinfo("Choose a file", "Click an individual file in the Graveyard first.")
@@ -1876,7 +1892,12 @@ class GameGraveApp(tk.Tk):
              if self.graveyard_lookup[key].can_recycle])
 
     def _grave_recycle_ids(self, ids):
+        """Confirm on the Tk thread, then process slow Windows Shell work off-UI."""
         import uuid
+        if getattr(self, "cleanup_running", False) or getattr(self, "scanning", False):
+            messagebox.showinfo("Game Grave is busy",
+                "Wait for the current scan or deletion to finish before starting another.")
+            return
         if len(ids) > DEFAULT_PAGE_SIZE:
             messagebox.showwarning("Too many files selected",
                 f"Select at most {DEFAULT_PAGE_SIZE} files per cleanup. "
@@ -1886,73 +1907,53 @@ class GameGraveApp(tk.Tk):
         if not chosen:
             messagebox.showinfo("No files selected", "Choose a file or tick eligible files first.")
             return
-        blocked = [e for e in chosen if not e.can_recycle]
-        if blocked:
+        if any(not entry.can_recycle for entry in chosen):
             messagebox.showwarning("Protected: deletion blocked",
-                f"{len(blocked)} selected item(s) cannot be deleted here. "
-                "A personally protected file must be Unprotected first. "
-                "Installed games, saves, profiles and mod folders stay protected. "
-                "Nothing was deleted.")
+                "One or more items are protected. Remove any personal protection "
+                "separately before choosing Delete. Installed games, saves and mods "
+                "remain protected. Nothing was deleted.")
             return
-        total = sum(e.apparent_bytes for e in chosen)
-        preview = "\n".join("• " + e.name for e in chosen[:7])
+        total = sum(entry.apparent_bytes for entry in chosen)
+        preview = "\n".join("• " + entry.name for entry in chosen[:7])
         if len(chosen) > 7:
-            preview += f"\n…and {len(chosen)-7} more"
+            preview += f"\n…and {len(chosen) - 7} more"
         if not messagebox.askyesno("Delete selected files?",
                 f"Move {len(chosen)} file(s) ({human_size(total)} apparent size) to the "
                 "Windows Recycle Bin?\n\n" + preview +
-                "\n\nCheck recordings and mod archives before deleting. "
-                "No permanent delete is performed. Space is not freed until the "
-                "Recycle Bin is emptied. Recovery is not guaranteed."):
+                "\n\nCheck recordings and archives before deleting. Each file needs "
+                "Windows recovery verification, which may take a little time. "
+                "Nothing is permanently deleted. Disk space is not reclaimed "
+                "until the Recycle Bin is emptied."):
             return
+
+        # The user has approved an exact immutable inventory snapshot. Never ask
+        # Tk questions or manipulate widgets from the worker thread.
         session = str(uuid.uuid4())
-        log_event("Cleanup started", f"Graveyard selected {len(chosen)} items",
-                  session_id=session, source="The Graveyard")
-        completed, skipped = 0, []
-        for entry in chosen:
-            f = entry.old_file
+        selected = tuple(chosen)
+        protected = tuple(self.settings.get("never_touch", ()))
+        self.cleanup_running = True
+        self.scan_button.configure(state="disabled", bg=RAISED)
+        self.status_text.set(f"Delete started: verifying Windows recovery for {len(selected)} file(s)…")
+        self._grave_sync_actions()
+
+        def worker():
             try:
-                if f is None or not is_unchanged(f):
-                    raise ValueError("File changed since scan; rescan before deleting.")
-                path = Path(f.path)
-                if is_protected_path(path, self.settings.get("never_touch", [])):
-                    raise ValueError("Protected by Game Grave or your Never Touch list.")
-                eligible = (looks_like_game_archive(path) or
-                            (entry.category == "Old game recording" and
-                             path.suffix.casefold() in RECORDING_EXTENSIONS))
-                if not path.is_file() or not eligible:
-                    raise ValueError("This is no longer a recognized reviewable file.")
-                recycle_file(path)
-                try:
-                    rid = register_recycle(path, f.size, "Graveyard")
-                except OSError:
-                    rid = None
-                    log_event("Recovery warning", "Undo Center entry not saved",
-                              session_id=session, path=str(path), source="The Graveyard")
-                log_event("Manual recycled", "Graveyard file sent to Recycle Bin",
-                          session_id=session, path=str(path), size_bytes=f.size,
-                          source="The Graveyard", result="Recycled", recovery_id=rid)
-                completed += 1
-            except (OSError, ValueError, RuntimeError) as exc:
-                skipped.append(f"{entry.name}: {exc}")
-                log_event("Cleanup skipped", str(exc), session_id=session,
-                          path=entry.path, source="The Graveyard", result="Skipped")
-        log_event("Cleanup finished",
-                  f"Graveyard: {completed} recycled, {len(skipped)} skipped. "
-                  "Recycle Bin may still occupy space.", session_id=session,
-                  source="The Graveyard")
-        self.status_text.set(f"Graveyard: {completed} moved to Recycle Bin; {len(skipped)} not moved")
-        self.grave_checked.clear()
-        self.scan_all()
-        outcome = (f"{completed} moved to Recycle Bin. {len(skipped)} not moved.\n\n" +
-                   "\n".join(skipped[:6]) +
-                   "\n\nIf Windows could not verify a recoverable Recycle Bin, "
-                   "Game Grave blocked deletion. Use File Explorer to investigate. "
-                   "Empty Recycle Bin separately when ready to free space.")
-        if skipped:
-            messagebox.showwarning("Deletion blocked for some files", outcome)
-        else:
-            messagebox.showinfo("Delete complete", outcome)
+                result = recycle_reviewed_entries(
+                    selected, protected, session,
+                    progress=lambda done, count: self.events.put(
+                        ("grave_cleanup_progress", (done, count))))
+                self.events.put(("grave_cleanup_complete", result))
+            except Exception as exc:
+                # Always reset busy state on the UI thread, never claim success.
+                self.events.put(("grave_cleanup_error", str(exc)[:350]))
+
+        try:
+            threading.Thread(target=worker, daemon=True).start()
+        except RuntimeError as exc:
+            self.cleanup_running = False
+            self.scan_button.configure(state="normal", bg=ACCENT)
+            self._grave_sync_actions()
+            messagebox.showerror("Deletion could not start", str(exc))
 
     def _files_page(self):
         self.header("Old Files", "Review files by last-modified date. Multi-select and send only what you choose to Recycle Bin.")
@@ -2040,6 +2041,9 @@ class GameGraveApp(tk.Tk):
                 messagebox.showerror("Cannot open folder", str(exc))
 
     def _recycle_selected(self):
+        if getattr(self, "cleanup_running", False):
+            messagebox.showinfo("Cleanup in progress", "One deletion at a time; wait for it to finish.")
+            return
         if not hasattr(self, "file_tree") or not self.file_tree.winfo_exists():
             return
         items = [self.file_lookup[k] for k in self.file_tree.selection() if k in self.file_lookup]
@@ -3577,6 +3581,9 @@ class GameGraveApp(tk.Tk):
         self._set_ui_setting("ui_layout", "simple")
 
     def _protect_folder(self):
+        if getattr(self, "cleanup_running", False):
+            messagebox.showinfo("Cleanup in progress", "Finish deletion before updating Never Touch.")
+            return
         folder = filedialog.askdirectory(title="Never Touch: protect a folder")
         if folder and folder not in self.settings["never_touch"]:
             self.settings["never_touch"].append(folder)
@@ -3584,6 +3591,9 @@ class GameGraveApp(tk.Tk):
             self.show_page("Settings")
 
     def _unprotect_folder(self):
+        if getattr(self, "cleanup_running", False):
+            messagebox.showinfo("Cleanup in progress", "Finish deletion before updating Never Touch.")
+            return
         selection = self.protected_list.curselection()
         if selection and messagebox.askyesno("Remove protection?", "Remove this folder from your Never Touch list?\nNo files will be deleted."):
             del self.settings["never_touch"][selection[0]]
@@ -3610,7 +3620,7 @@ class GameGraveApp(tk.Tk):
         log_event("Scan canceled", "User canceled the read-only inventory before acceptance.")
 
     def scan_all(self):
-        if self.scanning:
+        if self.scanning or getattr(self, "cleanup_running", False):
             return
         self.scanning = True
         self.scan_button.configure(state="disabled", bg=RAISED)
@@ -3695,6 +3705,44 @@ class GameGraveApp(tk.Tk):
                     self.scan_button.configure(state="normal", bg=ACCENT)
                     self.cancel_button.configure(state="disabled")
                     self.show_page(self.active)
+                elif name == "grave_cleanup_progress":
+                    completed, total = payload
+                    self.status_text.set(
+                        f"Delete in progress: checked {completed} of {total} file(s). "
+                        "Windows is verifying recovery for each item…")
+                elif name == "grave_cleanup_complete":
+                    self.cleanup_running = False
+                    self.grave_checked.clear()
+                    completed = payload["completed"]
+                    skipped = payload["skipped"]
+                    warnings = payload["recovery_warnings"]
+                    self.status_text.set(
+                        f"Delete finished: {completed} moved to Recycle Bin; "
+                        f"{len(skipped)} not moved.")
+                    self.scan_all()
+                    message = (f"{completed} file(s) moved to Windows Recycle Bin. "
+                               f"{len(skipped)} not moved.\n\n" +
+                               "\n".join(skipped[:6]))
+                    if warnings:
+                        message += (f"\n\nWarning: {warnings} moved item(s) could not be "
+                                    "registered with Undo Center. Inspect Windows "
+                                    "Recycle Bin for manual restore.")
+                    message += ("\n\nIf Windows recovery could not be verified, "
+                                "Game Grave refused to move the affected files. "
+                                "Empty the Recycle Bin separately to reclaim space.")
+                    if skipped or warnings:
+                        messagebox.showwarning("Delete results", message)
+                    else:
+                        messagebox.showinfo("Delete complete", message)
+                elif name == "grave_cleanup_error":
+                    self.cleanup_running = False
+                    self.status_text.set("Deletion stopped unexpectedly. Review existing files and Undo Center.")
+                    self.scan_button.configure(state="normal", bg=ACCENT)
+                    if self.active == "The Graveyard":
+                        self._grave_sync_actions()
+                    messagebox.showerror("Delete interrupted",
+                        payload + "\n\nNot all items may have been processed. "
+                        "Check Recycle Bin and Undo Center before retrying.")
                 elif name == "manager_profiles_result":
                     self.profile_report = payload
                     self.status_text.set(
