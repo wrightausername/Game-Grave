@@ -190,6 +190,43 @@ def _extract_runtime(archive: Path, destination: Path) -> Path:
     return candidates[0]
 
 
+def _runtime_verified(root: Path) -> bool:
+    """Verify executable and DLL bytes from the published, SHA-pinned archive.
+
+    A mutable metadata file alone is not proof that a downloaded executable
+    remains intact. The original ~24 MB runtime archive is retained locally.
+    """
+    archive = root / "runtime-download.zip"
+    if not _safe_regular_file(archive) or _hash_file(archive) != RUNTIME_SHA256:
+        return False
+    runtime = root / "runtime"
+    if not runtime.is_dir() or _has_reparse_component(runtime):
+        return False
+    count = 0
+    try:
+        with zipfile.ZipFile(archive) as package:
+            for entry in package.infolist():
+                if entry.is_dir():
+                    continue
+                parts = PurePosixPath(entry.filename.replace("\\", "/")).parts
+                if (not parts or ".." in parts or entry.filename.startswith("/")
+                        or ":" in entry.filename):
+                    return False
+                target = runtime.joinpath(*parts)
+                if not _safe_regular_file(target) or target.stat().st_size != entry.file_size:
+                    return False
+                expected = hashlib.sha256()
+                with package.open(entry) as source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        expected.update(chunk)
+                if _hash_file(target) != expected.hexdigest():
+                    return False
+                count += 1
+        return count > 0
+    except (OSError, ValueError, zipfile.BadZipFile):
+        return False
+
+
 def _metadata_ok(root: Path) -> bool:
     record = root / INSTALL_METADATA
     if not _safe_regular_file(record):
@@ -259,8 +296,7 @@ def install_ai(notify=None) -> None:
         finally:
             if staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
-    if archive.exists() and not archive.is_symlink():
-        archive.unlink()
+    # Preserve the pinned archive to check all runtime files before execution.
     if notify:
         notify("Downloading AI model", 0)
     model = model_dir / MODEL_FILENAME
@@ -326,7 +362,8 @@ def local_server() -> tuple[str, str]:
         root = ai_root()
         executable = _server_file(root)
         model = root / "models" / MODEL_FILENAME
-        if executable is None or _hash_file(model) != MODEL_SHA256:
+        if (executable is None or _hash_file(model) != MODEL_SHA256
+                or not _runtime_verified(root)):
             raise AiSetupError("AI components failed verification. Reinstall the optional AI pack.")
         token = secrets.token_urlsafe(32)
         port = _port()
