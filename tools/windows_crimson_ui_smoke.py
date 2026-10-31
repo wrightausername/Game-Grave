@@ -75,14 +75,40 @@ def main():
                 if route == "Graveyard":
                     assert len(window._shown_graves) == 1
                     assert window.grave_table.rowCount() == 1
-            window.navigate("Overview")
-            window.resize(1440, 900)
-            app.processEvents()
-            path = root / "_ci_temp" / "crimson-desktop-1440.png"
-            assert window.grab().save(str(path)), "Cannot render actual Qt screenshot"
-            assert path.stat().st_size > 15000, "Blank Qt screenshot"
+            # Exact personal Never Touch rule can be removed from the Graveyard
+            # with a separate confirmation and WITHOUT a recycle operation.
+            from gg_desktop.backend import refresh_graveyard
+            from unittest.mock import patch
+            window.settings["never_touch"] = [str(oldzip)]
+            refresh_graveyard(window.inventory, window.settings)
+            window.navigate("Graveyard")
+            assert not window.inventory.graveyard[0].can_recycle
+            archive = next(e for e in window.inventory.graveyard
+                           if e.category == "Possible mod / game download")
+            with patch.object(window, "confirm", return_value=True), \\
+                 patch("gg_desktop.screens.recycle_reviewed_entries") as recycle:
+                window._unprotect_grave(archive)
+                assert oldzip.is_file()
+                assert str(oldzip) not in window.settings["never_touch"]
+                recycle.assert_not_called()
+            window.settings["never_touch"] = []
+            refresh_graveyard(window.inventory, window.settings)
+
+            for route, filename in (
+                ("Overview", "crimson-desktop-1440.png"),
+                ("Games", "crimson-games-1440.png"),
+                ("Graveyard", "crimson-graveyard-1440.png"),
+                ("Game DNA", "crimson-dna-1440.png"),
+            ):
+                window.navigate(route)
+                window.resize(1440, 900)
+                app.processEvents()
+                path = root / "_ci_temp" / filename
+                assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
+                assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
             print("PASS: Qt Crimson Overview and 9 interactive pages, mixed-launcher "
-                  "Games, safe Graveyard, original hero asset, no deletion.")
+                  "Games, inline exact-rule Unprotect without deletion, "
+                  "four screenshots and original hero asset.")
         finally:
             window.close()
             app.processEvents()
