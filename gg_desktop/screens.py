@@ -1160,14 +1160,14 @@ class ScreenMethods:
         ai_toggle.toggled.connect(set_ai_enabled)
         ai_stack.addWidget(ai_toggle)
         ai_stack.addWidget(label(
-            "Requires a separately installed Ollama model. Default: qwen2.5:3b. "
-            "Run 'ollama pull qwen2.5:3b' once, then use the assistant. "
+            "Requires a separately installed Ollama model. Default: qwen2.5:1.5b. "
+            "Run 'ollama pull qwen2.5:1.5b' once, then use the assistant. "
             "No installation or download happens automatically.",
             "subtle", wrap=True))
         model_row = QWidget()
         model_layout = row()
         model_row.setLayout(model_layout)
-        model_field = QLineEdit(str(self.settings.get("ai_model", "qwen2.5:3b")))
+        model_field = QLineEdit(str(self.settings.get("ai_model", "qwen2.5:1.5b")))
         model_field.setPlaceholderText("Local Ollama model name")
         model_field.setMaxLength(80)
         def save_ai_model():
