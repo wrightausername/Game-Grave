@@ -696,6 +696,9 @@ class ScreenMethods:
                 "before touching any approved file. If that check fails, no "
                 "user data is moved; use Windows File Explorer instead. "
                 "Installed games should be uninstalled in their launcher.")))
+        guidance_col.addWidget(button(
+            "Test Windows Recycle Bin with a disposable file…",
+            self._test_recycle_bin_safely))
         page.content.addWidget(guidance)
         page.content.addWidget(label(
             "IMPORTANT: User-added protection can be removed here. Built-in game/save/mod safeguards "
@@ -852,6 +855,35 @@ class ScreenMethods:
                 self._focus_never_touch_rule = rule
                 break
         self.navigate("Settings")
+
+    def _test_recycle_bin_safely(self):
+        """Verify desktop recovery without selecting or touching user files."""
+        if self.cleaning or self.scanning:
+            self.info("Finish the current operation", "Try the safe test after scanning ends.")
+            return
+        root = Path(str(self.settings.get("scan_folder", "")))
+        if not self.confirm(
+            "Run disposable Windows Recycle Bin test?",
+            "Game Grave will create ONE tiny test file inside:\n" + str(root) +
+            "\n\nIt will attempt to recycle and restore only those exact disposable "
+            "bytes, then clean up its own test file if safe. "
+            "No personal game, mod, save, or screenshot is selected. "
+            "Results will explain whether verified cleanup is available on this PC."
+        ):
+            return
+        self.status.setText("Testing Windows Recycle Bin using disposable data only…")
+        def run(_emit):
+            from safety_selftest import check_disposable_undo
+            return check_disposable_undo(
+                root, tuple(self.settings.get("never_touch", [])))
+        def finished(outcome):
+            self.status.setText("Verified disposable Recycle Bin + Undo round trip passed.")
+            self.info("Recycle Bin verification passed",
+                "Windows successfully recycled and restored a tiny Game Grave "
+                "test file with byte-identical content. No user files were touched.\n\n"
+                "A successful test does not override protection for installed games "
+                "or guarantee every future file will recycle; each file is checked again.")
+        self.job(run, finished, error_title="Recycle Bin test failed: no user data moved")
 
     def _select_eligible(self):
         from PySide6.QtCore import QItemSelectionModel
