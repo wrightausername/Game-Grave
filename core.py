@@ -112,12 +112,50 @@ def load_settings() -> dict:
 
 
 def save_settings(settings: dict) -> None:
+    """Write an atomic private preferences copy, never a shared predictable .tmp.
+
+    Refuse linked paths and preserve the prior settings file if serialization,
+    writing or atomic publishing fails. Do not delete another operation's
+    scratch file or a user's unrelated data.
+    """
+    if not isinstance(settings, dict):
+        raise ValueError("Settings must be a dictionary.")
+    content = json.dumps(settings, indent=2, ensure_ascii=False).encode("utf-8")
+    if len(content) > MAX_SETTINGS_BYTES:
+        raise ValueError("Settings exceed the safe local size limit.")
     directory = config_dir()
     directory.mkdir(parents=True, exist_ok=True)
+    if _has_reparse_component(directory):
+        raise ValueError("Settings directory contains a linked or redirected path.")
     target = directory / "settings.json"
-    tmp = target.with_suffix(".tmp")
-    tmp.write_text(json.dumps(settings, indent=2), encoding="utf-8")
-    tmp.replace(target)
+    if target.is_symlink() or (target.exists() and _is_reparse_point(target)):
+        raise ValueError("Settings file is linked or redirected.")
+    owned = None
+    initial_identity = None
+    try:
+        fd, raw = tempfile.mkstemp(prefix=".gg-settings-", suffix=".tmp", dir=directory)
+        owned = Path(raw)
+        initial = owned.stat()
+        initial_identity = (initial.st_dev, initial.st_ino)
+        with os.fdopen(fd, "wb") as output:
+            output.write(content)
+            output.flush()
+            os.fsync(output.fileno())
+        if _has_reparse_component(directory) or target.is_symlink() or (
+                target.exists() and _is_reparse_point(target)):
+            raise ValueError("Settings location was redirected before publication.")
+        # On NTFS this replaces the intended settings file atomically. A failed
+        # operation never erases the previous settings or the old DustOff copy.
+        os.replace(owned, target)
+    finally:
+        if owned is not None:
+            try:
+                if owned.exists() and not owned.is_symlink():
+                    current = owned.stat()
+                    if (current.st_dev, current.st_ino) == initial_identity:
+                        owned.unlink()
+            except OSError:
+                pass
 
 
 def log_event(kind: str, details: str, *, session_id: str | None = None,
