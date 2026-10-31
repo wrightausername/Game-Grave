@@ -27,6 +27,7 @@ from gg_desktop.widgets import (
     ActionCard, HeroBanner, LandscapeArt, MetricCard, StorageRing,
     button, column, label, panel, row,
 )
+from gg_desktop.capture_image import ScreenshotImage, request_screenshot
 from recovery import get_records
 
 LAUNCHERS = [
@@ -466,9 +467,11 @@ def render_dashboard(window):
     capture, cap_col = panel(padding=12, spacing=7)
     capture.setObjectName("dashboardPanel")
     cap_col.addWidget(_heading(
-        "Latest Screenshot", lambda: window.navigate("Screenshots"),
+        "Latest Screenshot", lambda: window.navigate("Captures"),
         action_text="View All  ›"))
-    image = LandscapeArt(155, scene="sunset")
+    # Real scanned screenshot, never the placeholder sunset art. Pixels are
+    # decoded locally in the background only after scan results are available.
+    image = ScreenshotImage(height=155)
     cap_col.addWidget(image)
     shot_title = label("", "findingTitle", wrap=True)
     shot_caption = label("", "caption", wrap=True)
@@ -492,16 +495,20 @@ def render_dashboard(window):
     def update_screenshot():
         nonlocal index
         if not shots:
-            shot_title.setText("Illustration  •  No captures found")
-            shot_caption.setText("Scan PC to discover screenshots. Personal photos are excluded.")
+            image.set_status("No game screenshots found in supported locations")
+            shot_title.setText("No screenshot detected")
+            shot_caption.setText(
+                "Scan PC to discover your game captures. Personal photos are excluded.")
             preview.setEnabled(False)
         else:
             item = shots[index]
+            image.set_status("Loading your latest game screenshot…")
+            request_screenshot(window, item, image)
             shot_title.setText(Path(item.path).name)
             modified = datetime.fromtimestamp(item.modified).strftime("%b %d, %Y")
             shot_caption.setText(
                 f"{human_size(item.size)}  •  {modified}  •  "
-                f"{index+1}/{len(shots)}  •  image not opened automatically")
+                f"{index+1}/{len(shots)}  •  local image preview")
             preview.setEnabled(True)
         left.setEnabled(index > 0)
         right.setEnabled(index < len(shots) - 1)
