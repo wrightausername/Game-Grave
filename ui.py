@@ -16,6 +16,7 @@ from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
 from graveyard import build_graveyard, looks_like_game_archive
 from graveyard_protection import protection_action, set_item_protection
+from recordings import find_old_recordings, RECORDING_EXTENSIONS
 from ui_presets import (MAX_PRESETS, capture_presentation, normalize_color, validate_name,
                         read_preset_file, sanitize_local_presets, write_preset_file)
 from view_options import (GRAVE_SORT_KEYS, SORT_DIRECTIONS, GRAVE_STATES, GRAVE_SIZES,
@@ -136,6 +137,7 @@ class GameGraveApp(tk.Tk):
         self.other_games: list[LauncherGame] = []
         self.mod_folders: list[ModFolder] = []
         self.old_files: list[OldFile] = []
+        self.recordings: list[OldFile] = []
         self.save_findings = []
         self.profile_report = None
         self._scan_started = 0.0
@@ -1863,7 +1865,7 @@ class GameGraveApp(tk.Tk):
         self._populate_files()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(14, 0))
-        self.button(actions, "Send selected to Recycle Bin", self._recycle_selected, primary=True).pack(side="left")
+        self.button(actions, "Delete selected", self._recycle_selected, primary=True).pack(side="left")
         self.button(actions, "Select all shown", lambda: self.file_tree.selection_set(self.file_tree.get_children())).pack(
             side="left", padx=12)
         self.button(actions, "Open containing folder", self._open_file_folder).pack(side="left")
@@ -1922,7 +1924,7 @@ class GameGraveApp(tk.Tk):
             return
         items = [self.file_lookup[k] for k in self.file_tree.selection() if k in self.file_lookup]
         if not items:
-            messagebox.showinfo("No files selected", "Select the files you want to recycle.")
+            messagebox.showinfo("No files selected", "Select the files you want to delete.")
             return
         if not messagebox.askyesno("Recycle these files?",
                                    f"Send {len(items)} selected files ({human_size(sum(f.size for f in items))}) "
@@ -1948,8 +1950,8 @@ class GameGraveApp(tk.Tk):
         self.status_text.set(f"{success} files sent to Recycle Bin")
         self.scan_all()
         if errors:
-            messagebox.showwarning("Some files were skipped",
-                                   f"Recycled: {success}. Skipped: {len(errors)}.\n\n" + "\n".join(errors[:7]))
+            messagebox.showwarning("Some files could not be deleted",
+                                   f"Moved to Recycle Bin: {success}. Not moved: {len(errors)}.\n\n" + "\n".join(errors[:7]))
         else:
             messagebox.showinfo("Cleanup complete", f"{success} files sent to Recycle Bin. Empty it later to reclaim space.")
 
@@ -3449,6 +3451,8 @@ class GameGraveApp(tk.Tk):
         file_days = self.settings["files_stale_days"]
         mod_roots = list(self.settings.get("mod_extra_roots", []))
         other_roots = list(self.settings.get("other_library_roots", []))
+        recording_roots = list(self.settings.get("recording_roots", []))
+        recording_days = min(file_days, self.settings.get("graveyard_days", 365))
 
         def task():
             try:
@@ -3470,10 +3474,17 @@ class GameGraveApp(tk.Tk):
                     files = []
                     warning = str(exc)
                 self._check_scan_cancel()
+                try:
+                    recordings = find_old_recordings(recording_days, recording_roots,
+                                                     cancel=self._cancel_scan.is_set)
+                except (ValueError, OSError) as exc:
+                    recordings = []
+                    warning += ("; " if warning else "") + "Recordings: " + str(exc)
+                self._check_scan_cancel()
                 self.events.put(("scan_stage", (4, STAGES[4][0])))
                 saves = discover_saves()
                 self._check_scan_cancel()
-                self.events.put(("scan_complete", (games, other, mods, files, saves, warning)))
+                self.events.put(("scan_complete", (games, other, mods, files, recordings, saves, warning)))
             except Exception as exc:
                 self.events.put(("scan_error", str(exc)))
         threading.Thread(target=task, daemon=True).start()
@@ -3489,7 +3500,7 @@ class GameGraveApp(tk.Tk):
                     if self._cancel_scan.is_set():
                         self._scan_canceled_status()
                         continue
-                    self.games, self.other_games, self.mod_folders, self.old_files, self.save_findings, warning = payload
+                    self.games, self.other_games, self.mod_folders, self.old_files, self.recordings, self.save_findings, warning = payload
                     self.profile_report = None  # Profiles must be re-inspected after inventory changes.
                     self.scan_percent.set(100)
                     self.scan_progress_text.set("Scan complete · 100%")
@@ -3503,7 +3514,7 @@ class GameGraveApp(tk.Tk):
                               (f"; Files warning: {warning}" if warning else ""))
                     self.scanning = False
                     self.last_scan = datetime.now().strftime("%I:%M %p").lstrip("0")
-                    self.status_text.set(f"Scan finished at {self.last_scan}  •  {len(self.games) + len(self.other_games)} games, {len(self.mod_folders)} mod/storage findings, {len(self.old_files)} old files" +
+                    self.status_text.set(f"Scan finished at {self.last_scan}  •  {len(self.games) + len(self.other_games)} games, {len(self.mod_folders)} mods, {len(self.old_files)} old files, {len(self.recordings)} possible game clips" +
                                          ("  •  File folder unavailable" if warning else ""))
                     self.scan_button.configure(state="normal", bg=ACCENT)
                     self.cancel_button.configure(state="disabled")
