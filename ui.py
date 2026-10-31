@@ -1310,133 +1310,160 @@ class GameGraveApp(tk.Tk):
 
 
     def _graveyard_page(self):
-        """The user controls presentation; protection is independent of the view."""
-        self.header("The Graveyard", "Find old game-related content. Customize, save and reuse your review views.")
+        """Clear review workflow, with advanced filters available on demand."""
+        self.header("The Graveyard", "Find forgotten gaming files and clips. Review before deleting.")
         self._applying_grave_preset = False
         saved = sanitize_saved_views(self.settings.get("graveyard_saved_views", {}))
         self.settings["graveyard_saved_views"] = saved
-        toolbar = tk.Frame(self.content, bg=BG)
-        toolbar.pack(fill="x", pady=(0, 5))
-        self.text(toolbar, "Age", 9, MUTED).pack(side="left")
-        self.grave_days_var = tk.StringVar(value=str(self.settings.get("graveyard_days", 365)))
-        age = ttk.Combobox(toolbar, textvariable=self.grave_days_var,
-                           values=("180", "365", "730", "1095"), state="readonly",
-                           style="Dark.TCombobox", width=5)
-        age.pack(side="left", padx=(6, 14))
-        age.bind("<<ComboboxSelected>>", self._change_grave_days)
-        self.text(toolbar, "Category", 9, MUTED).pack(side="left")
         self.graveyard_entries = build_graveyard(
             self.games, self.mod_folders, self.old_files,
             self.settings.get("graveyard_days", 365), self.settings.get("never_touch", []),
-            watched_mods=self.settings.get("graveyard_watchlist", []))
+            watched_mods=self.settings.get("graveyard_watchlist", []),
+            recordings=getattr(self, "recordings", []))
+
+        search_row = tk.Frame(self.content, bg=BG)
+        search_row.pack(fill="x", pady=(0, 8))
+        self.text(search_row, "Find", 10, MUTED).pack(side="left")
+        self.grave_search_var = tk.StringVar(value=self.settings.get("graveyard_search", ""))
+        tk.Entry(search_row, textvariable=self.grave_search_var, bg=PANEL, fg=TEXT,
+                 insertbackground=TEXT, relief="flat", font=("Segoe UI", 11), width=32).pack(
+                 side="left", padx=(8, 15), ipady=7)
+        self.text(search_row, "Older than", 10, MUTED).pack(side="left")
+        self.grave_days_var = tk.StringVar(value=str(self.settings.get("graveyard_days", 365)))
+        days = ttk.Combobox(search_row, textvariable=self.grave_days_var,
+                            values=("180", "365", "730", "1095"), state="readonly",
+                            style="Dark.TCombobox", width=6)
+        days.pack(side="left", padx=(7, 13))
+        days.bind("<<ComboboxSelected>>", self._change_grave_days)
+        self.button(search_row, "More filters", self._grave_toggle_advanced).pack(side="left")
+        self.grave_search_var.trace_add("write", lambda *_: self._grave_view_changed())
+
+        self.grave_extra_filters = tk.Frame(self.content, bg=BG)
+        row = tk.Frame(self.grave_extra_filters, bg=BG)
+        row.pack(fill="x", pady=(0, 6))
         categories = ("All types", *sorted({e.category for e in self.graveyard_entries}))
         current_cat = self.settings.get("graveyard_category", "All types")
-        # A category may be absent after a different scan. Show all, don't silently hide results.
         if current_cat not in categories:
             current_cat = "All types"
+        self.text(row, "Type", 9, MUTED).pack(side="left")
         self.grave_category_var = tk.StringVar(value=current_cat)
-        category = ttk.Combobox(toolbar, textvariable=self.grave_category_var,
-                                values=categories, state="readonly", style="Dark.TCombobox", width=23)
+        category = ttk.Combobox(row, textvariable=self.grave_category_var, values=categories,
+                                state="readonly", style="Dark.TCombobox", width=24)
         category.pack(side="left", padx=(6, 14))
         category.bind("<<ComboboxSelected>>", self._grave_view_changed)
-        self.text(toolbar, "Safety", 9, MUTED).pack(side="left")
+        self.text(row, "Status", 9, MUTED).pack(side="left")
         self.grave_status_var = tk.StringVar(value=self.settings.get("graveyard_status", "All findings"))
-        safety = ttk.Combobox(toolbar, textvariable=self.grave_status_var,
-                              values=GRAVE_STATES, state="readonly", style="Dark.TCombobox", width=23)
+        safety = ttk.Combobox(row, textvariable=self.grave_status_var, values=GRAVE_STATES,
+                              state="readonly", style="Dark.TCombobox", width=23)
         safety.pack(side="left", padx=(6, 0))
         safety.bind("<<ComboboxSelected>>", self._grave_view_changed)
-
-        toolbar2 = tk.Frame(self.content, bg=BG)
-        toolbar2.pack(fill="x", pady=(0, 5))
-        self.text(toolbar2, "Search", 9, MUTED).pack(side="left")
-        self.grave_search_var = tk.StringVar(value=self.settings.get("graveyard_search", ""))
-        tk.Entry(toolbar2, textvariable=self.grave_search_var, bg=PANEL, fg=TEXT,
-                 insertbackground=TEXT, relief="flat", font=("Segoe UI", 10), width=23).pack(
-                 side="left", padx=(6, 12), ipady=5)
-        self.grave_search_var.trace_add("write", lambda *_: self._grave_view_changed())
-        self.text(toolbar2, "Minimum", 9, MUTED).pack(side="left")
+        row2 = tk.Frame(self.grave_extra_filters, bg=BG)
+        row2.pack(fill="x", pady=(0, 6))
+        self.text(row2, "Minimum size", 9, MUTED).pack(side="left")
         self.grave_min_size_var = tk.StringVar(value=self.settings.get("graveyard_min_size", "Any size"))
-        minimum = ttk.Combobox(toolbar2, textvariable=self.grave_min_size_var,
-                               values=tuple(GRAVE_SIZES), state="readonly", style="Dark.TCombobox", width=10)
-        minimum.pack(side="left", padx=(6, 12))
+        minimum = ttk.Combobox(row2, textvariable=self.grave_min_size_var,
+                               values=tuple(GRAVE_SIZES), state="readonly",
+                               style="Dark.TCombobox", width=11)
+        minimum.pack(side="left", padx=(6, 14))
         minimum.bind("<<ComboboxSelected>>", self._grave_view_changed)
-        self.text(toolbar2, "Sort", 9, MUTED).pack(side="left")
+        self.text(row2, "Sort by", 9, MUTED).pack(side="left")
         self.grave_sort_var = tk.StringVar(value=self.settings.get("graveyard_sort", "Size"))
-        sort = ttk.Combobox(toolbar2, textvariable=self.grave_sort_var,
-                            values=GRAVE_SORT_KEYS, state="readonly", style="Dark.TCombobox", width=10)
-        sort.pack(side="left", padx=(6, 8))
+        sort = ttk.Combobox(row2, textvariable=self.grave_sort_var, values=GRAVE_SORT_KEYS,
+                            state="readonly", style="Dark.TCombobox", width=11)
+        sort.pack(side="left", padx=(6, 9))
         sort.bind("<<ComboboxSelected>>", self._grave_view_changed)
         self.grave_order_var = tk.StringVar(value=self.settings.get("graveyard_order", "Descending"))
-        direction = ttk.Combobox(toolbar2, textvariable=self.grave_order_var,
-                                 values=SORT_DIRECTIONS, state="readonly", style="Dark.TCombobox", width=12)
+        direction = ttk.Combobox(row2, textvariable=self.grave_order_var,
+                                 values=SORT_DIRECTIONS, state="readonly",
+                                 style="Dark.TCombobox", width=13)
         direction.pack(side="left")
         direction.bind("<<ComboboxSelected>>", self._grave_view_changed)
 
-        toolbar3 = tk.Frame(self.content, bg=BG)
-        toolbar3.pack(fill="x", pady=(0, 9))
-        self.text(toolbar3, "Saved views", 9, MUTED).pack(side="left")
+        views = tk.Frame(self.grave_extra_filters, bg=BG)
+        views.pack(fill="x", pady=(0, 7))
+        self.text(views, "Saved view", 9, MUTED).pack(side="left")
         self.grave_preset_var = tk.StringVar(value="Custom")
-        self.grave_preset_selector = ttk.Combobox(toolbar3, textvariable=self.grave_preset_var,
-                            values=("Custom", *sorted(saved)), state="readonly",
-                            style="Dark.TCombobox", width=24)
+        self.grave_preset_selector = ttk.Combobox(
+            views, textvariable=self.grave_preset_var, values=("Custom", *sorted(saved)),
+            state="readonly", style="Dark.TCombobox", width=22)
         self.grave_preset_selector.pack(side="left", padx=(6, 9))
         self.grave_preset_selector.bind("<<ComboboxSelected>>", self._grave_load_view)
-        self.button(toolbar3, "Save view", self._grave_save_view).pack(side="left", padx=(0, 8))
-        self.button(toolbar3, "Remove saved view", self._grave_remove_view).pack(side="left", padx=(0, 8))
-        self.button(toolbar3, "Reset filters", self._grave_reset_view).pack(side="left")
+        self.button(views, "Save", self._grave_save_view).pack(side="left", padx=(0, 6))
+        self.button(views, "Remove", self._grave_remove_view).pack(side="left", padx=(0, 6))
+        self.button(views, "Reset", self._grave_reset_view).pack(side="left")
 
-        note = self.panel(pad=9)
-        note.pack(fill="x", pady=(0, 8))
+        note = self.panel(pad=12)
+        note.pack(fill="x", pady=(0, 9))
+        self.grave_count_panel = note
         self.grave_count_var = tk.StringVar()
-        self.text(note, "", 10, bold=True, textvariable=self.grave_count_var).pack(anchor="w")
-        self.text(note,
-                  "Tick files you want to recycle. Installed games, mod folders, saves and profiles "
-                  "cannot be removed here. You may override your own Never Touch setting for an "
-                  "ordinary archive, but only after an extra confirmation.",
-                  9, WARN, wraplength=850).pack(anchor="w", pady=(5, 0))
+        self.text(note, "", 11, bold=True, textvariable=self.grave_count_var).pack(anchor="w")
+        self.text(note, "Select one file below. Delete moves it to Windows Recycle Bin after approval. "
+                  "Protect prevents deleting that item; Unprotect removes only your own rule. "
+                  "Installed games and managed mods remain protected.",
+                  9, MUTED, wraplength=830).pack(anchor="w", pady=(4, 0))
+
         area = self.panel(pad=8)
         area.pack(fill="both", expand=True)
         self.grave_tree = self._tree(area,
             ("check", "name", "category", "age", "size", "decision"),
-            ("✓", "FINDING", "CATEGORY", "AGE SIGNAL", "APPARENT SIZE", "ACTION"),
-            (38, 210, 170, 92, 105, 140))
+            ("SELECT", "FILE OR GAME", "TYPE", "LAST MODIFIED", "SIZE", "STATUS"),
+            (54, 235, 160, 112, 108, 146))
         self.grave_tree.tag_configure("protected", foreground=WARN)
         self.grave_tree.bind("<Double-1>", lambda _e: self._grave_details())
         self.grave_tree.bind("<Button-1>", self._grave_toggle_click)
         self.grave_tree.bind("<space>", self._grave_toggle_keyboard)
-        # Mouse and keyboard menus must target the selected row, not a stale item.
         self.grave_tree.bind("<Button-3>", self._grave_context_click)
         self.grave_tree.bind("<Shift-F10>", self._grave_context_keyboard)
         self.grave_tree.bind("<Menu>", self._grave_context_keyboard)
-        self.grave_tree.heading("name", command=lambda: self._grave_column_sort("Name"))
-        self.grave_tree.heading("category", command=lambda: self._grave_column_sort("Category"))
-        self.grave_tree.heading("age", command=lambda: self._grave_column_sort("Age"))
-        self.grave_tree.heading("size", command=lambda: self._grave_column_sort("Size"))
-        self.grave_tree.heading("decision", command=lambda: self._grave_column_sort("Safety"))
+        self.grave_tree.bind("<<TreeviewSelect>>", lambda _e: self._grave_sync_actions())
+        for column, sort_key in (("name", "Name"), ("category", "Category"),
+                                 ("age", "Age"), ("size", "Size"), ("decision", "Safety")):
+            self.grave_tree.heading(column, command=lambda key=sort_key: self._grave_column_sort(key))
         self.graveyard_lookup = {}
         self._grave_page_keys = set()
         self._add_page_controls("grave", self._populate_graveyard)
         self._populate_graveyard()
+
         actions = tk.Frame(self.content, bg=BG)
-        actions.pack(fill="x", pady=(8, 0))
-        self.button(actions, "Why is this here?", self._grave_details).pack(side="left")
-        self.button(actions, "Check eligible on page", self._grave_select_eligible).pack(side="left", padx=(7, 0))
-        self.button(actions, "Check page", self._grave_select_all).pack(side="left", padx=(7, 0))
-        self.button(actions, "Clear checks", self._grave_clear_checks).pack(side="left", padx=(7, 0))
-        cleanup_actions = tk.Frame(self.content, bg=BG)
-        cleanup_actions.pack(fill="x", pady=(5, 0))
-        self.button(cleanup_actions, "Recycle one", self._grave_recycle_one).pack(side="left")
-        self.button(cleanup_actions, "Recycle checked (max 160)", self._grave_recycle_selected, primary=True).pack(side="left", padx=(7, 0))
-        self.button(cleanup_actions, "Recycle eligible on page", self._grave_recycle_all, danger=True).pack(side="left", padx=(7, 0))
-        utilities = tk.Frame(self.content, bg=BG)
-        utilities.pack(fill="x", pady=(6, 0))
-        self.button(utilities, "Open Folder", self._grave_open_folder).pack(side="left")
-        self.button(utilities, "Protect / Unprotect", self._grave_toggle_protection).pack(side="left", padx=(7, 0))
-        self.text(self.content, "Checks persist when you change pages within this filtered view. 'Check page' "
-                  "and 'Recycle eligible on page' affect only the displayed page. Cleanup is limited "
-                  "to 160 entries per explicit approval, with protected files blocked. "
-                  "Recycle Bin storage is NOT freed disk space.",
-                  9, MUTED, wraplength=850).pack(anchor="w", pady=(7, 0))
+        actions.pack(fill="x", pady=(9, 0))
+        self.grave_delete_button = self.button(actions, "Delete selected", self._grave_recycle_one, primary=True)
+        self.grave_delete_button.pack(side="left")
+        self.grave_protection_button = self.button(actions, "Protect selected", self._grave_toggle_protection)
+        self.grave_protection_button.pack(side="left", padx=(8, 0))
+        self.button(actions, "Open folder", self._grave_open_folder).pack(side="left", padx=(8, 0))
+        self.button(actions, "Why is this here?", self._grave_details).pack(side="left", padx=(8, 0))
+        bulk = tk.Frame(self.content, bg=BG)
+        bulk.pack(fill="x", pady=(7, 0))
+        self.button(bulk, "Check eligible", self._grave_select_eligible).pack(side="left")
+        self.button(bulk, "Check page", self._grave_select_all).pack(side="left", padx=(7, 0))
+        self.button(bulk, "Clear checks", self._grave_clear_checks).pack(side="left", padx=(7, 0))
+        self.grave_delete_checked_button = self.button(bulk, "Delete checked", self._grave_recycle_selected, danger=True)
+        self.grave_delete_checked_button.pack(side="left", padx=(7, 0))
+        self.text(self.content,
+                  "Delete is reversible through Windows Recycle Bin when recovery is available. "
+                  "It does not free space until you empty the bin. Max 160 files per approval.",
+                  9, MUTED, wraplength=820).pack(anchor="w", pady=(10, 0))
+        self._grave_sync_actions()
+
+    def _grave_toggle_advanced(self):
+        if self.grave_extra_filters.winfo_manager():
+            self.grave_extra_filters.pack_forget()
+        else:
+            self.grave_extra_filters.pack(fill="x", pady=(0, 8), before=self.grave_count_panel)
+
+    def _grave_sync_actions(self):
+        entry = self._grave_selected_entry()
+        if hasattr(self, "grave_delete_button"):
+            self.grave_delete_button.configure(state="normal" if entry and entry.can_recycle else "disabled")
+        if hasattr(self, "grave_protection_button"):
+            action, _ = protection_action(entry.path, self.settings.get("never_touch", [])) if (
+                entry and entry.old_file is not None) else (None, "")
+            self.grave_protection_button.configure(
+                text=(action + " selected") if action else "Protected by Game Grave",
+                state="normal" if action else "disabled")
+        if hasattr(self, "grave_delete_checked_button"):
+            self.grave_delete_checked_button.configure(
+                state="normal" if self.grave_checked else "disabled")
 
     def _populate_graveyard(self):
         if not hasattr(self, "grave_tree") or not self.grave_tree.winfo_exists():
