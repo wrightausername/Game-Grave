@@ -88,11 +88,19 @@ def main():
             refresh_graveyard(window.inventory, window.settings)
             window.navigate("Graveyard")
             assert not window.inventory.graveyard[0].can_recycle
+            from PySide6.QtWidgets import QPushButton
+            window.grave_table.selectRow(0)
+            app.processEvents()
+            unlock = window.grave_table.cellWidget(0, 3)
+            assert isinstance(unlock, QPushButton) and "Unprotect" in unlock.text(), (
+                "Missing the user's requested direct in-row Unprotect control")
+            protected_image = root / "_ci_temp" / "crimson-unprotect-1440.png"
+            assert window.grab().save(str(protected_image)), "Cannot render protected Graveyard row"
             archive = next(e for e in window.inventory.graveyard
                            if e.category == "Possible mod / game download")
             with patch.object(window, "confirm", return_value=True), \
                  patch("gg_desktop.screens.recycle_reviewed_entries") as recycle:
-                window._unprotect_grave(archive)
+                unlock.click()
                 assert oldzip.is_file()
                 assert str(oldzip) not in window.settings["never_touch"]
                 recycle.assert_not_called()
