@@ -95,11 +95,11 @@ def override_eligibility(entry: Any, inventory: Any) -> tuple[bool, str]:
         return False, "Run Scan PC and select an actual Graveyard finding first."
     known = getattr(inventory, "graveyard", ())
     if not any(
-        getattr(e, "key", None) == getattr(entry, "key", None)
+        e == entry and getattr(e, "key", None) == getattr(entry, "key", None)
         and _same_path(getattr(e, "path", ""), getattr(entry, "path", ""))
         for e in known
     ):
-        return False, "This item is not in the current Graveyard scan. Scan again."
+        return False, "This exact item is not in the current Graveyard scan. Scan again."
     raw_path = str(getattr(entry, "path", ""))
     path = Path(raw_path)
     if not raw_path or len(raw_path) > MAX_PATH_LENGTH:
@@ -193,6 +193,28 @@ def _metadata_fingerprint(path: Path) -> tuple[str, int, int]:
     return digest.hexdigest(), total_bytes, entries
 
 
+def _recycle_canary_on_local_volume(target: Path) -> bool:
+    """Try parent first; otherwise an ordinary writable folder on the SAME disk.
+
+    Protected game installations under Program Files may not permit temporary
+    canary creation in steamapps/common. A fallback canary validates the
+    actual Windows Recycle Bin volume without modifying a protected directory.
+    Windows still makes the final permission decision for the selected item.
+    """
+    candidates = [target.parent, Path.home() / "Downloads",
+                  Path.home() / "Documents", Path.home()]
+    seen = set()
+    for candidate in candidates:
+        if (_identity(candidate) in seen or not candidate.is_dir()
+                or _has_reparse_component(candidate)
+                or _identity(Path(candidate.anchor)) != _identity(Path(target.anchor))):
+            continue
+        seen.add(_identity(candidate))
+        if core._recycle_canary_passes(candidate):
+            return True
+    return False
+
+
 def recycle_selected_override(entry: Any, inventory: Any, never_touch: tuple[str, ...],
                               session: str, *, acknowledged: bool = False) -> dict:
     """A single, deliberate Recycle Bin move; never a permanent-delete fallback."""
@@ -211,7 +233,7 @@ def recycle_selected_override(entry: Any, inventory: Any, never_touch: tuple[str
     if ctypes.windll.kernel32.GetDriveTypeW(str(drive)) != 3:
         raise OverrideRefused("Only a local fixed disk is supported.")
     # No bypass of the existing Windows Recycle Bin / Undo canary.
-    if not core._recycle_canary_passes(target.parent):
+    if not _recycle_canary_on_local_volume(target):
         raise OverrideRefused(
             "Windows cannot verify a recoverable Recycle Bin move here. "
             "No file was moved. Use Windows File Explorer for manual management.")
