@@ -117,7 +117,8 @@ class HeroBanner(QFrame):
         self.detail = detail
         from PySide6.QtSvg import QSvgRenderer
         self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "crimson_hero.svg"))
-        self.atlas = QPixmap(str(Path(__file__).parent / "assets" / "crimson_atlas.jpg"))
+        # Vector original, rendered at display resolution to stay crisp on
+        # 1440p, 4K and high-DPI monitors. Avoid the low-resolution JPG atlas.
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -128,11 +129,7 @@ class HeroBanner(QFrame):
         painter.drawRoundedRect(target, 11, 11)
         painter.save()
         painter.setClipRect(target)
-        if not self.atlas.isNull():
-            # Art from the approved mockup. ONLY the scenery region is sampled,
-            # never its fictional UI figures or controls.
-            painter.drawPixmap(target, self.atlas, QRectF(0, 0, 788, 190))
-        elif self.art.isValid():
+        if self.art.isValid():
             self.art.render(painter, QRectF(0, -6, self.width(), self.height() + 16))
         from PySide6.QtGui import QLinearGradient
         grad = QLinearGradient(0, 0, self.width() * .79, 0)
