@@ -19,6 +19,62 @@ COLORS = {
 STYLE = r"""
 QMainWindow, QWidget#appRoot, QScrollArea, QWidget#scrollBody { background: #080C13; color: #F4F7FC; }
 QWidget { font-family: "Segoe UI Variable", "Segoe UI", Arial; font-size: 12px; color: #F4F7FC; }
+/* All confirmation, destructive-action, text-entry, info and file dialogs
+   must have a dark surface and high-contrast text. Without this, native
+   Qt dialog panels may render as white with inherited white text. */
+QDialog, QMessageBox, QInputDialog, QFileDialog {
+    background-color: #111B27;
+    color: #F5FAFF;
+}
+QDialog QLabel, QMessageBox QLabel, QInputDialog QLabel, QFileDialog QLabel {
+    background-color: transparent;
+    color: #F5FAFF;
+    font-size: 12px;
+}
+QDialog QLineEdit, QInputDialog QLineEdit, QFileDialog QLineEdit {
+    background-color: #081522;
+    color: #F5FAFF;
+    selection-background-color: #31758C;
+    border: 1px solid #62798F;
+    border-radius: 6px;
+    padding: 8px;
+}
+QDialogButtonBox, QMessageBox QDialogButtonBox {
+    background-color: #111B27;
+    color: #F5FAFF;
+}
+QDialog QPushButton, QMessageBox QPushButton, QInputDialog QPushButton {
+    background-color: #243446;
+    color: #F5FAFF;
+    border: 1px solid #577187;
+}
+QDialog QPushButton:hover, QMessageBox QPushButton:hover, QInputDialog QPushButton:hover {
+    background-color: #34526A;
+    border-color: #6DD0E8;
+}
+QDialog QPlainTextEdit, QDialog QTextEdit {
+    background-color: #0D1722;
+    color: #F5FAFF;
+    border: 1px solid #547086;
+}
+QTabWidget#captureTabs::pane {
+    border: 1px solid #304653;
+    background: #0C1520;
+    border-radius: 8px;
+}
+QTabWidget#captureTabs QTabBar::tab {
+    color: #BDD1E2;
+    background: #121E29;
+    border: 1px solid #365064;
+    border-bottom: none;
+    padding: 12px 22px;
+    font-weight: 700;
+}
+QTabWidget#captureTabs QTabBar::tab:selected {
+    color: white;
+    background: #38202C;
+    border-bottom: 3px solid #FF4357;
+}
 QWidget#navRail { background: #0B111A; border-right: 1px solid #25303C; }
 QFrame#panel, QFrame#metricCard, QFrame#actionCard, QFrame#infoCard, QFrame#heroBottom {
     background: #111922; border: 1px solid #2A3541; border-radius: 11px;
