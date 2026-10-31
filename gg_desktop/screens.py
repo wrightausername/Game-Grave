@@ -1327,7 +1327,7 @@ class ScreenMethods:
         buttonbar.setLayout(br)
         inspect = button("Analyze selected folder…")
         open_folder = button("Open folder in Explorer")
-        back = button("Back to drive overview")
+        back = button("Analyze entire drive again…")
         br.addWidget(inspect)
         br.addWidget(open_folder)
         br.addWidget(back)
@@ -1437,14 +1437,28 @@ class ScreenMethods:
             drive_at_start = drive
 
             def job(emitter):
-                return analyze_other_storage(
-                    drive_at_start, selected_games, scope=scope,
-                    notify=emitter)
+                try:
+                    return True, analyze_other_storage(
+                        drive_at_start, selected_games, scope=scope,
+                        notify=emitter)
+                except Exception as exc:
+                    # A failed read-only scan is not allowed to leave the
+                    # action permanently disabled in Settings/Other Storage.
+                    return False, type(exc).__name__ + ": " + str(exc)[:250]
             def progress_cb(percent, message):
                 if isValid(progress):
                     progress.setValue(percent)
                     scan_state.setText(message)
-            def done(report):
+            def done(outcome):
+                success, response = outcome
+                if not success:
+                    if isValid(table):
+                        progress.hide()
+                        run_scan.setEnabled(True)
+                        scan_state.setText("Read-only scan could not finish. Retry or choose another drive.")
+                    self.error("Other Storage analysis incomplete", response)
+                    return
+                report = response
                 self._other_storage_report = report
                 self._other_storage_report_drive = drive_at_start
                 if (isValid(table) and disk_choices.currentData() == drive_at_start):
