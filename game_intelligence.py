@@ -187,18 +187,21 @@ def _special(path: Path) -> bool:
 
 
 def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
-    """Bounded, on-demand metadata snapshot of recognized mod folders only.
+    """Bounded, opt-in mod metadata snapshot with explicit coverage uncertainty.
 
-    Not a snapshot of full game installations; hashes/content are deliberately
-    excluded. A comparison is not proof that a game was ever known-good.
+    Unreadable, redirected, linked, deep or skipped entries make completeness
+    uncertain. A later Ghost Watch comparison must NEVER treat absence from a
+    partial observation as proof that a user mod was removed.
     """
-    if not 1 <= int(max_entries) <= MAX_ENTRIES:
+    if type(max_entries) is not int or not 1 <= max_entries <= MAX_ENTRIES:
         raise ValueError("Choose a valid observation limit.")
     sources = list(mods)
     roots = []
     entries = {}
     truncated = False
     skipped_roots = 0
+    skipped_entries = 0
+    scan_errors = 0
     for m in sources[:MAX_ROOTS]:
         root = Path(str(getattr(m, "path", "")))
         if (not root.is_dir() or _special(root) or
@@ -209,38 +212,71 @@ def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
             skipped_roots += 1
             continue
         roots.append(str(_path(root)))
-        for current, dirs, filenames in os.walk(root, topdown=True, followlinks=False):
+
+        def on_walk_error(_error):
+            nonlocal scan_errors
+            scan_errors += 1
+
+        for current, dirs, filenames in os.walk(
+                root, topdown=True, followlinks=False, onerror=on_walk_error):
             directory = Path(current)
+            if _linked_ancestor(directory) or _special(directory):
+                skipped_entries += 1
+                dirs[:] = []
+                continue
             depth = len(directory.relative_to(root).parts)
-            dirs[:] = [] if depth >= MAX_DEPTH else [
-                name for name in dirs if not _special(directory / name)
-            ]
+            if depth >= MAX_DEPTH:
+                skipped_entries += len(dirs)
+                dirs[:] = []
+            else:
+                ordinary_dirs = []
+                for name in dirs:
+                    if _special(directory / name):
+                        skipped_entries += 1
+                    else:
+                        ordinary_dirs.append(name)
+                dirs[:] = ordinary_dirs
             for name in filenames:
                 item = directory / name
                 if len(entries) >= max_entries:
                     truncated = True
                     break
                 if _special(item):
+                    skipped_entries += 1
                     continue
                 try:
                     info = item.stat()
                     if not stat.S_ISREG(info.st_mode):
+                        skipped_entries += 1
+                        continue
+                    if _linked_ancestor(item):
+                        skipped_entries += 1
                         continue
                     entries[str(_path(item))] = [info.st_size, info.st_mtime_ns]
-                except OSError:
-                    continue
+                except (OSError, ValueError):
+                    skipped_entries += 1
             if truncated:
                 break
         if truncated:
             break
+    incomplete = bool(
+        truncated or len(sources) > MAX_ROOTS or skipped_roots or
+        skipped_entries or scan_errors
+    )
     return {
         "schema": SCHEMA,
         "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "roots": sorted(set(roots)),
         "entries": entries,
-        "truncated": truncated or len(sources) > MAX_ROOTS or skipped_roots > 0,
+        "truncated": incomplete,
         "skipped_roots": skipped_roots,
-        "limitations": "Metadata-only, bounded to recognized mod roots, max 3 levels; skipped/linked roots make coverage incomplete; no game launch verification.",
+        "skipped_entries": skipped_entries,
+        "scan_errors": scan_errors,
+        "limitations": (
+            "Metadata only, bounded to recognized mod roots, max 3 levels. "
+            "Any skipped, linked, deep or inaccessible files make this an "
+            "incomplete observation; never infer that absent data was deleted."
+        ),
     }
 
 
