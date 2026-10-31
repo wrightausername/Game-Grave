@@ -3674,9 +3674,10 @@ class GameGraveApp(tk.Tk):
             return
         if not messagebox.askyesno(
             "Download verified stable installer?",
-            f"Stable version: {release.version}\\n"
-            f"Expected size: {human_size(release.size_bytes)}\\n"
-            f"Signed manifest SHA-256: {release.installer_sha256}\\n\\n"
+            f"Stable version: {release.version}\n"
+            f"Download URL: {release.download_url}\n"
+            f"Expected size: {human_size(release.size_bytes)}\n"
+            f"Signed manifest SHA-256: {release.installer_sha256}\n\n"
             "Download and verify these exact bytes into a NEW local file? "
             "Game Grave will NOT open or install it. Windows publisher "
             "signature validation is a separate requirement.",
