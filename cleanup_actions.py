@@ -29,6 +29,7 @@ def recycle_reviewed_entries(
     *,
     review_root: str | Path | None = None,
     min_age_days: int = 0,
+    managed_roots: Iterable[str] | None = None,
 ) -> dict:
     """Move only approved individual files to Windows Recycle Bin.
 
@@ -69,6 +70,11 @@ def recycle_reviewed_entries(
                     raise ValueError("File is outside the reviewed Old Files folder")
                 if file.modified > time.time() - min_age_days * 86400:
                     raise ValueError("File no longer meets the reviewed age requirement")
+                if managed_roots is None:
+                    raise ValueError("Game/mod ownership context is missing; scan again")
+                if is_protected_path(path, [r for r in managed_roots
+                                            if isinstance(r, str) and r.strip()]):
+                    raise ValueError("Inside a known game or mod directory; use its manager")
                 if looks_like_screenshot(path):
                     raise ValueError("Pictures require an individual screenshot preview")
                 allowed = True
