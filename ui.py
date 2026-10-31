@@ -16,6 +16,7 @@ from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
 from graveyard import build_graveyard, looks_like_game_archive
 from cleanup_actions import recycle_reviewed_entries, recycle_old_files
+from safety_selftest import check_disposable_undo, SafetySelfCheckError
 from graveyard_protection import protection_action, set_item_protection
 from recordings import find_old_recordings, RECORDING_EXTENSIONS
 from duplicates import inspect_duplicate_archives
@@ -157,6 +158,7 @@ class GameGraveApp(tk.Tk):
         self.active = "Overview"
         self.scanning = False
         self.cleanup_running = False
+        self._selfcheck_busy = False
         self.last_scan: str | None = None
         self.status_text = tk.StringVar(value="Ready. Choose Scan PC to begin. No background scan is running.")
         self.events: queue.Queue = queue.Queue()
@@ -171,7 +173,7 @@ class GameGraveApp(tk.Tk):
             self.after(250, self.scan_all)
 
     def _close_safely(self):
-        if self.cleanup_running:
+        if self.cleanup_running or self._selfcheck_busy:
             messagebox.showinfo("Cleanup still running",
                                 "Wait for the current Windows Recycle Bin check to finish. "
                                 "Closing now could interrupt recovery records.")
@@ -3380,6 +3382,11 @@ class GameGraveApp(tk.Tk):
         self.text(extra, "Advanced tools", 13, bold=True).pack(anchor="w", pady=(0, 10))
         for title in ("Old Files", "Make Room", "Cleanup History", "Storage History", "Automation"):
             self.button(extra, title, lambda page=title: self.show_page(page)).pack(side="left", padx=(0, 8))
+        self.button(extra, "Test Windows recovery (disposable file)",
+                    self._start_disposable_undo_check).pack(anchor="w", pady=(11, 3))
+        self.text(extra, "Checks Windows Recycle Bin and Undo using one new test file "
+                  "in a folder you choose. Never touches your games or saves.",
+                  9, MUTED, wraplength=790).pack(anchor="w", pady=(0, 8))
         self.text(extra, "Free forever or optional $24.99 lifetime Pro target. No subscriptions or account requirement.",
                   9, MUTED, wraplength=810).pack(anchor="w", pady=(12, 0))
         recording_panel = self.panel(tools_tab)
@@ -3450,6 +3457,51 @@ class GameGraveApp(tk.Tk):
         save_settings(self.settings)
         self.recording_root_list.delete(index)
         self.status_text.set("Custom recording folder removed. Existing files were not touched.")
+
+    def _start_disposable_undo_check(self):
+        if self.scanning or self.cleanup_running or getattr(self, "_selfcheck_busy", False):
+            messagebox.showinfo("Game Grave is busy",
+                "Finish the current scan, cleanup or safety check before starting another.")
+            return
+        folder = filedialog.askdirectory(
+            title="Select an ordinary local folder for a disposable Windows Undo test",
+            initialdir=self.settings.get("scan_folder", str(downloads_dir())))
+        if not folder:
+            return
+        path = Path(folder)
+        if not safe_scan_root(path) or is_protected_path(
+                path, self.settings.get("never_touch", [])):
+            messagebox.showwarning("Test folder protected",
+                "Choose an ordinary local folder outside game installs, saves, "
+                "system folders and your Never Touch rules.")
+            return
+        if not messagebox.askyesno("Test Windows Recycle Bin and Undo?",
+                "Game Grave will create ONE tiny disposable test file in your chosen "
+                "folder, move it to the Windows Recycle Bin and try to restore "
+                "the exact bytes. It removes only its own verified test data at the end. "
+                "No games, saves, mods or recordings are touched. "
+                "A failed restore may leave the test file in the Recycle Bin. "
+                "Start this on-demand test?"):
+            return
+        self._selfcheck_busy = True
+        self.status_text.set("Windows recovery safety check running on disposable data…")
+        rules = tuple(self.settings.get("never_touch", []))
+
+        def work():
+            try:
+                report = check_disposable_undo(path, rules)
+                self.events.put(("undo_selfcheck_pass", report))
+            except SafetySelfCheckError as exc:
+                self.events.put(("undo_selfcheck_fail", str(exc)))
+            except Exception:
+                self.events.put(("undo_selfcheck_fail",
+                    "An unexpected local safety check failure occurred. No user files were selected."))
+
+        try:
+            threading.Thread(target=work, daemon=True).start()
+        except RuntimeError as exc:
+            self._selfcheck_busy = False
+            messagebox.showerror("Safety check not started", str(exc))
 
     def _choose_custom_accent(self):
         current = self.settings.get("ui_custom_accent", "#50DCC5")
@@ -3703,7 +3755,7 @@ class GameGraveApp(tk.Tk):
         log_event("Scan canceled", "User canceled the read-only inventory before acceptance.")
 
     def scan_all(self):
-        if self.scanning or getattr(self, "cleanup_running", False):
+        if self.scanning or getattr(self, "cleanup_running", False) or getattr(self, "_selfcheck_busy", False):
             return
         self.scanning = True
         self.scan_button.configure(state="disabled", bg=RAISED)
@@ -3883,6 +3935,21 @@ class GameGraveApp(tk.Tk):
                     self._dupe_busy = False
                     self.status_text.set("Duplicate check incomplete. Nothing changed.")
                     messagebox.showwarning("Duplicate inspection incomplete", payload)
+                elif name == "undo_selfcheck_pass":
+                    self._selfcheck_busy = False
+                    self.status_text.set("Disposable Recycle Bin and exact-byte Undo check passed.")
+                    messagebox.showinfo("Recovery self-check passed",
+                        "Windows moved and restored the exact bytes of one tiny Game Grave "
+                        "test file, which was then cleaned up. No games, saves or mods "
+                        "were touched. This is a local diagnostic, not full Windows "
+                        "10/11 release acceptance.")
+                elif name == "undo_selfcheck_fail":
+                    self._selfcheck_busy = False
+                    self.status_text.set("Windows recovery check failed. Cleanup must remain conservative.")
+                    messagebox.showwarning("Recovery self-check failed",
+                        payload + "\n\nGame Grave will not bypass its Recycle Bin "
+                        "safety checks. The disposable test file might remain in "
+                        "the Recycle Bin. No user game or save was selected.")
                 elif name == "manager_profiles_result":
                     self.profile_report = payload
                     self.status_text.set(
