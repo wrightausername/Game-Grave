@@ -1451,6 +1451,9 @@ class GameGraveApp(tk.Tk):
         self.grave_count_panel = note
         self.grave_count_var = tk.StringVar()
         self.text(note, "", 11, bold=True, textvariable=self.grave_count_var).pack(anchor="w")
+        self.grave_selection_var = tk.StringVar(value="Select a finding to see available actions.")
+        self.text(note, "", 10, textvariable=self.grave_selection_var,
+                  wraplength=800).pack(anchor="w", pady=(4, 0))
         self.text(note, "Select one file below. Delete moves it to Windows Recycle Bin after approval. "
                   "Protect prevents deleting that item; Unprotect removes only your own rule. "
                   "Installed games and managed mods remain protected.",
@@ -1507,17 +1510,25 @@ class GameGraveApp(tk.Tk):
 
     def _grave_sync_actions(self):
         entry = self._grave_selected_entry()
+        action, reason = protection_action(
+            entry.path, self.settings.get("never_touch", [])) if (
+                entry and entry.old_file is not None) else (None, "")
         if hasattr(self, "grave_delete_button"):
             self.grave_delete_button.configure(state="normal" if entry and entry.can_recycle else "disabled")
         if hasattr(self, "grave_protection_button"):
-            action, _ = protection_action(entry.path, self.settings.get("never_touch", [])) if (
-                entry and entry.old_file is not None) else (None, "")
             self.grave_protection_button.configure(
                 text=(action + " selected") if action else "Protected by Game Grave",
                 state="normal" if action else "disabled")
         if hasattr(self, "grave_delete_checked_button"):
             self.grave_delete_checked_button.configure(
                 state="normal" if self.grave_checked else "disabled")
+        if hasattr(self, "grave_selection_var"):
+            if entry is None:
+                self.grave_selection_var.set("Select a finding to see available actions.")
+            else:
+                status = ("Ready for reviewed deletion" if entry.can_recycle else
+                          reason if reason else entry.protection)
+                self.grave_selection_var.set(f"Selected: {entry.name}  •  {status}")
 
     def _populate_graveyard(self):
         if not hasattr(self, "grave_tree") or not self.grave_tree.winfo_exists():
