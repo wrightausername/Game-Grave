@@ -12,7 +12,7 @@ def main():
     if os.name != "nt" or os.environ.get("GG_CRIMSON_QA_DISPOSABLE") != "YES":
         print("Refusing to run without Windows disposable CI approval.")
         return 2
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("QT_QPA_PLATFORM", "windows")
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root))
     from PySide6.QtWidgets import QApplication, QTableWidget
@@ -23,6 +23,11 @@ def main():
     from gg_desktop.app import CrimsonWindow
 
     app = QApplication.instance() or QApplication(sys.argv)
+    from PySide6.QtGui import QFontDatabase
+    families = QFontDatabase.families()
+    print("Native Windows Qt font families:", len(families),
+          "Segoe UI?", QFontDatabase.hasFamily("Segoe UI"),
+          "Arial?", QFontDatabase.hasFamily("Arial"))
     with tempfile.TemporaryDirectory(prefix="GG-Crimson-", dir=root / "_ci_temp") as temp:
         synthetic = Path(temp)
         os.environ["LOCALAPPDATA"] = str(synthetic / "Local")
