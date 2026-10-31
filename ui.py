@@ -3636,7 +3636,7 @@ class GameGraveApp(tk.Tk):
 
     def _check_updates_clicked(self):
         """Never make a network request unless the user explicitly clicks."""
-        if self._update_download_active:
+        if getattr(self, "_update_download_active", False):
             messagebox.showinfo("Download running", "Finish or cancel the current download first.")
             return
         if not update_ready():
