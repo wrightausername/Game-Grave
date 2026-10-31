@@ -298,6 +298,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
                 self.status.setText("Scan canceled. The earlier inventory was not replaced.")
                 return
             self.inventory = inventory
+            # Disk contributions must be re-analyzed after a new scan changes
+            # installed-game ownership; never show a stale Other breakdown.
+            self._other_storage_report = None
+            self._other_storage_report_drive = None
             self.status.setText(
                 f"Scanned {inventory.scanned_at}  •  {len(inventory.games)} game installs, "
                 f"{len(inventory.mods)} mod locations, {len(inventory.graveyard)} Graveyard findings."
