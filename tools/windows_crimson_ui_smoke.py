@@ -20,7 +20,15 @@ def main():
     from launchers import LauncherGame
     from graveyard import build_graveyard
     from gg_desktop.models import merge_games
-    from gg_desktop.app import CrimsonWindow
+    from gg_desktop.app import CrimsonWindow, configure_crimson_dialog_palette
+    from gg_desktop.capture_image import ScreenshotImage
+    from gg_desktop.widgets import HeroBanner
+    from PySide6.QtWidgets import QTabWidget
+    from PySide6.QtGui import QPalette
+    from PIL import Image
+    configure_crimson_dialog_palette(app)
+    assert app.palette().color(QPalette.Window).lightness() < 90
+    assert app.palette().color(QPalette.WindowText).lightness() > 180
 
     app = QApplication.instance() or QApplication(sys.argv)
     from PySide6.QtGui import QFontDatabase
@@ -34,6 +42,20 @@ def main():
         os.environ["APPDATA"] = str(synthetic / "Roaming")
         Path(os.environ["LOCALAPPDATA"]).mkdir(parents=True)
         Path(os.environ["APPDATA"]).mkdir(parents=True)
+        # Real (disposable) 1920px screenshot and video records exercise
+        # actual thumbnail decoding and two separate Captures panels.
+        screen_path = synthetic / "Videos" / "Captures" / "latest-game.png"
+        screen_path.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (1920, 1080), (38, 132, 185)).save(screen_path)
+        video_path = screen_path.parent / "gameplay-2026-11-01.mp4"
+        video_path.write_bytes(b"metadata fixture; never launched or decoded")
+        def record_file(file):
+            data = file.stat()
+            return OldFile(str(file), data.st_size, data.st_mtime,
+                           data.st_dev, data.st_ino, data.st_mtime_ns,
+                           data.st_nlink)
+        screenshot_record = record_file(screen_path)
+        video_record = record_file(video_path)
         oldzip = synthetic / "old-skyrim-mod.zip"
         oldzip.write_bytes(b"not an actual mod or game")
         stamp = time.time() - 800 * 86400
@@ -61,6 +83,8 @@ def main():
             window.inventory.other = other
             window.inventory.games = merge_games(steam, other)
             window.inventory.files = [old]
+            window.inventory.screenshots = [screenshot_record]
+            window.inventory.recordings = [video_record]
             window.inventory.scanned_at = "Synthetic test date"
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
             # Native reference-dashboard parity: all pictured controls must
@@ -97,7 +121,8 @@ def main():
                     "Invalid cinematic local visual: " + name)
             assert oldzip.read_bytes() == b"not an actual mod or game"
             for route in ("Overview", "Games", "Graveyard", "Game DNA",
-                          "Mods", "Old Files", "Undo Center", "Settings", "More Tools"):
+                          "Mods", "Old Files", "Captures", "Other Storage",
+                          "Undo Center", "Settings", "More Tools"):
                 window.navigate(route)
                 window.resize(1366, 768)
                 app.processEvents()
@@ -113,6 +138,42 @@ def main():
                 if route == "Graveyard":
                     assert len(window._shown_graves) == 1
                     assert window.grave_table.rowCount() == 1
+            window.navigate("Captures")
+            app.processEvents()
+            capture_tabs = window.page.findChildren(QTabWidget)
+            assert len(capture_tabs) == 1, "Captures must contain two separate tabs"
+            assert capture_tabs[0].count() == 2
+            assert "Screenshots" in capture_tabs[0].tabText(0)
+            assert "Videos" in capture_tabs[0].tabText(1)
+            capture_tabs[0].setCurrentIndex(1)
+            app.processEvents()
+            from PySide6.QtWidgets import QTableWidget
+            assert any(t.rowCount() == 1 for t in capture_tabs[0].currentWidget()
+                       .findChildren(QTableWidget)), "Video tab must display the real recording"
+            capture_tabs[0].setCurrentIndex(0)
+            app.processEvents()
+            thumbnail_widgets = capture_tabs[0].currentWidget().findChildren(ScreenshotImage)
+            assert thumbnail_widgets, "Screenshots tab requires a real image preview"
+            preview_deadline = time.monotonic() + 12
+            while time.monotonic() < preview_deadline and not thumbnail_widgets[0].has_image():
+                app.processEvents()
+                time.sleep(0.06)
+            assert thumbnail_widgets[0].has_image(), (
+                "The actual scanned 1920px screenshot must render, not placeholder art")
+            assert screen_path.is_file() and video_path.is_file()
+            window.navigate("Other Storage")
+            app.processEvents()
+            buttons = {w.text() for w in window.page.findChildren(QPushButton)}
+            assert any("Analyze Other storage" in txt for txt in buttons), (
+                "Other Storage must have an explicit-click read-only analyzer")
+            window.navigate("Overview")
+            app.processEvents()
+            assert window.page.findChildren(HeroBanner), "Hero must be a real native vector widget"
+            assert not hasattr(window.page.findChildren(HeroBanner)[0], "atlas"), (
+                "Overview must not use the old pixelated JPEG artwork")
+            # Dialogs must not be white background with white text on Windows.
+            assert app.palette().color(QPalette.Window).lightness() < 90
+            assert app.palette().color(QPalette.WindowText).lightness() > 180
             # Exact personal Never Touch rule can be removed from the Graveyard
             # with a separate confirmation and WITHOUT a recycle operation.
             from gg_desktop.backend import refresh_graveyard
