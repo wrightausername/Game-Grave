@@ -216,6 +216,10 @@ class ActionCard(QFrame):
     def __init__(self, glyph: str, title: str, explanation: str, action):
         super().__init__()
         self.setObjectName("actionCard")
+        self._action = action
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setAccessibleName(title + ". " + explanation)
         contents = row(spacing=11, margins=(13, 12, 13, 12))
         self.setLayout(contents)
         g = label(glyph)
@@ -231,6 +235,20 @@ class ActionCard(QFrame):
         trigger.setMinimumWidth(36)
         trigger.setAccessibleName(title)
         contents.addWidget(trigger)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._action()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space):
+            self._action()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 def data_table(headers: list[str]) -> QTableWidget:
