@@ -19,6 +19,10 @@ on:
       - 'tools/windows_crimson_ui_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
 
+concurrency:
+  group: crimson-command-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
