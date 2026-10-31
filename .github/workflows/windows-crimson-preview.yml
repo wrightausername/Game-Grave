@@ -74,6 +74,54 @@ jobs:
           } finally {
             if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
           }
+      - name: Install Inno Setup 6 for distinct preview installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot install Inno Setup' }
+          }
+      - name: Build separate unsigned Crimson installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          & $iscc /Qp 'installer/GameGraveCrimsonPreview.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Crimson preview installer compilation failed' }
+          if (-not (Test-Path 'release/GameGrave-Crimson-Preview-Setup.exe')) { throw 'Preview installer missing' }
+          $hash = (Get-FileHash 'release/GameGrave-Crimson-Preview-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path 'release/GameGrave-Crimson-Preview-Setup.sha256' -Value "$hash  GameGrave-Crimson-Preview-Setup.exe"
+          Write-Host 'Built isolated, unsigned preview installer with independently verifiable SHA-256.'
+      - name: Test isolated install and uninstall without touching any user settings
+        shell: pwsh
+        run: |
+          $root = (Resolve-Path '_ci_temp').Path
+          $local = Join-Path $root 'PreviewUserLocal'
+          $installed = Join-Path $local 'CrimsonInstall'
+          New-Item -ItemType Directory -Force -Path $local | Out-Null
+          $sentinel = Join-Path $local 'sentinel-settings.json'
+          Set-Content -Path $sentinel -Value '{"never_touch":["KEEP THIS"]}'
+          $setup = (Resolve-Path 'release/GameGrave-Crimson-Preview-Setup.exe').Path
+          $install = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installed") -PassThru -Wait
+          if ($install.ExitCode -ne 0) { throw 'Crimson isolated installation failed' }
+          $exe = Join-Path $installed 'GameGrave-Crimson-Preview.exe'
+          if (-not (Test-Path $exe)) { throw 'Crimson installed EXE missing' }
+          $env:LOCALAPPDATA = $local
+          $env:APPDATA = $local
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 5
+          try {
+            if ($p.HasExited) { throw 'Installed Crimson UI exited immediately' }
+          } finally {
+            if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          }
+          $uninstaller = Join-Path $installed 'unins000.exe'
+          if (-not (Test-Path $uninstaller)) { throw 'Preview uninstaller missing' }
+          $removed = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -PassThru -Wait
+          if ($removed.ExitCode -ne 0) { throw 'Preview uninstaller failed' }
+          if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
+          if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
+          Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
       - name: Upload Crimson screenshot and Windows engineering EXE
         uses: actions/upload-artifact@v4
         with:
@@ -81,6 +129,8 @@ jobs:
           path: |
             dist/GameGrave-Crimson-Preview.exe
             _ci_temp/crimson-*-1440.png
+            release/GameGrave-Crimson-Preview-Setup.exe
+            release/GameGrave-Crimson-Preview-Setup.sha256
           if-no-files-found: error
           retention-days: 14
 
