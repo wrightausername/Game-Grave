@@ -1,0 +1,59 @@
+name: M3 disposable Windows Resurrection Kit recovery QA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'resurrection_v2.py'
+      - 'resurrection_lab.py'
+      - 'mo2_reconnect.py'
+      - 'tools/windows_m3_disposable_qa.py'
+      - '.github/workflows/windows-m3-qa.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'resurrection_v2.py'
+      - 'resurrection_lab.py'
+      - 'mo2_reconnect.py'
+      - 'tools/windows_m3_disposable_qa.py'
+      - '.github/workflows/windows-m3-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-recovery:
+    name: Disposable Resurrection Kit on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run multi-root archive, staged restore, rehearsal, Time Machine, transfer and tamper QA
+        shell: pwsh
+        env:
+          GG_M3_QA_DISPOSABLE: 'YES'
+        run: |
+          python tools/windows_m3_disposable_qa.py
+          if ($LASTEXITCODE -ne 0) {
+            throw 'M3 disposable recovery suite failed. Release gate remains blocked.'
+          }
+      - name: Store path-free M3 QA results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-M3-Disposable-${{ matrix.os }}
+          path: _ci_temp/m3-disposable-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: State remaining release acceptance requirements
+        shell: pwsh
+        run: |
+          Write-Host 'Engineering QA is not Windows 10/11 desktop or live MO2 reconnection acceptance.'
+          Write-Host 'M3 remains OPEN until independent human review and issue #12 sign-off.'
