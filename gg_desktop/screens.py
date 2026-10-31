@@ -225,6 +225,16 @@ class ScreenMethods:
         bar.addStretch()
         bar.addWidget(button("View complete details…",
                              lambda _=False, g=game: self._inspect_game_record(g)))
+        from graveyard_override import manual_game_entry, override_eligibility
+        advanced_entry = manual_game_entry(game)
+        eligible, reason = override_eligibility(advanced_entry, self.inventory)
+        advanced_button = button(
+            "Advanced override (Recycle Bin)…",
+            lambda _=False, e=advanced_entry: self._override_protected_grave_entry(e),
+            kind="danger")
+        advanced_button.setEnabled(eligible)
+        advanced_button.setToolTip(reason)
+        bar.addWidget(advanced_button)
         self.game_details_col.addWidget(actions)
 
     def _steam_uninstall(self, game):
@@ -426,8 +436,16 @@ class ScreenMethods:
             menu.addAction("Uninstall through Steam…",
                            lambda: self._steam_uninstall(game))
         else:
-            disabled = menu.addAction("Direct deletion unavailable (protected game)")
-            disabled.setEnabled(False)
+            notice = menu.addAction("Launcher uninstall unavailable")
+            notice.setEnabled(False)
+        from graveyard_override import manual_game_entry, override_eligibility
+        review = manual_game_entry(game)
+        permitted, reason = override_eligibility(review, self.inventory)
+        advanced = menu.addAction(
+            "Advanced override: Recycle installed game folder…",
+            lambda: self._override_protected_grave_entry(review))
+        advanced.setEnabled(permitted)
+        advanced.setToolTip(reason)
         menu.exec(self.game_table.viewport().mapToGlobal(point))
 
     def _go_grave_item(self, key):
