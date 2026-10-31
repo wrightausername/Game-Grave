@@ -15,7 +15,7 @@ from pathlib import Path
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
 from graveyard import build_graveyard, looks_like_game_archive
-from cleanup_actions import recycle_reviewed_entries
+from cleanup_actions import recycle_reviewed_entries, recycle_old_files
 from graveyard_protection import protection_action, set_item_protection
 from recordings import find_old_recordings, RECORDING_EXTENSIONS
 from ui_presets import (MAX_PRESETS, capture_presentation, normalize_color, validate_name,
@@ -1006,6 +1006,10 @@ class GameGraveApp(tk.Tk):
 
     def _clear_game_shader_cache(self):
         """Only Steam's verified per-app cache for a selected installed game."""
+        if getattr(self, "cleanup_running", False) or self.scanning:
+            messagebox.showinfo("Game Grave is busy",
+                                "Finish the current scan or cleanup before clearing shaders.")
+            return
         game = self._selected_game()
         if game is None:
             return
@@ -1019,6 +1023,10 @@ class GameGraveApp(tk.Tk):
         threading.Thread(target=inspect, daemon=True).start()
 
     def _confirm_shader_cache(self, game, cache):
+        if getattr(self, "cleanup_running", False) or self.scanning:
+            messagebox.showinfo("Game Grave is busy",
+                                "Finish the current scan or cleanup before clearing shaders.")
+            return
         if cache is None or not cache.files:
             messagebox.showinfo("No shader cache found",
                                 f"No eligible Steam shader files were found for {game.name}.\n\n"
@@ -1036,7 +1044,9 @@ class GameGraveApp(tk.Tk):
             parent=self,
         ):
             return
-        self.status_text.set(f"Recycling verified shader files for {game.name}…")
+        self.cleanup_running = True
+        self.scan_button.configure(state="disabled", bg=RAISED)
+        self.status_text.set(f"Deleting verified shader files for {game.name}…")
         def cleanup():
             import uuid
             session = str(uuid.uuid4())
@@ -1066,7 +1076,17 @@ class GameGraveApp(tk.Tk):
                       f"{len(skipped)} skipped. Recycle Bin may still occupy disk space.",
                       session_id=session, source="Steam per-game shader cache")
             self.events.put(("shader_result", (game.name, removed, skipped)))
-        threading.Thread(target=cleanup, daemon=True).start()
+        def guarded_cleanup():
+            try:
+                cleanup()
+            except Exception as exc:
+                self.events.put(("shader_cleanup_error", str(exc)[:350]))
+        try:
+            threading.Thread(target=guarded_cleanup, daemon=True).start()
+        except RuntimeError as exc:
+            self.cleanup_running = False
+            self.scan_button.configure(state="normal", bg=ACCENT)
+            messagebox.showerror("Shader deletion could not start", str(exc))
 
     def _add_steam_library(self):
         folder = filedialog.askdirectory(title="Select Steam install or SteamLibrary folder")
@@ -2041,43 +2061,51 @@ class GameGraveApp(tk.Tk):
                 messagebox.showerror("Cannot open folder", str(exc))
 
     def _recycle_selected(self):
-        if getattr(self, "cleanup_running", False):
-            messagebox.showinfo("Cleanup in progress", "One deletion at a time; wait for it to finish.")
+        """Confirm on the UI thread, perform slow Windows Shell work separately."""
+        import uuid
+        if getattr(self, "cleanup_running", False) or self.scanning:
+            messagebox.showinfo("Game Grave is busy",
+                                "Finish the current scan or deletion before starting another.")
             return
         if not hasattr(self, "file_tree") or not self.file_tree.winfo_exists():
             return
         items = [self.file_lookup[k] for k in self.file_tree.selection() if k in self.file_lookup]
         if not items:
-            messagebox.showinfo("No files selected", "Select the files you want to delete.")
+            messagebox.showinfo("No files selected", "Select files first.")
+            return
+        if len(items) > DEFAULT_PAGE_SIZE:
+            messagebox.showwarning("Too many files", f"Select at most {DEFAULT_PAGE_SIZE} files.")
             return
         if not messagebox.askyesno("Delete selected files?",
-                                   f"Send {len(items)} selected files ({human_size(sum(f.size for f in items))}) "
-                                   "to the Windows Recycle Bin?\n\nYou can restore them from there until the bin is emptied."):
+                f"Move {len(items)} file(s) ({human_size(sum(f.size for f in items))} apparent size) "
+                "to Windows Recycle Bin?\n\nWindows will verify safe recovery for each file. "
+                "This can take a little time; the app will remain responsive. "
+                "No permanent deletion is performed. Disk space will not be freed until "
+                "the Recycle Bin is emptied."):
             return
-        success = 0
-        errors = []
-        for item in items:
+        session = str(uuid.uuid4())
+        selected = tuple(items)
+        protected = tuple(self.settings.get("never_touch", ()))
+        self.cleanup_running = True
+        self.scan_button.configure(state="disabled", bg=RAISED)
+        self.status_text.set(f"Delete started: verifying {len(selected)} file(s)…")
+
+        def worker():
             try:
-                if not is_unchanged(item):
-                    raise ValueError("File changed since scan")
-                if is_protected_path(Path(item.path), self.settings.get("never_touch", [])):
-                    raise ValueError("Protected by your Never Touch list")
-                recycle_file(Path(item.path))
-                try:
-                    register_recycle(Path(item.path), item.size)
-                except OSError:
-                    log_event("Recovery warning", "Could not register: " + item.path)
-                success += 1
-                log_event("Manual recycled", item.path)
-            except (OSError, ValueError, RuntimeError) as exc:
-                errors.append(f"{Path(item.path).name}: {exc}")
-        self.status_text.set(f"{success} files sent to Recycle Bin")
-        self.scan_all()
-        if errors:
-            messagebox.showwarning("Some files could not be deleted",
-                                   f"Moved to Recycle Bin: {success}. Not moved: {len(errors)}.\n\n" + "\n".join(errors[:7]))
-        else:
-            messagebox.showinfo("Cleanup complete", f"{success} files sent to Recycle Bin. Empty it later to reclaim space.")
+                outcome = recycle_old_files(
+                    selected, protected, session,
+                    progress=lambda done, count: self.events.put(
+                        ("old_cleanup_progress", (done, count))))
+                self.events.put(("old_cleanup_complete", outcome))
+            except Exception as exc:
+                self.events.put(("old_cleanup_error", str(exc)[:350]))
+
+        try:
+            threading.Thread(target=worker, daemon=True).start()
+        except RuntimeError as exc:
+            self.cleanup_running = False
+            self.scan_button.configure(state="normal", bg=ACCENT)
+            messagebox.showerror("Deletion could not start", str(exc))
 
     def _automation_page(self):
         self.header("Automation", "Weekly housekeeping, without giving a program permission to wipe your game library.")
@@ -3743,6 +3771,35 @@ class GameGraveApp(tk.Tk):
                     messagebox.showerror("Delete interrupted",
                         payload + "\n\nNot all items may have been processed. "
                         "Check Recycle Bin and Undo Center before retrying.")
+                elif name == "old_cleanup_progress":
+                    done, total = payload
+                    self.status_text.set(f"Deleting old files: {done} of {total} checked. "
+                                         "Windows recovery is verified per file.")
+                elif name == "old_cleanup_complete":
+                    self.cleanup_running = False
+                    completed = payload["completed"]
+                    skipped = payload["skipped"]
+                    warnings = payload["recovery_warnings"]
+                    self.status_text.set(
+                        f"Old Files: {completed} moved to Recycle Bin; {len(skipped)} not moved.")
+                    self.scan_all()
+                    message = (f"{completed} file(s) moved to Windows Recycle Bin; "
+                               f"{len(skipped)} not moved.\n\n" + "\n".join(skipped[:6]))
+                    if warnings:
+                        message += (f"\n\n{warnings} item(s) moved, but Undo Center could "
+                                    "not save a recovery record. Check Windows Recycle Bin.")
+                    message += "\n\nEmpty Recycle Bin separately to actually reclaim disk space."
+                    if skipped or warnings:
+                        messagebox.showwarning("Delete results", message)
+                    else:
+                        messagebox.showinfo("Delete complete", message)
+                elif name == "old_cleanup_error":
+                    self.cleanup_running = False
+                    self.status_text.set("Old Files deletion interrupted. Check Recycle Bin before retrying.")
+                    self.scan_button.configure(state="normal", bg=ACCENT)
+                    messagebox.showerror(
+                        "Deletion interrupted", payload +
+                        "\n\nSome items may already have moved. Check Windows Recycle Bin and Undo Center.")
                 elif name == "manager_profiles_result":
                     self.profile_report = payload
                     self.status_text.set(
@@ -3978,6 +4035,7 @@ class GameGraveApp(tk.Tk):
                     game, cache = payload
                     self._confirm_shader_cache(game, cache)
                 elif name == "shader_result":
+                    self.cleanup_running = False
                     game_name, removed, skipped = payload
                     self.status_text.set(f"{game_name}: {removed} shader-cache files recycled")
                     messagebox.showinfo("Shader cleanup finished",
@@ -3986,6 +4044,15 @@ class GameGraveApp(tk.Tk):
                         "Shader files may rebuild at the next launch. Empty the Recycle Bin "
                         "separately if you need to reclaim disk space.\n\n" +
                         "\n".join(skipped[:5]))
+                    self.scan_all()
+                elif name == "shader_cleanup_error":
+                    self.cleanup_running = False
+                    self.status_text.set("Shader deletion was interrupted. Check Recycle Bin and Undo Center.")
+                    self.scan_button.configure(state="normal", bg=ACCENT)
+                    messagebox.showwarning("Shader deletion interrupted",
+                        payload + "\n\nSome files may already have moved. "
+                        "Check Recycle Bin and Undo Center before trying again.")
+                    self.scan_all()
                 elif name == "shader_error":
                     self.status_text.set("Shader cache check incomplete. Nothing was removed.")
                     messagebox.showwarning("Shader cache check incomplete", payload)
