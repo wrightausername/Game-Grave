@@ -7,6 +7,8 @@ content is unclassified; the user must preview each image before recycling.
 from __future__ import annotations
 
 import os
+import stat
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -47,7 +49,7 @@ def default_screenshot_roots(
     ]
     for steam in (steam_roots or []):
         base = Path(steam) / "userdata"
-        if not safe_scan_root(base):
+        if _has_reparse_component(base) or not base.is_dir():
             continue
         try:
             accounts = sorted(base.iterdir())[:MAX_ACCOUNTS]
@@ -57,7 +59,7 @@ def default_screenshot_roots(
             if not account.name.isdecimal() or _has_reparse_component(account):
                 continue
             remote = account / "760" / "remote"
-            if not safe_scan_root(remote):
+            if _has_reparse_component(remote) or not remote.is_dir():
                 continue
             try:
                 app_dirs = sorted(remote.iterdir())[:MAX_GAMES_PER_ACCOUNT]
@@ -70,9 +72,55 @@ def default_screenshot_roots(
     keys = set()
     for p in candidates:
         key = os.path.normcase(os.path.abspath(os.fspath(p))).casefold()
-        if key not in keys and safe_scan_root(p):
+        if key not in keys and p.is_dir() and not _has_reparse_component(p):
             found.append(p)
             keys.add(key)
+    return found
+
+
+def _steam_screenshot_root(root: Path, steam_roots: list[Path]) -> bool:
+    for steam in steam_roots:
+        try:
+            parts = root.absolute().relative_to((Path(steam) / "userdata").absolute()).parts
+        except ValueError:
+            continue
+        if (len(parts) == 5 and parts[0].isdecimal() and
+                parts[1:3] == ("760", "remote") and
+                parts[3].isdecimal() and parts[4].casefold() == "screenshots"):
+            return True
+    return False
+
+
+def _read_direct_steam_images(root: Path, days: int, cancel: Cancel,
+                              max_matches: int) -> list[OldFile]:
+    """Known Steam screenshots can be under Program Files; no generic OS scan.
+
+    Only direct ordinary image files within a validated account/game directory,
+    never thumbnails or other game/Steam data.
+    """
+    cutoff = time.time() - days * 86400
+    found = []
+    inspected = 0
+    with os.scandir(root) as listing:
+        for item in listing:
+            if cancel and cancel():
+                raise InterruptedError("Screenshot scan canceled")
+            inspected += 1
+            if inspected > 10000 or len(found) >= max_matches:
+                break
+            path = Path(item.path)
+            if not looks_like_screenshot(path) or item.is_symlink():
+                continue
+            try:
+                state = item.stat(follow_symlinks=False)
+            except OSError:
+                continue
+            if (not stat.S_ISREG(state.st_mode) or state.st_nlink != 1
+                    or state.st_mtime > cutoff or _has_reparse_component(path)):
+                continue
+            found.append(OldFile(str(path), state.st_size, state.st_mtime,
+                                 state.st_dev, state.st_ino, state.st_mtime_ns,
+                                 state.st_nlink))
     return found
 
 
@@ -107,16 +155,23 @@ def find_old_screenshots(
         if cancel and cancel():
             raise InterruptedError("Screenshot scan canceled")
         key = os.path.normcase(os.path.abspath(os.fspath(root))).casefold()
-        if key in seen_dirs or not safe_scan_root(root):
+        steam_trusted = _steam_screenshot_root(root, steam)
+        if (key in seen_dirs or _has_reparse_component(root)
+                or not root.is_dir()
+                or (not steam_trusted and not safe_scan_root(root))):
             continue
         seen_dirs.add(key)
         remaining = max_matches - len(result)
         if remaining <= 0:
             break
-        for record in scan_old_files(
-            root, days, cancel=cancel, allowed_extensions=set(SCREENSHOT_EXTENSIONS),
-            max_matches=remaining * 2,
-        ):
+        candidates = (_read_direct_steam_images(root, days, cancel, remaining * 2)
+                      if steam_trusted else
+                      scan_old_files(
+                          root, days, cancel=cancel,
+                          allowed_extensions=set(SCREENSHOT_EXTENSIONS),
+                          max_matches=remaining * 2,
+                      ))
+        for record in candidates:
             if cancel and cancel():
                 raise InterruptedError("Screenshot scan canceled")
             candidate = Path(record.path)
