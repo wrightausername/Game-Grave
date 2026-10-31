@@ -13,7 +13,8 @@ from pathlib import Path
 import shutil
 import sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRect
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
     QMenu, QProgressBar, QSizePolicy, QVBoxLayout, QWidget,
@@ -65,6 +66,35 @@ def _pill_icon(text: str, color: str, size=36):
     return item
 
 
+def _art_badge(name: str, *, size=35, launcher=False, fallback="♱", color="#FF4057"):
+    """Crop only the illustrated icon tiles, not mockup numbers or UI text."""
+    covers = {
+        "baldur": 0, "cyberpunk": 1, "elden": 2,
+        "witcher": 3, "starfield": 4, "skyrim": 6,
+    }
+    launchers = {
+        "Steam": 9, "Xbox": 10, "Epic Games": 11,
+        "EA App": 12, "Ubisoft Connect": 13,
+        "GOG Galaxy": 14, "Battle.net": 15, "Other": 16,
+    }
+    idx = launchers.get(name) if launcher else next(
+        (v for k, v in covers.items() if k in name.casefold()), None)
+    if idx is None:
+        return _pill_icon(fallback, color, size)
+    source = QPixmap(str(Path(__file__).parent / "assets" / "crimson_icons.jpg"))
+    if source.isNull() or source.width() < 384 or source.height() < 144:
+        return _pill_icon(fallback, color, size)
+    part = source.copy(QRect((idx % 8) * 48, (idx // 8) * 48, 48, 48))
+    icon = QLabel()
+    icon.setObjectName("artBadge")
+    icon.setPixmap(part.scaled(size, size, Qt.KeepAspectRatioByExpanding,
+                              Qt.SmoothTransformation))
+    icon.setFixedSize(size, size)
+    icon.setToolTip(name + " visual identifier")
+    icon.setAccessibleName("Illustrated identifier for " + name)
+    return icon
+
+
 def _decorated_item(text: str, subtitle: str, activation, *,
                     glyph: str = "♱", color="#FF4057", fixed_height=47):
     box = QFrame()
@@ -72,7 +102,7 @@ def _decorated_item(text: str, subtitle: str, activation, *,
     box.setMinimumHeight(fixed_height)
     line = row(spacing=9, margins=(5, 5, 5, 5))
     box.setLayout(line)
-    line.addWidget(_pill_icon(glyph, color, 35))
+    line.addWidget(_art_badge(text, size=35, fallback=glyph, color=color))
     detail = QWidget()
     stack = column(spacing=1)
     detail.setLayout(stack)
@@ -373,7 +403,8 @@ def render_dashboard(window):
             line = QWidget()
             layout = row(spacing=6)
             line.setLayout(layout)
-            logo = _pill_icon(icon, color, 26)
+            logo = _art_badge(name, size=28, launcher=True,
+                              fallback=icon, color=color)
             logo.setToolTip(name)
             layout.addWidget(logo)
             link = button(name, lambda checked=False, n=name: window._go_launcher(n),
@@ -509,7 +540,8 @@ def render_dashboard(window):
                        not box.isEnabled() else "Will require confirmation and Windows recovery tests.")
         wrap.addWidget(box)
         color, glyph = _pick_game_icon(entry.name)
-        wrap.addWidget(_pill_icon(glyph, color, 32))
+        wrap.addWidget(_art_badge(entry.name, size=35,
+                                fallback=glyph, color=color))
         information = QWidget()
         info_layout = column(spacing=1)
         information.setLayout(info_layout)
