@@ -468,11 +468,12 @@ class GameGraveApp(tk.Tk):
         metrics.pack(fill="x", pady=(0, 13))
         stale = [g for g in self.games if is_game_neglected(g, self.settings["game_stale_days"])]
         unknown = [g for g in self.games if g.last_played is None]
+        reviewable_files = {f.path: f.size for f in (*self.old_files, *self.recordings)}
         values = [
             ("GAMES FOUND", str(len(self.games) + len(self.other_games)), "Steam + discovered launchers"),
             ("LONG UNPLAYED", str(len(stale)), f"{self.settings['game_stale_days']}+ days, where known"),
             ("MOD FINDINGS", str(len(self.mod_folders)), "Steam / Workshop / mod managers"),
-            ("REVIEWABLE SIZE", human_size(sum(g.size for g in stale) + sum(f.size for f in self.old_files)),
+            ("REVIEWABLE SIZE", human_size(sum(g.size for g in stale) + sum(reviewable_files.values())),
              "not free space yet"),
         ]
         if not self.last_scan:
@@ -492,7 +493,7 @@ class GameGraveApp(tk.Tk):
              "View games", lambda: self.show_page("Steam Games")),
             ("2", "Review hidden game and mod storage", f"{len(self.mod_folders)} findings across game folders, Steam Workshop and mod managers.",
              "Review mods", lambda: self.show_page("Game Mods")),
-            ("3", "Check old downloads", f"{len(self.old_files)} old files found in your chosen folder.",
+            ("3", "Check old downloads and game clips", f"{len(self.old_files)} old files; {len(self.recordings)} possible old recordings.",
              "View files", lambda: self.show_page("Old Files")),
             ("4", "Make room for a game", "Enter a storage target and preview your review options.",
              "Make room", lambda: self.show_page("Make Room")),
