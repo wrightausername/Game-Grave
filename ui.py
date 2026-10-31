@@ -1692,27 +1692,42 @@ class GameGraveApp(tk.Tk):
     def _grave_toggle_protection(self):
         entry = self._grave_selected_entry()
         if entry is None:
-            messagebox.showinfo("Select one", "Select one Graveyard finding first.")
+            messagebox.showinfo("Choose a file", "Click an individual file in the Graveyard first.")
+            return
+        if entry.old_file is None:
+            messagebox.showinfo("Managed file protection",
+                "Installed games and managed folders are protected by Game Grave.")
             return
         action, reason = protection_action(entry.path, self.settings.get("never_touch", []))
         if action is None:
             messagebox.showinfo("Protected by Game Grave", reason)
             return
-        if action == "Unprotect" and not messagebox.askyesno("Remove personal protection?",
-                f"Stop protecting this specific item?\n\n{entry.path}\n\n"
-                "No files will be deleted. Built-in safety rules still apply."):
+        if action == "Unprotect" and not messagebox.askyesno(
+                "Unprotect this file?",
+                f"Remove only your Never Touch rule for this file?\n\n{entry.path}\n\n"
+                "No files will be deleted. Built-in protection remains enabled."):
             return
-        updated = set_item_protection(self.settings.get("never_touch", []), entry.path,
-                                      protect=(action == "Protect"))
-        self.settings["never_touch"] = updated
-        save_settings(self.settings)
-        # Recompute can_recycle; never reuse stale eligibility after a protection change.
+        try:
+            updated = set_item_protection(self.settings.get("never_touch", []), entry.path,
+                                          protect=(action == "Protect"))
+            self.settings["never_touch"] = updated
+            save_settings(self.settings)
+        except (ValueError, OSError) as exc:
+            messagebox.showerror("Protection unchanged", str(exc))
+            return
         self.graveyard_entries = build_graveyard(
             self.games, self.mod_folders, self.old_files,
             self.settings.get("graveyard_days", 365), updated,
-            watched_mods=self.settings.get("graveyard_watchlist", []))
+            watched_mods=self.settings.get("graveyard_watchlist", []),
+            recordings=getattr(self, "recordings", []))
+        if action == "Protect":
+            self.grave_checked.discard(entry.key)
         self._populate_graveyard()
-        self.status_text.set(f"{action} applied. No files were deleted.")
+        self.status_text.set(f"{entry.name}: {action} succeeded. No files were deleted.")
+        messagebox.showinfo("Protection changed", f"{entry.name}\n\n" +
+            ("Now protected. Delete is disabled." if action == "Protect" else
+             "Personal protection removed. Deletion still requires explicit approval.") +
+            "\n\nNo files were deleted.")
 
     def _grave_context_click(self, event):
         key = self.grave_tree.identify_row(event.y)
@@ -1738,16 +1753,17 @@ class GameGraveApp(tk.Tk):
         entry = self._grave_selected_entry()
         if entry is None:
             return
-        action, _reason = protection_action(entry.path, self.settings.get("never_touch", []))
+        action, _reason = (protection_action(entry.path, self.settings.get("never_touch", []))
+                           if entry.old_file is not None else (None, "Managed item"))
         menu = tk.Menu(self.grave_tree, tearoff=False)
         menu.add_command(label="Details", command=self._grave_details)
-        menu.add_command(label="Open Folder", command=self._grave_open_folder)
+        menu.add_command(label="Open folder", command=self._grave_open_folder)
         menu.add_command(label=action or "Protected by Game Grave",
                          command=self._grave_toggle_protection,
                          state="normal" if action else "disabled")
         menu.add_separator()
-        menu.add_command(label="Move to Recycle Bin…", command=self._grave_recycle_one,
-                         state="normal" if entry.can_recycle or self._grave_can_override(entry) else "disabled")
+        menu.add_command(label="Delete (to Recycle Bin)…", command=self._grave_recycle_one,
+                         state="normal" if entry.can_recycle else "disabled")
         try:
             menu.tk_popup(x, y)
         finally:
