@@ -63,7 +63,7 @@ def default_settings() -> dict:
         "never_touch": [],
         "scan_on_launch": False,
         "ai_assistant_enabled": False,  # explicit opt-in; no model requests on startup
-        "ai_model": "qwen2.5:3b",  # user-installed localhost Ollama model
+        "ai_model": "qwen2.5:1.5b",  # user-installed localhost Ollama model
         "save_review_paths": [],
         "graveyard_watchlist": [],
         "recording_roots": [],  # Optional user-chosen capture folders, read-only scan
