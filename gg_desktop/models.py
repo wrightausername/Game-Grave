@@ -200,8 +200,10 @@ def graveyard_detail_text(entry, never_touch=()) -> str:
         )
     elif category == "Neglected installed game":
         next_step = (
-            "This is a still-installed game. Open its launcher for uninstall options. "
-            "Game Grave cannot directly recycle the game folder."
+            "This is a still-installed game. The launcher is the recommended "
+            "way to uninstall it. If you intentionally want the folder removed, "
+            "the Graveyard offers a one-time Advanced override with typed "
+            "confirmation and verified Windows Recycle Bin safeguards."
         )
     elif getattr(entry, "old_file", None) is None:
         next_step = (
