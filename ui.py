@@ -2149,10 +2149,10 @@ class GameGraveApp(tk.Tk):
             try:
                 managed = tuple(
                     str(g.install_path) for g in
-                    (*self.games, *self.other_games)
+                    (*getattr(self, "games", ()), *getattr(self, "other_games", ()))
                     if getattr(g, "install_path", None))
                 managed += tuple(
-                    str(m.path) for m in self.mod_folders
+                    str(m.path) for m in getattr(self, "mod_folders", ())
                     if getattr(m, "path", None))
                 result = recycle_reviewed_entries(
                     selected, protected, session,
