@@ -2143,7 +2143,7 @@ class GameGraveApp(tk.Tk):
         session = str(uuid.uuid4())
         selected = tuple(items)
         protected = tuple(self.settings.get("never_touch", ()))
-        reviewed_root = Path(self.settings["scan_folder"])
+        reviewed_root = Path(self.settings.get("scan_folder", str(downloads_dir())))
         reviewed_age = int(self.settings.get("files_stale_days", 180))
         self.cleanup_running = True
         self.scan_button.configure(state="disabled", bg=RAISED)
