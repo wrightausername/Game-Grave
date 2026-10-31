@@ -556,99 +556,145 @@ class GameGraveApp(tk.Tk):
         return tree
 
     def _game_dna_page(self):
-        self.header("Game DNA", "Understand game/mod relationships and inspect changes. Nothing is deleted.")
+        """Simple relationship view first; technical tools available when requested."""
+        self.header("Game DNA", "See which games, mods and saves belong together. Nothing is deleted.")
         dna = build_game_dna(self.games, self.other_games, self.mod_folders, self.save_findings,
                              manager_profiles=(self.profile_report or {}).get("profiles", []))
-        controls = self.panel(pad=13)
-        controls.pack(fill="x", pady=(0, 12))
-        self.text(controls, "Gaming intelligence · read-only preview", 14, ACCENT, True).pack(anchor="w")
-        self.text(controls, "Game associations need installation records or Steam Workshop IDs. "
-                  "Unmatched mod folders and saves stay protected. Scan PC first to update the inventory.",
-                  10, MUTED, wraplength=820).pack(anchor="w", pady=6)
-        row = tk.Frame(controls, bg=PANEL)
-        row.pack(fill="x", pady=(8, 0))
-        self.button(row, "Capture / compare changes", self._capture_intelligence, primary=True).pack(side="left")
-        self.button(row, "Exodus checklist", self._preview_exodus).pack(side="left", padx=9)
-        row2 = tk.Frame(controls, bg=PANEL)
-        row2.pack(fill="x", pady=(6, 0))
-        self.button(row2, "Inspect manager profiles", self._inspect_manager_profiles).pack(side="left")
-        self.button(row2, "Mod Radar audit", self._show_mod_radar_audit).pack(side="left", padx=9)
-        dna_tools = tk.Frame(controls, bg=PANEL)
-        dna_tools.pack(fill="x", pady=(8, 0))
-        self.button(dna_tools, "Find my setup for a Resurrection Kit", self._start_auto_kit).pack(side="left")
-        self.button(dna_tools, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(side="left", padx=9)
-        dna_tools2 = tk.Frame(controls, bg=PANEL)
-        dna_tools2.pack(fill="x", pady=(6, 0))
-        self.button(dna_tools2, "View visual map", lambda: self._open_dna_visual_map(dna)).pack(side="left")
-        self.button(dna_tools2, "Export QA", self._export_private_m2_qa).pack(side="left", padx=9)
-        previous = load_observation()
-        if previous:
-            self.text(controls, "Last on-demand mod snapshot: " + str(previous.get("time", "unknown")),
-                      10, MUTED).pack(anchor="w", pady=(10, 0))
+        summary = self.panel(pad=15)
+        summary.pack(fill="x", pady=(0, 12))
+        if not self.last_scan:
+            self.text(summary, "STEP 1  Scan your PC", 15, bold=True).pack(anchor="w")
+            self.text(summary, "Choose Scan PC in the top right. Game Grave will look for games "
+                      "and possible mod connections without changing files.",
+                      10, MUTED, wraplength=800).pack(anchor="w", pady=(5, 0))
         else:
-            self.text(controls, "No mod baseline yet. Capturing one records metadata, not file contents.",
-                      10, MUTED).pack(anchor="w", pady=(10, 0))
+            self.text(summary, "Your gaming setup at a glance", 15, bold=True).pack(anchor="w")
+            self.text(summary,
+                      f"{len(dna['games'])} games found   •   "
+                      f"{len(dna['unresolved'])} files or folders need review",
+                      12, ACCENT, True).pack(anchor="w", pady=(9, 4))
+            self.text(summary, "A connection is based on available installation records. "
+                      "Unmatched does not mean abandoned or safe to delete.",
+                      10, MUTED, wraplength=800).pack(anchor="w")
+
+        guide = self.panel(pad=15)
+        guide.pack(fill="x", pady=(0, 12))
+        self.text(guide, "STEP 2  Pick a game", 15, bold=True).pack(anchor="w", pady=(0, 7))
+        self.text(guide, "Choose a game to see how many mod-storage locations are linked to it.",
+                  10, MUTED, wraplength=780).pack(anchor="w", pady=(0, 8))
+        self._dna_game_options = {
+            f"{g['game']}  ·  {g['launcher']}  (#{i + 1})": g
+            for i, g in enumerate(dna["games"])
+        }
+        self.dna_pick_var = tk.StringVar(
+            value=next(iter(self._dna_game_options), "No games found yet"))
+        selector = ttk.Combobox(guide, textvariable=self.dna_pick_var,
+                                values=tuple(self._dna_game_options),
+                                state="readonly", style="Dark.TCombobox", width=55)
+        selector.pack(anchor="w", pady=(0, 9))
+        selector.bind("<<ComboboxSelected>>", lambda _event: self._dna_selected_game())
+        self.dna_explanation_var = tk.StringVar()
+        self._dna_selected_game()
+        self.text(guide, "", 11, textvariable=self.dna_explanation_var,
+                  wraplength=790).pack(anchor="w", pady=(0, 10))
+        self.button(guide, "View visual relationship map",
+                    lambda: self._open_dna_visual_map(dna)).pack(anchor="w")
+
+        next_steps = self.panel(pad=15)
+        next_steps.pack(fill="x", pady=(0, 12))
+        self.text(next_steps, "STEP 3  Check for changes", 15, bold=True).pack(anchor="w")
+        self.text(next_steps, "Save a snapshot of your mod-folder information. The next time "
+                  "you check, Game Grave shows what looks different. No mod files are edited.",
+                  10, MUTED, wraplength=790).pack(anchor="w", pady=(5, 9))
+        self.button(next_steps, "Check what changed", self._capture_intelligence,
+                    primary=True).pack(anchor="w")
+        previous = load_observation()
+        self.text(next_steps, "Previous snapshot: " +
+                  (str(previous.get("time", "date unknown")) if previous else "None yet"),
+                  9, MUTED).pack(anchor="w", pady=(9, 0))
         if getattr(self, "_intel_report", None):
             report = self._intel_report
-            self.text(controls, f"Ghost Watch: {report.get('count', 0)} changes, "
-                      f"{report.get('patch_review', 0)} mod/config files to review. "
-                      "This does not prove what caused a crash.",
-                      11, WARN, True, wraplength=800).pack(anchor="w", pady=(8, 0))
+            self.text(next_steps, f"{report.get('count', 0)} changes detected. "
+                      "Changes are clues, not proof of a broken mod.",
+                      10, WARN, True, wraplength=780).pack(anchor="w", pady=(7, 0))
             for message in what_broke_my_game(report)[:3]:
-                self.text(controls, "• " + message, 9, MUTED, wraplength=820).pack(anchor="w")
-        summary = self.panel(pad=13)
-        summary.pack(fill="both", expand=True)
-        palette = {"panel": PANEL, "raised": RAISED, "text": TEXT,
-                   "muted": MUTED, "line": LINE, "blue": BLUE,
-                   "accent": ACCENT, "warn": WARN}
-        # Keep manager profile tables accessible on smaller monitors.
-        # The full-size diagram is always one click away via "View visual map".
-        if self.winfo_height() >= 830:
-            dna_visual(summary, dna, palette=palette, scanned=bool(self.last_scan)).pack(
-                fill="x", pady=(0, 12))
-        self.text(summary, f"{len(dna['games'])} recorded games · "
-                  f"{len(dna['unresolved'])} unresolved mod/save locations",
-                  14, bold=True).pack(anchor="w", pady=(0, 10))
-        for game in dna["games"][:10]:
-            self.text(summary, f"• {game['game']} ({game['launcher']}): "
-                      f"{len(game['assets'])} associated mod-storage location(s)",
-                      10, MUTED, wraplength=820).pack(anchor="w", pady=3)
-        if len(dna["games"]) > 10:
-            self.text(summary, f"Showing the first 10 of {len(dna['games'])} games.",
-                      9, MUTED).pack(anchor="w", pady=6)
-        report = self.profile_report
-        if report is not None:
-            self.text(summary, f"Read-only manager profiles: {report['count']}",
-                      12, bold=True).pack(anchor="w", pady=(8, 4))
-            profile_rows = report["profiles"]
-            if profile_rows:
-                area = tk.Frame(summary, bg=PANEL, height=180)
+                self.text(next_steps, "• " + message, 9, MUTED,
+                          wraplength=760).pack(anchor="w", pady=2)
+
+        advanced_toggle = tk.Frame(self.content, bg=BG)
+        advanced_toggle.pack(fill="x", pady=(0, 6))
+        self.button(advanced_toggle, "Advanced tools and mod-manager profiles",
+                    self._dna_toggle_advanced).pack(side="left")
+        self.text(advanced_toggle, "Optional: backups, migration, deeper diagnostics",
+                  9, MUTED).pack(side="left", padx=(10, 0))
+        self.dna_advanced_panel = self.panel(pad=15)
+        self.text(self.dna_advanced_panel, "Advanced tools", 14, bold=True).pack(anchor="w", pady=(0, 9))
+        tools1 = tk.Frame(self.dna_advanced_panel, bg=PANEL)
+        tools1.pack(fill="x", pady=(0, 7))
+        self.button(tools1, "Inspect mod-manager profiles", self._inspect_manager_profiles).pack(side="left")
+        self.button(tools1, "Mod ownership audit", self._show_mod_radar_audit).pack(side="left", padx=8)
+        tools2 = tk.Frame(self.dna_advanced_panel, bg=PANEL)
+        tools2.pack(fill="x", pady=(0, 7))
+        self.button(tools2, "Find setup for backup", self._start_auto_kit).pack(side="left")
+        self.button(tools2, "Resurrection Lab", lambda: self.show_page("Resurrection Lab")).pack(
+            side="left", padx=8)
+        tools3 = tk.Frame(self.dna_advanced_panel, bg=PANEL)
+        tools3.pack(fill="x", pady=(0, 9))
+        self.button(tools3, "Moving to another PC?", self._preview_exodus).pack(side="left")
+        self.button(tools3, "Export private QA report", self._export_private_m2_qa).pack(
+            side="left", padx=8)
+        profiles = self.profile_report
+        if profiles is not None:
+            self.text(self.dna_advanced_panel,
+                      f"Mod-manager profiles inspected: {profiles['count']}",
+                      12, bold=True).pack(anchor="w", pady=(6, 6))
+            if profiles["profiles"]:
+                area = tk.Frame(self.dna_advanced_panel, bg=PANEL, height=180)
                 area.pack(fill="both", expand=True, pady=(0, 6))
                 self.profile_tree = self._tree(
                     area, ("manager", "profile", "game", "enabled", "disabled", "status"),
-                    ("MANAGER", "PROFILE", "MATCHED GAME", "ENABLED", "DISABLED", "RECORD STATUS"),
-                    (115, 130, 190, 75, 80, 185))
+                    ("MANAGER", "PROFILE", "GAME", "ON", "OFF", "DATA STATUS"),
+                    (115, 130, 190, 65, 65, 170))
                 self.profile_lookup = {}
-                for idx, profile in enumerate(profile_rows):
+                for idx, profile in enumerate(profiles["profiles"]):
                     stats = summarize_manager_profile(profile)
                     self.profile_lookup[str(idx)] = profile
-                    game = profile.get("verified_game") or "Unverified"
-                    status = ("Stale snapshot" if profile.get("stale") else
-                              "Incomplete" if stats["incomplete"] else "Recorded only")
+                    name = profile.get("verified_game") or "Unverified"
+                    status = ("Outdated snapshot" if profile.get("stale") else
+                              "Incomplete" if stats["incomplete"] else "Recorded data")
                     self.profile_tree.insert("", "end", iid=str(idx),
-                        values=(profile["manager"], profile["profile"], game,
+                        values=(profile["manager"], profile["profile"], name,
                                 stats["enabled"], stats["disabled"], status))
                 self.profile_tree.bind("<Double-1>", lambda _event: self._view_manager_profile())
-                self.button(summary, "View selected profile details",
+                self.button(self.dna_advanced_panel, "View selected profile",
                             self._view_manager_profile).pack(anchor="w", pady=(2, 8))
-            for note in report.get("warnings", [])[:2]:
-                self.text(summary, "• " + note, 9, WARN, wraplength=810).pack(anchor="w", pady=2)
+            for warning in profiles.get("warnings", [])[:2]:
+                self.text(self.dna_advanced_panel, "• " + warning, 9, WARN,
+                          wraplength=780).pack(anchor="w")
+        self.text(self.dna_advanced_panel,
+                  "Unknown associations always stay protected. These tools only inspect "
+                  "available records until you explicitly approve a separate action.",
+                  9, MUTED, wraplength=780).pack(anchor="w", pady=(9, 0))
+        if getattr(self, "_dna_advanced_open", False):
+            self.dna_advanced_panel.pack(fill="x", pady=(0, 12))
+
+    def _dna_selected_game(self):
+        game = self._dna_game_options.get(self.dna_pick_var.get())
+        if game is None:
+            self.dna_explanation_var.set("Run Scan PC to start. No games are listed yet.")
+            return
+        count = len(game["assets"])
+        self.dna_explanation_var.set(
+            f"{game['game']}  •  {game['launcher']}\n"
+            f"{count} mod-storage location(s) linked using available records. "
+            "A link is not permission to delete anything.")
+
+    def _dna_toggle_advanced(self):
+        self._dna_advanced_open = not getattr(self, "_dna_advanced_open", False)
+        if self._dna_advanced_open:
+            self.dna_advanced_panel.pack(fill="x", pady=(0, 12))
         else:
-            self.text(summary, "Inspect manager profiles to read MO2 modlists and Vortex backup metadata.",
-                      10, MUTED, wraplength=800).pack(anchor="w", pady=6)
-        self.text(summary, "Unresolved does not mean abandoned. Association does not mean safe to delete. "
-                  "For full folder evidence, use File Detective in Game Mods or The Graveyard.",
-                  9, WARN, wraplength=820).pack(anchor="w", pady=(12, 0))
+            self.dna_advanced_panel.pack_forget()
 
     def _open_dna_visual_map(self, dna):
         """Readable, zoomable native diagram; never launches any file action."""
