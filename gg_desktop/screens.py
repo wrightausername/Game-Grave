@@ -926,9 +926,15 @@ class ScreenMethods:
         min_age_days = max(
             int(self.settings.get("files_stale_days", 180)),
             int(self.settings.get("graveyard_days", 365)))
+        protected_ownership = tuple(
+            str(row.install_path) for row in self.inventory.games
+            if getattr(row, "install_path", None))
+        protected_ownership += tuple(
+            str(row.path) for row in self.inventory.mods
+            if getattr(row, "path", None))
         self.job(lambda _emitter: recycle_reviewed_entries(
             reviewed, rules, session, review_root=reviewed_root,
-            min_age_days=min_age_days),
+            min_age_days=min_age_days, managed_roots=protected_ownership),
                  success, error_title="Recycling failed")
 
     def _remove_missing_inventory(self):
