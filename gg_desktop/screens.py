@@ -1209,6 +1209,8 @@ class ScreenMethods:
                     restore_toggle(True)
                     self.error("Could not disable AI", str(exc))
                     return
+                from ai_bundle import stop_ai
+                stop_ai()
                 ai_open.setEnabled(False)
                 ai_status.setText("AI disabled. You can enable it any time.")
                 return
