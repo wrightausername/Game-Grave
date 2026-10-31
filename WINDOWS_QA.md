@@ -167,3 +167,28 @@ The emitted report deliberately sets `m2_release_accepted: false`, because count
 ### Easier M2 report export directly inside the desktop app
 
 After clicking **Scan PC** and optionally **Inspect manager profiles**, open **Game DNA → Export QA**. Confirm the privacy notice and choose a new JSON destination. The report contains only whitelisted counts, never raw paths, game names or mod/profile names. A checkmark in the report is **not** an M2 sign-off; compare the actual findings against the launchers/managers on both Windows 10 and Windows 11 and record any false positives or missed storage in [M2 issue #11](https://github.com/wrightausername/Game-Grave/issues/11). The separate command-line helper remains available to developers.
+
+
+## Interactive disposable Recycle Bin self-check (engineering M1)
+
+Under **Settings → More tools**, use **Test Windows recovery (disposable file)**
+on an interactive Windows desktop. Choose an ordinary local fixed-disk folder
+that is outside all user Never Touch and built-in protected locations.
+Game Grave asks for explicit approval, creates one uniquely named, tiny test
+file and runs the same Windows Shell byte-verification canary as real Delete.
+It then checks that the new test file appears in Recycle Bin and is restored
+byte-for-byte by Windows Shell. The UI stays responsive while the check runs.
+On PASS, only the exact Game Grave-created marker is cleaned up.
+
+A failed or missing restore is reported as a failure; no user file is deleted
+to bypass the problem. A failed restore can leave the disposable file in
+Recycle Bin. The self-check never signs a build, supplies a live Pro backend,
+or marks the release gate passed. It cannot substitute for real Windows 10
+and Windows 11 installation, locale, permission, unplugged drive, old backup,
+and Undo Center manual acceptance on independently reviewed machines.
+
+The self-check never runs automatically, has no telemetry, never modifies
+existing saves/mods/game libraries and does not add synthetic items to the
+user's actual Undo Center history. Repeat it on a dedicated disposable
+Windows 10 and Windows 11 beta/QA machine and log only privacy-redacted
+pass/fail and OS build to issue #10 before human M1 acceptance.
