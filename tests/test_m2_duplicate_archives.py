@@ -27,13 +27,13 @@ class DuplicateArchiveTests(unittest.TestCase):
         return OldFile(str(path), state.st_size, state.st_mtime)
 
     def test_exact_content_duplicates_not_merely_same_size(self):
-        first = self.file("game-patch-a.zip", b"same archive bytes")
-        second = self.file("game-patch-b.zip", b"same archive bytes")
-        unrelated = self.file("game-patch-c.zip", b"other file content")
+        first = self.file("skyrim-patch-a.zip", b"same archive bytes")
+        second = self.file("skyrim-patch-b.zip", b"same archive bytes")
+        unrelated = self.file("skyrim-patch-c.zip", b"other file content")
         report = inspect_duplicate_archives([first, second, unrelated])
         self.assertEqual(len(report.groups), 1)
         self.assertEqual({Path(p).name for p in report.groups[0].paths},
-                         {"game-patch-a.zip", "game-patch-b.zip"})
+                         {"skyrim-patch-a.zip", "skyrim-patch-b.zip"})
         self.assertEqual(report.potential_redundant_apparent_bytes, len(b"same archive bytes"))
         self.assertEqual(report.verified_reclaimable_bytes, 0)
         self.assertTrue(all(Path(f.path).exists() for f in (first, second, unrelated)))
@@ -84,8 +84,8 @@ class DuplicateArchiveTests(unittest.TestCase):
         self.assertEqual(report.hashed_files, 0)
 
     def test_budget_and_explicit_cancel(self):
-        a = self.file("a.zip", b"data")
-        b = self.file("b.zip", b"data")
+        a = self.file("mod-a.zip", b"data")
+        b = self.file("mod-b.zip", b"data")
         report = inspect_duplicate_archives([a, b], max_hashed_bytes=4)
         self.assertTrue(report.truncated)
         self.assertEqual(report.verified_reclaimable_bytes, 0)
