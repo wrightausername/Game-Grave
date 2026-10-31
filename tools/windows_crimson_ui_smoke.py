@@ -152,9 +152,17 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
-            print("PASS: Qt Crimson Overview and 9 interactive pages, mixed-launcher "
-                  "Games, inline exact-rule Unprotect without deletion, "
-                  "four screenshots and original hero asset.")
+            # Full-height capture preserves all three bands of the reference
+            # dashboard. The 900px legacy capture deliberately tests scrolling.
+            window.navigate("Overview")
+            window.resize(1440, 1080)
+            app.processEvents()
+            full = root / "_ci_temp" / "crimson-desktop-full-1440.png"
+            assert window.grab().save(str(full)), "Cannot render full reference dashboard"
+            assert full.stat().st_size > 15000, "Full-height overview appears blank"
+            print("PASS: Qt Crimson dashboard, all pictured controls, original art, "
+                  "9 interactive pages, mixed-launcher data, protected Graveyard, "
+                  "and full-height screenshot without changing user data.")
         finally:
             window.close()
             app.processEvents()
