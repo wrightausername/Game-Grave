@@ -42,3 +42,40 @@ Signed metadata does **not** establish the installer itself is safe. The app cur
 A live, authorized license service remains unconfigured. Synthetic tests use ephemeral Ed25519 keys and bogus product keys only. Verify that activation rejects HTTPS redirects even when the response is otherwise correctly signed, refuses query-string/embedded-password endpoints, does not log or write the raw activation key, and does not overwrite an unrelated old temporary file.
 
 When the receipt target is locked, a failed activation must preserve any prior *valid* signed proof byte-for-byte and remove its own partial unique temp file without recursively touching any user folder. Tampered or malformed replies cannot replace an existing valid receipt. Live validation of refunds/revocation, multi-device portability, backend rate limits, purchase webhooks, fraud prevention, true payment settlement and recovery of a lost key remain **uncompleted M5 requirements**.
+
+
+## M5/M7 independent signed installer verification (engineering preflight)
+
+A new **local fail-closed** release operator command,
+`python tools/verify_signed_release.py`, checks a final 1.0 EXE against:
+(1) all seven human-verified release gates in `release_gate_status.json`,
+(2) an independently supplied SHA-256 and reviewed source commit, (3) an
+independently pinned Windows publisher-certificate thumbprint, (4) a valid
+Windows Authenticode trust result with timestamp, and (5) identical bytes
+before and after signature verification. Neither a candidate's own JSON nor
+a GitHub green checkmark establishes signer identity.
+
+The command requires `--installer`, `--manifest`, `--trusted-sha256`,
+`--reviewed-source-commit`, and `--pinned-publisher-thumbprint`. It
+accepts `--ledger` for a separately reviewed release-gate file. The three
+identity values must come from an **independent approved release record**, not
+copy-pasted from the candidate's untrusted build manifest. It only prints a
+local verification result and never launches or publishes installers.
+
+The signed final `.build.json` must contain `schema=1`,
+`product="Game Grave"`, `version="1.0.0"`, exact installer name,
+final signed installer SHA-256, exact source commit, `signed=true`,
+`release_approved=true` and `build_kind="signed-stable"`. These fields
+are necessary **but never sufficient**. The checked Authenticode certificate,
+timestamp, actual signed EXE checksum, independently reviewed inputs and human
+gate ledger must all agree. Signed bytes differ from unsigned candidate bytes,
+so **recompute SHA-256 after authentic signing**.
+
+This tooling intentionally cannot sign with a non-existent key, configure a
+payment processor, manufacture paid licenses or approve the beta. The current
+CI build emits `signed=false` and `release_approved=false`, so the
+preflight correctly **refuses** it. Its unit tests use synthetic files and
+mock certificate results to verify the refusal logic; they are not signing
+evidence. Production hardware key handling, Windows 10/11 installation,
+real public distribution, paid entitlement service and owner authorization
+remain M5/M7 blockers.
