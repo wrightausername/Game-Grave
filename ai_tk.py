@@ -32,7 +32,7 @@ def open_local_ai_dialog(app):
     body.pack(fill="both", expand=True)
     ttk.Label(
         body, wraplength=590, justify="left",
-        text=("Optional local AI, powered by an installed Ollama model. "
+        text=("Optional AI, installed directly by Game Grave when enabled in Settings. "
               "No cloud upload or file inspection; only anonymous scan counts "
               "are included automatically. Nothing can be deleted by AI. "
               "Chat is not saved."),
@@ -48,7 +48,7 @@ def open_local_ai_dialog(app):
     entry.pack(side="left", fill="x", expand=True, padx=(0, 9))
     action = ttk.Button(bar, text="Ask local AI")
     action.pack(side="right")
-    status_var = tk.StringVar(value="Local model: " + app.settings.get("ai_model", "qwen2.5:1.5b"))
+    status_var = tk.StringVar(value="Built-in local AI • no account or subscription")
     ttk.Label(body, textvariable=status_var, wraplength=590).pack(anchor="w", pady=(8, 0))
 
     responses = queue.Queue()
