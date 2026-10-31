@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QProgressBar, QVBoxLayout, QWidget, QScrollArea,
@@ -66,6 +66,33 @@ class Job(QRunnable):
             self.signals.done.emit(result)
         except Exception as exc:
             self.signals.failed.emit(type(exc).__name__ + ": " + str(exc)[:300])
+
+
+def configure_crimson_dialog_palette(app: QApplication) -> None:
+    """Provide readable dark native/Qt prompts when Windows uses light mode.
+
+    Style sheets cover Qt widget dialogs, while this palette covers child
+    widgets or system styles that otherwise inherit an unusable white-on-white
+    combination for Yes/No, file and typed override prompts.
+    """
+    app.setStyle("Fusion")
+    palette = QPalette(app.palette())
+    for role, hex_color in (
+        (QPalette.Window, "#111B27"),
+        (QPalette.WindowText, "#F5FAFF"),
+        (QPalette.Base, "#0D1722"),
+        (QPalette.AlternateBase, "#1D2C3A"),
+        (QPalette.Text, "#F5FAFF"),
+        (QPalette.Button, "#243446"),
+        (QPalette.ButtonText, "#F5FAFF"),
+        (QPalette.Highlight, "#345E74"),
+        (QPalette.HighlightedText, "#FFFFFF"),
+        (QPalette.ToolTipBase, "#111B27"),
+        (QPalette.ToolTipText, "#F5FAFF"),
+        (QPalette.PlaceholderText, "#ACBDCE"),
+    ):
+        palette.setColor(role, QColor(hex_color))
+    app.setPalette(palette)
 
 
 class CrimsonWindow(ScreenMethods, QMainWindow):
@@ -312,6 +339,7 @@ def main() -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Game Grave")
     app.setOrganizationName("Game Grave")
+    configure_crimson_dialog_palette(app)
     app.setStyleSheet(STYLE)
     app.setQuitOnLastWindowClosed(True)
     win = CrimsonWindow()
