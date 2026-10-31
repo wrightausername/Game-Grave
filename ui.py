@@ -4210,6 +4210,7 @@ class GameGraveApp(tk.Tk):
                     screenshots = find_old_screenshots(
                         recording_days, screenshot_roots,
                         extra_steam_roots=games_extra,
+                        games=[*games, *other], include_recent=True,
                         cancel=self._cancel_scan.is_set)
                 except (ValueError, OSError) as exc:
                     screenshots = []
