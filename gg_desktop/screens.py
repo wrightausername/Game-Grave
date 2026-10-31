@@ -1248,6 +1248,237 @@ class ScreenMethods:
             "managed profile folders. Recycle Bin is reversible only while Windows holds a matching item.",
             "warning", wrap=True))
 
+    def other_storage_page(self):
+        """Explain 'Other used' with an explicitly approved, read-only scan."""
+        from collections import defaultdict
+        from shiboken6 import isValid
+        from gg_desktop.dashboard import _drive_choices, _game_on_drive
+
+        page = self._new(
+            "Other Storage",
+            "See which folders contribute to storage outside the games Game Grave has identified.")
+        intro, intro_col = panel(padding=14)
+        intro_col.addWidget(section_title("What is 'Other' storage?"))
+        intro_col.addWidget(label(
+            "'Other' in Storage Overview is your drive's used space minus known "
+            "launcher-reported game sizes. It can contain Windows, applications, "
+            "documents, media, caches, and games with unknown sizes. It is NOT "
+            "necessarily junk, and this difference is not a verified folder breakdown.",
+            "subtle", wrap=True))
+        intro_col.addWidget(label(
+            "Choose Analyze to examine local file and folder metadata, without "
+            "opening file contents, uploading anything, or deleting anything. "
+            "Results are estimated file sizes, not an exact accounting of physical disk usage.",
+            "warning", wrap=True))
+        page.content.addWidget(intro)
+
+        selection, sc = panel(padding=14)
+        sc.addWidget(section_title("Analyze another part of your drive"))
+        selectors = QWidget()
+        rowline = row(spacing=9)
+        selectors.setLayout(rowline)
+        disk_choices = QComboBox()
+        for drv in _drive_choices():
+            disk_choices.addItem("Local drive (" + drv.rstrip("\\") + ")", drv)
+        chosen = str(getattr(self, "_other_selected_drive", "") or "")
+        ix = disk_choices.findData(chosen)
+        if ix >= 0:
+            disk_choices.setCurrentIndex(ix)
+        disk_choices.setAccessibleName("Choose a local fixed disk to examine")
+        rowline.addWidget(disk_choices)
+        run_scan = button("Analyze Other storage…", kind="primary")
+        rowline.addWidget(run_scan)
+        rowline.addStretch()
+        sc.addWidget(selectors)
+
+        overview = label("", "subtle", wrap=True)
+        sc.addWidget(overview)
+        progress = QProgressBar()
+        progress.setRange(0, 100)
+        progress.setValue(0)
+        progress.hide()
+        sc.addWidget(progress)
+        scan_state = label("Not analyzed yet. Nothing is scanned automatically.", "caption", wrap=True)
+        sc.addWidget(scan_state)
+        page.content.addWidget(selection)
+
+        summary, summary_col = panel(padding=14)
+        summary_col.addWidget(section_title("Folder and category breakdown"))
+        summary_col.addWidget(label(
+            "These are possible contributors to the 'Other' estimate, not "
+            "confirmed portions of it. Known installed-game folders are excluded "
+            "where detected. Protected/system locations or incomplete scans "
+            "may leave substantial unclassified space.",
+            "subtle", wrap=True))
+        categories = label("Choose Analyze to see folder category totals.", "subtle", wrap=True)
+        summary_col.addWidget(categories)
+        report_stats = label("", "caption", wrap=True)
+        summary_col.addWidget(report_stats)
+        table = data_table(["FOLDER / ROOT FILE", "CATEGORY", "APPARENT SIZE", "FILES COUNTED"])
+        table.setMinimumHeight(430)
+        table.setSelectionMode(QAbstractItemView.SingleSelection)
+        table.setColumnWidth(0, 250)
+        table.setColumnWidth(1, 230)
+        table.setColumnWidth(2, 135)
+        table.setRowCount(0)
+        summary_col.addWidget(table)
+        buttonbar = QWidget()
+        br = row(spacing=8)
+        buttonbar.setLayout(br)
+        inspect = button("Analyze selected folder…")
+        open_folder = button("Open folder in Explorer")
+        back = button("Back to drive overview")
+        br.addWidget(inspect)
+        br.addWidget(open_folder)
+        br.addWidget(back)
+        br.addStretch()
+        summary_col.addWidget(buttonbar)
+        page.content.addWidget(summary)
+
+        current = {"report": None, "root": None}
+        def get_drive():
+            return disk_choices.currentData()
+        def refresh_drive(_=None):
+            target = get_drive()
+            self._other_selected_drive = target
+            try:
+                usage = shutil.disk_usage(target)
+                guessed = sum(max(0, g.size_bytes or 0)
+                              for g in self.inventory.games
+                              if _game_on_drive(g.install_path, target))
+                guessed = min(guessed, usage.used)
+                other = max(0, usage.used - guessed)
+                overview.setText(
+                    f"Drive: {target}  •  Used: {human_size(usage.used)}  •  "
+                    f"Known game sizes: up to {human_size(guessed)}  •  "
+                    f"OTHER ESTIMATE: {human_size(other)}. "
+                    "Launcher sizes may be missing or overlap.")
+            except (OSError, ValueError):
+                overview.setText("Could not read local drive capacity.")
+            present = getattr(self, "_other_storage_report", None)
+            previous_drive = getattr(self, "_other_storage_report_drive", None)
+            if present is not None and previous_drive == target:
+                show_report(present)
+            else:
+                current["report"] = None
+                table.setRowCount(0)
+                categories.setText("Not scanned. Choose Analyze.")
+                report_stats.setText("Scan only starts after explicit approval.")
+                scan_state.setText("Read-only, on-device category analysis.")
+                inspect.setEnabled(False)
+                open_folder.setEnabled(False)
+                back.setEnabled(False)
+
+        def show_report(report):
+            if not isValid(table):
+                return
+            current["report"] = report
+            current["root"] = report.root
+            lines = defaultdict(int)
+            for item in report.folders:
+                lines[item.category] += item.apparent_bytes
+            categories.setText(
+                "\n".join(
+                    f"{name}: {human_size(total)} apparent"
+                    for name, total in sorted(lines.items(), key=lambda x: -x[1])
+                ) or "No measurable folders found.")
+            shown = report.folders[:150]
+            table.setRowCount(len(shown))
+            for index, item in enumerate(shown):
+                for colno, value in enumerate((
+                    item.name, item.category,
+                    human_size(item.apparent_bytes),
+                    f"{item.files_seen:,}",
+                )):
+                    _table_text(table, index, colno, value)
+                table.setRowHeight(index, 35)
+                table.item(index, 0).setToolTip(item.path)
+            report_stats.setText(
+                f"Scope: {report.root}  •  {report.entries_seen:,} entries examined  •  "
+                f"{human_size(report.analyzed_bytes)} apparent bytes measured  •  "
+                f"{report.skipped_entries:,} entries inaccessible/skipped  •  "
+                f"{report.excluded_games:,} recognized game directories excluded.\n"
+                f"Coverage: {report.limitation}")
+            scan_state.setText("Read-only analysis finished. No files were modified.")
+            progress.hide()
+            run_scan.setEnabled(True)
+            inspect.setEnabled(bool(shown))
+            open_folder.setEnabled(bool(shown))
+            back.setEnabled(report.root != get_drive())
+
+        def selected_folder():
+            idx = _selected_indices(table)
+            data = current["report"]
+            if not idx or data is None or idx[0] >= len(data.folders):
+                return None
+            return data.folders[idx[0]]
+
+        def analyze(scope=None):
+            drive = get_drive()
+            if not drive:
+                self.error("No drive found", "Select a connected local fixed drive.")
+                return
+            proposed = str(scope or drive)
+            if not self.confirm(
+                "Run read-only storage analysis?",
+                "Game Grave will examine file/folder names and sizes under:\n"
+                + proposed + "\n\nThe scan stops after 220,000 entries or 25 seconds. "
+                "It may be incomplete where Windows restricts access. "
+                "No contents are opened, sent to a server, modified, or deleted."):
+                return
+            from other_storage import analyze_other_storage
+            selected_games = tuple(
+                g.install_path for g in self.inventory.games
+                if getattr(g, "install_path", None))
+            scan_state.setText("Analyzing local file metadata…")
+            progress.show()
+            progress.setValue(0)
+            run_scan.setEnabled(False)
+            drive_at_start = drive
+
+            def job(emitter):
+                return analyze_other_storage(
+                    drive_at_start, selected_games, scope=scope,
+                    notify=emitter)
+            def progress_cb(percent, message):
+                if isValid(progress):
+                    progress.setValue(percent)
+                    scan_state.setText(message)
+            def done(report):
+                self._other_storage_report = report
+                self._other_storage_report_drive = drive_at_start
+                if (isValid(table) and disk_choices.currentData() == drive_at_start):
+                    show_report(report)
+                else:
+                    self.status.setText(
+                        "Other Storage analysis complete. Open Other Storage to review.")
+            self.job(job, done, progress=progress_cb,
+                     error_title="Other Storage analysis could not finish")
+
+        def analyze_selected():
+            entry = selected_folder()
+            if entry is None:
+                self.info("Choose a folder", "Select a row to inspect in more detail.")
+                return
+            path = Path(entry.path)
+            if not path.is_dir():
+                self.info("Root-level file", "This is a file, not a folder. Open its containing folder.")
+                return
+            analyze(scope=path)
+
+        def open_selected():
+            entry = selected_folder()
+            if entry is not None:
+                path = Path(entry.path)
+                self._open_folder(str(path if path.is_dir() else path.parent))
+
+        run_scan.clicked.connect(lambda _=False: analyze())
+        inspect.clicked.connect(analyze_selected)
+        open_folder.clicked.connect(open_selected)
+        back.clicked.connect(lambda _=False: analyze())
+        disk_choices.currentIndexChanged.connect(refresh_drive)
+        refresh_drive()
+
     def captures_page(self):
         """One Captures destination with distinct Screenshots and Videos panels.
 
