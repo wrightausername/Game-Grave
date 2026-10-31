@@ -42,7 +42,7 @@ MODEL_URL = (
     "resolve/main/" + MODEL_FILENAME
 )
 MODEL_SHA256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e"
-MODEL_MAX_BYTES = 1200 * 1024 * 1024
+MODEL_MAX_BYTES = 1250 * 1024 * 1024
 
 ROOT_NAME = "optional-ai"
 SERVER_NAME = "llama-server.exe"
@@ -217,6 +217,10 @@ def install_ai(notify=None) -> None:
         raise AiSetupError("Automatic AI installation currently supports Windows only.")
     root = ai_root()
     _validate_folder(root)
+    if is_ai_installed():
+        if notify:
+            notify("AI already installed", 1.0)
+        return
     model_dir = root / "models"
     _validate_folder(model_dir)
     if notify:
@@ -315,7 +319,7 @@ def local_server() -> tuple[str, str]:
         token = secrets.token_urlsafe(32)
         port = _port()
         args = [
-            str(executable), "--model", str(model), "--host", "127.0.0.1",
+            str(executable), "--model", str(model), "--alias", "Game Grave AI", "--host", "127.0.0.1",
             "--port", str(port), "--api-key", token,
             "--no-webui", "--ctx-size", "2048", "--threads", "4",
             "--gpu-layers", "0",
