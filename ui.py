@@ -3223,6 +3223,27 @@ class GameGraveApp(tk.Tk):
             self.button(extra, title, lambda page=title: self.show_page(page)).pack(side="left", padx=(0, 8))
         self.text(extra, "Free forever or optional $24.99 lifetime Pro target. No subscriptions or account requirement.",
                   9, MUTED, wraplength=810).pack(anchor="w", pady=(12, 0))
+        recording_panel = self.panel(tools_tab)
+        recording_panel.pack(fill="x", pady=(12, 0))
+        self.text(recording_panel, "Old game recordings", 14, bold=True).pack(anchor="w", pady=(0, 5))
+        self.text(recording_panel,
+                  "On Scan PC, Game Grave checks common local Videos folders for possible "
+                  "Game Bar, OBS, ShadowPlay and similar clips. Video contents are never opened. "
+                  "Add a folder if you record somewhere else. Clips only appear for review; "
+                  "nothing is automatically deleted.",
+                  10, MUTED, wraplength=770).pack(anchor="w", pady=(0, 8))
+        self.recording_root_list = tk.Listbox(
+            recording_panel, bg=RAISED, fg=TEXT, selectbackground=ACCENT,
+            selectforeground=ON_ACCENT, relief="flat", height=3, font=("Segoe UI", 10))
+        self.recording_root_list.pack(fill="x", pady=(0, 7))
+        for folder in self.settings.get("recording_roots", []):
+            self.recording_root_list.insert("end", folder)
+        capture_actions = tk.Frame(recording_panel, bg=PANEL)
+        capture_actions.pack(fill="x")
+        self.button(capture_actions, "Add capture folder", self._add_recordings_folder).pack(side="left")
+        self.button(capture_actions, "Remove selected folder", self._remove_recordings_folder).pack(
+            side="left", padx=(8, 0))
+
         updates_panel = self.panel(tools_tab)
         updates_panel.pack(fill="x", pady=(12, 0))
         self.text(updates_panel, "Verified updates", 14, bold=True).pack(anchor="w", pady=(0, 8))
@@ -3235,6 +3256,41 @@ class GameGraveApp(tk.Tk):
         if not update_ready():
             self.text(updates_panel, "Engineering preview: update service not connected. No internet request is made.",
                       9, WARN, wraplength=760).pack(anchor="w", pady=(7, 0))
+
+    def _add_recordings_folder(self):
+        folder = filedialog.askdirectory(title="Choose a game recording folder")
+        if not folder:
+            return
+        path = Path(folder)
+        if not safe_scan_root(path):
+            messagebox.showwarning("Folder not allowed",
+                "Choose a local capture folder, not a drive root, system folder or game installation.")
+            return
+        roots = list(self.settings.get("recording_roots", []))
+        if os.path.normcase(os.path.abspath(folder)) in {
+                os.path.normcase(os.path.abspath(existing)) for existing in roots}:
+            messagebox.showinfo("Already included", "That recording folder is already selected.")
+            return
+        roots.append(str(path))
+        self.settings["recording_roots"] = roots
+        save_settings(self.settings)
+        self.recording_root_list.insert("end", str(path))
+        self.status_text.set("Recording folder added. Choose Scan PC to look for older clips.")
+
+    def _remove_recordings_folder(self):
+        selected = self.recording_root_list.curselection()
+        if not selected:
+            messagebox.showinfo("Choose a folder", "Select a custom recordings folder to remove.")
+            return
+        index = selected[0]
+        roots = list(self.settings.get("recording_roots", []))
+        if index >= len(roots):
+            return
+        roots.pop(index)
+        self.settings["recording_roots"] = roots
+        save_settings(self.settings)
+        self.recording_root_list.delete(index)
+        self.status_text.set("Custom recording folder removed. Existing files were not touched.")
 
     def _choose_custom_accent(self):
         current = self.settings.get("ui_custom_accent", "#50DCC5")
