@@ -26,6 +26,9 @@ def recycle_reviewed_entries(
     never_touch: Iterable[str],
     session: str,
     progress: Callable[[int, int], None] | None = None,
+    *,
+    review_root: str | Path | None = None,
+    min_age_days: int = 0,
 ) -> dict:
     """Move only approved individual files to Windows Recycle Bin.
 
@@ -51,7 +54,25 @@ def recycle_reviewed_entries(
             path = Path(file.path)
             if is_protected_path(path, protected):
                 raise ValueError("Protected by Game Grave or your Never Touch list")
-            if entry.category == "Old game screenshot":
+            if entry.category == "Old file from reviewed folder":
+                # Generic older files come ONLY from the manually scoped Old
+                # Files scan. Recheck both original root and age at action time.
+                # No automatic cleanup and no generic image-file bypass.
+                if review_root is None or min_age_days < 1:
+                    raise ValueError("Original reviewed folder and age are required")
+                root = Path(review_root).absolute()
+                if not safe_scan_root(root) or _has_reparse_component(root):
+                    raise ValueError("The original Old Files folder is unsafe or unavailable")
+                try:
+                    path.absolute().relative_to(root)
+                except ValueError:
+                    raise ValueError("File is outside the reviewed Old Files folder")
+                if file.modified > time.time() - min_age_days * 86400:
+                    raise ValueError("File no longer meets the reviewed age requirement")
+                if looks_like_screenshot(path):
+                    raise ValueError("Pictures require an individual screenshot preview")
+                allowed = True
+            elif entry.category == "Old game screenshot":
                 # Screenshot cleanup is strictly one-by-one after the user
                 # displayed its actual image in the preview window. A bulk
                 # selection, plain image extension, or old timestamp is NOT
