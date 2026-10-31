@@ -79,3 +79,23 @@ mock certificate results to verify the refusal logic; they are not signing
 evidence. Production hardware key handling, Windows 10/11 installation,
 real public distribution, paid entitlement service and owner authorization
 remain M5/M7 blockers.
+
+
+## Non-destructive preferences migration from DustOff
+
+Game Grave now checks its current local `Game Grave/settings.json` first.
+When that file is absent, it may **read**, but does not move, replace, or
+delete, the prior `DustOff/settings.json` preference file. The older file
+stays byte-identical. On the next explicit settings save, Game Grave writes
+the new canonical preference path; no installer has to touch the prior file.
+Reparse/linked paths, duplicate JSON keys, oversized records, invalid
+encodings and incompatible setting types are refused.
+
+A current Game Grave file always wins, even when malformed, to avoid
+silently rolling back later settings to an unrelated older profile. Existing
+Game Grave installation settings, Never Touch data and recovery history
+must remain preserved through upgrade and uninstall.
+
+Synthetic Windows/Linux tests prove these preferences migration rules but
+**not** a true installer upgrade from a prior signed release. That
+cross-version acceptance test remains M5-04 OPEN.
