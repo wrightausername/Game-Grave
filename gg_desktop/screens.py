@@ -1164,6 +1164,28 @@ class ScreenMethods:
             "Run 'ollama pull qwen2.5:3b' once, then use the assistant. "
             "No installation or download happens automatically.",
             "subtle", wrap=True))
+        model_row = QWidget()
+        model_layout = row()
+        model_row.setLayout(model_layout)
+        model_field = QLineEdit(str(self.settings.get("ai_model", "qwen2.5:3b")))
+        model_field.setPlaceholderText("Local Ollama model name")
+        model_field.setMaxLength(80)
+        def save_ai_model():
+            from local_ai import AssistantUnavailable, _model_name
+            chosen = model_field.text().strip()
+            try:
+                _model_name({"ai_model": chosen})
+                updated = dict(self.settings)
+                updated["ai_model"] = chosen
+                save_settings(updated)
+            except (AssistantUnavailable, OSError, ValueError) as exc:
+                self.error("Cannot save AI model", str(exc))
+                return
+            self.settings = updated
+            self.status.setText("Local AI model saved. Nothing was downloaded.")
+        model_layout.addWidget(model_field, 1)
+        model_layout.addWidget(button("Save model", save_ai_model))
+        ai_stack.addWidget(model_row)
         def show_ai():
             from gg_desktop.ai_dialog import open_local_ai_dialog
             open_local_ai_dialog(self)
