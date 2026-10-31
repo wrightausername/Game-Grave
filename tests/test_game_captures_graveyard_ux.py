@@ -94,6 +94,33 @@ class GraveyardActionTests(unittest.TestCase):
             self.assertFalse(fake.grave_checked)
             fake._populate_graveyard.assert_called_once()
 
+    def test_windows_recycle_failure_is_reported_not_claimed_as_deleted(self):
+        with tempfile.TemporaryDirectory() as base:
+            p = Path(base) / "skyrim-mod.zip"
+            p.write_bytes(b"test archive")
+            stamp = time.time() - 900 * 86400
+            os.utime(p, (stamp, stamp))
+            entry = build_graveyard([], [], [
+                OldFile(str(p), p.stat().st_size, p.stat().st_mtime)])[0]
+            fake = SimpleNamespace(
+                graveyard_lookup={entry.key: entry},
+                settings={"never_touch": []},
+                grave_checked={entry.key},
+                status_text=SimpleNamespace(set=Mock()),
+                scan_all=Mock())
+            with patch("ui.messagebox.askyesno", return_value=True), \
+                 patch("ui.messagebox.showwarning") as warning, \
+                 patch("ui.messagebox.showinfo") as info, \
+                 patch("ui.log_event"), \
+                 patch("ui.recycle_file", side_effect=RuntimeError("Windows recycle unavailable")), \
+                 patch("ui.register_recycle") as registration:
+                GameGraveApp._grave_recycle_ids(fake, [entry.key])
+            warning.assert_called_once()
+            self.assertIn("0 moved", warning.call_args.args[1])
+            registration.assert_not_called()
+            info.assert_not_called()
+            self.assertTrue(p.exists())
+
     def test_english_game_dna_summary_has_no_action_side_effects(self):
         class Var:
             def __init__(self, value): self.value = value
