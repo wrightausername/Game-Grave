@@ -1404,7 +1404,9 @@ class GameGraveApp(tk.Tk):
         category.pack(side="left", padx=(6, 14))
         category.bind("<<ComboboxSelected>>", self._grave_view_changed)
         self.text(row, "Status", 9, MUTED).pack(side="left")
-        self.grave_status_var = tk.StringVar(value=self.settings.get("graveyard_status", "All findings"))
+        self.grave_status_var = tk.StringVar(
+            value=("Ready to delete" if self.settings.get("graveyard_status") == "Reviewable archives"
+                   else self.settings.get("graveyard_status", "All findings")))
         safety = ttk.Combobox(row, textvariable=self.grave_status_var, values=GRAVE_STATES,
                               state="readonly", style="Dark.TCombobox", width=23)
         safety.pack(side="left", padx=(6, 0))
