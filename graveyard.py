@@ -1,8 +1,8 @@
 """Read-only, evidence-first Graveyard inventory for Game Grave.
 
 Aging and a missing Steam manifest do not establish abandonment. Only individual
-ordinary files from the explicitly chosen Old Files scan are eligible for review
-in the recycling workflow. Entire games/mod folders are never recyclable here.
+ordinary files from the explicitly chosen Old Files scan or discovered recording
+folders are eligible for review. Entire games/mod folders are never recyclable here.
 """
 from __future__ import annotations
 
@@ -52,7 +52,8 @@ def looks_like_game_archive(path: Path) -> bool:
 
 def build_graveyard(games: list[SteamGame], mods: list[ModFolder], old_files: list[OldFile],
                     min_days: int = 365, never_touch: list[str] | None = None,
-                    now: float | None = None, watched_mods: list[str] | None = None) -> list[GraveyardEntry]:
+                    now: float | None = None, watched_mods: list[str] | None = None,
+                    recordings: list[OldFile] | None = None) -> list[GraveyardEntry]:
     """Create an evidence-led snapshot. Does NOT change any file on disk."""
     if min_days < 1:
         raise ValueError("Choose a positive age threshold")
@@ -76,6 +77,27 @@ def build_graveyard(games: list[SteamGame], mods: list[ModFolder], old_files: li
             age_days=age, relationship="Game association unverified",
             finding=f"Filename resembles gaming content; last modified {age} days ago. Usage is unknown.",
             protection="Never Touch / managed game location" if protected else "User review required",
+            can_recycle=not protected, old_file=f,
+        ))
+    for f in recordings or []:
+        path = Path(f.path)
+        if path.suffix.casefold() not in {".mp4", ".mkv", ".mov", ".avi", ".webm", ".flv", ".wmv"}:
+            continue
+        age = max(0, int((now - f.modified) / 86400))
+        if age < min_days:
+            continue
+        key = str(path).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        protected = is_protected_path(path, never_touch)
+        results.append(GraveyardEntry(
+            key=f"recording:{key}", name=path.name, path=str(path),
+            category="Old game recording", apparent_bytes=max(0, f.size),
+            age_days=age, relationship="Possible capture; not content-verified",
+            finding=(f"Recording-folder or filename hint; modified {age} days ago. "
+                     "This might be a personal video. Preview it before deletion."),
+            protection="Never Touch / protected location" if protected else "Review before deleting",
             can_recycle=not protected, old_file=f,
         ))
     for g in games:
