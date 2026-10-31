@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from PySide6.QtCore import Qt, QSize, QRectF
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QHBoxLayout, QVBoxLayout, QPushButton,
     QScrollArea, QGridLayout, QProgressBar, QTableWidget, QHeaderView,
@@ -117,6 +117,7 @@ class HeroBanner(QFrame):
         self.detail = detail
         from PySide6.QtSvg import QSvgRenderer
         self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "crimson_hero.svg"))
+        self.atlas = QPixmap(str(Path(__file__).parent / "assets" / "crimson_atlas.jpg"))
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -127,8 +128,11 @@ class HeroBanner(QFrame):
         painter.drawRoundedRect(target, 11, 11)
         painter.save()
         painter.setClipRect(target)
-        if self.art.isValid():
-            # Crop art into the banner rather than stretching its full dimensions.
+        if not self.atlas.isNull():
+            # Art from the approved mockup. ONLY the scenery region is sampled,
+            # never its fictional UI figures or controls.
+            painter.drawPixmap(target, self.atlas, QRectF(0, 0, 788, 190))
+        elif self.art.isValid():
             self.art.render(painter, QRectF(0, -6, self.width(), self.height() + 16))
         from PySide6.QtGui import QLinearGradient
         grad = QLinearGradient(0, 0, self.width() * .79, 0)
@@ -173,6 +177,13 @@ class LandscapeArt(QFrame):
         from PySide6.QtSvg import QSvgRenderer
         self.renderer = QSvgRenderer(str(
             Path(__file__).parent / "assets" / self.SCENES[self.scene]))
+        self.atlas = QPixmap(str(Path(__file__).parent / "assets" / "crimson_atlas.jpg"))
+        self.crop_regions = {
+            "sunset": QRectF(2, 211, 352, 181),
+            "fog": QRectF(393, 235, 325, 119),
+            "footer": QRectF(790, 24, 219, 232),
+            "hero": QRectF(0, 0, 788, 190),
+        }
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -183,7 +194,11 @@ class LandscapeArt(QFrame):
         painter.drawRoundedRect(area, 9, 9)
         painter.save()
         painter.setClipRect(area)
-        if self.renderer.isValid():
+        if not self.atlas.isNull():
+            painter.drawPixmap(area, self.atlas,
+                               self.crop_regions.get(self.scene,
+                                                     self.crop_regions["sunset"]))
+        elif self.renderer.isValid():
             size = self.renderer.defaultSize()
             if size.width() and size.height():
                 scale = max(self.width() / size.width(),
