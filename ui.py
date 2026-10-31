@@ -4301,8 +4301,8 @@ class GameGraveApp(tk.Tk):
                     self._update_download_active = False
                     self.status_text.set("Stable installer downloaded and SHA-256 verified; not installed.")
                     messagebox.showinfo("Verified installer saved",
-                        f"File: {payload['saved_path']}\\n"
-                        f"Verified SHA-256: {payload['sha256']}\\n\\n"
+                        f"File: {payload['saved_path']}\n"
+                        f"Verified SHA-256: {payload['sha256']}\n\n"
                         "The installer was NOT opened or installed. "
                         "Confirm its Windows Authenticode publisher signature "
                         "before manually executing this file.", parent=self)
