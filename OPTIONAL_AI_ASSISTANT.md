@@ -1,41 +1,59 @@
-# Optional Local AI Assistant (engineering feature)
+# Built-in Optional AI Assistant (Windows engineering preview)
 
-Game Grave can use a **separately installed** Ollama local language model to explain gaming-storage findings and answer questions. The assistant is **off by default** and is entirely optional. Ordinary scanning, Graveyard, Mod Radar, safety rules, and recovery work without it.
+Game Grave AI is **off by default** and never required for scanning, Mod Radar, Graveyard or recovery. Customers do not need to know about Ollama, install external software, type commands or buy an AI subscription.
 
-## Enable on Windows
+## Customer setup
 
-1. Install Ollama from its official website: https://ollama.com/download/windows
-2. Open PowerShell and run: ollama pull qwen2.5:1.5b
-3. Make sure Ollama is running on this PC. If needed, run: ollama serve
-4. Open **Game Grave > Settings > AI Assistant** (classic) or **Settings > Local AI Assistant** (Crimson Qt preview).
-5. Check **Enable optional local AI Assistant**, then click **Open local AI Assistant**.
-6. Ask a question. The first local generation may take time on slower CPUs.
+1. Open **Settings > AI Assistant** in either desktop interface.
+2. Tick **Enable AI Assistant**.
+3. Approve the one-time model download (approximately 1.2 GB).
+4. Game Grave downloads the local inference engine and the model into its own local per-user data folder; integrity checks are required before it becomes available.
+5. Installation progress is shown in Settings. When it finishes, click **Open AI Assistant**.
 
-You may choose another already installed model by entering its Ollama model identifier in Settings, saving it, and reopening the assistant.
+No background or automatic download starts while AI is disabled. The rest of Game Grave works without it. On supported Windows PCs, a local inference server starts when asked and is stopped when the program exits.
 
-**Nothing is downloaded or installed by Game Grave itself.** Not enabling AI incurs no model storage, performance overhead, or service requests.
+## What customers can ask
 
-## Privacy and safety contract
+The assistant is built to be the built-in help desk for Game Grave, including:
+- Starting a scan, understanding findings and navigation
+- Graveyard review, protection rules and why deletion is blocked
+- Mod Radar, Game DNA, MO2/Vortex considerations
+- Steam, Epic, EA, Ubisoft, GOG, Blizzard and other launcher discovery
+- Screenshots, recordings and safe review
+- Undo Center, Resurrection Kit, Save Vault and recovery limitations
+- Settings, Free versus future lifetime Pro and preview limitations
+- Common troubleshooting questions and warnings
 
-- The only automatic request goes to http://127.0.0.1:11434/api/chat, on this computer. An HTTP proxy is explicitly bypassed.
-- The request includes your manually typed question and, where available, **aggregate counts** of local scan findings (e.g., number of games, mods, screenshots, or Graveyard items).
-- It does **not** automatically include game names, file paths, file contents, mods, screenshots, serial numbers, personal customer records, billing information, or logs.
-- Game Grave does not persist chat transcripts, upload them to a cloud AI service, or collect AI analytics. Ollama and any model packages are third-party local software governed by their own privacy and operational behavior.
-- AI **cannot initiate scanning, unprotect files, recycle files, delete data, restore data, install updates, or change settings**.
-- File cleanup continues to require existing rule-based eligibility checks and explicit human confirmation; AI opinions have no effect on those checks.
-- Responses may be inaccurate or incomplete. Don't rely on an AI suggestion as proof that a file or mod folder is unused.
-- Turning off the checkbox blocks future assistant requests. An already-running local generation may finish; the checkbox does not stop Ollama's independent service.
+The versioned local help facts in ai_help.py ground answers in documented features. The AI explains steps but does not actually operate any controls, cannot diagnose unobserved system state, and may still make mistakes. It should say when more information is needed instead of inventing options.
 
-## Architecture
+## Asset integrity and security
 
-- local_ai.py: pure-Python optional local HTTP client, bounded inputs/outputs, fixed loopback-only endpoint, no cleanup interfaces.
-- ai_tk.py: optional classic UI chat, worker thread and queue so a slow model does not freeze the interface.
-- gg_desktop/ai_dialog.py: optional Crimson Qt chat via existing UI job worker.
-- core.default_settings(): disabled by default with a model identifier preference.
-- tests/test_optional_local_ai.py: default-off, no-request, context minimization, fixed endpoint, disabled proxy, invalid model, and unavailable-service behavior.
+The optional components are pinned:
+- llama.cpp Windows CPU x64 b12020 runtime from the official GitHub release; verify SHA-256 07e81782f5a16c7ffef42403183808e02f271c9ece3aa2d64040b2620ae8d519.
+- Qwen2.5-1.5B-Instruct-GGUF Q4_K_M from the official Qwen Hugging Face repository; verify SHA-256 6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e.
 
-## Limits and deployment
+These optional downloads require internet initially, but generation runs locally after installation. Neither is bundled in the main executable; this preserves its small size. Third-party license and notices require commercial redistribution review prior to a stable release.
 
-This is an **initial integration**, not a bundled offline model or a fully polished AI assistant release. On-device performance and RAM usage depend on the model and hardware. A hosted inference service or downloadable model packs are *not* enabled. The assistant does not know exact file ownership or permissions and cannot safely determine deletion eligibility on its own.
+## Privacy and safety
 
-Acceptance for a Windows release includes classic and Qt smoke testing, running with no Ollama installed, confirming zero background requests while disabled, checking a locally installed model, verifying no file paths in outgoing requests, and user-facing failure messages.
+- Only the question typed by the customer and anonymous aggregate scan counts are passed to the local inference server bound to 127.0.0.1.
+- The app does not automatically send game titles, filenames, filesystem paths, file contents, screenshots, payment records, or chat history.
+- AI cannot scan, move files to the Recycle Bin, delete, unprotect, change settings, or override independent safety checks.
+- AI messages are not persisted by Game Grave; the separately installed service compatibility mode may have its own data-handling behaviors.
+- AI is optional. AI setup and calls run off the UI thread and cannot block the usual cleanup workflows.
+- Existing users of a standalone Ollama installation can still use it as a compatibility fallback; *new users never need to install Ollama themselves*.
+
+## Testing and release gate
+
+This is an engineering implementation, not proof of production readiness. Before a retail release, verify on Windows 10/11 with real hardware:
+- Signed-hash-verified first install and interrupted-download recovery
+- CPU/RAM/disk impact and responsiveness on low-end PCs
+- Windows Defender / firewall compatibility
+- Privacy by monitoring network requests on local and cloud interfaces
+- Full native packaging of ai_bundle.py, ai_help.py, ai_tk.py and gg_desktop/ai_dialog.py
+- Successful fully local question-answer cycle and grounded how-to answers
+- AI disabled by default with zero background requests
+- Correct error messages and no file modification authority
+- Install/uninstall lifecycle, and third-party notices/licenses
+
+The Windows preview is unsigned and should not be distributed commercially until remaining release gates are met.
