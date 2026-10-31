@@ -65,6 +65,7 @@ def default_settings() -> dict:
         "save_review_paths": [],
         "graveyard_watchlist": [],
         "recording_roots": [],  # Optional user-chosen capture folders, read-only scan
+        "screenshot_roots": [],  # Explicit user-selected game screenshot folders
     }
 
 
