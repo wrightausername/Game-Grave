@@ -65,3 +65,38 @@ A reviewed MO2 reconnection workflow exists only for supported verified setups a
 Free works without an account, a key or telemetry. The intended business model is Free plus optional one-time lifetime Pro, but the preview cannot issue paid keys. New game/mod discovery is local and on-demand unless you explicitly enable the legacy Downloads schedule.
 
 **Do not use this engineering preview as the sole protection for important saves or mod setups.** Real Windows 10/11 installed-app, screen-reader, game-manager, signing, entitlement, and closed-beta acceptance remain outstanding. See [the release plan](RELEASE_1_0_PLAN.md) and [release safety checks](WINDOWS_QA.md).
+
+
+## Review old in-game screenshots
+
+1. Choose **Scan PC**. Game Grave checks Steam's per-game screenshot
+   locations (including the Steam account's `userdata/760/remote` folders),
+   local Windows/Game Bar `Videos/Captures`, and narrowly named local
+   Game Screenshots folders. It **does not search your general Pictures or
+   family photo collection** by default.
+2. If you save screenshots somewhere unusual, open **Settings → More
+   tools → In-game screenshots → Add screenshot folder**. Only folders
+   you explicitly add extend the screenshot search.
+3. Open **The Graveyard**, choose **More filters → Type → Old game screenshot**
+   to see older images. Screenshot entries say **Preview individually**, not
+   **Ready to delete**, even if they are very old. Bulk **Check eligible**
+   cannot select them for removal.
+4. Select one image and choose **Preview screenshot** or double-click
+   the screenshot row. Game Grave displays a bounded local thumbnail. The
+   image never leaves your computer. Large/corrupt/linked images refuse
+   preview; they cannot be recycled through this feature.
+5. Choose **Keep screenshot** to leave it untouched, or **Review moving THIS
+   image to Recycle Bin**, followed by the ordinary explicit confirmation.
+   Windows Recycle Bin recovery must pass its disposable test before
+   Game Grave moves this one file. **Never Touch** rules still win.
+6. If you change your mind, open **Undo Center**. An item moved into the
+   Recycle Bin is not automatically free disk space. Emptying the Recycle
+   Bin later is separate and may make restoration impossible.
+
+Supported still images: PNG, JPEG/JPG, WebP and BMP. Scan reads only
+filenames, dates and sizes; actual image decoding happens **only after
+you click preview**. In-game screenshot origin is a *guess based on the
+folder*, not image recognition, so you must check each picture yourself.
+For source-code runs, install Pillow for in-app image preview; the
+Windows preview/installer bundles it. This tool never performs scheduled
+screenshot deletion or mass screenshot cleanup.
