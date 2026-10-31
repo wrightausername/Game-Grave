@@ -148,6 +148,48 @@ def _read_direct_steam_images(root: Path, days: int, cancel: Cancel,
     return found
 
 
+def _read_scoped_capture_images(root: Path, cancel: Cancel,
+                                max_matches: int) -> list[OldFile]:
+    """Discover recent *and* older captures without loading image contents.
+
+    Called only for a known-game-specific screenshot root, recognized launcher
+    capture folder, or explicitly approved custom root. No generic home crawl.
+    """
+    output: list[OldFile] = []
+    inspected = 0
+    for parent, dirs, names in os.walk(root, followlinks=False):
+        if cancel and cancel():
+            raise InterruptedError("Screenshot scan canceled")
+        current = Path(parent)
+        if _has_reparse_component(current):
+            dirs[:] = []
+            continue
+        depth = len(current.relative_to(root).parts)
+        if depth >= 3:
+            dirs[:] = []
+        else:
+            dirs[:] = [d for d in dirs if d.casefold() not in SKIP_IMAGE_PARTS
+                       and not _has_reparse_component(current / d)][:40]
+        for name in names:
+            inspected += 1
+            if inspected > 16000 or len(output) >= max_matches:
+                return output
+            file = current / name
+            if not looks_like_screenshot(file) or _has_reparse_component(file):
+                continue
+            try:
+                info = file.lstat()
+            except OSError:
+                continue
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                continue
+            output.append(OldFile(
+                str(file), info.st_size, info.st_mtime,
+                info.st_dev, info.st_ino, info.st_mtime_ns, info.st_nlink,
+            ))
+    return output
+
+
 def find_old_screenshots(
     days: int = 365,
     custom_roots: list[str] | None = None,
@@ -193,6 +235,8 @@ def find_old_screenshots(
             break
         candidates = (_read_direct_steam_images(root, scan_days, cancel, remaining * 2)
                       if steam_trusted else
+                      _read_scoped_capture_images(root, cancel, remaining * 2)
+                      if include_recent else
                       scan_old_files(
                           root, scan_days, cancel=cancel,
                           allowed_extensions=set(SCREENSHOT_EXTENSIONS),
