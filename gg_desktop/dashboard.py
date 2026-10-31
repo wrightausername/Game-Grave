@@ -329,6 +329,14 @@ def render_dashboard(window):
         "Game sizes are launcher-reported and may overlap. "
         "Recycle Bin moves do not equal freed space.", "caption", wrap=True)
     disk_col.addWidget(disclaimer)
+    def inspect_other(_=False):
+        window._other_selected_drive = drive_picker.currentData()
+        window.navigate("Other Storage")
+    inspect = button("Explore Other storage  ›", inspect_other, kind="link")
+    inspect.setToolTip(
+        "See top folders and categories behind 'Other'. A deeper local "
+        "metadata scan only starts with your permission.")
+    disk_col.addWidget(inspect)
 
     def update_drive(_=None):
         drive = drive_picker.currentData()
