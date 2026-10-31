@@ -2147,10 +2147,22 @@ class GameGraveApp(tk.Tk):
 
         def worker():
             try:
+                managed = tuple(
+                    str(g.install_path) for g in
+                    (*self.games, *self.other_games)
+                    if getattr(g, "install_path", None))
+                managed += tuple(
+                    str(m.path) for m in self.mod_folders
+                    if getattr(m, "path", None))
                 result = recycle_reviewed_entries(
                     selected, protected, session,
                     progress=lambda done, count: self.events.put(
-                        ("grave_cleanup_progress", (done, count))))
+                        ("grave_cleanup_progress", (done, count))),
+                    review_root=str(self.settings.get("scan_folder", "")),
+                    min_age_days=max(
+                        int(self.settings.get("files_stale_days", 180)),
+                        int(self.settings.get("graveyard_days", 365))),
+                    managed_roots=managed)
                 self.events.put(("grave_cleanup_complete", result))
             except Exception as exc:
                 # Always reset busy state on the UI thread, never claim success.
