@@ -357,8 +357,19 @@ class ScreenMethods:
             menu.addAction("Manage parent protection…",
                            lambda: self._manage_parent_rule(entry))
         else:
-            notice = menu.addAction("Built-in protection: cannot override")
+            notice = menu.addAction(
+                "Built-in safety active (one-time override below if eligible)")
             notice.setEnabled(False)
+        # Advanced one-time override is separate from the ordinary recycle
+        # workflow. It never changes the customer's permanent safety settings.
+        if not entry.can_recycle and entry.category != "Old game screenshot":
+            from graveyard_override import override_eligibility
+            allowed, explanation = override_eligibility(entry, self.inventory)
+            override = menu.addAction(
+                "Override protection & move to Recycle Bin…",
+                lambda: self._override_protected_grave_entry(entry))
+            override.setEnabled(allowed)
+            override.setToolTip(explanation)
         menu.addSeparator()
         menu.addAction("Open containing folder",
                        lambda: self._open_folder(str(Path(entry.path).parent)))
@@ -453,7 +464,8 @@ class ScreenMethods:
                          for e in self.inventory.graveyard)
         guidance_col.addWidget(label(
             f"{reviewable} ordinary file(s) available for safe Recycle Bin review. "
-            "Installed games, managed mods and saves stay protected. "
+            "Installed games, managed mods and saves are protected by default. "
+            "Advanced override is available for recognized items after typed confirmation. "
             "Right-click any row for item-specific actions.",
             "subtle", wrap=True))
         guidance_col.addWidget(button(
@@ -470,14 +482,18 @@ class ScreenMethods:
                 "Game Grave also runs a real, reversible Windows recovery check "
                 "before touching any approved file. If that check fails, no "
                 "user data is moved; use Windows File Explorer instead. "
-                "Installed games should be uninstalled in their launcher.")))
+                "You may explicitly override Game Grave's default protection "
+                "for a verified item, but Windows system locations and unsafe "
+                "links cannot be overridden. Using the launcher is safer.")))
         guidance_col.addWidget(button(
             "Test Windows Recycle Bin with a disposable file…",
             self._test_recycle_bin_safely))
         page.content.addWidget(guidance)
         page.content.addWidget(label(
-            "IMPORTANT: User-added protection can be removed here. Built-in game/save/mod safeguards "
-            "cannot. No permanent-delete fallback. Images require individual preview.", "warning", wrap=True))
+            "IMPORTANT: One-time protected-item override requires typing RECYCLE "
+            "and separate confirmation. Never Touch settings remain intact. "
+            "Windows/system folders, redirects and unverified recovery stay blocked. "
+            "No permanent-delete fallback. Images require individual preview.", "warning", wrap=True))
         self.grave_search.textChanged.connect(self._fill_graveyard)
         self.grave_type.currentTextChanged.connect(self._fill_graveyard)
         self.grave_state.currentTextChanged.connect(self._fill_graveyard)
@@ -587,9 +603,22 @@ class ScreenMethods:
                 lambda _=False, e=e: self._manage_parent_rule(e)))
         elif action == "Why protected?":
             self.grave_detail.addWidget(label(
-                "Built-in protection cannot be overridden from Graveyard. "
-                "Manage the installed game or active mod profile with its proper launcher.",
+                "Default protection prevents accidental deletion. If you deliberately "
+                "want to remove this exact item, use Advanced override below. "
+                "Windows and filesystem safety checks still apply.",
                 "warning", wrap=True))
+        if not e.can_recycle and e.category != "Old game screenshot":
+            from graveyard_override import override_eligibility
+            override_ok, override_reason = override_eligibility(e, self.inventory)
+            advanced = button(
+                "Override protection & recycle this item…",
+                lambda _=False, entry=e: self._override_protected_grave_entry(entry),
+                kind="danger")
+            advanced.setEnabled(override_ok)
+            advanced.setToolTip(override_reason)
+            self.grave_detail.addWidget(advanced)
+            if not override_ok:
+                self.grave_detail.addWidget(label(override_reason, "subtle", wrap=True))
         if e.category == "Old game screenshot":
             self.grave_detail.addWidget(button(
                 "Preview screenshot  ▧",
@@ -604,6 +633,75 @@ class ScreenMethods:
             "Open containing folder",
             lambda _=False, e=e: self._open_folder(str(Path(e.path).parent))))
         self.grave_detail.addStretch()
+
+    def _override_protected_grave_entry(self, entry):
+        """Typed, one-shot exception for selected game/mod folder or scanned file."""
+        from graveyard_override import (
+            ACKNOWLEDGEMENT, override_eligibility, recycle_selected_override,
+        )
+        if self.cleaning or self.scanning:
+            self.info("Game Grave is busy", "Finish the current scan or cleanup first.")
+            return
+        allowed, detail = override_eligibility(entry, self.inventory)
+        if not allowed:
+            self.error("This override isn't available", detail)
+            return
+        warning = (
+            "YOU ARE OVERRIDING GAME GRAVE'S PROTECTION FOR THIS ITEM.\n\n"
+            + entry.name + "\n" + entry.path + "\n\n"
+            "This may remove an installed game, active mods, saves, profiles, "
+            "or related settings and could break your game or destroy progress.\n\n"
+            "The operation is a one-time move to Windows Recycle Bin. "
+            "It does NOT permanently disable protection. "
+            "There is no permanent-delete fallback. "
+            "Windows may refuse the operation or recovery may later be unavailable.\n\n"
+            "Consider using your game's launcher or creating a Resurrection Kit first.\n\n"
+            "Type " + ACKNOWLEDGEMENT + " below to proceed."
+        )
+        typed, accepted = QInputDialog.getText(
+            self, "Advanced override: protected content", warning)
+        if not accepted or typed.strip() != ACKNOWLEDGEMENT:
+            return
+        if not self.confirm(
+            "Final confirmation: Move protected item to Recycle Bin?",
+            "You are explicitly authorizing Game Grave to recycle this exact "
+            "protected item:\n\n" + entry.path +
+            "\n\nThis may remove every file inside the selected game/mod directory. "
+            "The app will recheck its identity, filesystem links, and the Windows "
+            "Recycle Bin before moving anything. No permanent deletion.",
+            destructive=True):
+            return
+        self.cleaning = True
+        snapshot = self.inventory
+        rules = tuple(self.settings.get("never_touch", ()))
+        session = "override-" + uuid.uuid4().hex[:12]
+        self.status.setText("Verifying protected-item override and Windows recovery…")
+        def finished(result):
+            self.cleaning = False
+            self._remove_missing_inventory()
+            if result.get("recovery_verified"):
+                message = (
+                    "Moved your selected protected item to Windows Recycle Bin.\n\n"
+                    f"Files and folders examined: {result['entries']}\n"
+                    f"Reported contents: {human_size(result['size_bytes'])}\n\n"
+                    "The exact Recycle Bin entry was found. It is NOT yet freed disk space."
+                )
+            else:
+                message = (
+                    "Windows reports the protected item was moved, but Game Grave "
+                    "could not verify its Recycle Bin recovery entry. "
+                    "Check the Windows Recycle Bin immediately before emptying it."
+                )
+            if result.get("recovery_warning"):
+                message += "\n\n" + result["recovery_warning"]
+            self.info("Advanced override result", message)
+            # Rebuild ownership evidence instead of showing a removed game as
+            # still installed from an earlier scan.
+            self.start_scan()
+        self.job(
+            lambda _progress: recycle_selected_override(
+                entry, snapshot, rules, session, acknowledged=True),
+            finished, error_title="Protected-item override blocked")
 
     def _unprotect_grave(self, entry):
         action, reason = protection_action(entry.path, list(self.settings.get("never_touch", [])))
