@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 
 ENDPOINT = "http://127.0.0.1:11434/api/chat"
-DEFAULT_MODEL = "qwen2.5:3b"
+DEFAULT_MODEL = "qwen2.5:1.5b"
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]{1,80}$")
 MAX_QUESTION = 800
 MAX_REPLY = 5000
