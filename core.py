@@ -658,6 +658,12 @@ class OldFile:
     path: str
     size: int
     modified: float
+    # Optional scan-time identity. Legacy inventories and synthetic tests
+    # retain their existing three-field constructor.
+    device: int | None = None
+    inode: int | None = None
+    modified_ns: int | None = None
+    hardlinks: int | None = None
 
 
 def _is_reparse_point(path: Path) -> bool:
@@ -694,7 +700,7 @@ def _has_reparse_component(path: Path) -> bool:
 def safe_scan_root(path: Path) -> bool:
     """Refuse drive root/home and core operating-system directories."""
     try:
-        if _is_reparse_point(path):
+        if _has_reparse_component(path):
             return False
         p = path.expanduser().resolve(strict=True)
         home = Path.home().resolve()
@@ -718,18 +724,24 @@ def scan_old_files(folder: Path, min_days: int = 180, cancel: Callable[[], bool]
     for parent, dirs, names in os.walk(folder, followlinks=False):
         if cancel and cancel():
             raise InterruptedError("Scan canceled")
+        # A moved or redirected parent changes scope. Never traverse it.
+        if _has_reparse_component(Path(parent)):
+            dirs[:] = []
+            continue
         dirs[:] = [d for d in dirs if d.lower() not in SCAN_EXCLUDED and not
-                   _is_reparse_point(Path(parent) / d)]
+                   _has_reparse_component(Path(parent) / d)]
         for name in names:
             path = Path(parent) / name
             if allowed_extensions is not None and path.suffix.lower() not in allowed_extensions:
                 continue
             try:
-                if _is_reparse_point(path) or not path.is_file():
+                if _has_reparse_component(path) or not path.is_file():
                     continue
-                stat = path.stat()
-                if stat.st_mtime <= cutoff:
-                    found.append(OldFile(str(path), stat.st_size, stat.st_mtime))
+                state = path.stat()
+                if state.st_mtime <= cutoff:
+                    found.append(OldFile(str(path), state.st_size, state.st_mtime,
+                                         state.st_dev, state.st_ino, state.st_mtime_ns,
+                                         state.st_nlink))
                     if len(found) >= max_matches:
                         return found
             except (OSError, ValueError):
@@ -762,10 +774,20 @@ def age_text(timestamp: float | None) -> str:
 def is_unchanged(candidate: OldFile) -> bool:
     try:
         path = Path(candidate.path)
-        if _is_reparse_point(path) or not path.is_file():
+        if _has_reparse_component(path) or not path.is_file():
             return False
         state = path.stat()
-        return state.st_size == candidate.size and abs(state.st_mtime - candidate.modified) < 1
+        if state.st_nlink > 1 or state.st_size != candidate.size:
+            return False
+        if candidate.device is not None and state.st_dev != candidate.device:
+            return False
+        if candidate.inode is not None and state.st_ino != candidate.inode:
+            return False
+        if candidate.hardlinks is not None and state.st_nlink != candidate.hardlinks:
+            return False
+        if candidate.modified_ns is not None:
+            return state.st_mtime_ns == candidate.modified_ns
+        return abs(state.st_mtime - candidate.modified) < 1
     except OSError:
         return False
 
