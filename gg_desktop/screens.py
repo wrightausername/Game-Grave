@@ -3188,13 +3188,21 @@ class ScreenMethods:
             )):
                 _table_text(photo_table, i, colno, value)
             photo_table.setRowHeight(i, 37)
+        from gg_desktop.capture_slideshow import CaptureSlideshow
+        slideshow = CaptureSlideshow(self, shots, page)
+        photo_col.insertWidget(2, slideshow)
+        # The image gallery is the primary Captures view. Detailed rows are
+        # optional, not a wall of table data covering the actual pictures.
+        inventory_toggle = button("▤  Show screenshot inventory", kind="referenceSecondary")
+        def toggle_screenshot_inventory():
+            visible = not photo_table.isVisible()
+            photo_table.setVisible(visible)
+            inventory_toggle.setText(
+                "▤  Hide screenshot inventory" if visible
+                else "▤  Show screenshot inventory")
+        photo_col.addWidget(inventory_toggle)
         photo_col.addWidget(photo_table)
-        from gg_desktop.capture_image import ScreenshotImage, request_screenshot
-        photo_col.addWidget(label(
-            "SELECTED SCREENSHOT  •  ACTUAL IMAGE FROM YOUR PC",
-            "eyebrow"))
-        selected_photo_image = ScreenshotImage(height=215)
-        photo_col.addWidget(selected_photo_image)
+        photo_table.hide()
         if not shots:
             photo_col.addWidget(label(
                 "No in-game screenshots found yet. Scan PC or add a specific "
@@ -3206,12 +3214,11 @@ class ScreenMethods:
             return photos[indices[0]] if indices and indices[0] < len(photos) else None
 
         def update_photo_thumbnail():
-            item = current_photo()
-            if item is None:
-                selected_photo_image.set_status("Choose a screenshot to see its real thumbnail")
-            else:
-                request_screenshot(self, item, selected_photo_image)
+            indices = _selected_indices(photo_table)
+            if indices and indices[0] < len(photos):
+                slideshow.jump_to(indices[0])
         photo_table.itemSelectionChanged.connect(update_photo_thumbnail)
+        inventory_toggle.clicked.connect(toggle_screenshot_inventory)
         if photos:
             photo_table.selectRow(0)
 
@@ -3239,11 +3246,11 @@ class ScreenMethods:
                 )):
                     _table_text(photo_table, i, colno, value)
                 photo_table.setRowHeight(i, 37)
-            tabs.setTabText(0, f"▧  Screenshots  ({len(photos)})")
+            tabs.setTabText(0, f"▧  Screenshots  ({len(self.inventory.screenshots)})")
+            slideshow.set_records([
+                shot for shot in shots if shot in self.inventory.screenshots])
             if photos:
                 photo_table.selectRow(min(idx, len(photos) - 1))
-            else:
-                selected_photo_image.set_status("No screenshots remain in this review list.")
 
         def folder_photo():
             record = current_photo()
