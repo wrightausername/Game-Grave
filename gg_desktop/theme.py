@@ -17,13 +17,217 @@ COLORS = {
 }
 
 STYLE = r"""
+/* Handcrafted route ribbon: navigation does not disappear on long panels. */
+QFrame#routeNavigationBar {
+    background: #0A111C;
+    border-bottom: 1px solid #3F2635;
+    border-top: 1px solid #322331;
+    min-height: 44px;
+}
+QLabel#detectedLauncherPill {
+    color: #C8E4F1;
+    background: #14232D;
+    border: 1px solid #386279;
+    border-radius: 9px;
+    padding: 5px 9px;
+    font-size: 10px;
+    font-weight: 800;
+}
+QLabel#routeBreadcrumb {
+    color: #D8D1D9;
+    font-family: "Georgia", "Segoe UI", serif;
+    font-size: 13px; font-weight: 700;
+    letter-spacing: 1px; background: transparent;
+}
+QPushButton#routeBackButton, QPushButton#routeHomeButton {
+    background: #101923;
+    color: #F4E8EC;
+    border: 1px solid #B23E55;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 7px 17px;
+    min-height: 25px;
+}
+QPushButton#routeBackButton:hover, QPushButton#routeHomeButton:hover {
+    background: #3B1827; border: 1px solid #FF526F;
+}
+QPushButton#routeBackButton:disabled, QPushButton#routeHomeButton:disabled {
+    color: #71808C; border-color: #25313F; background: #0D151F;
+}
 QMainWindow, QWidget#appRoot, QScrollArea, QWidget#scrollBody { background: #080C13; color: #F4F7FC; }
 QWidget { font-family: "Segoe UI Variable", "Segoe UI", Arial; font-size: 12px; color: #F4F7FC; }
+/* All confirmation, destructive-action, text-entry, info and file dialogs
+   must have a dark surface and high-contrast text. Without this, native
+   Qt dialog panels may render as white with inherited white text. */
+QDialog, QMessageBox, QInputDialog, QFileDialog {
+    background-color: #111B27;
+    color: #F5FAFF;
+}
+QDialog QLabel, QMessageBox QLabel, QInputDialog QLabel, QFileDialog QLabel {
+    background-color: transparent;
+    color: #F5FAFF;
+    font-size: 12px;
+}
+QDialog QLineEdit, QInputDialog QLineEdit, QFileDialog QLineEdit {
+    background-color: #081522;
+    color: #F5FAFF;
+    selection-background-color: #31758C;
+    border: 1px solid #62798F;
+    border-radius: 6px;
+    padding: 8px;
+}
+QDialogButtonBox, QMessageBox QDialogButtonBox {
+    background-color: #111B27;
+    color: #F5FAFF;
+}
+QDialog QPushButton, QMessageBox QPushButton, QInputDialog QPushButton {
+    background-color: #243446;
+    color: #F5FAFF;
+    border: 1px solid #577187;
+}
+QDialog QPushButton:hover, QMessageBox QPushButton:hover, QInputDialog QPushButton:hover {
+    background-color: #34526A;
+    border-color: #6DD0E8;
+}
+QDialog QPlainTextEdit, QDialog QTextEdit {
+    background-color: #0D1722;
+    color: #F5FAFF;
+    border: 1px solid #547086;
+}
+QTabWidget#captureTabs::pane {
+    border: 1px solid #304653;
+    background: #0C1520;
+    border-radius: 8px;
+}
+QTabWidget#captureTabs QTabBar::tab {
+    color: #BDD1E2;
+    background: #121E29;
+    border: 1px solid #365064;
+    border-bottom: none;
+    padding: 12px 22px;
+    font-weight: 700;
+}
+QTabWidget#captureTabs QTabBar::tab:selected {
+    color: white;
+    background: #38202C;
+    border-bottom: 3px solid #FF4357;
+}
+/* Approved Crimson Command tab system. Same shell, distinct vector scenes. */
+QFrame#sceneHeader {
+    background: #0D1924; border: 1px solid #304758; border-radius: 11px;
+}
+QLabel#sceneTitle {
+    color: #F5F9FC; font-size: 30px; font-weight: 900;
+    letter-spacing: .4px; background: transparent;
+}
+QLabel#sceneDescription {
+    color: #B2C4D2; font-size: 12px; background: transparent;
+}
+QLabel#sceneKicker {
+    color: #43D6F2; font-size: 10px; font-weight: 800;
+    letter-spacing: 2px; background: transparent;
+}
+QFrame#graphicCard {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #10212C, stop:1 #0B1520);
+    border: 1px solid #315065; border-radius: 9px;
+}
+QLabel#graphicValue {
+    color: #F4F8FB; font-size: 20px; font-weight: 800;
+}
+QFrame#featureStep {
+    background: #111E29; border: 1px solid #2B4456; border-radius: 8px;
+}
+QLabel#featureNumber {
+    color: #43D6F2; font-size: 20px; font-weight: 800;
+}
+QFrame#radarFocus {
+    background: #0B2831; border: 1px solid #236477; border-radius: 10px;
+}
+QFrame#gameCover {
+    background: #10212C; border: 1px solid #315064;
+    border-radius: 9px; padding:0;
+}
+QFrame#gameCover:hover { border: 2px solid #43D6F2; }
+
+/* Approved artwork-first library and the evidence-backed right inspectors. */
+QFrame#premiumInspector {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #21121E, stop:.25 #14131D, stop:1 #09131B);
+    border:1px solid #A42A43;
+    border-radius:12px;
+}
+QFrame#premiumInspector QLabel {
+    background:transparent;
+}
+QLabel#premiumTitle {
+    color:#F7F8FD; font-size:21px; font-weight:850;
+}
+QLabel#premiumMetric {
+    color:#F9F9FE; font-size:26px; font-weight:900;
+}
+QLabel#premiumState {
+    color:#62E6A0; font-size:12px; font-weight:700;
+}
+QLabel#premiumPath {
+    color:#C4D5E4; font-size:11px;
+    background:#0D1A25;
+    border:1px solid #304858;
+    border-radius:7px; padding:9px;
+}
+QFrame#premiumInspector QPushButton#primary {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #A41936,stop:.5 #C52843,stop:1 #7E162B);
+    color:#FFF;
+    border:1px solid #FF5069;
+    min-height:27px;
+}
+QFrame#premiumInspector QPushButton:hover {
+    border:1px solid #FF6578;
+}
+QFrame#modLocationCard {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #261726, stop:.58 #152434, stop:1 #111721);
+    border:1px solid #7A3449;
+    border-radius:11px;
+}
+QFrame#modLocationCard:hover {
+    background:#2B2031;
+    border:2px solid #FF4C65;
+}
+QFrame#gameCover {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #271622, stop:.45 #192A39, stop:1 #0B1520);
+    border:1px solid #714053;
+    border-radius:10px;
+}
+QFrame#gameCover:hover {
+    border:2px solid #FF4B63;
+}
+
 QWidget#navRail { background: #0B111A; border-right: 1px solid #25303C; }
 QFrame#panel, QFrame#metricCard, QFrame#actionCard, QFrame#infoCard, QFrame#heroBottom {
     background: #111922; border: 1px solid #2A3541; border-radius: 11px;
 }
 QFrame#actionCard:hover, QFrame#metricCard:hover { border: 1px solid #415569; background: #18232E; }
+QFrame#actionCardPrimary {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #36141F, stop:0.72 #19131D, stop:1 #10141C);
+    border: 1px solid #E0364E; border-radius: 11px;
+}
+QFrame#actionCardPrimary:hover { border: 1px solid #FF5969; background: #381B27; }
+QMenu {
+    background: #131D28; color: #E6F1FC;
+    border: 1px solid #445263; border-radius: 7px; padding: 6px;
+}
+QMenu::item { padding: 9px 28px 9px 15px; border-radius: 5px; }
+QMenu::item:selected { background: #393042; color: #FFFFFF; }
+QMenu::item:disabled { color: #7C8794; background: transparent; }
+QMenu::separator { height: 1px; background: #34404B; margin: 7px 5px; }
+QPlainTextEdit { background: #0D141D; color: #E4EFF9;
+                 border: 1px solid #425469; border-radius: 8px;
+                 padding: 11px; font-size: 12px; }
 QFrame#alertCard { background: #20151D; border: 1px solid #9D3548; border-radius: 12px; }
 QFrame#hero { background: #111923; border-radius: 11px; }
 QLabel#brand { font-size: 22px; font-weight: 900; letter-spacing: 1px; }
@@ -87,4 +291,695 @@ QCheckBox { spacing: 7px; }
 QProgressBar { background: #24303D; border: none; border-radius: 5px; text-align: center; min-height: 10px; }
 QProgressBar::chunk { background: #42D4F2; border-radius: 5px; }
 QToolTip { color: white; background: #172633; border: 1px solid #5C7D92; padding: 6px; }
+
+/* Main system scan control: deliberate, high-visibility action on every tab.
+   Always visible at the beginning of the content area, not in a top corner. */
+QFrame#scanCommandBar {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #15111B, stop:.55 #111C27, stop:1 #0A151D);
+    border: 1px solid #804053;
+    border-bottom: 2px solid #B93A50;
+    border-radius: 9px;
+}
+QPushButton#mainScanControl {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #DF2B4B, stop:1 #A51C36);
+    border: 2px solid #FF687F;
+    border-radius: 10px;
+    color: #FFFFFF; font-size: 17px; font-weight: 900;
+    padding: 12px 18px;
+}
+QPushButton#mainScanControl:hover {
+    background: #F03555; border-color: #FF9BAA;
+}
+QPushButton#mainScanControl:disabled {
+    background: #502431; color: #DEB6C0;
+    border: 1px solid #765461;
+}
+QPushButton#mainCancelScan {
+    background: #172633; border: 1px solid #71899B;
+    border-radius: 9px; color: #F0F6FC;
+    font-size: 12px; font-weight: 800;
+}
+QPushButton#mainCancelScan:hover {
+    background: #4A1828; border-color: #F95C70;
+}
+QPushButton#mainCancelScan:disabled {
+    background: #14202A; border-color: #324252; color: #788D9C;
+}
+QLabel#scanControlHeading {
+    color: #F76680; font-size: 10px;
+    font-weight: 900; letter-spacing: 2px;
+}
+QLabel#scanControlStatus {
+    color: #CDDCE7; font-size: 12px;
+}
+QProgressBar#mainScanProgress { background:#15212C; border:1px solid #485A67;
+    border-radius:5px; min-height:11px; }
+QProgressBar#mainScanProgress::chunk {
+    background:#F64A64; border-radius:5px;
+}
+
+/* Crimson Command reference dashboard: compact glass panels and high contrast */
+QFrame#dashboardPanel, QFrame#heroMetric {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+       stop:0 #0D1A21, stop:1 #080F14);
+    border: 1px solid #30434D; border-radius: 9px;
+}
+QFrame#heroMetric {
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
+       stop:0 #101B24, stop:1 #071016);
+    border-color: #21414D;
+}
+QFrame#actionCard {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+       stop:0 #151C23, stop:1 #090F14);
+    border: 1px solid #2C3A43; border-radius: 8px;
+}
+QFrame#actionCardPrimary {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+       stop:0 #310E1A, stop:.7 #160E15, stop:1 #0A1016);
+    border: 1px solid #FF354F; border-radius: 8px;
+}
+QFrame#actionCard:hover, QFrame#actionCardPrimary:hover {
+    border: 1px solid #FF4A61;
+}
+QFrame#reclaimBand {
+    background: #07191F; border: 1px solid #154350; border-radius: 7px;
+}
+QFrame#findingRow {
+    background: transparent; border-bottom: 1px solid #27353D;
+    border-radius: 0;
+}
+QFrame#queueRow {
+    background: #0A1920; border: 1px solid #152932; border-radius: 6px;
+}
+QFrame#queueRow:hover { border-color:#315A68; background:#11232D; }
+QFrame#landscapeArt { border:1px solid #35515B; border-radius:7px; }
+QFrame#alertCard {
+    background: #160F15; border: 1px solid #973048; border-radius: 9px;
+}
+QLabel#sectionTitle { font-size: 15px; font-weight: 800; color: #F6F8FA; }
+QLabel#findingTitle { font-size: 12px; font-weight: 700; color: #F0F5F9; }
+QLabel#statBold { font-size:19px; font-weight:900; color:#F5FBFD; }
+QLabel#queuePill {
+    background: #39131D; color:#FF6275; border: 1px solid #582130;
+    border-radius: 10px; font-weight:bold; padding:3px 9px; font-size:11px;
+}
+QLabel#trend { color: #6EEB86; font-weight: 800; font-size:12px; }
+QPushButton#launcherLink, QPushButton#queueLink {
+    background: transparent; border: none; border-radius:3px;
+    color:#F1F6FA; padding:2px; text-align:left;
+    min-height:20px; font-size: 12px; font-weight:600;
+}
+QPushButton#launcherLink:hover, QPushButton#queueLink:hover {
+    color:#4BD6F5; background:#142731;
+}
+QPushButton#carouselArrow, QPushButton#ellipsis {
+    background:#14232C; border:1px solid #2A4452;
+    border-radius:15px; min-height:20px; padding: 4px 8px;
+    color:#D8E6F0;
+}
+QPushButton#carouselArrow:hover,QPushButton#ellipsis:hover {
+    border-color:#4AD3EF; color:white;
+}
+QProgressBar#usageTrack { background:#27343E; border:none;
+    min-height:6px; max-height:7px; border-radius:3px; }
+QProgressBar#usageTrack::chunk { background:#FF4055; border-radius:3px; }
+QComboBox { font-size:11px; border-color:#314A59;
+    background:#101C25; min-height:23px; padding:4px 8px; }
+QPushButton#danger {
+    background:#991B2C; border:1px solid #FF465A; color:#FFFFFF;
+}
+QPushButton#danger:hover { background:#D12B3E; }
+QPushButton#navButton { min-height:23px; padding:9px 11px; }
+QPushButton#navButton[active="true"] {
+    border-left:3px solid #FF344F;
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+      stop:0 #421321, stop:1 #110F15);
+    color:#FFFFFF;
+}
+
+"""
+
+# Reference-fidelity layer: screenshots are a visual contract, not static UI.
+STYLE += r"""
+QWidget {font-size:13px;}
+QFrame#referenceHero {background:#100B14; border:1px solid #9A2238; border-radius:12px;}
+QFrame#referenceLibrary {
+    background:#0B0A10; border:1px solid #331724; border-radius:12px;
+}
+QFrame#referenceLibrary QLabel#sectionTitle {
+    font-size:17px;font-weight:850;color:#F6F4F7;
+}
+QFrame#gameCover {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #2B1421, stop:.68 #10121C,stop:1 #070A10);
+    border:1px solid #663344; border-radius:12px; padding:0;
+}
+QFrame#gameCover:hover {
+    background:#2F1724;
+    border:2px solid #FF3D59;
+}
+QFrame#modLocationCard {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #31121F,stop:.62 #12151D,stop:1 #070A10);
+    border:1px solid #673145;border-radius:12px;
+}
+QFrame#modLocationCard:hover {border:2px solid #FF3F5F;}
+QFrame#gameCover QLabel#findingTitle,
+QFrame#modLocationCard QLabel#findingTitle {
+    color:#FCF8FA;font-size:14px;font-weight:850;
+}
+QFrame#premiumInspector {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #230D1B,stop:.36 #150E17,stop:1 #080B13);
+    border:1px solid #A32942;border-radius:13px;
+}
+QFrame#premiumInspector QLabel#premiumTitle {
+    font-size:21px;font-weight:850;color:#FFFFFF;
+}
+QLabel#premiumMetric {font-size:25px;font-weight:850;color:#FFFFFF;}
+QPushButton#referenceSecondary {
+    background:#180F19;color:#EBDBE5;border:1px solid #7B293E;
+    border-radius:9px;font-size:12px;font-weight:750;
+    min-height:28px;text-align:left;padding:11px 14px;
+}
+QPushButton#referenceSecondary:hover {
+    background:#331521;border:1px solid #F3445D;color:white;
+}
+QPushButton#navButton {
+    color:#DBD5DF;font-size:14px;
+    padding:10px 12px; min-height:26px;
+}
+QPushButton#navButton[active="true"] {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #7E1028,stop:.58 #3A101F,stop:1 #140C15);
+    border:1px solid #DF2E4C;border-radius:8px;
+    color:#FFFFFF;font-weight:800;
+}
+QComboBox, QLineEdit {
+    background:#140F19;color:#F5EAF0;
+    border:1px solid #513045;border-radius:8px;
+    min-height:28px;font-size:12px;padding:7px 10px;
+}
+QComboBox:focus,QLineEdit:focus {border:1px solid #F5425D;}
+"""
+
+
+# Approved Ready Room: visually quieter than the earlier dense concept.
+# Soft charcoal and burgundy panels, selective crimson for actions only.
+STYLE += r"""
+QFrame#readyRoomCard, QFrame#readyRoomRecapCenter {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+       stop:0 #241B21, stop:.48 #1A191E, stop:1 #14161B);
+    border: 1px solid #49333C;
+    border-radius: 11px;
+}
+QFrame#readyRoomRecapCenter {border:1px solid #78404C;}
+QFrame#readyRoomMetric {
+    background:#191A21;
+    border:1px solid #40313B;
+    border-radius:9px;
+}
+QPushButton#readyRoomGameCover {
+    background:#11131A;
+    border:1px solid #49414B;
+    border-radius:9px; color:#B8C6D0;
+    font-size:10px;
+}
+QPushButton#readyRoomGameCover:hover {
+    border:2px solid #D8435B;
+}
+QPushButton#readyRoomPeriod {
+    background:#25232A; border:1px solid #4A3A45;
+    color:#E9E2E7; border-radius:7px;
+}
+QPushButton#readyRoomSessionControl {
+    background:#9D2138; color:white;
+    border:1px solid #E14B64; border-radius:8px;
+    font-weight:800; min-height:35px;
+}
+QPushButton#readyRoomSessionControl:hover {
+    background:#BE2A45;
+}
+QPushButton#readyRoomDiagnostics {
+    background:#17171D; color:#BFC3CD;
+    border:1px solid #45323D; border-radius:8px;
+    text-align:left; padding:10px;
+}
+QPushButton#readyRoomDiagnostics:hover {
+    background:#271D28; border-color:#A34357;
+}
+"""
+
+
+# Deliberate, feature-specific craft layer. The actual Qt widgets and real
+# inventory remain interactive; none of these panels use screenshot overlays.
+STYLE += r"""
+QFrame#archiveCategoryTile {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #102638, stop:.55 #0C1C2B, stop:1 #090D17);
+    border:1px solid #286E84;
+    border-top:2px solid #3DA9C6;
+    border-radius:5px;
+}
+QLabel#archiveTileTitle {color:#CEE8F0;font-weight:800;font-size:12px;}
+QLabel#archiveTileMetric {color:#F2F9FD;font-weight:900;font-size:20px;}
+QLabel#archiveTileCount {color:#8CA9B7;font-size:10px;}
+QFrame#captureSlideshow {
+    background: #070D15;
+    border: 1px solid #793044;
+    border-top: 2px solid #B22C47;
+    border-radius: 6px;
+}
+QLabel#captureSlideshowHeading {
+    color:#F5E3E9;font-family:"Georgia","Segoe UI",serif;
+    font-size:17px;font-weight:750;letter-spacing:1px;
+}
+QLabel#captureSlideshowCount {
+    color:#77D8EA;font-size:14px;font-weight:900;
+}
+QLabel#captureSlideshowDescription {
+    color:#C5BAC4;font-size:11px;
+}
+QLabel#captureSlideshowNote {
+    color:#91AEC3;font-size:10px;
+}
+QPushButton#captureSlideshowPlay {
+    background:#752036;border:1px solid #DC4561;color:#FFFFFF;
+    border-radius:4px;min-height:29px;padding:6px 16px;
+}
+QPushButton#captureSlideshowPlay:hover {background:#AB2B45;}
+QFrame#dnaRelationshipStudio {
+    border:1px solid #38657C;
+    border-top:2px solid #69D9EA;
+    border-radius:5px;
+    background:#091420;
+}
+QFrame#dnaEvidenceInspector {
+    background:#0C1622;border:1px solid #8A2E4B;
+    border-radius:5px;
+}
+QFrame#graveyardEmptyPanel {
+    background:#080F1B;border:1px solid #305F77;
+    border-top:2px solid #4AAFC9;border-radius:6px;
+}
+QFrame#graveyardScanInspector {
+    background:#101B27;border:1px solid #294455;
+    border-radius:6px;
+}
+QFrame#undoRecoveryStatusPanel {
+    background:#10121C;border:1px solid #884052;
+    border-radius:6px;
+}
+"""
+
+
+# Screen-specific geometry, sourced from the approved Crimson mockups.
+STYLE += r"""
+QFrame#captureTheaterPanel {
+    background:#080E17; border:1px solid #71324A;
+    border-top:2px solid #E14460; border-radius:6px;
+}
+QLabel#captureTheaterNote {
+    color:#7DAFC0; font-weight:800;
+    font-size:10px; letter-spacing:1.7px;
+    padding:3px 12px;
+}
+QWidget#captureFilmstrip {background:#090F17;border:0;}
+QPushButton#captureFilmstripTile {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #222C38,stop:1 #0A111A);
+    color:#E0EBF3;border:1px solid #365266;
+    border-bottom:2px solid #7B344A;
+    border-radius:3px; font-size:11px;
+    text-align:center; padding:5px 7px;
+}
+QPushButton#captureFilmstripTile:hover {
+    border:1px solid #E14662; border-bottom:2px solid #E14662;
+    background:#34212E;
+}
+QTabWidget#captureTabs::pane {
+    border:1px solid #314454;background:#08101B;
+    border-radius:4px;
+}
+QTabWidget#captureTabs QTabBar::tab {
+    padding:10px 22px;background:#101926;
+    border:1px solid #314353;color:#ABC3D2;
+    font-size:12px;font-weight:800;
+}
+QTabWidget#captureTabs QTabBar::tab:selected {
+    background:#542038;border-bottom:2px solid #E94B68;
+    color:#FFFFFF;
+}
+"""
+
+
+# The Archivist's Workbench. Less neon-on-every-box; more editorial hierarchy,
+# texture, and clear interaction. These are live Qt widget styles, not mockups.
+STYLE += r"""
+QFrame#referenceHero {
+    background:#090C15;
+    border:0;
+    border-bottom:2px solid #A9324C;
+    border-radius:4px;
+}
+QFrame#referenceLibrary {
+    background:#0C1018;
+    border:0;
+    border-radius:4px;
+}
+QFrame#modCommandFilters {
+    background:#0F131C;
+    border:0;
+    border-bottom:1px solid #49313F;
+    border-radius:0;
+}
+QFrame#modShelfEmpty {
+    background:#090F17;
+    border:1px solid #44303A;
+    border-left:3px solid #C5405B;
+    border-radius:4px;
+}
+QWidget#modShelfCopy {
+    background:transparent;border:0;
+}
+QLabel#modShelfKicker {
+    color:#D96378;
+    font-family:"Segoe UI",sans-serif;
+    font-size:10px;font-weight:800;letter-spacing:2px;
+    background:transparent;
+}
+QLabel#modShelfHeadline, QLabel#editorialEmptyTitle {
+    color:#F6F0EB;
+    font-family:"Georgia","Cambria","Segoe UI",serif;
+    font-size:29px;font-weight:700;
+    background:transparent;
+}
+QLabel#modShelfDescription, QLabel#editorialBody {
+    color:#C9D0D8;font-size:13px;line-height:1.4;
+    background:transparent;
+}
+QLabel#modShelfSectionTitle {
+    color:#F0EAE8;
+    font-family:"Georgia","Cambria","Segoe UI",serif;
+    font-size:23px;font-weight:700;
+    background:transparent;
+}
+QLabel#modShelfSectionNote {
+    color:#AAB7C3;font-size:12px;
+    background:transparent;
+}
+QLabel#editorialFootnote {
+    color:#95A5B4;font-size:11px;
+    background:transparent;
+}
+QFrame#premiumInspector {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #17131D,stop:1 #0B121B);
+    border:0;
+    border-left:2px solid #994155;
+    border-radius:4px;
+}
+QFrame#premiumInspector QLabel#premiumTitle {
+    color:#F6F0EB;
+    font-family:"Georgia","Cambria","Segoe UI",serif;
+    font-size:23px;font-weight:700;
+}
+QFrame#modLocationCard {
+    background:#101820;
+    border:1px solid #363F48;
+    border-bottom:2px solid #5F3442;
+    border-radius:4px;
+}
+QFrame#modLocationCard:hover {
+    background:#1B1720;
+    border:1px solid #D74C65;
+    border-bottom:2px solid #D74C65;
+}
+QFrame#modLocationCard QLabel#findingTitle {
+    color:#EDE7E7;
+    font-size:13px;font-weight:700;
+}
+QLabel#modSourcePlaceholder {
+    color:#92BBC9;
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+       stop:0 #112532,stop:1 #201622);
+    border:1px solid #355267;
+    font-family:"Georgia","Segoe UI",serif;
+    font-size:16px;
+    padding:12px;
+}
+QFrame#beforeFirstScan {
+    border:1px solid #544451;
+    border-left:3px solid #C5465E;
+    background:#121923;border-radius:5px;
+}
+QFrame#graveyardEmptyPanel {
+    background:#0B151D;
+    border:1px solid #35536B;
+    border-left:3px solid #5E98B2;
+    border-radius:4px;
+}
+QFrame#graveyardScanInspector {
+    background:#101923;
+    border:0;border-left:1px solid #415462;
+    border-radius:0;
+}
+QFrame#routeNavigationBar {
+    background:#0C1018;
+    border:0;border-bottom:1px solid #332C37;
+    min-height:38px;
+}
+QLabel#routeBreadcrumb {
+    color:#C5C4C9;
+    font-family:"Segoe UI",sans-serif;
+    font-size:11px;font-weight:600;
+    background:transparent;
+}
+QPushButton#routeBackButton, QPushButton#routeHomeButton {
+    background:transparent;
+    color:#CBD5DF;
+    border:1px solid #413342;
+    border-radius:3px;
+    min-height:25px;
+    padding:5px 13px;font-size:11px;font-weight:700;
+}
+QPushButton#routeBackButton:hover,QPushButton#routeHomeButton:hover {
+    color:#FFFFFF;background:#29212F;border-color:#D74C65;
+}
+QPushButton#navButton {
+    background:transparent;
+    border:0;border-radius:3px;
+    color:#D5D5DB;
+    font-size:13px;font-weight:600;
+    padding:9px 12px;
+}
+QPushButton#navButton[active="true"] {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #532235,stop:1 #17131D);
+    color:#FFFFFF;
+    border:0;border-left:3px solid #E04964;
+    border-radius:2px;
+    font-weight:800;
+}
+QLabel#sectionTitle {
+    color:#F2E9EB;font-size:16px;font-weight:750;
+}
+QPushButton#referenceSecondary {
+    background:#151A24;
+    border:1px solid #584453;border-radius:3px;
+    color:#E7DDE1;
+    font-size:12px;font-weight:700;
+    min-height:31px;text-align:left;padding:8px 14px;
+}
+QPushButton#referenceSecondary:hover {
+    border-color:#C94B65;background:#24202A;
+}
+"""
+
+
+# LOCKED: second Crimson Mod Shelf design. Installed Windows fonts only.
+# Bahnschrift is the display family; Segoe is reserved for dense working text.
+STYLE += r"""
+QWidget {
+    font-family: "Segoe UI Variable", "Segoe UI", "Arial";
+    font-size: 12px;
+}
+QFrame#navRail, QFrame#scanCommandBar {
+    background: #090D14;
+}
+QLabel#brand {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    color:#F7F4F8;font-weight:900;font-size:24px;letter-spacing:1.2px;
+}
+QLabel#brandEdition, QLabel#scanControlHeading, QLabel#brandKicker,
+QLabel#featureHeroKicker, QLabel#sceneKicker {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:11px;font-weight:800;letter-spacing:1.1px;
+}
+QLabel#brandEdition {
+    color:#F04460;
+}
+QLabel#scanControlStatus {
+    font-family:"Segoe UI Variable","Segoe UI",sans-serif;
+    font-size:12px;color:#D6DDE7;
+}
+QPushButton#navButton {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:14px;font-weight:600;letter-spacing:.2px;
+    color:#ECF2F6;padding:11px 12px;min-height:23px;
+}
+QPushButton#navButton[active="true"] {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #8F132E, stop:.52 #3B1424, stop:1 #17121A);
+    border:1px solid #D33854;border-left:3px solid #FF465F;
+    color:#FFFFFF;font-weight:800;border-radius:4px;
+}
+QPushButton#mainScanControl {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:18px;font-weight:900;letter-spacing:1.5px;
+    color:#FFFFFF;
+    border:1px solid #FF5B73;
+    border-radius:5px;
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #B82D44,stop:.45 #8F1A31,stop:1 #4B1323);
+}
+QPushButton#mainScanControl:hover {
+    background:#B62643;border:1px solid #FF7E8E;
+}
+QFrame#modCommandFilters {
+    background:#10151E;
+    border:1px solid #3F2936;border-radius:5px;
+    padding:3px;
+}
+QFrame#modCommandFilters QLineEdit,
+QFrame#modCommandFilters QComboBox {
+    background:#0B111A;
+    color:#F3F5FA;
+    border:1px solid #394756;
+    border-radius:4px;
+    selection-background-color:#9D2947;
+    padding:8px 12px;min-height:25px;
+    font-family:"Segoe UI Variable","Segoe UI",sans-serif;
+    font-size:12px;
+}
+QFrame#modCommandFilters QLineEdit:focus,
+QFrame#modCommandFilters QComboBox:focus {
+    border:1px solid #EE4E69;
+}
+QFrame#modCommandFilters QPushButton#modViewMode {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    background:#101A24;color:#B5C7D3;border:1px solid #364653;
+    border-radius:4px;padding:9px 12px;min-height:22px;
+    font-size:12px;font-weight:800;
+}
+QFrame#modCommandFilters QPushButton#modViewMode[active="true"] {
+    background:#92253F;color:#FFFFFF;border-color:#FA5470;
+}
+QLabel#referenceHeroTitle, QLabel#referenceHeroPrefix {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-weight:900;letter-spacing:1px;
+}
+QLabel#referenceHeroTitle {
+    font-size:44px;
+}
+QLabel#referenceHeroPrefix {
+    font-size:27px;
+}
+QFrame#referenceHero {
+    border:1px solid #842B46;
+    border-radius:6px;
+    border-bottom:3px solid #D43B58;
+}
+QFrame#referenceHeroTile {
+    border:1px solid #9C304A;
+    border-radius:4px;
+    background:#160E18;
+}
+QFrame#referenceLibrary {
+    background:#0B111A;
+    border:1px solid #334352;
+    border-top:1px solid #823047;
+    border-radius:6px;
+}
+QLabel#modShelfSectionTitle, QLabel#sectionTitle,
+QLabel#premiumTitle, QLabel#editorialEmptyTitle,
+QLabel#modShelfHeadline, QLabel#pageTitle {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-style:normal;
+    font-weight:800;
+    color:#F4F4F7;
+    letter-spacing:.3px;
+}
+QLabel#modShelfSectionTitle {
+    font-size:22px;
+}
+QLabel#modShelfHeadline, QLabel#editorialEmptyTitle {
+    font-size:29px;
+}
+QLabel#premiumTitle {
+    font-size:23px;
+}
+QFrame#modLocationCard {
+    background:#111922;
+    border:1px solid #374756;
+    border-radius:5px;
+    border-bottom:3px solid #562B3A;
+}
+QFrame#modLocationCard:hover {
+    border:1px solid #E44B67;
+    border-bottom:3px solid #E44B67;
+    background:#161924;
+}
+QFrame#modLocationCard[selected="true"] {
+    border:2px solid #FF4367;
+    border-bottom:3px solid #FF4367;
+    background:#2A1525;
+}
+QFrame#modLocationCard QLabel#findingTitle {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:14px;font-weight:800;
+    color:#FFFFFF;
+}
+QFrame#modLocationCard QLabel#premiumState {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    color:#F3CCD6;font-size:12px;font-weight:800;
+}
+QFrame#premiumInspector {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #1E111C,stop:.38 #0C121B,stop:1 #09131D);
+    border:1px solid #753247;
+    border-radius:6px;
+}
+QFrame#premiumInspector QLabel#premiumTitle {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:24px;font-weight:800;color:#F7F7F9;
+}
+QFrame#premiumInspector QLabel#sceneKicker {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:17px;font-weight:900;letter-spacing:.6px;
+    color:#F4F1F5;
+}
+QFrame#premiumInspector QLabel#premiumMetric {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:21px;font-weight:900;color:#FA5972;
+}
+QPushButton#primary, QPushButton#captureSlideshowPlay {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:13px;font-weight:900;letter-spacing:.4px;
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #D53250,stop:1 #771B36);
+    color:white;border:1px solid #FF5E75;border-radius:5px;
+    padding:10px 15px;
+}
+QPushButton#primary:hover {
+    background:#C33552;border-color:#FF8695;
+}
+QLabel#archiveTileTitle, QLabel#archiveTileMetric,
+QLabel#archiveTileCount, QLabel#captureSlideshowHeading,
+QLabel#captureSlideshowCount, QLabel#scanControlHeading {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+}
 """

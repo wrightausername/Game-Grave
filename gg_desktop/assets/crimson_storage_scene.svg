@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400" viewBox="0 0 1600 400">
+<defs><linearGradient id="b" x2="1" y2="1"><stop stop-color="#07101c"/><stop offset=".65" stop-color="#103245"/><stop offset="1" stop-color="#0a0b19"/></linearGradient>
+<radialGradient id="g"><stop stop-color="#16b9e0" stop-opacity=".42"/><stop offset="1" stop-color="#16b9e0" stop-opacity="0"/></radialGradient>
+<linearGradient id="disk" x2="1" y2="1"><stop stop-color="#364e62"/><stop offset=".55" stop-color="#122536"/><stop offset="1" stop-color="#070c17"/></linearGradient></defs>
+<rect width="1600" height="400" fill="url(#b)"/>
+<g stroke="#265e71" opacity=".3"><path d="M0 300L1600 300M0 340L1600 340M0 380L1600 380M700 0V400M860 0V400M1020 0V400M1180 0V400M1340 0V400M1500 0V400"/></g>
+<circle cx="1130" cy="161" r="320" fill="url(#g)"/>
+<g transform="translate(1025 35)">
+ <path d="M40 64L350 83l77 215-351-3Z" fill="url(#disk)" stroke="#3e8194" stroke-width="6"/>
+ <path d="M64 75L337 95l56 170-300-7Z" fill="#0a192b" stroke="#1ecbed" stroke-width="4"/>
+ <ellipse cx="224" cy="168" rx="121" ry="62" transform="rotate(10 224 168)" fill="#091624" stroke="#44dcf4" stroke-width="5"/>
+ <ellipse cx="224" cy="168" rx="78" ry="38" transform="rotate(10 224 168)" fill="none" stroke="#235e80" stroke-width="7"/>
+ <ellipse cx="224" cy="168" rx="27" ry="14" fill="#60e9f8"/><path d="M132 210l92-42 56-8" stroke="#e63755" stroke-width="8" fill="none" stroke-linecap="round"/>
+ <path d="M98 269l52 3M168 273l52 2" stroke="#7af1fd" stroke-width="6"/>
+</g>
+<g fill="none" stroke="#44e2f8" stroke-width="4"><path d="M845 100l-35 27v116l35 27M870 85l-44 36M860 288l-45-36"/><path d="M947 78v220" stroke-dasharray="5 12" opacity=".65"/></g>
+<g transform="translate(805 248)">
+<rect x="0" y="0" width="385" height="15" rx="7" fill="#19384b" stroke="#486e7d"/><rect x="3" y="3" width="225" height="9" rx="5" fill="#40cbea"/><rect x="228" y="3" width="78" height="9" fill="#eb4360"/><rect x="306" y="3" width="64" height="9" fill="#6e8ea7"/>
+</g>
+<path d="M0 335Q350 275 740 341T1600 322V400H0Z" fill="#060b15"/><path d="M0 357Q430 322 810 352T1600 356" fill="none" stroke="#ec3157" stroke-opacity=".33" stroke-width="3"/>
+</svg>

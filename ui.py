@@ -180,6 +180,15 @@ class GameGraveApp(tk.Tk):
         if self.settings.get("scan_on_launch", False):
             self.after(250, self.scan_all)
 
+    @staticmethod
+    def _start_background_worker(callback):
+        """Low CPU/disk I/O priority without lowering the Tk UI thread."""
+        from performance_guard import background_worker_priority
+        def run():
+            with background_worker_priority():
+                callback()
+        threading.Thread(target=run, daemon=True).start()
+
     def _close_safely(self):
         if self._update_download_active:
             messagebox.showinfo("Update download running",
@@ -841,7 +850,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("manager_profiles_result", result))
             except (OSError, ValueError, RuntimeError) as exc:
                 self.events.put(("manager_profiles_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _view_manager_profile(self):
         if (not hasattr(self, "profile_tree") or
@@ -887,7 +896,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("intelligence_result", ghost_watch(before, after)))
             except (OSError, ValueError, RuntimeError) as exc:
                 self.events.put(("intelligence_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _preview_exodus(self):
         dna = build_game_dna(self.games, self.other_games, self.mod_folders, self.save_findings)
@@ -1036,7 +1045,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("shader_preview", (game, cache)))
             except (OSError, ValueError) as exc:
                 self.events.put(("shader_error", str(exc)))
-        threading.Thread(target=inspect, daemon=True).start()
+        GameGraveApp._start_background_worker(inspect)
 
     def _confirm_shader_cache(self, game, cache):
         if getattr(self, "cleanup_running", False) or self.scanning:
@@ -1098,7 +1107,7 @@ class GameGraveApp(tk.Tk):
             except Exception as exc:
                 self.events.put(("shader_cleanup_error", str(exc)[:350]))
         try:
-            threading.Thread(target=guarded_cleanup, daemon=True).start()
+            GameGraveApp._start_background_worker(guarded_cleanup)
         except RuntimeError as exc:
             self.cleanup_running = False
             self.scan_button.configure(state="normal", bg=ACCENT)
@@ -1601,7 +1610,7 @@ class GameGraveApp(tk.Tk):
             except Exception as exc:
                 self.events.put(("duplicates_error", str(exc)[:250]))
         try:
-            threading.Thread(target=work, daemon=True).start()
+            GameGraveApp._start_background_worker(work)
         except RuntimeError as exc:
             self._dupe_busy = False
             messagebox.showerror("Could not inspect", str(exc))
@@ -1875,7 +1884,7 @@ class GameGraveApp(tk.Tk):
             except Exception as exc:
                 self.events.put(("screenshot_preview_error", str(exc)[:250]))
         try:
-            threading.Thread(target=work, daemon=True).start()
+            GameGraveApp._start_background_worker(work)
         except RuntimeError:
             self._screenshot_preview_busy = False
             messagebox.showerror("Preview unavailable",
@@ -2147,17 +2156,29 @@ class GameGraveApp(tk.Tk):
 
         def worker():
             try:
+                managed = tuple(
+                    str(g.install_path) for g in
+                    (*getattr(self, "games", ()), *getattr(self, "other_games", ()))
+                    if getattr(g, "install_path", None))
+                managed += tuple(
+                    str(m.path) for m in getattr(self, "mod_folders", ())
+                    if getattr(m, "path", None))
                 result = recycle_reviewed_entries(
                     selected, protected, session,
                     progress=lambda done, count: self.events.put(
-                        ("grave_cleanup_progress", (done, count))))
+                        ("grave_cleanup_progress", (done, count))),
+                    review_root=str(self.settings.get("scan_folder", "")),
+                    min_age_days=max(
+                        int(self.settings.get("files_stale_days", 180)),
+                        int(self.settings.get("graveyard_days", 365))),
+                    managed_roots=managed)
                 self.events.put(("grave_cleanup_complete", result))
             except Exception as exc:
                 # Always reset busy state on the UI thread, never claim success.
                 self.events.put(("grave_cleanup_error", str(exc)[:350]))
 
         try:
-            threading.Thread(target=worker, daemon=True).start()
+            GameGraveApp._start_background_worker(worker)
         except RuntimeError as exc:
             self.cleanup_running = False
             self.scan_button.configure(state="normal", bg=ACCENT)
@@ -2169,8 +2190,12 @@ class GameGraveApp(tk.Tk):
         bar = tk.Frame(self.content, bg=BG)
         bar.pack(fill="x", pady=(0, 13))
         folder = self.settings["scan_folder"]
-        self.text(bar, f"Scanning: {folder}", 10, MUTED, wraplength=580).pack(side="left", fill="x", expand=True)
+        self.text(bar, f"Selected: {folder}", 10, MUTED, wraplength=480).pack(side="left", fill="x", expand=True)
         self.button(bar, "Change folder", self._change_folder).pack(side="right")
+        from old_files_scope import is_fixed_drive_root
+        if is_fixed_drive_root(Path("C:/")):
+            self.button(bar, "Scan C: drive…", self._change_to_c_drive).pack(
+                side="right", padx=7)
         self.file_days_var = tk.StringVar(value=str(self.settings["files_stale_days"]))
         days = ttk.Combobox(bar, textvariable=self.file_days_var, values=("30", "90", "180", "365", "730"),
                             state="readonly", style="Dark.TCombobox", width=5)
@@ -2192,6 +2217,8 @@ class GameGraveApp(tk.Tk):
                                     (235, 140, 115, 300))
         self.file_tree.tag_configure("protected", foreground=WARN)
         self._add_page_controls("files", self._populate_files)
+        self.file_scan_result = self.text(self.content, "", 11, MUTED, wraplength=830)
+        self.file_scan_result.pack(anchor="w", fill="x", pady=(9, 2))
         self._populate_files()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(14, 0))
@@ -2226,16 +2253,80 @@ class GameGraveApp(tk.Tk):
                                   tags=("protected",) if protected else ())
             self.file_lookup[iid] = item
         self._update_inventory_page("files", page)
+        if hasattr(self, "file_scan_result") and self.file_scan_result.winfo_exists():
+            scanned_root = getattr(self, "old_files_scanned_root", "")
+            selected_root = str(self.settings.get("scan_folder", ""))
+            status = getattr(self, "old_files_scan_status", "not_scanned")
+            note = str(getattr(self, "old_files_scan_message", ""))
+            if scanned_root and scanned_root != selected_root:
+                message = "Scan the newly selected location to view its results."
+            elif status == "complete" and not self.old_files:
+                message = ("✓ No old files found. Nothing older than " +
+                           str(self.settings.get("files_stale_days", 180)) +
+                           " days detected in " + selected_root + ".")
+            elif status == "partial":
+                message = "Scan incomplete; results are partial. " + note
+            elif status == "failed":
+                message = "Old Files scan could not finish. " + note
+            elif status == "not_scanned":
+                message = "Run Scan PC to check the selected folder or drive."
+            else:
+                message = f"{len(self.old_files)} old files found. Review before recycling."
+            self.file_scan_result.configure(text=message)
+
+    def _change_to_c_drive(self):
+        from old_files_scope import is_fixed_drive_root
+        drive = Path("C:/")
+        if not is_fixed_drive_root(drive):
+            messagebox.showerror("C: unavailable",
+                                 "Only an existing local fixed C: drive is supported.")
+            return
+        if not messagebox.askyesno(
+                "Scan C: drive for Old Files?",
+                "Scan permitted locations on C: for files older than your age "
+                "filter? System folders, application data, managed game "
+                "locations and unsafe links will be skipped. "
+                "The read-only scan is limited to 25 seconds/160,000 entries "
+                "and may be incomplete. No files are deleted automatically."):
+            return
+        updated = dict(self.settings)
+        updated["scan_folder"] = str(drive)
+        try:
+            save_settings(updated)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Cannot save C: selection", str(exc))
+            return
+        self.settings = updated
+        self.old_files_scan_status = "not_scanned"
+        self.scan_all()
 
     def _change_folder(self):
         folder = filedialog.askdirectory(title="Choose folder to scan for old files", initialdir=self.settings["scan_folder"])
         if not folder:
             return
-        if not safe_scan_root(Path(folder)):
-            messagebox.showerror("Folder blocked", "Choose an ordinary folder. System folders and entire drives are blocked.")
+        from old_files_scope import accepted_old_files_scope, is_fixed_drive_root
+        target = Path(folder)
+        if is_fixed_drive_root(target):
+            if str(target).upper().startswith("C:"):
+                self._change_to_c_drive()
+            else:
+                messagebox.showinfo("Choose C: or a folder",
+                                    "Use the C: option for drive-wide scanning.")
             return
-        self.settings["scan_folder"] = folder
-        save_settings(self.settings)
+        if not accepted_old_files_scope(target):
+            messagebox.showerror("Folder blocked",
+                                 "Choose an ordinary folder or use the C: button. "
+                                 "Managed game, mod, system and redirected paths are excluded.")
+            return
+        updated = dict(self.settings)
+        updated["scan_folder"] = folder
+        try:
+            save_settings(updated)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Cannot save scan choice", str(exc))
+            return
+        self.settings = updated
+        self.old_files_scan_status = "not_scanned"
         self.scan_all()
 
     def _open_file_folder(self):
@@ -2277,6 +2368,13 @@ class GameGraveApp(tk.Tk):
         protected = tuple(self.settings.get("never_touch", ()))
         reviewed_root = Path(self.settings.get("scan_folder", str(downloads_dir())))
         reviewed_age = int(self.settings.get("files_stale_days", 180))
+        known_roots = tuple(
+            str(game.install_path) for game in
+            (*getattr(self, "games", ()), *getattr(self, "other_games", ()))
+            if getattr(game, "install_path", None))
+        known_roots += tuple(
+            str(mod.path) for mod in getattr(self, "mod_folders", ())
+            if getattr(mod, "path", None))
         self.cleanup_running = True
         self.scan_button.configure(state="disabled", bg=RAISED)
         self.status_text.set(f"Delete started: verifying {len(selected)} file(s)…")
@@ -2287,13 +2385,14 @@ class GameGraveApp(tk.Tk):
                     selected, protected, session,
                     progress=lambda done, count: self.events.put(
                         ("old_cleanup_progress", (done, count))),
-                    review_root=reviewed_root, min_age_days=reviewed_age)
+                    review_root=reviewed_root, min_age_days=reviewed_age,
+                    managed_roots=known_roots)
                 self.events.put(("old_cleanup_complete", outcome))
             except Exception as exc:
                 self.events.put(("old_cleanup_error", str(exc)[:350]))
 
         try:
-            threading.Thread(target=worker, daemon=True).start()
+            GameGraveApp._start_background_worker(worker)
         except RuntimeError as exc:
             self.cleanup_running = False
             self.scan_button.configure(state="normal", bg=ACCENT)
@@ -2737,7 +2836,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("undo_result", (perform, result)))
             except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
                 self.events.put(("undo_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _resurrection_lab_page(self):
         self.header("Resurrection Lab", "Five tools to check, rehearse, preserve, rewind, and move your gaming setup.")
@@ -2813,7 +2912,7 @@ class GameGraveApp(tk.Tk):
             except (OSError, ValueError, RuntimeError, PermissionError,
                     FileExistsError, zipfile.BadZipFile, EOFError) as exc:
                 self.events.put(("lab_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _lab_missing_pieces(self):
         manifest = self._lab_manifest("Select kit to check for missing components")
@@ -3012,7 +3111,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("saves_complete", found))
             except Exception as exc:
                 self.events.put(("saves_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _populate_saves(self):
         if not hasattr(self, "saves_tree") or not self.saves_tree.winfo_exists():
@@ -3097,7 +3196,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("backup_result", result))
             except (OSError, ValueError, RuntimeError, InterruptedError, zipfile.BadZipFile) as exc:
                 self.events.put(("backup_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _start_auto_kit(self):
         """Small setup picker; no scan or source writes happen before user approval."""
@@ -3150,7 +3249,7 @@ class GameGraveApp(tk.Tk):
                     self.events.put(("kit_discovery_result", (game.name, data)))
                 except (OSError, ValueError, RuntimeError) as exc:
                     self.events.put(("kit_error", str(exc)))
-            threading.Thread(target=worker, daemon=True).start()
+            GameGraveApp._start_background_worker(worker)
         self.button(frame, "Find recommended folders", on_discover, primary=True).pack(
             anchor="w", pady=(8, 0))
 
@@ -3232,7 +3331,7 @@ class GameGraveApp(tk.Tk):
                 except (OSError, ValueError, RuntimeError, InterruptedError,
                         zipfile.BadZipFile) as exc:
                     self.events.put(("kit_error", str(exc)))
-            threading.Thread(target=worker, daemon=True).start()
+            GameGraveApp._start_background_worker(worker)
         self.button(body, "Create verified kit from selected folders", preserve,
                     primary=True).pack(anchor="w", pady=(6, 0))
 
@@ -3276,7 +3375,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("mo2_reconnect_preview", (manifest, ini, plan)))
             except (OSError, ValueError, RuntimeError, FileExistsError, zipfile.BadZipFile) as exc:
                 self.events.put(("mo2_reconnect_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _apply_mo2_reconnect(self, manifest, ini, plan):
         games, other_games = list(self.games), list(self.other_games)
@@ -3288,7 +3387,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("mo2_reconnect_result", result))
             except (OSError, ValueError, RuntimeError, FileExistsError) as exc:
                 self.events.put(("mo2_reconnect_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _make_resurrection_kit(self):
         chosen = self._selected_saves()
@@ -3339,7 +3438,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("kit_result", created))
             except (OSError, ValueError, RuntimeError, InterruptedError, zipfile.BadZipFile) as exc:
                 self.events.put(("kit_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _preview_resurrection_kit(self, preselected_manifest=None):
         manifest = preselected_manifest or filedialog.askopenfilename(
@@ -3358,7 +3457,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("kit_preview", (manifest, parent, checked)))
             except (OSError, ValueError, RuntimeError, zipfile.BadZipFile, FileExistsError) as exc:
                 self.events.put(("kit_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _restore_verified_kit(self, manifest, parent):
         self.status_text.set("Recovering kit into a new folder; existing game files are untouched…")
@@ -3368,7 +3467,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("kit_restore_result", restored))
             except (OSError, ValueError, RuntimeError, zipfile.BadZipFile, FileExistsError) as exc:
                 self.events.put(("kit_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _history_page(self):
         self.header("Storage History", "Compare on-demand scans. No 24/7 game update monitoring.")
@@ -3404,6 +3503,52 @@ class GameGraveApp(tk.Tk):
         tabs.add(protected_tab, text="Never Touch")
         tabs.add(tools_tab, text="More tools")
         tabs.add(edition_tab, text="Free / Pro")
+        ai_tab = tk.Frame(tabs, bg=BG)
+        tabs.add(ai_tab, text="AI Assistant")
+        ai_panel = self.panel(ai_tab)
+        ai_panel.pack(fill="x", pady=(0, 12))
+        self.text(ai_panel, "Built-in AI Assistant", 14, bold=True).pack(anchor="w", pady=(0, 9))
+        self.text(ai_panel,
+                  "Enable it once, approve the download, and Game Grave installs "
+                  "the local AI engine and model automatically. No separate apps, "
+                  "terminal, accounts, subscriptions or AI-driven deletion.",
+                  10, MUTED, wraplength=760).pack(anchor="w", pady=(0, 11))
+        from ai_bundle import is_ai_installed
+        self.ai_enabled_var = tk.BooleanVar(
+            value=self.settings.get("ai_assistant_enabled") is True)
+        self.ai_toggle = ttk.Checkbutton(
+            ai_panel, text="Enable optional AI Assistant",
+            variable=self.ai_enabled_var, command=self._save_ai_assistant_pref,
+            style="Dark.TCheckbutton")
+        self.ai_toggle.pack(anchor="w", pady=(0, 11))
+        self.ai_install_status = tk.StringVar(
+            value="AI installed and ready." if is_ai_installed()
+                  else "Not installed. One-time download: about 1.2 GB.")
+        self.text(ai_panel, "Setup progress", 10, MUTED).pack(anchor="w", pady=(0, 3))
+        self.ai_progress = ttk.Progressbar(ai_panel, orient="horizontal",
+                                         length=510, mode="determinate", maximum=100)
+        self.ai_progress.pack(anchor="w", fill="x", pady=(0, 7))
+        tk.Label(ai_panel, textvariable=self.ai_install_status,
+                 bg=PANEL, fg=MUTED, font=("Segoe UI", 10),
+                 wraplength=760, justify="left").pack(anchor="w", pady=(0, 8))
+        self.ai_launch_button = self.button(ai_panel, "Open AI Assistant",
+                                            self._open_ai_assistant)
+        self.ai_launch_button.pack(anchor="w", pady=(0, 8))
+        self.ai_launch_button.configure(
+            state="normal" if self.ai_enabled_var.get() and is_ai_installed()
+            else "disabled")
+        self.text(ai_panel,
+                  "The model is downloaded only after your approval, verified, "
+                  "and stored privately on this PC. All other Game Grave features "
+                  "work normally without AI.",
+                  9, WARN, wraplength=760).pack(anchor="w")
+        if self.settings.get("ai_assistant_enabled") and not is_ai_installed():
+            self.ai_install_status.set(
+                "AI is not installed. Disable and re-enable to set it up automatically.")
+        if getattr(self, "_ai_setup_running", False):
+            self.ai_toggle.configure(state="disabled")
+            self.ai_install_status.set("AI installation is already underway.")
+
         settings = self.panel(appearance_tab)
         settings.pack(fill="x", pady=(0, 12))
         self.text(settings, "Appearance and navigation", 14, bold=True).pack(anchor="w", pady=(0, 11))
@@ -3589,6 +3734,97 @@ class GameGraveApp(tk.Tk):
             self.text(updates_panel, "Engineering preview: update service not connected. No internet request is made.",
                       9, WARN, wraplength=760).pack(anchor="w", pady=(7, 0))
 
+    def _save_ai_assistant_pref(self):
+        from ai_bundle import INSTALL_MESSAGE, is_ai_installed, install_ai, AiSetupError
+        if getattr(self, "_ai_setup_running", False):
+            self.ai_enabled_var.set(False)
+            return
+        enabled = self.ai_enabled_var.get()
+        if not enabled or is_ai_installed():
+            updated = dict(self.settings)
+            updated["ai_assistant_enabled"] = enabled
+            try:
+                save_settings(updated)
+            except (OSError, ValueError) as exc:
+                self.ai_enabled_var.set(self.settings.get("ai_assistant_enabled") is True)
+                messagebox.showerror("Could not save AI setting", str(exc), parent=self)
+                return
+            self.settings = updated
+            if not enabled:
+                from ai_bundle import stop_ai
+                stop_ai()
+            self.ai_launch_button.configure(
+                state="normal" if enabled and is_ai_installed() else "disabled")
+            self.ai_install_status.set(
+                "AI ready. Everything stays on this PC." if enabled else "AI disabled.")
+            return
+        if not messagebox.askyesno("Install AI Assistant?", INSTALL_MESSAGE, parent=self):
+            self.ai_enabled_var.set(False)
+            return
+        self.ai_enabled_var.set(False)
+        self._ai_setup_running = True
+        self.ai_toggle.configure(state="disabled")
+        self.ai_launch_button.configure(state="disabled")
+        self.ai_install_status.set("Downloading and setting up AI automatically.")
+        self.ai_progress["value"] = 0
+        events = queue.Queue()
+
+        def worker():
+            try:
+                install_ai(lambda stage, amount:
+                           events.put(("progress", (stage, int(amount * 100)))))
+                events.put(("done", (True, "")))
+            except (AiSetupError, OSError, ValueError) as exc:
+                events.put(("done", (False, str(exc))))
+            except Exception:
+                events.put(("done", (False, "Unexpected AI setup error. No files changed.")))
+
+        def poll():
+            while True:
+                try:
+                    kind, data = events.get_nowait()
+                except queue.Empty:
+                    break
+                if kind == "progress":
+                    stage, pct = data
+                    self.ai_install_status.set(stage + " • " + str(pct) + "%")
+                    if self.ai_progress.winfo_exists():
+                        self.ai_progress["value"] = pct
+                else:
+                    success, detail = data
+                    self._ai_setup_running = False
+                    if success:
+                        try:
+                            updated = dict(self.settings)
+                            updated["ai_assistant_enabled"] = True
+                            save_settings(updated)
+                            self.settings = updated
+                            self.ai_enabled_var.set(True)
+                            self.ai_install_status.set("AI installed and ready. Open AI Assistant.")
+                        except (OSError, ValueError) as exc:
+                            success = False
+                            detail = "Could not save AI preference: " + str(exc)
+                    if not success:
+                        self.ai_enabled_var.set(False)
+                        self.ai_install_status.set("AI setup did not finish. Your files are unchanged.")
+                        messagebox.showerror("AI setup incomplete", detail, parent=self)
+                    if self.ai_toggle.winfo_exists():
+                        self.ai_toggle.configure(state="normal")
+                    if self.ai_launch_button.winfo_exists():
+                        self.ai_launch_button.configure(
+                            state="normal" if success and self.ai_enabled_var.get()
+                            else "disabled")
+                    return
+            if self.winfo_exists():
+                self.after(140, poll)
+
+        GameGraveApp._start_background_worker(worker)
+        self.after(140, poll)
+
+    def _open_ai_assistant(self):
+        from ai_tk import open_local_ai_dialog
+        open_local_ai_dialog(self)
+
     def _add_screenshot_folder(self):
         folder = filedialog.askdirectory(
             title="Choose an existing folder containing game screenshots")
@@ -3708,7 +3944,7 @@ class GameGraveApp(tk.Tk):
                     "An unexpected local safety check failure occurred. No user files were selected."))
 
         try:
-            threading.Thread(target=work, daemon=True).start()
+            GameGraveApp._start_background_worker(work)
         except RuntimeError as exc:
             self._selfcheck_busy = False
             messagebox.showerror("Safety check not started", str(exc))
@@ -3850,7 +4086,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("update_check_result", report))
             except UpdateError as exc:
                 self.events.put(("update_check_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _cancel_verified_download(self):
         if not self._update_download_active:
@@ -3899,7 +4135,7 @@ class GameGraveApp(tk.Tk):
             except Exception:
                 self.events.put(("update_download_error", "UnexpectedError"))
         try:
-            threading.Thread(target=worker, daemon=True).start()
+            GameGraveApp._start_background_worker(worker)
         except RuntimeError:
             self._update_download_active = False
             messagebox.showerror("Download not started",
@@ -3923,7 +4159,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("license_activated", result))
             except LicenseError as exc:
                 self.events.put(("license_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        GameGraveApp._start_background_worker(worker)
 
     def _deactivate_pro(self):
         if not self.edition.is_pro:
@@ -4027,6 +4263,9 @@ class GameGraveApp(tk.Tk):
         self.scan_button.configure(state="disabled", bg=RAISED)
         self.cancel_button.configure(state="normal")
         self._scan_started = time.monotonic()
+        self._scan_paused_for_game = False
+        self._scan_pause_started = None
+        self._scan_pause_accumulated = 0.0
         self._scan_stage = 0
         self._scan_stage_name = STAGES[0][0]
         self.scan_percent.set(0)
@@ -4043,49 +4282,77 @@ class GameGraveApp(tk.Tk):
         recording_days = min(file_days, self.settings.get("graveyard_days", 365))
 
         def task():
+            from performance_guard import (
+                GameActivityDetector, CooperativeGameplayPause, background_worker_priority,
+            )
+            detector = GameActivityDetector()
+            gate = CooperativeGameplayPause(
+                self._cancel_scan.is_set, detector=detector,
+                on_pause=lambda paused: self.events.put(("scan_game_pause", paused)),
+            )
             try:
-                self.events.put(("scan_stage", (0, STAGES[0][0])))
-                games = find_games(games_extra, cancel=self._cancel_scan.is_set)
-                self._check_scan_cancel()
-                self.events.put(("scan_stage", (1, STAGES[1][0])))
-                other = find_launcher_games(other_roots, cancel=self._cancel_scan.is_set)
-                self._check_scan_cancel()
-                self.events.put(("scan_stage", (2, STAGES[2][0])))
-                mods = find_all_mod_storage(games_extra, mod_roots,
-                                            games=games, cancel=self._cancel_scan.is_set)
-                self._check_scan_cancel()
-                self.events.put(("scan_stage", (3, STAGES[3][0])))
-                try:
-                    files = scan_old_files(chosen_folder, file_days, cancel=self._cancel_scan.is_set)
-                    warning = ""
-                except (ValueError, OSError) as exc:
-                    files = []
-                    warning = str(exc)
-                self._check_scan_cancel()
-                try:
-                    recordings = find_old_recordings(recording_days, recording_roots,
-                                                     cancel=self._cancel_scan.is_set)
-                except (ValueError, OSError) as exc:
-                    recordings = []
-                    warning += ("; " if warning else "") + "Recordings: " + str(exc)
-                self._check_scan_cancel()
-                try:
-                    screenshots = find_old_screenshots(
-                        recording_days, screenshot_roots,
-                        extra_steam_roots=games_extra,
-                        cancel=self._cancel_scan.is_set)
-                except (ValueError, OSError) as exc:
-                    screenshots = []
-                    warning += ("; " if warning else "") + "Screenshots: " + str(exc)
-                self._check_scan_cancel()
-                self.events.put(("scan_stage", (4, STAGES[4][0])))
-                saves = discover_saves()
-                self._check_scan_cancel()
-                self.events.put(("scan_complete", (
-                    games, other, mods, files, recordings, screenshots, saves, warning)))
+                with background_worker_priority():
+                    self.events.put(("scan_stage", (0, STAGES[0][0])))
+                    games = find_games(games_extra, cancel=gate.checkpoint)
+                    detector.set_game_roots(g.install_path for g in games)
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_stage", (1, STAGES[1][0])))
+                    other = find_launcher_games(other_roots, cancel=gate.checkpoint)
+                    detector.set_game_roots([g.install_path for g in games] + [g.install_path for g in other])
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_stage", (2, STAGES[2][0])))
+                    mods = find_all_mod_storage(games_extra, mod_roots,
+                                                games=games, cancel=gate.checkpoint)
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_stage", (3, STAGES[3][0])))
+                    from old_files_scope import scan_old_files_scope
+                    try:
+                        known_roots = [g.install_path for g in (*games, *other)
+                                       if getattr(g, "install_path", None)]
+                        known_roots += [str(mod.path) for mod in mods
+                                        if getattr(mod, "path", None)]
+                        old_scope_result = scan_old_files_scope(
+                            chosen_folder, file_days, cancel=gate.checkpoint,
+                            known_game_roots=known_roots)
+                        files = list(old_scope_result.files)
+                        old_file_status = old_scope_result.status
+                        old_file_message = old_scope_result.message
+                        warning = old_file_message if old_file_status == "partial" else ""
+                    except (ValueError, OSError) as exc:
+                        if self._cancel_scan.is_set():
+                            raise
+                        files = []
+                        old_file_status = "failed"
+                        old_file_message = str(exc)
+                        warning = str(exc)
+                    gate.raise_if_canceled()
+                    try:
+                        recordings = find_old_recordings(recording_days, recording_roots,
+                                                         cancel=gate.checkpoint,
+                                                         include_recent=True)
+                    except (ValueError, OSError) as exc:
+                        recordings = []
+                        warning += ("; " if warning else "") + "Recordings: " + str(exc)
+                    gate.raise_if_canceled()
+                    try:
+                        screenshots = find_old_screenshots(
+                            recording_days, screenshot_roots,
+                            extra_steam_roots=games_extra,
+                            games=[*games, *other], include_recent=True,
+                            cancel=gate.checkpoint)
+                    except (ValueError, OSError) as exc:
+                        screenshots = []
+                        warning += ("; " if warning else "") + "Screenshots: " + str(exc)
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_stage", (4, STAGES[4][0])))
+                    saves = discover_saves()
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_complete", (
+                        games, other, mods, files, recordings, screenshots, saves,
+                        warning, old_file_status, old_file_message, str(chosen_folder))))
             except Exception as exc:
                 self.events.put(("scan_error", str(exc)))
-        threading.Thread(target=task, daemon=True).start()
+        GameGraveApp._start_background_worker(task)
 
     def _poll(self):
         try:
@@ -4094,11 +4361,27 @@ class GameGraveApp(tk.Tk):
                 if name == "scan_stage":
                     self._scan_stage, self._scan_stage_name = payload
                     self.scan_percent.set(round(100 * sum(w for _, w in STAGES[:self._scan_stage])))
+                elif name == "scan_game_pause":
+                    if self.scanning:
+                        now = time.monotonic()
+                        if payload and not self._scan_paused_for_game:
+                            self._scan_paused_for_game = True
+                            self._scan_pause_started = now
+                        elif not payload and self._scan_paused_for_game:
+                            self._scan_pause_accumulated += now - self._scan_pause_started
+                            self._scan_paused_for_game = False
+                            self._scan_pause_started = None
+                        self.status_text.set(
+                            "Scan paused while a game is running; cancel remains available."
+                            if payload else "Game closed. Resuming low-priority scan.")
                 elif name == "scan_complete":
                     if self._cancel_scan.is_set():
                         self._scan_canceled_status()
                         continue
-                    self.games, self.other_games, self.mod_folders, self.old_files, self.recordings, self.screenshots, self.save_findings, warning = payload
+                    (self.games, self.other_games, self.mod_folders, self.old_files,
+                     self.recordings, self.screenshots, self.save_findings, warning,
+                     self.old_files_scan_status, self.old_files_scan_message,
+                     self.old_files_scanned_root) = payload
                     self.profile_report = None  # Profiles must be re-inspected after inventory changes.
                     self.scan_percent.set(100)
                     self.scan_progress_text.set("Scan complete · 100%")
@@ -4579,8 +4862,18 @@ class GameGraveApp(tk.Tk):
         except queue.Empty:
             pass
         if self.scanning:
-            elapsed = time.monotonic() - self._scan_started
-            eta = format_eta(eta_seconds(elapsed, self._scan_stage))
-            self.scan_progress_text.set(f"{self._scan_stage_name} · {self.scan_percent.get():.0f}% stages complete "
-                                        f"· {eta} · {int(elapsed)}s elapsed")
-        self.after(180, self._poll)
+            now = time.monotonic()
+            waiting = now - self._scan_pause_started if self._scan_paused_for_game else 0.0
+            elapsed = max(0, now - self._scan_started - self._scan_pause_accumulated - waiting)
+            if self._scan_paused_for_game:
+                self.scan_progress_text.set(
+                    f"Paused for gameplay · {self.scan_percent.get():.0f}% stages complete")
+            else:
+                eta = format_eta(eta_seconds(elapsed, self._scan_stage))
+                self.scan_progress_text.set(
+                    f"{self._scan_stage_name} · {self.scan_percent.get():.0f}% stages complete "
+                    f"· {eta} · {int(elapsed)}s active scanning")
+        busy = (getattr(self, "scanning", False) or getattr(self, "cleanup_running", False)
+                or getattr(self, "_update_download_active", False)
+                or getattr(self, "_selfcheck_busy", False))
+        self.after(180 if busy else 1200, self._poll)

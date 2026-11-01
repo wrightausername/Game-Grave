@@ -15,14 +15,31 @@ def main():
     os.environ.setdefault("QT_QPA_PLATFORM", "windows")
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root))
-    from PySide6.QtWidgets import QApplication, QTableWidget
+    from PySide6.QtWidgets import QApplication, QTableWidget, QFrame, QWidget
     from core import SteamGame, OldFile
     from launchers import LauncherGame
     from graveyard import build_graveyard
     from gg_desktop.models import merge_games
-    from gg_desktop.app import CrimsonWindow
+    from gg_desktop.app import CrimsonWindow, configure_crimson_dialog_palette
+    from gg_desktop.capture_image import ScreenshotImage
+    from gg_desktop.widgets import HeroBanner
+    from gg_desktop.visuals import SceneHeader, RelationshipMap
+    from gg_desktop.undo_visuals import UndoStatusDial, RecoveryActionTile
+    from gg_desktop.tab_panels import GraphicCard, GameCover, ArchiveCategoryTile
+    from gg_desktop.premium_panels import GameInspector, ModInspector, ModRadarScope
+    from gg_desktop.capture_slideshow import CaptureSlideshow
+    from gg_desktop.dna_layers import GenomeLayerMap
+    from gg_desktop.storage_dials import DriveUsageDial
+    from gg_desktop.reference_hero import ReferenceHero
+    from PySide6.QtCore import QPoint
+    from PySide6.QtWidgets import QTabWidget, QStackedWidget, QDockWidget
+    from PySide6.QtGui import QPalette
+    from PIL import Image
 
     app = QApplication.instance() or QApplication(sys.argv)
+    configure_crimson_dialog_palette(app)
+    assert app.palette().color(QPalette.Window).lightness() < 90
+    assert app.palette().color(QPalette.WindowText).lightness() > 180
     from PySide6.QtGui import QFontDatabase
     families = QFontDatabase.families()
     print("Native Windows Qt font families:", len(families),
@@ -34,6 +51,20 @@ def main():
         os.environ["APPDATA"] = str(synthetic / "Roaming")
         Path(os.environ["LOCALAPPDATA"]).mkdir(parents=True)
         Path(os.environ["APPDATA"]).mkdir(parents=True)
+        # Real (disposable) 1920px screenshot and video records exercise
+        # actual thumbnail decoding and two separate Captures panels.
+        screen_path = synthetic / "Videos" / "Captures" / "latest-game.png"
+        screen_path.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (1920, 1080), (38, 132, 185)).save(screen_path)
+        video_path = screen_path.parent / "gameplay-2026-11-01.mp4"
+        video_path.write_bytes(b"metadata fixture; never launched or decoded")
+        def record_file(file):
+            data = file.stat()
+            return OldFile(str(file), data.st_size, data.st_mtime,
+                           data.st_dev, data.st_ino, data.st_mtime_ns,
+                           data.st_nlink)
+        screenshot_record = record_file(screen_path)
+        video_record = record_file(video_path)
         oldzip = synthetic / "old-skyrim-mod.zip"
         oldzip.write_bytes(b"not an actual mod or game")
         stamp = time.time() - 800 * 86400
@@ -41,9 +72,17 @@ def main():
         st = oldzip.stat()
         old = OldFile(str(oldzip), st.st_size, st.st_mtime,
                       st.st_dev, st.st_ino, st.st_mtime_ns, st.st_nlink)
-        steam = [SteamGame("455", "Sample Steam Game", str(synthetic),
-                           str(synthetic / "Steam" / "Sample"),
-                           1200000, None, "Unknown")]
+        # Simulate an actual Steam library-cache image on the disposable drive.
+        # Both Games and DNA must render the same cache-backed cover by AppID.
+        steam_root = synthetic / "Steam"
+        steam_install = steam_root / "steamapps" / "common" / "Sample Steam Game"
+        steam_install.mkdir(parents=True)
+        art_cache = steam_root / "appcache" / "librarycache"
+        art_cache.mkdir(parents=True)
+        Image.new("RGB", (600, 900), (112, 38, 70)).save(
+            art_cache / "455_library_600x900.jpg")
+        steam = [SteamGame("455", "Sample Steam Game", str(steam_root),
+                           str(steam_install), 1200000, None, "Unknown")]
         other = [
             LauncherGame("Sample Epic Game", "Epic Games",
                          str(synthetic / "Epic" / "Sample"),
@@ -61,10 +100,63 @@ def main():
             window.inventory.other = other
             window.inventory.games = merge_games(steam, other)
             window.inventory.files = [old]
+            window.inventory.screenshots = [screenshot_record]
+            window.inventory.recordings = [video_record]
             window.inventory.scanned_at = "Synthetic test date"
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
+            # Native reference-dashboard parity: all pictured controls must
+            # exist and be wired to the real app, never static screenshot overlays.
+            from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox, QLabel
+            from PySide6.QtSvg import QSvgRenderer
+            from gg_desktop.widgets import ActionCard
+            window.navigate("Overview")
+            app.processEvents()
+            buttons = {b.text() for b in window.page.findChildren(QPushButton)}
+            labels = {b.text() for b in window.page.findChildren(QLabel)}
+            cards = window.page.findChildren(ActionCard)
+            assert len(cards) == 4, "Four clickable top-level action cards are required"
+            assert all(callable(card._action) for card in cards)
+            for expected in ("Scan for Old Files", "Review Graveyard",
+                             "Open Undo Center", "Quick Settings"):
+                assert any(expected in t for t in labels), (
+                    f"Missing text label inside actionable reference card: {expected}")
+            for expected in ("Delete Selected", "Restore", "Add to Graveyard",
+                             "Review Files", "Preview actual image"):
+                assert any(expected in t for t in buttons), (
+                    f"Missing or unconnected reference dashboard button: {expected}")
+            combos = window.page.findChildren(QComboBox)
+            drives = [c for c in combos if "local drive" in c.accessibleName().lower()]
+            filters = [c for c in combos if "filter launchers" in c.accessibleName().lower()]
+            assert len(drives) == 1 and drives[0].count() >= 1
+            assert len(filters) == 1 and filters[0].count() >= 9
+            assert filters[0].findText("Steam") >= 0
+            assert window.page.findChildren(QCheckBox), "Missing Graveyard queue checkboxes"
+            scan_control = window.findChild(QPushButton, "mainScanControl")
+            cancel_control = window.findChild(QPushButton, "mainCancelScan")
+            assert scan_control is window.scan_button and cancel_control is window.cancel_button
+            assert scan_control.isVisible() and scan_control.isEnabled(), (
+                "Main Scan PC action must be visible and usable on the current page")
+            print("Main scan rendered size:", scan_control.width(),
+                  scan_control.height(), "minimum:", scan_control.minimumWidth(),
+                  scan_control.minimumHeight())
+            assert scan_control.width() >= 155 and scan_control.height() >= 50, (
+                "Main Scan PC must render as a prominent large button.")
+            assert scan_control.mapTo(window, QPoint(0, 0)).x() < window.width() * .50, (
+                "Main Scan PC action must not be hidden in the far top-right corner")
+            assert cancel_control.isVisible() and not cancel_control.isEnabled(), (
+                "Persistent Cancel control remains visible but disabled until a scan starts")
+            assert window.progress.objectName() == "mainScanProgress"
+            for name in ("crimson_hero.svg", "crimson_sunset.svg",
+                         "crimson_fog.svg", "crimson_footer.svg",
+                         "crimson_dna_scene.svg", "crimson_undo_scene.svg",
+                         "crimson_mods_scene.svg"):
+                asset = root / "gg_desktop" / "assets" / name
+                assert QSvgRenderer(str(asset)).isValid(), (
+                    "Invalid cinematic local visual: " + name)
+            assert oldzip.read_bytes() == b"not an actual mod or game"
             for route in ("Overview", "Games", "Graveyard", "Game DNA",
-                          "Mods", "Old Files", "Undo Center", "Settings", "More Tools"):
+                          "Mods", "Old Files", "Captures", "Other Storage",
+                          "Undo Center", "Settings", "More Tools"):
                 window.navigate(route)
                 window.resize(1366, 768)
                 app.processEvents()
@@ -80,6 +172,256 @@ def main():
                 if route == "Graveyard":
                     assert len(window._shown_graves) == 1
                     assert window.grave_table.rowCount() == 1
+                if route in ("Games", "Mods", "Old Files", "Graveyard",
+                             "Game DNA", "Undo Center", "Captures", "Settings"):
+                    art = window.page.findChildren(SceneHeader)
+                    assert len(art) == 1 and art[0].kind, (
+                        "Missing high-DPI, tab-specific scene for " + route)
+                if route == "Games":
+                    assert len(window.page.findChildren(GameCover)) == 3, (
+                        "Games gallery must present actual verified game records")
+                    hero = window.page.findChildren(ReferenceHero)
+                    assert len(hero) == 1 and hero[0].height() >= 240, (
+                        "Approved Games layout needs a cinematic metrics header")
+                    assert not window.game_inventory_panel.isVisible(), (
+                        "Advanced game table must not dominate the default visual screen")
+                    first = window.page.findChildren(GameCover)[0]
+                    gap = first.mapTo(window.game_gallery_frame, QPoint(0, 0)).y()
+                    assert 0 <= gap < 145, (
+                        f"Qt stretched artwork gallery vertically: first card starts {gap}px down")
+                    inspectors = window.page.findChildren(GameInspector)
+                    assert len(inspectors) == 1 and inspectors[0].game is not None, (
+                        "Games tab requires a live selection-driven inspector")
+                    window.game_table.selectRow(1)
+                    app.processEvents()
+                    assert inspectors[0].game.key == window._shown_games[1].key, (
+                        "Selecting a different game must update its right-side inspector")
+                    assert window.page.findChild(QPushButton, "chooseGameCover"), (
+                        "Games must allow per-title artwork selection for non-Steam launchers")
+                    assert window.page.findChild(QPushButton, "steamStoreCoverLookup"), (
+                        "Games must allow manually verified Steam AppID artwork.")
+                    assert any("Fetch missing Steam covers" in b.text()
+                               for b in window.page.findChildren(QPushButton)), (
+                        "Games must provide a visible official artwork recovery control")
+                    assert window.art_page_status.text().startswith("Page 1 / 1")
+                    assert not window.art_next.isEnabled()
+                if route == "Mods":
+                    assert len(window.page.findChildren(ModInspector)) == 1, (
+                        "Mod Radar requires a source-aware right-side inspector")
+                    assert len(window.page.findChildren(ModRadarScope)) == 1, (
+                        "Mods needs a native high-DPI radar")
+                    assert window.page.findChild(QFrame, "modCommandFilters"), (
+                        "Mods needs a searchable visual game library")
+                if route == "Old Files":
+                    assert len(window.page.findChildren(ArchiveCategoryTile)) == 5, (
+                        "Old Files must have five original category shelves")
+                if route == "Captures":
+                    galleries = window.page.findChildren(CaptureSlideshow)
+                    assert len(galleries) == 1 and galleries[0].timer.interval() == 5000, (
+                        "Captures must be an actual 5-second image-first theater")
+                if route == "Graveyard":
+                    assert window.page.findChild(QFrame, "graveyardBurialLedger")
+                    assert window.page.findChild(QFrame, "graveyardEvidenceInspector")
+                if route == "Other Storage":
+                    assert len(window.page.findChildren(DriveUsageDial)) == 1
+                    assert window.page.findChild(QWidget, "otherStorageMapRoom")
+                if route == "Game DNA":
+                    dna_art = window.page.findChildren(RelationshipMap)
+                    assert dna_art and dna_art[0].game_name == "Sample Steam Game", (
+                        "Game DNA visual map must use actual scan data")
+                    assert window.page.findChild(QFrame, "dnaRelationshipStudio")
+                    assert dna_art[0].minimumHeight() >= 380
+                    assert len(window.page.findChildren(GenomeLayerMap)) == 1, (
+                        "DNA needs an evidence-aware layered file map")
+                    assert dna_art[0].mapTo(window.page, QPoint(0, 0)).y() < 660, (
+                        "Main forensic map must start above the fold.")
+                    assert window.page.findChild(QTableWidget, "dnaGamesResults")
+                    official = window.page.findChild(QLabel, "dnaOfficialCover")
+                    assert official is not None and official.pixmap() is not None and (
+                        not official.pixmap().isNull()), (
+                        "Game DNA must display the verified Steam cached cover")
+                    assert not dna_art[0]._cover.isNull(), (
+                        "Game DNA relationship map must share the selected Steam cover")
+                if route == "Undo Center":
+                    dials = window.page.findChildren(UndoStatusDial)
+                    assert len(dials) == 1, "Undo Center needs real recovery status."
+                    assert len(window.page.findChildren(RecoveryActionTile)) == 4
+                    assert window.page.findChild(QTableWidget, "undoHistoryTable")
+                    assert any("Browse Recycle Bin" in b.text()
+                               for b in window.page.findChildren(QPushButton))
+                if route == "Settings":
+                    categories = window.page.findChildren(QStackedWidget)
+                    assert len(categories) == 1 and categories[0].count() == 8, (
+                        "Settings must show real controls in eight organized sections")
+            # Ready Room must be a real navigable page, with no live web traffic
+            # in disposable CI. Production network calls are independently tested.
+            from unittest.mock import patch
+            with patch("gg_desktop.steam_artwork.prime_visible_covers",
+                       return_value=0), patch(
+                    "gg_desktop.ready_room_data.game_news_batch", return_value=[]):
+                window.navigate("Ready Room")
+                window.pool.waitForDone(3000)
+                app.processEvents()
+                assert window.current_route == "Ready Room"
+                assert window._ready_room_version == "approved-2026-recap-and-memory"
+                assert window.page.findChild(QFrame, "readyRoomRecapCenter"), (
+                    "Locked Crimson Ready Room requires a visible Recap Center.")
+                assert window.page.findChild(
+                    QPushButton, "readyRoomSessionControl"), (
+                    "One-click session launch and explicit timer control missing.")
+                assert window.page.findChild(
+                    QPushButton, "readyRoomLaunchGame"), (
+                    "Selected game Launch action must exist.")
+                assert window.page.findChild(
+                    QPushButton, "readyRoomDiagnostics"), (
+                    "Existing advanced recovery tools must remain accessible.")
+                from gg_desktop.ready_room_visuals import PlaytimeTimeline
+                timeline = window.page.findChildren(PlaytimeTimeline)
+                assert len(timeline) == 1
+                assert timeline[0]._months == [0] * 12, (
+                    "Do not invent a year's gameplay when no sessions were tracked.")
+                assert len(window.page.findChildren(
+                    QPushButton, "readyRoomPeriod")) == 3, (
+                    "Recap needs Year, Month and Session views.")
+                assert len(window.page.findChildren(
+                    QPushButton, "readyRoomGameCover")) == 3
+                approved = root / "_ci_temp" / "crimson-ready-room-approved-1440.png"
+                window.resize(1440, 1050)
+                app.processEvents()
+                assert window.grab().save(str(approved))
+                full_ready_room = root / "_ci_temp" / (
+                    "crimson-ready-room-full-content-1440.png")
+                assert window.page.body.grab().save(str(full_ready_room)), (
+                    "Could not render complete approved Ready Room for visual review.")
+                assert full_ready_room.stat().st_size > 14000
+                window.ready_room_diagnostics_page()
+                window.pool.waitForDone(3000)
+                app.processEvents()
+                advanced_buttons = {b.text() for b in window.page.findChildren(
+                    QPushButton)}
+                for expected in ("Record baseline", "Compare changes",
+                                 "Game Time Machine…", "Record benchmark results…"):
+                    assert expected in advanced_buttons, (
+                        "Existing advanced Ready Room action lost: " + expected)
+                window.navigate("Ready Room")
+                app.processEvents()
+                assert window.page.findChild(QFrame, "readyRoomRecapCenter")
+
+            # The optional assistant stays visible while the user navigates.
+            # This test never invokes the model or installs anything.
+            window.settings["ai_assistant_enabled"] = True
+            window.navigate("Games")
+            before = window.current_route
+            window.navigate("AI Assistant")
+            app.processEvents()
+            docks = window.findChildren(QDockWidget)
+            assert len(docks) == 1 and docks[0].isVisible(), (
+                "AI must open as a companion, not replace the current tab")
+            assert window.current_route == before
+            docks[0].setFloating(True)
+            app.processEvents()
+            assert docks[0].isFloating()
+            window.navigate("Graveyard")
+            app.processEvents()
+            assert window.current_route == "Graveyard"
+            assert docks[0].isVisible()
+            docks[0].setFloating(False)
+            docks[0].hide()
+            window.settings["ai_assistant_enabled"] = False
+
+            window.navigate("Captures")
+            app.processEvents()
+            capture_tabs = window.page.findChildren(QTabWidget)
+            assert len(capture_tabs) == 1, "Captures must contain two separate tabs"
+            assert capture_tabs[0].count() == 2
+            assert "Screenshots" in capture_tabs[0].tabText(0)
+            assert "Videos" in capture_tabs[0].tabText(1)
+            capture_tabs[0].setCurrentIndex(1)
+            app.processEvents()
+            from PySide6.QtWidgets import QTableWidget
+            assert any(t.rowCount() == 1 for t in capture_tabs[0].currentWidget()
+                       .findChildren(QTableWidget)), "Video tab must display the real recording"
+            capture_tabs[0].setCurrentIndex(0)
+            app.processEvents()
+            thumbnail_widgets = capture_tabs[0].currentWidget().findChildren(ScreenshotImage)
+            assert thumbnail_widgets, "Screenshots tab requires a real image preview"
+            preview_deadline = time.monotonic() + 12
+            while time.monotonic() < preview_deadline and not thumbnail_widgets[0].has_image():
+                app.processEvents()
+                time.sleep(0.06)
+            assert thumbnail_widgets[0].has_image(), (
+                "The actual scanned 1920px screenshot must render, not placeholder art")
+            assert screen_path.is_file() and video_path.is_file()
+            window.navigate("Other Storage")
+            app.processEvents()
+            buttons = {w.text() for w in window.page.findChildren(QPushButton)}
+            assert "Quick Scan" in buttons and "Full Scan" in buttons
+            quick = window.page.findChild(QPushButton, "otherStorageQuickScan")
+            full = window.page.findChild(QPushButton, "otherStorageFullScan")
+            assert quick is not None and full is not None
+            assert full.isVisible() and full.isEnabled(), (
+                "Full Scan must be directly visible, not buried in a dropdown.")
+            assert full.mapTo(window.page, QPoint(0, 0)).y() < window.page.height()
+
+            # After a scan, users must get a genuinely data-driven chart AND
+            # the detailed sortable file/folder list on the SAME page.
+            from gg_desktop.dashboard import _drive_choices
+            from gg_desktop.storage_breakdown import OtherStorageBreakdown
+            from gg_desktop.scan_progress import CrimsonScanProgress
+            from other_storage import OtherStorageReport, FolderUsage
+            drive = _drive_choices()[0]
+            window._other_selected_drive = drive
+            window._other_storage_report_drive = drive
+            window._other_storage_report = OtherStorageReport(
+                root=drive,
+                folders=(
+                    FolderUsage("Program Files", drive + "Program Files",
+                                "Apps and shared app data", 5000, 2),
+                    FolderUsage("Windows", drive + "Windows",
+                                "Windows / system", 3000, 1)),
+                analyzed_bytes=8000, entries_seen=7,
+                skipped_entries=2, excluded_games=1,
+                complete=False, limitation="Partial synthetic scan",
+                elapsed_seconds=3.0,
+                category_totals=(
+                    ("Apps and shared app data", 5000),
+                    ("Windows / system", 3000)),
+                root_entries_count=2,
+            )
+            window.navigate("Other Storage")
+            app.processEvents()
+            chart = window.page.findChild(
+                OtherStorageBreakdown, "otherStorageBreakdownChart")
+            assert chart is not None and chart.isVisible(), (
+                "Completed and partial Other Storage scans must show a chart")
+            assert chart.measured_total == 8000
+            assert len(chart.segments) == 2
+            assert "PARTIAL COVERAGE" in window.page.findChild(
+                QLabel, "otherStorageBreakdownCoverage").text()
+            assert any(t.rowCount() >= 2
+                       for t in window.page.findChildren(QTableWidget)), (
+                "The sortable folder results must remain below the visual chart.")
+            other_progress = window.page.findChild(
+                CrimsonScanProgress, "otherStorageScanProgress")
+            assert other_progress is not None, (
+                "Other Storage scans must have the new segmented loading bar.")
+            assert isinstance(window.progress, CrimsonScanProgress), (
+                "Main system scan must use the same Crimson progress system.")
+            # CI-only synthetic visualization for human visual review, not user data.
+            breakdown_preview = root / "_ci_temp" / (
+                "crimson-other-storage-breakdown-SYNTHETIC-1440.png")
+            assert window.grab().save(str(breakdown_preview)), (
+                "Failed to capture populated scan breakdown and results list.")
+            window._other_storage_report = None
+            window._other_storage_report_drive = None
+            window.navigate("Overview")
+            app.processEvents()
+            assert window.page.findChildren(HeroBanner), "Hero must be a real native vector widget"
+            assert not hasattr(window.page.findChildren(HeroBanner)[0], "atlas"), (
+                "Overview must not use the old pixelated JPEG artwork")
+            # Dialogs must not be white background with white text on Windows.
+            assert app.palette().color(QPalette.Window).lightness() < 90
+            assert app.palette().color(QPalette.WindowText).lightness() > 180
             # Exact personal Never Touch rule can be removed from the Graveyard
             # with a separate confirmation and WITHOUT a recycle operation.
             from gg_desktop.backend import refresh_graveyard
@@ -107,11 +449,65 @@ def main():
             window.settings["never_touch"] = []
             refresh_graveyard(window.inventory, window.settings)
 
+            # Visual-regression fixture for the APPROVED second Mod Shelf
+            # mockup. All games, covers and mod folders are synthetic and live
+            # only in the disposable CI directory. No fake data is bundled.
+            from core import ModFolder
+            from gg_desktop.premium_panels import ModLocationCard
+            from gg_desktop.typography import display_family
+            from gg_desktop.reference_hero import ReferenceHero
+            synthetic_mods = []
+            for index, game in enumerate(window.inventory.games):
+                fake_folder = Path(game.install_path) / "Mods"
+                fake_folder.mkdir(parents=True, exist_ok=True)
+                synthetic_mods.append(ModFolder(
+                    game.name + " - mods", str(fake_folder), str(synthetic),
+                    "Scanned mod location", ("QA synthetic fixture",),
+                    (index + 1) * 3_500_000, 6 + index,
+                    False, source=("Vortex", "Mod Organizer 2", "BepInEx")[index % 3]))
+            window.inventory.mods = synthetic_mods
+            window.navigate("Mods")
+            window.resize(1440, 900)
+            app.processEvents()
+            heroes = window.page.findChildren(ReferenceHero)
+            assert len(heroes) == 1 and heroes[0].title_overlay.text() == "MOD SHELF"
+            rendered_family = heroes[0].title_overlay.font().family()
+            assert "Georgia" not in rendered_family and "Cambria" not in rendered_family, (
+                "The chosen Mod Shelf reference requires a modern, non-serif gaming display font: "
+                + rendered_family)
+            cards = window.page.findChildren(ModLocationCard)
+            assert len(cards) >= 3, "Artwork-led Mod Shelf must show actual modded game tiles"
+            cards[1].activate()
+            app.processEvents()
+            assert cards[1].property("selected") is True
+            assert cards[0].property("selected") is False
+            assert window.mod_inspector.title.text() == cards[1].game_name
+            window.mod_list_btn.click()
+            app.processEvents()
+            assert window.mod_list_btn.property("active") is True
+            assert not cards[1].isVisible(), "List view must hide gallery tiles"
+            window.mod_grid_btn.click()
+            app.processEvents()
+            assert window.mod_grid_btn.property("active") is True
+            assert cards[1].isVisible(), "Grid view must bring back game cover tiles"
+            window.page.verticalScrollBar().setValue(0)
+            app.processEvents()
+            mockup_screen = root / "_ci_temp" / "crimson-mods-populated-SYNTHETIC-1440.png"
+            assert window.grab().save(str(mockup_screen)), (
+                "Failed to render approved Mod Shelf interaction state")
+            assert mockup_screen.stat().st_size > 12000
+
             for route, filename in (
                 ("Overview", "crimson-desktop-1440.png"),
                 ("Games", "crimson-games-1440.png"),
+                ("Mods", "crimson-mods-1440.png"),
+                ("Old Files", "crimson-old-files-1440.png"),
                 ("Graveyard", "crimson-graveyard-1440.png"),
                 ("Game DNA", "crimson-dna-1440.png"),
+                ("Undo Center", "crimson-undo-1440.png"),
+                ("Other Storage", "crimson-other-storage-1440.png"),
+                ("Captures", "crimson-captures-1440.png"),
+                ("Settings", "crimson-settings-1440.png"),
             ):
                 window.navigate(route)
                 window.resize(1440, 900)
@@ -119,9 +515,17 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
-            print("PASS: Qt Crimson Overview and 9 interactive pages, mixed-launcher "
-                  "Games, inline exact-rule Unprotect without deletion, "
-                  "four screenshots and original hero asset.")
+            # Full-height capture preserves all three bands of the reference
+            # dashboard. The 900px legacy capture deliberately tests scrolling.
+            window.navigate("Overview")
+            window.resize(1440, 1080)
+            app.processEvents()
+            full = root / "_ci_temp" / "crimson-desktop-full-1440.png"
+            assert window.grab().save(str(full)), "Cannot render full reference dashboard"
+            assert full.stat().st_size > 15000, "Full-height overview appears blank"
+            print("PASS: Qt Crimson dashboard, all pictured controls, original art, "
+                  "9 interactive pages, mixed-launcher data, protected Graveyard, "
+                  "and full-height screenshot without changing user data.")
         finally:
             window.close()
             app.processEvents()

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400" viewBox="0 0 1600 400">
+<defs><linearGradient id="night" x2="0" y2="1"><stop stop-color="#071120"/><stop offset=".6" stop-color="#0c2534"/><stop offset="1" stop-color="#050c14"/></linearGradient>
+<radialGradient id="moon"><stop stop-color="#b5e9fd"/><stop offset=".8" stop-color="#6897b9"/><stop offset="1" stop-color="#375c79"/></radialGradient>
+<radialGradient id="fog"><stop stop-color="#d92b51" stop-opacity=".44"/><stop offset="1" stop-color="#d92b51" stop-opacity="0"/></radialGradient>
+<linearGradient id="stone" x2="1" y2="1"><stop stop-color="#344b5b"/><stop offset=".5" stop-color="#192f40"/><stop offset="1" stop-color="#0a141f"/></linearGradient></defs>
+<rect width="1600" height="400" fill="url(#night)"/>
+<circle cx="1100" cy="69" r="129" fill="url(#moon)" opacity=".83"/>
+<path d="M0 278L117 166 212 233 326 157 442 262 584 167 710 252 821 143 951 273 1051 165 1220 267 1342 145 1600 240V400H0Z" fill="#0b1a28"/>
+<g fill="#08121b" stroke="#1d3446" stroke-width="2">
+ <path d="M762 320V165l20-25 22 25v155Z"/><path d="M900 325V111l26-32 27 31v215Z"/><path d="M1450 323V155l23-29 21 29v168Z"/>
+</g>
+<g transform="translate(1162 45)">
+ <ellipse cx="85" cy="290" rx="218" ry="34" fill="#cd1b41" opacity=".32"/>
+ <path d="M-27 285V122Q-22 18 91 19Q204 24 210 122V285Z" fill="url(#stone)" stroke="#4b6978" stroke-width="8"/>
+ <path d="M-4 266V124Q3 42 92 42Q176 45 184 124V266Z" fill="none" stroke="#637785" stroke-opacity=".4" stroke-width="3"/>
+ <path d="M91 92l-27 19 12 24h30l13-24Z" fill="#0c1824" stroke="#6cb0c4" stroke-width="4"/>
+ <path d="M66 160h56m-28-23v54" stroke="#8dc7cc" stroke-width="8" stroke-linecap="round" opacity=".72"/>
+ <g stroke="#f4425d" stroke-width="3" fill="none"><path d="M-14 233l32-16m148 11 28 26M38 93l28-7"/></g>
+</g>
+<g transform="translate(1370 40)" fill="#060b10">
+ <path d="M30 124Q42 92 79 97Q108 110 101 136L82 159 64 158 41 138Z"/>
+ <path d="M60 110Q8 75-27 17Q26 34 62 83M79 107Q121 55 171 42Q134 91 99 124Z"/>
+ <path d="M97 128l38 14-40 6-7 36-12-29 13-25Z"/>
+ <path d="M52 157l-19 63m51-63 8 59" stroke="#060b10" stroke-width="7" fill="none"/>
+ <circle cx="91" cy="121" r="3" fill="#e63a55"/>
+</g>
+<g transform="translate(985 240) rotate(13 95 50)">
+ <path d="M15 56Q3 12 45 13h102q45-2 41 43l-17 28-41-22H69L33 84Z" fill="#101926" stroke="#62717a" stroke-width="6"/>
+ <path d="M48 33v30M33 48h30" stroke="#60b3c5" stroke-width="6"/><circle cx="140" cy="39" r="7" fill="#e74061"/><circle cx="155" cy="56" r="7" fill="#65b9d2"/>
+</g>
+<path d="M0 351Q290 309 700 349T1600 337V400H0Z" fill="#060b13"/>
+<ellipse cx="1200" cy="346" rx="415" ry="78" fill="url(#fog)"/>
+</svg>
