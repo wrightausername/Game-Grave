@@ -149,7 +149,12 @@ class ScreenMethods:
         self.navigate("Games")
 
     def ready_room_page(self):
-        """Pre-game home for verified installs, user notes and Steam announcements.
+        """The owner-approved Crimson Ready Room. Details stay in diagnostics."""
+        from gg_desktop.ready_room_screen import render_ready_room
+        return render_ready_room(self)
+
+    def ready_room_diagnostics_page(self):
+        """Existing advanced Mod Health, patch history and recovery functions.
 
         This is NOT a background launcher or game-hook service. Optional news
         and official artwork are fetched on demand with low worker priority
@@ -166,7 +171,10 @@ class ScreenMethods:
 
         page = self._new(
             "Ready Room",
-            "Your games, recent activity and official Steam announcements in one place.")
+            "Advanced mod baselines, benchmark records and recovery tools.")
+        page.content.addWidget(button(
+            "← Back to Ready Room", lambda: self.navigate("Ready Room"),
+            kind="primary"))
         if self._not_scanned(page):
             return
         favorites = tuple(self.settings.get("ready_room_favorites", []))
