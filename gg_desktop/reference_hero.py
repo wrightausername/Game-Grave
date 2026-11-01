@@ -52,7 +52,7 @@ class ReferenceHero(SceneHeader):
         row = QHBoxLayout(self.metrics)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(10)
-        for i, (name, value, note) in enumerate(list(metrics)[:4]):
+        for i, (name, value, note) in enumerate(list(metrics)[:6]):
             tile = QFrame(self.metrics)
             tile.setObjectName("referenceHeroTile")
             tile.setStyleSheet(
