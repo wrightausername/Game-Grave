@@ -1393,15 +1393,26 @@ class ScreenMethods:
         if is_fixed_drive_root(Path("C:/")):
             top.addWidget(button(
                 "Select C: drive…", self._choose_old_files_c_drive))
-        top.addWidget(button("Scan selected location", self.start_scan, kind="primary"))
+        old_mode = QComboBox()
+        old_mode.addItems(["Quick Scan", "Full Scan"])
+        old_mode.setAccessibleName("Old Files scan depth")
+        old_mode.setCurrentText(getattr(self, "_old_files_scan_mode", "Quick Scan"))
+        top.addWidget(old_mode)
+        def run_old_scan():
+            self._old_files_scan_mode = old_mode.currentText()
+            self.start_scan(old_files_full=(self._old_files_scan_mode == "Full Scan"))
+        top.addWidget(button("Scan selected location", run_old_scan, kind="primary"))
+        top.addWidget(button("Cancel scan", self.cancel_scan))
         top.addStretch()
         contents.addWidget(actions)
         drive_scope = is_fixed_drive_root(Path(root))
         if drive_scope:
             contents.addWidget(label(
                 "Whole-drive mode: only safe non-system folders are inspected, "
-                "up to 160,000 entries or 25 seconds. Results can be incomplete. "
-                "Installed games and protected locations are excluded. "
+                "Quick Scan: 160,000 entries / 15,000 matches / 25 seconds. "
+                "Full Scan: no arbitrary entry, match, depth or time limit; "
+                "it may take longer. Both skip system, installed games and "
+                "protected locations. "
                 "No files are deleted by scanning.",
                 "warning", wrap=True))
         if self._not_scanned(page):
@@ -1417,7 +1428,7 @@ class ScreenMethods:
                 ". Click Scan selected location to view actual results. "
                 "Previous results are not displayed as if they came from this location.",
                 "subtle", wrap=True))
-            note_col.addWidget(button("Scan this location", self.start_scan,
+            note_col.addWidget(button("Scan this location", run_old_scan,
                                       kind="primary"))
             page.content.addWidget(p)
             page.content.addWidget(note)
@@ -1447,7 +1458,7 @@ class ScreenMethods:
                     "The selected location was not fully scanned. "
                     "No clean-results claim is being made. " + status_message,
                     "warning", wrap=True))
-            stack.addWidget(button("Rescan Old Files", self.start_scan,
+            stack.addWidget(button("Rescan Old Files", run_old_scan,
                                    kind="primary"))
             page.content.addWidget(p)
             page.content.addWidget(empty)
@@ -1455,21 +1466,55 @@ class ScreenMethods:
                 return
         page.content.addWidget(old_files_categories(self.inventory.files))
         page.content.addWidget(old_file_age_chart(self.inventory.files))
+        sorter = QWidget()
+        sort_row = row(spacing=9)
+        sorter.setLayout(sort_row)
+        sort_row.addWidget(label("Sort by", "subtle"))
+        sort_choice = QComboBox()
+        sort_choice.setAccessibleName("Sort Old Files by size, name or modified date")
+        sort_choice.addItems([
+            "Largest first", "Smallest first", "Name A to Z", "Name Z to A",
+            "Newest modified", "Oldest modified"])
+        sort_choice.setCurrentText(getattr(self, "_old_files_sort", "Largest first"))
+        sort_row.addWidget(sort_choice)
+        sort_row.addWidget(label(
+            f"{len(self.inventory.files):,} found; showing up to 500 rows. "
+            "Results are never deleted automatically.", "caption"))
+        sort_row.addStretch()
+        contents.addWidget(sorter)
         table = data_table(["FILE", "SIZE", "MODIFIED", "PROTECTION"])
         table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        table.setRowCount(min(len(self.inventory.files), 500))
         table.setColumnWidth(0, 350)
         table.setColumnWidth(1, 120)
         table.setColumnWidth(2, 140)
-        rows = self.inventory.files[:500]
-        for i, old in enumerate(rows):
-            fields = (str(Path(old.path).name), human_size(old.size),
-                      datetime.fromtimestamp(old.modified).strftime("%Y-%m-%d"),
-                      "Protected" if is_protected_path(Path(old.path),
-                                                      self.settings.get("never_touch", []))
-                      else "Reviewable (not proven unused)")
-            for j, value in enumerate(fields):
-                _table_text(table, i, j, value)
+        rows = []
+        def refill(*_):
+            self._old_files_sort = sort_choice.currentText()
+            options = {
+                "Largest first": lambda f: (-f.size, f.path.casefold()),
+                "Smallest first": lambda f: (f.size, f.path.casefold()),
+                "Name A to Z": lambda f: (Path(f.path).name.casefold(), f.path.casefold()),
+                "Name Z to A": lambda f: (Path(f.path).name.casefold(), f.path.casefold()),
+                "Newest modified": lambda f: (-f.modified, f.path.casefold()),
+                "Oldest modified": lambda f: (f.modified, f.path.casefold()),
+            }
+            ordered = sorted(self.inventory.files,
+                             key=options.get(self._old_files_sort,
+                                             options["Largest first"]),
+                             reverse=self._old_files_sort == "Name Z to A")
+            rows[:] = ordered[:500]
+            table.setRowCount(len(rows))
+            for i, old in enumerate(rows):
+                fields = (str(Path(old.path).name), human_size(old.size),
+                          datetime.fromtimestamp(old.modified).strftime("%Y-%m-%d %H:%M"),
+                          "Protected" if is_protected_path(Path(old.path),
+                                                          self.settings.get("never_touch", []))
+                          else "Reviewable (not proven unused)")
+                for j, value in enumerate(fields):
+                    _table_text(table, i, j, value)
+                table.setRowHeight(i, 36)
+        sort_choice.currentTextChanged.connect(refill)
+        refill()
         contents.addWidget(table)
         def remove():
             if self.scanning or self.cleaning:
