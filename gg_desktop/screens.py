@@ -227,7 +227,35 @@ class ScreenMethods:
             if 0 <= row_idx < len(self._shown_games) else None)
         self.game_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.game_table.customContextMenuRequested.connect(self._games_context_menu)
+        self._cover_requests_inflight = False
+        self._cover_attempted_ids = set()
         self._fill_games()
+
+    def _load_official_covers(self, games):
+        """Only visible Steam AppIDs, only on demand and off the UI thread."""
+        if getattr(self, "_cover_requests_inflight", False):
+            return
+        from gg_desktop.steam_artwork import verified_steam_id
+        from gg_desktop.local_art import game_cover_path
+        attempted = getattr(self, "_cover_attempted_ids", set())
+        needed = [g for g in games[:9]
+                  if verified_steam_id(g) and
+                  verified_steam_id(g) not in attempted and
+                  not game_cover_path(g)]
+        if not needed:
+            return
+        attempted.update(verified_steam_id(g) for g in needed)
+        self._cover_attempted_ids = attempted
+        self._cover_requests_inflight = True
+        def fetched(count):
+            self._cover_requests_inflight = False
+            if count and getattr(self, "current_route", "") == "Games":
+                # Rebuild only the visible covers, never rescan the disk.
+                self._gallery_keys = None
+                self._refresh_games_gallery(self._shown_games)
+        from gg_desktop.steam_artwork import prime_visible_covers
+        self.job(lambda _progress: prime_visible_covers(needed),
+                 fetched, error_title="Official artwork unavailable")
 
     def _refresh_games_gallery(self, rows):
         keys = tuple(g.key for g in rows[:9])
@@ -311,6 +339,7 @@ class ScreenMethods:
         if self._shown_games and not _selected_indices(self.game_table):
             self.game_table.selectRow(0)
         self._game_details()
+        self._load_official_covers(rows)
 
     def _game_details(self):
         from gg_desktop.widgets import destroy_layout
