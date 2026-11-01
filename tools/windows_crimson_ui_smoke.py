@@ -239,11 +239,44 @@ def main():
                 window.pool.waitForDone(3000)
                 app.processEvents()
                 assert window.current_route == "Ready Room"
-                ready_buttons = {b.text() for b in window.page.findChildren(QPushButton)}
+                assert window._ready_room_version == "approved-2026-recap-and-memory"
+                assert window.page.findChild(QFrame, "readyRoomRecapCenter"), (
+                    "Locked Crimson Ready Room requires a visible Recap Center.")
+                assert window.page.findChild(
+                    QPushButton, "readyRoomSessionControl"), (
+                    "One-click session launch and explicit timer control missing.")
+                assert window.page.findChild(
+                    QPushButton, "readyRoomLaunchGame"), (
+                    "Selected game Launch action must exist.")
+                assert window.page.findChild(
+                    QPushButton, "readyRoomDiagnostics"), (
+                    "Existing advanced recovery tools must remain accessible.")
+                from gg_desktop.ready_room_visuals import PlaytimeTimeline
+                timeline = window.page.findChildren(PlaytimeTimeline)
+                assert len(timeline) == 1
+                assert timeline[0]._months == [0] * 12, (
+                    "Do not invent a year's gameplay when no sessions were tracked.")
+                assert len(window.page.findChildren(
+                    QPushButton, "readyRoomPeriod")) == 3, (
+                    "Recap needs Year, Month and Session views.")
+                assert len(window.page.findChildren(
+                    QPushButton, "readyRoomGameCover")) == 3
+                approved = root / "_ci_temp" / "crimson-ready-room-approved-1440.png"
+                window.resize(1440, 1050)
+                app.processEvents()
+                assert window.grab().save(str(approved))
+                window.ready_room_diagnostics_page()
+                window.pool.waitForDone(3000)
+                app.processEvents()
+                advanced_buttons = {b.text() for b in window.page.findChildren(
+                    QPushButton)}
                 for expected in ("Record baseline", "Compare changes",
                                  "Game Time Machine…", "Record benchmark results…"):
-                    assert expected in ready_buttons, (
-                        "Missing Ready Room action: " + expected)
+                    assert expected in advanced_buttons, (
+                        "Existing advanced Ready Room action lost: " + expected)
+                window.navigate("Ready Room")
+                app.processEvents()
+                assert window.page.findChild(QFrame, "readyRoomRecapCenter")
 
             # The optional assistant stays visible while the user navigates.
             # This test never invokes the model or installs anything.
