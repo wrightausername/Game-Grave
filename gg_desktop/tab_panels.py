@@ -124,7 +124,7 @@ class GameCover(QFrame):
         super().mouseReleaseEvent(event)
 
 
-def game_gallery(games, selected_callback, *, limit=9):
+def game_gallery(games, selected_callback, *, limit=9, empty_message=None):
     """Artwork-led game library grid, backed only by actual installations.
 
     The full searchable record table remains below. This is visual navigation,
@@ -140,7 +140,8 @@ def game_gallery(games, selected_callback, *, limit=9):
         "Select a cover to inspect its verified install and actions. "
         "Artwork is loaded from local caches when available."))
     if not games:
-        layout.addWidget(_small("No verified games yet. Run Scan PC to populate the library."))
+        layout.addWidget(_small(
+            empty_message or "No verified games yet. Run Scan PC to populate the library."))
         return section
     shelf = QWidget()
     row_count = (min(len(games), limit) + 2) // 3
