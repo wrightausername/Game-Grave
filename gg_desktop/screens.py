@@ -104,12 +104,18 @@ class ScreenMethods:
             from gg_desktop.premium_panels import group_mod_locations
             groups, _unmatched = group_mod_locations(
                 self.inventory.games, self.inventory.mods)
+            measured = [int(getattr(m, "apparent_bytes", 0) or 0)
+                        for m in self.inventory.mods]
+            known = sum(max(0, v) for v in measured)
             metrics = (
+                ("Games with mods", len(groups), "Verified install links"),
                 ("Mod locations", len(self.inventory.mods), "Discovered locations"),
-                ("Linked games", len(groups), "Verified path matches"),
-                ("Sources", len({str(getattr(m, "source", "Unknown"))
-                                 for m in self.inventory.mods}), "Reported sources"),
-                ("Protection", "ON", "No automatic deletion"),
+                ("Apparent mod storage",
+                 (human_size(known) if measured and known else "Unknown"),
+                 "Sizes may overlap"),
+                ("Conflicts", "—", "Not assessed"),
+                ("Updates", "—", "Not verified"),
+                ("Orphaned mods", "—", "Not proven by age"),
             )
             page.content.addWidget(ReferenceHero(
                 "mods", "Mods", subtitle, metrics))
@@ -2348,10 +2354,13 @@ class ScreenMethods:
         mod_workspace = QWidget()
         mod_workspace_row = row(spacing=14)
         mod_workspace.setLayout(mod_workspace_row)
+        columns = (5 if self.width() >= 1400 else
+                   4 if self.width() >= 1300 else
+                   3 if self.width() >= 1100 else 2)
         gallery, matched, external = mod_gallery(
             self.inventory.games, self.inventory.mods,
             lambda game, locations, source: self.mod_inspector.set_group(
-                game, locations, source), limit=9)
+                game, locations, source), limit=columns * 2, columns=columns)
         gallery.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         mod_workspace_row.addWidget(gallery, 1, Qt.AlignTop)
         self.mod_inspector = ModInspector(
