@@ -214,7 +214,7 @@ def main():
                     dials = window.page.findChildren(UndoStatusDial)
                     assert len(dials) == 1, "Undo Center needs real recovery status."
                     assert window.page.findChild(QTableWidget, "undoHistoryTable")
-                    assert any(b.text().startswith("Browse Recycle Bin")
+                    assert any("Browse Recycle Bin" in b.text()
                                for b in window.page.findChildren(QPushButton))
                 if route == "Settings":
                     categories = window.page.findChildren(QStackedWidget)
