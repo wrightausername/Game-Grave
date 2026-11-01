@@ -1148,7 +1148,7 @@ class ScreenMethods:
         actions.setLayout(top)
         from old_files_scope import is_fixed_drive_root
         top.addWidget(button("Choose folder…", self._choose_scan_folder))
-        if is_fixed_drive_root(Path("C:\\\\")):
+        if is_fixed_drive_root(Path("C:/")):
             top.addWidget(button(
                 "Select C: drive…", self._choose_old_files_c_drive))
         top.addWidget(button("Scan selected location", self.start_scan, kind="primary"))
@@ -1166,7 +1166,7 @@ class ScreenMethods:
             page.content.addWidget(p)
             return
         previous_root = str(getattr(self.inventory, "old_files_scan_root", ""))
-        if previous_root != root:
+        if previous_root and previous_root != root:
             note, note_col = panel(padding=18)
             note_col.addWidget(section_title("Ready to scan the selected location"))
             note_col.addWidget(label(
@@ -1903,7 +1903,7 @@ class ScreenMethods:
     def _choose_old_files_c_drive(self):
         """Deliberately opt in to a read-only bounded C-drive scan."""
         from old_files_scope import is_fixed_drive_root
-        root = Path("C:\\\\")
+        root = Path("C:/")
         if not is_fixed_drive_root(root):
             self.error("C: is unavailable", "Only an existing local fixed C: drive can be scanned.")
             return
@@ -1964,6 +1964,10 @@ class ScreenMethods:
             "Old Files: " + str(self.settings.get("scan_folder", "")),
             "subtle", wrap=True))
         contents.addWidget(button("Choose Old Files folder…", self._choose_scan_folder))
+        from old_files_scope import is_fixed_drive_root
+        if is_fixed_drive_root(Path("C:/")):
+            contents.addWidget(button("Select C: for Old Files…",
+                                      self._choose_old_files_c_drive))
         contents.addWidget(label(
             "Automatic cleanup remains OFF. Every actual Recycle Bin move "
             "requires separate approval.", "warning", wrap=True))
