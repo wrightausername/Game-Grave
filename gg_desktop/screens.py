@@ -2871,7 +2871,8 @@ class ScreenMethods:
             recovery_path.set_record(
                 str(rec.get("path", "Select a recovery record")) if rec else
                 "Select a recovery record",
-                "Requires Windows check" if rec else "Not checked")
+                ("Last logged state: " + str(rec.get("state", "Not checked")))
+                if rec else "Not checked")
         table.itemSelectionChanged.connect(update_route)
         if entries:
             table.selectRow(0)
@@ -2880,16 +2881,37 @@ class ScreenMethods:
                 "No recovery records",
                 "Game Grave has not recorded a Recycle Bin cleanup yet. "
                 "Nothing to restore from this list."))
+        def refresh_recovery_row(event_id: str):
+            # Update the existing table without throwing the user to the top
+            # of the Undo Center or discarding their selected record.
+            recent = {str(r.get("id", "")): r for r in get_records()}
+            updated = recent.get(str(event_id))
+            if updated is None:
+                return
+            from shiboken6 import isValid
+            if not isValid(table):
+                return
+            for index, previous in enumerate(entries):
+                if str(previous.get("id", "")) == str(event_id):
+                    entries[index] = updated
+                    _table_text(table, index, 3,
+                                updated.get("state", "Not checked"))
+                    if index in _selected_indices(table):
+                        update_route()
+                    break
+
         def check():
             record = selected_record()
             if not record:
                 self.info("Choose a record", "Select an Undo Center entry first.")
                 return
-            self.job(lambda _emitter: check_restore(record["id"]),
-                     lambda outcome: (
-                         self.info("Windows restore availability",
-                                   str(outcome) + "\n\nOnly a real unique Recycle Bin match is restorable."),
-                         self.navigate("Undo Center")),
+            key = str(record.get("id", ""))
+            def verified(outcome):
+                refresh_recovery_row(key)
+                self.status.setText(
+                    "Windows recovery check: " + str(outcome) +
+                    ". Verify an exact Recycle Bin match before restoring.")
+            self.job(lambda _emitter: check_restore(key), verified,
                      error_title="Cannot check recovery")
         def undo():
             if self.cleaning or self.scanning:
@@ -2906,11 +2928,13 @@ class ScreenMethods:
                 "Game Grave will not overwrite a current file."):
                 return
             self.cleaning = True
+            key = str(rec.get("id", ""))
             def finished(value):
                 self.cleaning = False
+                refresh_recovery_row(key)
+                self.status.setText("Windows restore result: " + str(value))
                 self.info("Restore result", str(value))
-                self.navigate("Undo Center")
-            self.job(lambda _progress: restore_recycled(rec["id"]), finished,
+            self.job(lambda _progress: restore_recycled(key), finished,
                      error_title="Restore could not be verified")
         line.addWidget(button("Verify exact Windows match", check))
         line.addWidget(button("Restore selected…", undo, kind="primary"))
@@ -2934,8 +2958,9 @@ class ScreenMethods:
             "permitted parts of C:\\\\. "
             "Windows folders, installed programs, Game Grave's protected "
             "locations, junctions and known game installs are excluded. "
-            "The scan is limited to 25 seconds or 160,000 entries and "
-            "may return partial findings. Old does not mean unused. "
+            "Quick Scan is limited to 25 seconds or 160,000 entries; "
+            "Full Scan removes arbitrary limits but may take longer. "
+            "Choose the mode on the Old Files tab. Old does not mean unused. "
             "Nothing is deleted automatically."):
             return
         updated = dict(self.settings)
