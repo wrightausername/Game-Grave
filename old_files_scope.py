@@ -214,7 +214,7 @@ def scan_old_files_scope(
                 break
             if cancel and cancel():
                 raise InterruptedError("Old Files drive scan canceled.")
-            if time.monotonic() - started >= max_seconds:
+            if max_seconds is not None and time.monotonic() - started >= max_seconds:
                 status, reason = "partial", "Time limit reached; results are incomplete."
                 break
             candidate = parent_path / name
