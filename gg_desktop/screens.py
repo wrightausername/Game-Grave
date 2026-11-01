@@ -870,7 +870,7 @@ class ScreenMethods:
 
     def _fetch_missing_game_covers(self):
         """User-triggered catch-up for up to 24 exact Steam AppIDs."""
-        from gg_desktop.local_art import game_cover_path, invalidate_cover_cache
+        from gg_desktop.local_art import game_needs_portrait, invalidate_cover_cache
         from gg_desktop.steam_artwork import verified_steam_id, prime_visible_covers
         from performance_guard import GameActivityDetector
         if getattr(self, "_cover_requests_inflight", False):
@@ -881,7 +881,7 @@ class ScreenMethods:
                 "Art downloads deferred while a game is running. FPS first.")
             return
         missing = [g for g in getattr(self, "_filtered_games", [])
-                   if verified_steam_id(g) and not game_cover_path(g)]
+                   if verified_steam_id(g) and game_needs_portrait(g)]
         if not missing:
             self.info("Steam covers", "No missing verified Steam covers in this view. "
                       "Other launchers can use Choose Cover in the game inspector.")
@@ -951,13 +951,13 @@ class ScreenMethods:
         if getattr(self, "_cover_requests_inflight", False):
             return
         from gg_desktop.steam_artwork import verified_steam_id
-        from gg_desktop.local_art import game_cover_path
+        from gg_desktop.local_art import game_needs_portrait
         attempted = getattr(self, "_cover_attempted_ids", set())
         page_start = 9 * getattr(self, "_art_page", 0)
         needed = [g for g in games[page_start:page_start + 9]
                   if verified_steam_id(g) and
                   verified_steam_id(g) not in attempted and
-                  not game_cover_path(g)]
+                  game_needs_portrait(g)]
         if not needed:
             return
         attempted.update(verified_steam_id(g) for g in needed)
