@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QRectF, QPointF
 from PySide6.QtGui import QColor, QFont, QImageReader, QPixmap, QLinearGradient, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame, QGridLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QSizePolicy, QScrollArea,
@@ -208,6 +208,65 @@ def mod_radar_panel(mods):
     return panel
 
 
+class ArchiveCategoryGlyph(QWidget):
+    """Original cyan archive pictograms, vector at every Windows DPI."""
+    def __init__(self, kind):
+        super().__init__()
+        self.kind = kind
+        self.setFixedSize(54, 47)
+        self.setAccessibleName(kind + " category symbol")
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(QPen(QColor("#51D5EB"), 2.2))
+        p.setBrush(QColor("#123748"))
+        if self.kind == "Game caches":
+            p.drawRoundedRect(QRectF(4, 12, 44, 26), 6, 6)
+            p.drawLine(QPointF(10, 26), QPointF(42, 26))
+            p.drawEllipse(QPointF(37, 32), 2.7, 2.7)
+            p.drawLine(QPointF(13, 8), QPointF(38, 8))
+        elif self.kind == "Logs":
+            p.drawRoundedRect(QRectF(10, 3, 34, 41), 3, 3)
+            for y in (13, 21, 29, 37):
+                p.drawLine(QPointF(16, y), QPointF(37, y))
+        elif self.kind == "Temporary":
+            p.drawEllipse(QPointF(26, 24), 19, 19)
+            p.drawLine(QPointF(26, 24), QPointF(26, 12))
+            p.drawLine(QPointF(26, 24), QPointF(35, 30))
+            p.drawLine(QPointF(17, 1), QPointF(35, 1))
+        elif self.kind == "Install remnants":
+            p.drawRect(QRectF(6, 12, 41, 30))
+            p.drawLine(QPointF(6, 12), QPointF(17, 4))
+            p.drawLine(QPointF(47, 12), QPointF(36, 4))
+            p.drawLine(QPointF(17, 4), QPointF(36, 4))
+            p.drawLine(QPointF(26, 15), QPointF(26, 32))
+            p.drawLine(QPointF(20, 25), QPointF(26, 32))
+            p.drawLine(QPointF(32, 25), QPointF(26, 32))
+        else:
+            p.drawRoundedRect(QRectF(3, 15, 48, 27), 4, 4)
+            p.drawRoundedRect(QRectF(6, 6, 23, 12), 3, 3)
+            p.drawLine(QPointF(13, 30), QPointF(40, 30))
+        p.end()
+
+
+class ArchiveCategoryTile(QFrame):
+    """Image-led category shelf backed by real scan-derived totals."""
+    def __init__(self, name, count, apparent_bytes):
+        super().__init__()
+        self.setObjectName("archiveCategoryTile")
+        self.setMinimumWidth(132)
+        self.setMinimumHeight(149)
+        self.setAccessibleName(
+            f"{name}: {count} discovered file(s), {human_size(apparent_bytes)} apparent size")
+        contents = _layout(self, pad=(12, 12, 9, 10), gap=5)
+        contents.addWidget(ArchiveCategoryGlyph(name))
+        contents.addWidget(_small(name, "archiveTileTitle"))
+        contents.addWidget(_small(human_size(apparent_bytes), "archiveTileMetric"))
+        contents.addWidget(_small(f"{count:,} scanned file(s)", "archiveTileCount"))
+        contents.addStretch(1)
+
+
 def old_files_categories(files):
     """Read-only, honest classification of files from the selected scan root."""
     buckets = {
@@ -233,14 +292,11 @@ def old_files_categories(files):
         buckets[group][1] += max(0, int(item.size))
     wrapper = QWidget()
     row = _layout(wrapper, vertical=False, pad=(0,0,0,0), gap=9)
-    marks = (("Game caches", "▥"), ("Logs", "▤"), ("Temporary", "▧"),
-             ("Install remnants", "▣"), ("Other old files", "▦"))
-    for index, (name, mark) in enumerate(marks):
+    names = ("Game caches", "Logs", "Temporary",
+             "Install remnants", "Other old files")
+    for name in names:
         count, bytes_size = buckets[name]
-        row.addWidget(GraphicCard(
-            name, human_size(bytes_size),
-            f"{count:,} discovered file(s)",
-            pictogram=mark, color="#43D6F2" if index != 3 else "#F84359"), 1)
+        row.addWidget(ArchiveCategoryTile(name, count, bytes_size), 1)
     return wrapper
 
 
