@@ -55,95 +55,81 @@ class GraphicCard(QFrame):
         layout.addStretch(1)
 
 
-class GameCover(QPushButton):
-    """Local vector cover treatment, NOT an external fictional cover image.
+class GameCover(QFrame):
+    """Clickable, fully laid-out visual game card backed by one real record.
 
-    The launcher, title and size are bound to scan data. Clicking selects the
-    game record in the real Games list.
+    Native labels avoid painter clipping on nested Windows scroll areas.
+    No fictional cover art or network image lookups.
     """
     def __init__(self, game, on_selected):
         super().__init__()
         self.game = game
-        self.setMinimumWidth(170)
-        self.setMaximumWidth(185)
-        self.setFixedHeight(188)
+        self._select = on_selected
         self.setObjectName("gameCover")
+        self.setFixedHeight(187)
+        self.setMinimumWidth(156)
+        self.setCursor(Qt.PointingHandCursor)
         self.setToolTip(f"{game.name}\n{game.launcher}\n{game.install_path}")
         self.setAccessibleName("Select game: " + game.name)
-        self.clicked.connect(on_selected)
+        layout = _layout(self, pad=(9, 8, 9, 8), gap=3)
+        symbol = QLabel("🎮")
+        symbol.setObjectName("coverSymbol")
+        symbol.setAlignment(Qt.AlignCenter)
+        symbol.setFixedHeight(77)
+        symbol.setStyleSheet(
+            "background: #153340; color:#46D0E9; border:1px solid #315B6B;"
+            "border-radius:6px; font-size:30px;")
+        # A title monogram is more honest than fake, potentially copyrighted
+        # game cover art. Use the game name in the accessibility description.
+        initials = "".join(w[0] for w in game.name.split()[:2]).upper()[:2]
+        symbol.setText(initials)
+        layout.addWidget(symbol)
+        name = QLabel(game.name)
+        name.setObjectName("findingTitle")
+        name.setWordWrap(True)
+        name.setMaximumHeight(36)
+        layout.addWidget(name)
+        launcher = _small(game.launcher)
+        launcher.setStyleSheet("color:#64D2EC;")
+        layout.addWidget(launcher)
+        value = (human_size(game.size_bytes)
+                 if game.size_bytes is not None else "Size unknown")
+        layout.addWidget(_small(value))
+        layout.addStretch()
 
-    def paintEvent(self, event):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        w, h = self.width(), self.height()
-        shades = [
-            ("#122D3B", "#1B576A"), ("#1C2B3E", "#3A6880"),
-            ("#263044", "#80525A"), ("#142D38", "#2D6B6D"),
-        ]
-        idx = sum(ord(c) for c in self.game.name) % len(shades)
-        gradient = QLinearGradient(0, 0, w, h)
-        gradient.setColorAt(0, QColor(shades[idx][0]))
-        gradient.setColorAt(1, QColor("#0B121C"))
-        p.setPen(QPen(QColor("#365363"), 1))
-        p.setBrush(gradient)
-        p.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 9, 9)
-        p.setPen(QPen(QColor(shades[idx][1]), 2))
-        for k in range(4):
-            p.drawArc(23+k*6, 14+k*4, 128-k*12, 118-k*9, 10*16, 128*16)
-        p.setPen(QPen(QColor("#55D2E9"), 3))
-        p.drawLine(23, 100, w-23, 100)
-        first_letters = "".join(x[0] for x in self.game.name.split()[:2]).upper()[:2]
-        p.setPen(QColor("#EAF6FD"))
-        p.setFont(QFont("Segoe UI", 29, QFont.Bold))
-        p.drawText(20, 19, w-40, 79, Qt.AlignCenter, first_letters)
-        p.setPen(QColor("#DDEBF6"))
-        p.setFont(QFont("Segoe UI", 10, QFont.DemiBold))
-        title = self.game.name
-        fm = p.fontMetrics()
-        title = fm.elidedText(title, Qt.ElideRight, w-24)
-        p.drawText(12, 123, w-24, 21, Qt.AlignLeft, title)
-        p.setPen(QColor("#9DCDDF"))
-        p.setFont(QFont("Segoe UI", 9))
-        p.drawText(12, 143, w-24, 18,
-                   Qt.AlignLeft, fm.elidedText(self.game.launcher, Qt.ElideRight, w-24))
-        size = human_size(self.game.size_bytes) if self.game.size_bytes is not None else "Size unknown"
-        p.drawText(12, 164, w-24, 18, Qt.AlignLeft, size)
-        if self.underMouse():
-            p.setPen(QPen(QColor("#43D6F2"), 2))
-            p.setBrush(Qt.NoBrush)
-            p.drawRoundedRect(self.rect().adjusted(2, 2, -3, -3), 9, 9)
-        p.end()
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self.rect().contains(event.pos()):
+            self._select()
+        super().mouseReleaseEvent(event)
 
 
-def game_gallery(games, selected_callback, *, limit=7):
-    """Horizontal browse row that maps directly to existing game records."""
+def game_gallery(games, selected_callback, *, limit=4):
+    """Four full visual cards; the complete inventory remains in the table.
+
+    No nested QScrollArea means no Windows render clipping or hidden row.
+    """
     section = QFrame()
     section.setObjectName("dashboardPanel")
     layout = _layout(section)
     layout.addWidget(_small("YOUR GAME LIBRARY  •  VERIFIED INSTALLATIONS", "sectionTitle"))
     layout.addWidget(_small(
-        "Select a game card to inspect its installation evidence and actions below. "
-        "Cards use local vector artwork, not unverified cover images."))
+        "Select a game card to inspect the source and actions below. "
+        "Local vector visuals, no fake game covers."))
     if not games:
         layout.addWidget(_small("No verified games yet. Run Scan PC to populate the shelf."))
         return section
-    scroller = QScrollArea()
-    scroller.setWidgetResizable(True)
-    scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-    scroller.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-    scroller.setFixedHeight(212)
-    scroller.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-    area = QWidget()
-    area.setFixedHeight(199)
-    row = _layout(area, vertical=False, pad=(1, 3, 1, 3), gap=11)
-    row.setAlignment(Qt.AlignTop)
+    shelf = QWidget()
+    shelf.setFixedHeight(202)
+    shelf_row = _layout(shelf, vertical=False, pad=(1, 5, 1, 1), gap=11)
     for game in games[:limit]:
-        row.addWidget(
-            GameCover(game, lambda _=False, g=game: selected_callback(g)),
-            0, Qt.AlignTop)
-    row.addStretch(1)
-    scroller.setWidget(area)
-    layout.addWidget(scroller)
+        shelf_row.addWidget(
+            GameCover(game, lambda g=game: selected_callback(g)), 1)
+    shelf_row.addStretch(1)
+    layout.addWidget(shelf)
+    if len(games) > limit:
+        layout.addWidget(_small(
+            f"Showing {limit} of {len(games)} verified games. "
+            "Use the search and full list underneath for the rest."))
     return section
 
 
