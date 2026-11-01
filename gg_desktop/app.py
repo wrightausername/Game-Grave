@@ -9,7 +9,7 @@ import sys
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
 from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
@@ -19,6 +19,7 @@ from core import load_settings
 from gg_desktop.backend import Inventory, scan_inventory, ScanCanceled
 from gg_desktop.theme import STYLE
 from gg_desktop.widgets import label, button, row, column, ScrollPage, LandscapeArt
+from gg_desktop.visuals import nav_icon
 from gg_desktop.screens import ScreenMethods
 
 ROUTES = (
@@ -155,10 +156,12 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         r.addWidget(edition)
         r.addSpacing(13)
         self.nav_buttons = {}
-        for route, icon in ROUTES:
-            control = button(icon + "    " + route,
+        for route, _legacy_icon in ROUTES:
+            control = button(route,
                              lambda _checked=False, route=route: self.navigate(route),
                              kind="navButton")
+            control.setIcon(nav_icon(route))
+            control.setIconSize(QSize(20, 20))
             control.setProperty("active", route == self.current_route)
             control.setAccessibleName(route + " page")
             control.setFocusPolicy(Qt.StrongFocus)
