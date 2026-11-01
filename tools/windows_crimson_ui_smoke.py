@@ -25,6 +25,7 @@ def main():
     from gg_desktop.widgets import HeroBanner
     from gg_desktop.visuals import SceneHeader, RelationshipMap, RecoveryRoute
     from gg_desktop.tab_panels import GraphicCard, GameCover
+    from gg_desktop.premium_panels import GameInspector, ModInspector
     from PySide6.QtWidgets import QTabWidget, QStackedWidget, QDockWidget
     from PySide6.QtGui import QPalette
     from PIL import Image
@@ -148,6 +149,16 @@ def main():
                 if route == "Games":
                     assert len(window.page.findChildren(GameCover)) == 3, (
                         "Games gallery must present actual verified game records")
+                    inspectors = window.page.findChildren(GameInspector)
+                    assert len(inspectors) == 1 and inspectors[0].game is not None, (
+                        "Games tab requires a live selection-driven inspector")
+                    window.game_table.selectRow(1)
+                    app.processEvents()
+                    assert inspectors[0].game.key == window._shown_games[1].key, (
+                        "Selecting a different game must update its right-side inspector")
+                if route == "Mods":
+                    assert len(window.page.findChildren(ModInspector)) == 1, (
+                        "Mod Radar requires a source-aware right-side inspector")
                 if route == "Game DNA":
                     dna_art = window.page.findChildren(RelationshipMap)
                     assert dna_art and dna_art[0].game_name == "Sample Steam Game", (
