@@ -40,7 +40,7 @@ from gg_desktop.widgets import (
 from gg_desktop.visuals import SceneHeader, FeatureStrip, RelationshipMap, RecoveryRoute
 from gg_desktop.tab_panels import (
     game_gallery, mod_radar_panel, old_files_categories, graveyard_overview,
-    clear_empty_panel,
+    graveyard_mix_panel, old_file_age_chart, clear_empty_panel,
 )
 from gg_desktop.premium_panels import GameInspector, ModInspector, mod_gallery
 
@@ -520,6 +520,7 @@ class ScreenMethods:
         if self._not_scanned(page):
             return
         page.content.addWidget(graveyard_overview(self.inventory.graveyard))
+        page.content.addWidget(graveyard_mix_panel(self.inventory.graveyard))
         page.content.addWidget(FeatureStrip([
             ("FIND", "Scanned game clutter"),
             ("UNDERSTAND", "Review evidence"),
@@ -1378,6 +1379,7 @@ class ScreenMethods:
             if not self.inventory.files:
                 return
         page.content.addWidget(old_files_categories(self.inventory.files))
+        page.content.addWidget(old_file_age_chart(self.inventory.files))
         table = data_table(["FILE", "SIZE", "MODIFIED", "PROTECTION"])
         table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         table.setRowCount(min(len(self.inventory.files), 500))
