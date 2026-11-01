@@ -15,7 +15,7 @@ def main():
     os.environ.setdefault("QT_QPA_PLATFORM", "windows")
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root))
-    from PySide6.QtWidgets import QApplication, QTableWidget
+    from PySide6.QtWidgets import QApplication, QTableWidget, QFrame
     from core import SteamGame, OldFile
     from launchers import LauncherGame
     from graveyard import build_graveyard
@@ -23,7 +23,8 @@ def main():
     from gg_desktop.app import CrimsonWindow, configure_crimson_dialog_palette
     from gg_desktop.capture_image import ScreenshotImage
     from gg_desktop.widgets import HeroBanner
-    from gg_desktop.visuals import SceneHeader, RelationshipMap, RecoveryRoute
+    from gg_desktop.visuals import SceneHeader, RelationshipMap
+    from gg_desktop.undo_visuals import UndoStatusDial
     from gg_desktop.tab_panels import GraphicCard, GameCover
     from gg_desktop.premium_panels import GameInspector, ModInspector
     from gg_desktop.reference_hero import ReferenceHero
@@ -183,6 +184,11 @@ def main():
                     dna_art = window.page.findChildren(RelationshipMap)
                     assert dna_art and dna_art[0].game_name == "Sample Steam Game", (
                         "Game DNA visual map must use actual scan data")
+                    assert window.page.findChild(QFrame, "dnaRelationshipStudio")
+                    assert dna_art[0].minimumHeight() >= 380
+                    assert dna_art[0].mapTo(window.page, QPoint(0, 0)).y() < 660, (
+                        "Main forensic map must start above the fold.")
+                    assert window.page.findChild(QTableWidget, "dnaGamesResults")
                     official = window.page.findChild(QLabel, "dnaOfficialCover")
                     assert official is not None and official.pixmap() is not None and (
                         not official.pixmap().isNull()), (
@@ -190,7 +196,11 @@ def main():
                     assert not dna_art[0]._cover.isNull(), (
                         "Game DNA relationship map must share the selected Steam cover")
                 if route == "Undo Center":
-                    assert len(window.page.findChildren(RecoveryRoute)) == 1
+                    dials = window.page.findChildren(UndoStatusDial)
+                    assert len(dials) == 1, "Undo Center needs real recovery status."
+                    assert window.page.findChild(QTableWidget, "undoHistoryTable")
+                    assert any(b.text().startswith("Browse Recycle Bin")
+                               for b in window.page.findChildren(QPushButton))
                 if route == "Settings":
                     categories = window.page.findChildren(QStackedWidget)
                     assert len(categories) == 1 and categories[0].count() == 8, (
@@ -259,8 +269,13 @@ def main():
             window.navigate("Other Storage")
             app.processEvents()
             buttons = {w.text() for w in window.page.findChildren(QPushButton)}
-            assert any("Analyze Other storage" in txt for txt in buttons), (
-                "Other Storage must have an explicit-click read-only analyzer")
+            assert "Quick Scan" in buttons and "Full Scan" in buttons
+            quick = window.page.findChild(QPushButton, "otherStorageQuickScan")
+            full = window.page.findChild(QPushButton, "otherStorageFullScan")
+            assert quick is not None and full is not None
+            assert full.isVisible() and full.isEnabled(), (
+                "Full Scan must be directly visible, not buried in a dropdown.")
+            assert full.mapTo(window.page, QPoint(0, 0)).y() < window.page.height()
             window.navigate("Overview")
             app.processEvents()
             assert window.page.findChildren(HeroBanner), "Hero must be a real native vector widget"
@@ -304,6 +319,7 @@ def main():
                 ("Graveyard", "crimson-graveyard-1440.png"),
                 ("Game DNA", "crimson-dna-1440.png"),
                 ("Undo Center", "crimson-undo-1440.png"),
+                ("Other Storage", "crimson-other-storage-1440.png"),
                 ("Captures", "crimson-captures-1440.png"),
                 ("Settings", "crimson-settings-1440.png"),
             ):
