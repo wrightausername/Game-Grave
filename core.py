@@ -68,6 +68,8 @@ def default_settings() -> dict:
         "graveyard_watchlist": [],
         "recording_roots": [],  # Optional user-chosen capture folders, read-only scan
         "screenshot_roots": [],  # Explicit user-selected game screenshot folders
+        "ready_room_favorites": [],  # Local-only game record pins, never uploaded
+        "ready_room_notes": {},  # Local-only user-authored game reminders
     }
 
 
