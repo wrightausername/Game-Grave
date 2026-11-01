@@ -9,8 +9,8 @@ import os
 from collections import Counter
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QImageReader, QPixmap
+from PySide6.QtCore import Qt, QSize, QPointF
+from PySide6.QtGui import QColor, QFont, QImageReader, QPainter, QPen, QPixmap, QRadialGradient
 from PySide6.QtWidgets import (
     QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,
     QVBoxLayout, QWidget,
@@ -309,6 +309,57 @@ def mod_gallery(games, mods, on_selected, *, limit=10, columns=5):
     return box, pairs, unknown
 
 
+class ModRadarScope(QWidget):
+    """Native high-DPI crimson radar instrument; count is actual selected rows.
+
+    This is navigation artwork, NOT an invented conflict/orphan health score.
+    No animation, polling, file access or GPU hooks.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._count = 0
+        self.setFixedHeight(156)
+        self.setObjectName("modRadarScope")
+        self.setAccessibleName("Illustrated mod radar: selection location count")
+
+    def set_count(self, count):
+        self._count = max(0, int(count))
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.fillRect(self.rect(), QColor("#0A1019"))
+        x, y = self.width() * .5, self.height() * .53
+        radius = min(70.0, self.height() * .43, self.width() * .39)
+        glow = QRadialGradient(QPointF(x, y), radius * 1.18)
+        glow.setColorAt(0, QColor(235, 44, 78, 55))
+        glow.setColorAt(1, QColor(235, 44, 78, 0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(glow)
+        p.drawEllipse(QPointF(x, y), radius * 1.15, radius * 1.15)
+        p.setBrush(Qt.NoBrush)
+        for fraction, color, weight in (
+                (1, "#E73959", 2.8),
+                (.73, "#7D3047", 1.4),
+                (.46, "#B73350", 1.1)):
+            p.setPen(QPen(QColor(color), weight))
+            p.drawEllipse(QPointF(x, y), radius * fraction, radius * fraction)
+        p.setPen(QPen(QColor("#C73B59"), 1))
+        p.drawLine(QPointF(x-radius-9, y), QPointF(x+radius+9, y))
+        p.drawLine(QPointF(x, y-radius-9), QPointF(x, y+radius+9))
+        p.setPen(QPen(QColor("#EF536E"), 2.4))
+        p.drawArc(int(x-radius*.95), int(y-radius*.95),
+                  int(radius*1.9), int(radius*1.9), 29*16, 54*16)
+        p.setFont(QFont("Segoe UI", 24, QFont.Bold))
+        p.setPen(QColor("#FEF3F5"))
+        p.drawText(int(x-60), int(y-30), 120, 48, Qt.AlignCenter, str(self._count))
+        p.setFont(QFont("Segoe UI", 8, QFont.Bold))
+        p.setPen(QColor("#DCA7B3"))
+        p.drawText(int(x-95), int(y+17), 190, 22, Qt.AlignCenter, "LOCATIONS")
+        p.end()
+
+
 class ModInspector(QFrame):
     """Selection-driven mod evidence panel, without speculative health scores."""
 
@@ -322,7 +373,9 @@ class ModInspector(QFrame):
         self._on_scan = on_scan
         self.locations = []
         col = _col(self, spacing=11)
-        col.addWidget(_label("MOD RADAR", "sceneKicker"))
+        col.addWidget(_label("MOD RADAR  /  LIVE INVENTORY", "sceneKicker"))
+        self.scope = ModRadarScope()
+        col.addWidget(self.scope)
         self.art = QLabel()
         col.addWidget(self.art)
         self.title = _label("Select a mod source", "premiumTitle")
@@ -357,6 +410,7 @@ class ModInspector(QFrame):
         self.title.setText(game.name if game is not None else
                            str(source or "Select a mod source"))
         self.count.setText(f"{len(self.locations)} location(s)")
+        self.scope.set_count(len(self.locations))
         self.provenance.setText(
             "Inside a verified installed game folder" if game is not None
             else "Source group / no proven installed-game association")
