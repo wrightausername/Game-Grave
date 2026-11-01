@@ -151,15 +151,16 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         brand_layout.addWidget(glyph)
         brand_name = label("GAME\nGRAVE", "brand")
         brand_name.setStyleSheet(
-            "color:#F5F7FB; font-size:21px; font-weight:900; line-height:1;")
+            "color:#F9F0F3;font-family:'Georgia','Segoe UI';"
+            "font-size:22px;font-weight:800;letter-spacing:.6px;")
         brand_layout.addWidget(brand_name, 1)
         r.addWidget(brand_holder)
-        kicker = label("CLEANER GAMES\nBRIGHTER WORLDS", "brandKicker")
+        kicker = label("KEEP THE GAMES.\nKNOW THE CLUTTER.", "brandKicker")
         kicker.setWordWrap(True)
         kicker.setStyleSheet(
-            "color:#8CA0B3; font-size:9px; letter-spacing:1px;")
+            "color:#A9ACBA;font-size:10px;letter-spacing:.4px;")
         r.addWidget(kicker)
-        edition = label("CRIMSON COMMAND", "brandEdition")
+        edition = label("CRIMSON / GAME GRAVE", "brandEdition")
         edition.setStyleSheet("color:#FF4056;font-size:10px;font-weight:800;"
                               "letter-spacing:1px;")
         r.addWidget(edition)
@@ -182,8 +183,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.sidebar_art = LandscapeArt(224, scene="footer")
         footer_layout = column(margins=(14, 22, 12, 4))
         self.sidebar_art.setLayout(footer_layout)
-        motto = label('“SAME GAMES.\nA CLEANER\nTOMORROW.”', "subtle", wrap=True)
-        motto.setStyleSheet("color:#D7E1EC;font-size:12px;letter-spacing:2px;")
+        motto = label('NOTHING LEAVES\nWITHOUT YOUR SAY-SO.', "subtle", wrap=True)
+        motto.setStyleSheet(
+            "color:#E3DBE1;font-family:'Georgia','Segoe UI';"
+            "font-size:12px;letter-spacing:.5px;")
         footer_layout.addWidget(motto)
         footer_layout.addStretch()
         self.sidebar_art.setVisible(self.height() >= 795)
@@ -218,9 +221,9 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         heading_layout = column(spacing=3)
         heading.setLayout(heading_layout)
         heading_layout.addWidget(
-            label("SYSTEM SCAN CONTROL", "scanControlHeading"))
+            label("THE SCAN IS YOUR CALL", "scanControlHeading"))
         self.status = label(
-            "Ready. Use SCAN PC to discover your installed games and storage.",
+            "Ready to look. Choose Scan PC when you're set.",
             "scanControlStatus", wrap=True)
         heading_layout.addWidget(self.status)
         topbox.addWidget(heading, 1)
@@ -236,7 +239,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.back_button.setToolTip("Back to the last page (Alt+Left)")
         self.back_button.setEnabled(False)
         navline.addWidget(self.back_button)
-        self.breadcrumbs = label("CRIMSON COMMAND  /  OVERVIEW", "routeBreadcrumb")
+        self.breadcrumbs = label("GAME GRAVE  /  OVERVIEW", "routeBreadcrumb")
         self.breadcrumbs.setAccessibleName("Current page breadcrumb")
         navline.addWidget(self.breadcrumbs, 1)
         self.home_button = button("⌂  READY ROOM", lambda: self.navigate("Ready Room"))
