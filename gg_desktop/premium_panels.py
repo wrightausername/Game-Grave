@@ -72,10 +72,16 @@ def _image(label, game, *, w=320, h=186):
         label.setPixmap(pixmap)
         label.setToolTip("Local game art found on this PC")
     else:
-        from gg_desktop.poster_art import generated_game_poster
-        title = str(getattr(game, "name", "") or "MOD RADAR")
-        label.setPixmap(generated_game_poster(title, min(w, 320), h))
-        label.setToolTip("Original Game Grave artwork, not official game cover art")
+        if game is not None:
+            label.setText("OFFICIAL COVER UNAVAILABLE")
+            label.setStyleSheet(
+                "background:#0A1824;color:#BDD0DE;border:1px dashed #345064;"
+                "font-size:11px;font-weight:700;")
+            label.setToolTip("No matching game artwork in cache.")
+        else:
+            from gg_desktop.poster_art import generated_game_poster
+            label.setPixmap(generated_game_poster("MOD RADAR", min(w, 320), h))
+            label.setToolTip("Game Grave artwork for a mod source, not a game cover.")
 
 
 class GameInspector(QFrame):
