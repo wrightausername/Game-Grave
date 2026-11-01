@@ -207,9 +207,9 @@ def render_dashboard(window):
     top_grid.setContentsMargins(0, 0, 0, 0)
     top_grid.setSpacing(11)
     hero = HeroBanner(
-        title="YOUR GAMES.", subtitle="A CLEANER TOMORROW.",
-        detail="Find old files, remove what you don't need, and keep your "
-               "games in top shape across all launchers.")
+        title="YOUR GAMES.", subtitle="ALL THEIR BAGGAGE.",
+        detail="Games leave stuff behind. Find out where it went, "
+               "see what's worth keeping, and make the call yourself.")
     top_grid.addWidget(hero, 7)
     this_month, previous_month, month_count, previous_count = _monthly_recycled()
     status = MetricCard(
@@ -230,15 +230,15 @@ def render_dashboard(window):
     actions.setSpacing(10)
     options = (
         ("⌕", "Scan for Old Files",
-         "Find leftover files, mods, and stale data.", window.start_scan),
+         "See what your games left behind.", window.start_scan),
         ("♱", "Review Graveyard",
-         f"{len(window.inventory.graveyard)} items waiting for review",
+         f"{len(window.inventory.graveyard)} places to look. Nothing moves on its own.",
          lambda: window.navigate("Graveyard")),
         ("↶", "Open Undo Center",
-         "Restore files you've previously recycled.",
+         "Second thoughts? Check what Windows can restore.",
          lambda: window.navigate("Undo Center")),
         ("⚙", "Quick Settings",
-         "Customize scans, exclusions, and appearance.",
+         "Choose where we look and what we leave alone.",
          lambda: window.navigate("Settings")),
     )
     cols = 4 if window.width() >= 1200 else 2
