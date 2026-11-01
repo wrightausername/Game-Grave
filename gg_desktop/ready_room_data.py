@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 import json
+import shutil
+from pathlib import Path
 import re
 import time
 from typing import Iterable
@@ -53,18 +55,33 @@ def prioritize_games(games: Iterable, favorite_keys=(), limit=12) -> list:
     return records[:max(0, limit)]
 
 
-def launch_guard_summary(game) -> tuple[str, str]:
-    """Do not infer mod compatibility, backup integrity, or game bootability."""
+def launch_guard_summary(game, *, free_bytes=None) -> tuple[str, str]:
+    """Lightweight Launch Guard; no game execution, hooks, or deep disk scan.
+
+    The result describes verified file/disk evidence only. It cannot promise a
+    game will launch, that saves are intact, or that mods are compatible.
+    """
     if not game:
         return "Unknown", "Run a read-only inventory to detect installed games."
     if "Ambiguous" in str(getattr(game, "status", "")):
         return "Attention", "Multiple launchers claim this folder. Ownership is ambiguous."
     if "Unverified" in str(getattr(game, "status", "")):
         return "Unknown", "This folder is unverified; avoid assuming it is a working game."
-    if "Installed" in str(getattr(game, "status", "")):
-        return ("Installed", "Installation record found. Game launch, saves, mods "
-                "and patch compatibility have not been verified.")
-    return "Unknown", "Read-only inventory does not establish this game's launch health."
+    if "Installed" not in str(getattr(game, "status", "")):
+        return "Unknown", "Read-only inventory does not establish this game's launch health."
+    path = str(getattr(game, "install_path", "") or "")
+    try:
+        if not path or not Path(path).is_dir():
+            return "Attention", "Installed location no longer exists. Rescan before launching."
+        if free_bytes is None:
+            free_bytes = shutil.disk_usage(path).free
+    except (OSError, ValueError):
+        return "Unknown", "Install or disk availability could not be verified."
+    if type(free_bytes) is int and free_bytes < 8 * 1024**3:
+        return ("Attention", "Less than 8 GB free on the game drive. "
+                "Some updates may need temporary workspace; requirements vary.")
+    return ("Installed", "Installation location exists and drive space was checked. "
+            "Launch success, saves, mods and patch compatibility remain unverified.")
 
 
 class _TextExtractor(HTMLParser):
