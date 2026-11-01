@@ -180,6 +180,20 @@ class GameGraveApp(tk.Tk):
         if self.settings.get("scan_on_launch", False):
             self.after(250, self.scan_all)
 
+    def _start_background_worker(self, callback):
+        """Use only low-priority CPU and disk I/O for auxiliary classic-UI work.
+
+        Never change priority for the Tk GUI thread. Heavy, automatically
+        scheduled jobs still require explicit game-aware suspension.
+        """
+        from performance_guard import background_worker_priority
+
+        def run():
+            with background_worker_priority():
+                callback()
+
+        threading.Thread(target=run, daemon=True).start()
+
     def _close_safely(self):
         if self._update_download_active:
             messagebox.showinfo("Update download running",
@@ -841,7 +855,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("manager_profiles_result", result))
             except (OSError, ValueError, RuntimeError) as exc:
                 self.events.put(("manager_profiles_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _view_manager_profile(self):
         if (not hasattr(self, "profile_tree") or
@@ -887,7 +901,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("intelligence_result", ghost_watch(before, after)))
             except (OSError, ValueError, RuntimeError) as exc:
                 self.events.put(("intelligence_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _preview_exodus(self):
         dna = build_game_dna(self.games, self.other_games, self.mod_folders, self.save_findings)
@@ -1036,7 +1050,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("shader_preview", (game, cache)))
             except (OSError, ValueError) as exc:
                 self.events.put(("shader_error", str(exc)))
-        threading.Thread(target=inspect, daemon=True).start()
+        self._start_background_worker(inspect)
 
     def _confirm_shader_cache(self, game, cache):
         if getattr(self, "cleanup_running", False) or self.scanning:
@@ -1098,7 +1112,7 @@ class GameGraveApp(tk.Tk):
             except Exception as exc:
                 self.events.put(("shader_cleanup_error", str(exc)[:350]))
         try:
-            threading.Thread(target=guarded_cleanup, daemon=True).start()
+            self._start_background_worker(guarded_cleanup)
         except RuntimeError as exc:
             self.cleanup_running = False
             self.scan_button.configure(state="normal", bg=ACCENT)
@@ -1601,7 +1615,7 @@ class GameGraveApp(tk.Tk):
             except Exception as exc:
                 self.events.put(("duplicates_error", str(exc)[:250]))
         try:
-            threading.Thread(target=work, daemon=True).start()
+            self._start_background_worker(work)
         except RuntimeError as exc:
             self._dupe_busy = False
             messagebox.showerror("Could not inspect", str(exc))
@@ -1875,7 +1889,7 @@ class GameGraveApp(tk.Tk):
             except Exception as exc:
                 self.events.put(("screenshot_preview_error", str(exc)[:250]))
         try:
-            threading.Thread(target=work, daemon=True).start()
+            self._start_background_worker(work)
         except RuntimeError:
             self._screenshot_preview_busy = False
             messagebox.showerror("Preview unavailable",
@@ -2157,7 +2171,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("grave_cleanup_error", str(exc)[:350]))
 
         try:
-            threading.Thread(target=worker, daemon=True).start()
+            self._start_background_worker(worker)
         except RuntimeError as exc:
             self.cleanup_running = False
             self.scan_button.configure(state="normal", bg=ACCENT)
@@ -2293,7 +2307,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("old_cleanup_error", str(exc)[:350]))
 
         try:
-            threading.Thread(target=worker, daemon=True).start()
+            self._start_background_worker(worker)
         except RuntimeError as exc:
             self.cleanup_running = False
             self.scan_button.configure(state="normal", bg=ACCENT)
@@ -2737,7 +2751,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("undo_result", (perform, result)))
             except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
                 self.events.put(("undo_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _resurrection_lab_page(self):
         self.header("Resurrection Lab", "Five tools to check, rehearse, preserve, rewind, and move your gaming setup.")
@@ -2813,7 +2827,7 @@ class GameGraveApp(tk.Tk):
             except (OSError, ValueError, RuntimeError, PermissionError,
                     FileExistsError, zipfile.BadZipFile, EOFError) as exc:
                 self.events.put(("lab_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _lab_missing_pieces(self):
         manifest = self._lab_manifest("Select kit to check for missing components")
@@ -3012,7 +3026,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("saves_complete", found))
             except Exception as exc:
                 self.events.put(("saves_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _populate_saves(self):
         if not hasattr(self, "saves_tree") or not self.saves_tree.winfo_exists():
@@ -3097,7 +3111,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("backup_result", result))
             except (OSError, ValueError, RuntimeError, InterruptedError, zipfile.BadZipFile) as exc:
                 self.events.put(("backup_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _start_auto_kit(self):
         """Small setup picker; no scan or source writes happen before user approval."""
@@ -3150,7 +3164,7 @@ class GameGraveApp(tk.Tk):
                     self.events.put(("kit_discovery_result", (game.name, data)))
                 except (OSError, ValueError, RuntimeError) as exc:
                     self.events.put(("kit_error", str(exc)))
-            threading.Thread(target=worker, daemon=True).start()
+            self._start_background_worker(worker)
         self.button(frame, "Find recommended folders", on_discover, primary=True).pack(
             anchor="w", pady=(8, 0))
 
@@ -3232,7 +3246,7 @@ class GameGraveApp(tk.Tk):
                 except (OSError, ValueError, RuntimeError, InterruptedError,
                         zipfile.BadZipFile) as exc:
                     self.events.put(("kit_error", str(exc)))
-            threading.Thread(target=worker, daemon=True).start()
+            self._start_background_worker(worker)
         self.button(body, "Create verified kit from selected folders", preserve,
                     primary=True).pack(anchor="w", pady=(6, 0))
 
@@ -3276,7 +3290,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("mo2_reconnect_preview", (manifest, ini, plan)))
             except (OSError, ValueError, RuntimeError, FileExistsError, zipfile.BadZipFile) as exc:
                 self.events.put(("mo2_reconnect_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _apply_mo2_reconnect(self, manifest, ini, plan):
         games, other_games = list(self.games), list(self.other_games)
@@ -3288,7 +3302,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("mo2_reconnect_result", result))
             except (OSError, ValueError, RuntimeError, FileExistsError) as exc:
                 self.events.put(("mo2_reconnect_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _make_resurrection_kit(self):
         chosen = self._selected_saves()
@@ -3339,7 +3353,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("kit_result", created))
             except (OSError, ValueError, RuntimeError, InterruptedError, zipfile.BadZipFile) as exc:
                 self.events.put(("kit_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _preview_resurrection_kit(self, preselected_manifest=None):
         manifest = preselected_manifest or filedialog.askopenfilename(
@@ -3358,7 +3372,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("kit_preview", (manifest, parent, checked)))
             except (OSError, ValueError, RuntimeError, zipfile.BadZipFile, FileExistsError) as exc:
                 self.events.put(("kit_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _restore_verified_kit(self, manifest, parent):
         self.status_text.set("Recovering kit into a new folder; existing game files are untouched…")
@@ -3368,7 +3382,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("kit_restore_result", restored))
             except (OSError, ValueError, RuntimeError, zipfile.BadZipFile, FileExistsError) as exc:
                 self.events.put(("kit_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _history_page(self):
         self.header("Storage History", "Compare on-demand scans. No 24/7 game update monitoring.")
@@ -3708,7 +3722,7 @@ class GameGraveApp(tk.Tk):
                     "An unexpected local safety check failure occurred. No user files were selected."))
 
         try:
-            threading.Thread(target=work, daemon=True).start()
+            self._start_background_worker(work)
         except RuntimeError as exc:
             self._selfcheck_busy = False
             messagebox.showerror("Safety check not started", str(exc))
@@ -3850,7 +3864,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("update_check_result", report))
             except UpdateError as exc:
                 self.events.put(("update_check_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _cancel_verified_download(self):
         if not self._update_download_active:
@@ -3899,7 +3913,7 @@ class GameGraveApp(tk.Tk):
             except Exception:
                 self.events.put(("update_download_error", "UnexpectedError"))
         try:
-            threading.Thread(target=worker, daemon=True).start()
+            self._start_background_worker(worker)
         except RuntimeError:
             self._update_download_active = False
             messagebox.showerror("Download not started",
@@ -3923,7 +3937,7 @@ class GameGraveApp(tk.Tk):
                 self.events.put(("license_activated", result))
             except LicenseError as exc:
                 self.events.put(("license_error", str(exc)))
-        threading.Thread(target=worker, daemon=True).start()
+        self._start_background_worker(worker)
 
     def _deactivate_pro(self):
         if not self.edition.is_pro:
@@ -4096,7 +4110,7 @@ class GameGraveApp(tk.Tk):
                         games, other, mods, files, recordings, screenshots, saves, warning)))
             except Exception as exc:
                 self.events.put(("scan_error", str(exc)))
-        threading.Thread(target=task, daemon=True).start()
+        self._start_background_worker(task)
 
     def _poll(self):
         try:
