@@ -2181,8 +2181,12 @@ class GameGraveApp(tk.Tk):
         bar = tk.Frame(self.content, bg=BG)
         bar.pack(fill="x", pady=(0, 13))
         folder = self.settings["scan_folder"]
-        self.text(bar, f"Scanning: {folder}", 10, MUTED, wraplength=580).pack(side="left", fill="x", expand=True)
+        self.text(bar, f"Selected: {folder}", 10, MUTED, wraplength=480).pack(side="left", fill="x", expand=True)
         self.button(bar, "Change folder", self._change_folder).pack(side="right")
+        from old_files_scope import is_fixed_drive_root
+        if is_fixed_drive_root(Path("C:/")):
+            self.button(bar, "Scan C: drive…", self._change_to_c_drive).pack(
+                side="right", padx=7)
         self.file_days_var = tk.StringVar(value=str(self.settings["files_stale_days"]))
         days = ttk.Combobox(bar, textvariable=self.file_days_var, values=("30", "90", "180", "365", "730"),
                             state="readonly", style="Dark.TCombobox", width=5)
@@ -2204,6 +2208,8 @@ class GameGraveApp(tk.Tk):
                                     (235, 140, 115, 300))
         self.file_tree.tag_configure("protected", foreground=WARN)
         self._add_page_controls("files", self._populate_files)
+        self.file_scan_result = self.text(self.content, "", 11, MUTED, wraplength=830)
+        self.file_scan_result.pack(anchor="w", fill="x", pady=(9, 2))
         self._populate_files()
         actions = tk.Frame(self.content, bg=BG)
         actions.pack(fill="x", pady=(14, 0))
@@ -2238,16 +2244,80 @@ class GameGraveApp(tk.Tk):
                                   tags=("protected",) if protected else ())
             self.file_lookup[iid] = item
         self._update_inventory_page("files", page)
+        if hasattr(self, "file_scan_result") and self.file_scan_result.winfo_exists():
+            scanned_root = getattr(self, "old_files_scanned_root", "")
+            selected_root = str(self.settings.get("scan_folder", ""))
+            status = getattr(self, "old_files_scan_status", "not_scanned")
+            note = str(getattr(self, "old_files_scan_message", ""))
+            if scanned_root and scanned_root != selected_root:
+                message = "Scan the newly selected location to view its results."
+            elif status == "complete" and not self.old_files:
+                message = ("✓ No old files found. Nothing older than " +
+                           str(self.settings.get("files_stale_days", 180)) +
+                           " days detected in " + selected_root + ".")
+            elif status == "partial":
+                message = "Scan incomplete; results are partial. " + note
+            elif status == "failed":
+                message = "Old Files scan could not finish. " + note
+            elif status == "not_scanned":
+                message = "Run Scan PC to check the selected folder or drive."
+            else:
+                message = f"{len(self.old_files)} old files found. Review before recycling."
+            self.file_scan_result.configure(text=message)
+
+    def _change_to_c_drive(self):
+        from old_files_scope import is_fixed_drive_root
+        drive = Path("C:/")
+        if not is_fixed_drive_root(drive):
+            messagebox.showerror("C: unavailable",
+                                 "Only an existing local fixed C: drive is supported.")
+            return
+        if not messagebox.askyesno(
+                "Scan C: drive for Old Files?",
+                "Scan permitted locations on C: for files older than your age "
+                "filter? System folders, application data, managed game "
+                "locations and unsafe links will be skipped. "
+                "The read-only scan is limited to 25 seconds/160,000 entries "
+                "and may be incomplete. No files are deleted automatically."):
+            return
+        updated = dict(self.settings)
+        updated["scan_folder"] = str(drive)
+        try:
+            save_settings(updated)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Cannot save C: selection", str(exc))
+            return
+        self.settings = updated
+        self.old_files_scan_status = "not_scanned"
+        self.scan_all()
 
     def _change_folder(self):
         folder = filedialog.askdirectory(title="Choose folder to scan for old files", initialdir=self.settings["scan_folder"])
         if not folder:
             return
-        if not safe_scan_root(Path(folder)):
-            messagebox.showerror("Folder blocked", "Choose an ordinary folder. System folders and entire drives are blocked.")
+        from old_files_scope import accepted_old_files_scope, is_fixed_drive_root
+        target = Path(folder)
+        if is_fixed_drive_root(target):
+            if str(target).upper().startswith("C:"):
+                self._change_to_c_drive()
+            else:
+                messagebox.showinfo("Choose C: or a folder",
+                                    "Use the C: option for drive-wide scanning.")
             return
-        self.settings["scan_folder"] = folder
-        save_settings(self.settings)
+        if not accepted_old_files_scope(target):
+            messagebox.showerror("Folder blocked",
+                                 "Choose an ordinary folder or use the C: button. "
+                                 "Managed game, mod, system and redirected paths are excluded.")
+            return
+        updated = dict(self.settings)
+        updated["scan_folder"] = folder
+        try:
+            save_settings(updated)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Cannot save scan choice", str(exc))
+            return
+        self.settings = updated
+        self.old_files_scan_status = "not_scanned"
         self.scan_all()
 
     def _open_file_folder(self):
@@ -2289,6 +2359,13 @@ class GameGraveApp(tk.Tk):
         protected = tuple(self.settings.get("never_touch", ()))
         reviewed_root = Path(self.settings.get("scan_folder", str(downloads_dir())))
         reviewed_age = int(self.settings.get("files_stale_days", 180))
+        known_roots = tuple(
+            str(game.install_path) for game in
+            (*getattr(self, "games", ()), *getattr(self, "other_games", ()))
+            if getattr(game, "install_path", None))
+        known_roots += tuple(
+            str(mod.path) for mod in getattr(self, "mod_folders", ())
+            if getattr(mod, "path", None))
         self.cleanup_running = True
         self.scan_button.configure(state="disabled", bg=RAISED)
         self.status_text.set(f"Delete started: verifying {len(selected)} file(s)…")
@@ -2299,7 +2376,8 @@ class GameGraveApp(tk.Tk):
                     selected, protected, session,
                     progress=lambda done, count: self.events.put(
                         ("old_cleanup_progress", (done, count))),
-                    review_root=reviewed_root, min_age_days=reviewed_age)
+                    review_root=reviewed_root, min_age_days=reviewed_age,
+                    managed_roots=known_roots)
                 self.events.put(("old_cleanup_complete", outcome))
             except Exception as exc:
                 self.events.put(("old_cleanup_error", str(exc)[:350]))
@@ -4204,11 +4282,25 @@ class GameGraveApp(tk.Tk):
                                             games=games, cancel=self._cancel_scan.is_set)
                 self._check_scan_cancel()
                 self.events.put(("scan_stage", (3, STAGES[3][0])))
+                from old_files_scope import scan_old_files_scope
                 try:
-                    files = scan_old_files(chosen_folder, file_days, cancel=self._cancel_scan.is_set)
-                    warning = ""
+                    known_roots = [g.install_path for g in (*games, *other)
+                                   if getattr(g, "install_path", None)]
+                    known_roots += [str(mod.path) for mod in mods
+                                    if getattr(mod, "path", None)]
+                    old_scope_result = scan_old_files_scope(
+                        chosen_folder, file_days, cancel=self._cancel_scan.is_set,
+                        known_game_roots=known_roots)
+                    files = list(old_scope_result.files)
+                    old_file_status = old_scope_result.status
+                    old_file_message = old_scope_result.message
+                    warning = old_file_message if old_file_status == "partial" else ""
                 except (ValueError, OSError) as exc:
+                    if self._cancel_scan.is_set():
+                        raise
                     files = []
+                    old_file_status = "failed"
+                    old_file_message = str(exc)
                     warning = str(exc)
                 self._check_scan_cancel()
                 try:
@@ -4233,7 +4325,8 @@ class GameGraveApp(tk.Tk):
                 saves = discover_saves()
                 self._check_scan_cancel()
                 self.events.put(("scan_complete", (
-                    games, other, mods, files, recordings, screenshots, saves, warning)))
+                    games, other, mods, files, recordings, screenshots, saves,
+                    warning, old_file_status, old_file_message, str(chosen_folder))))
             except Exception as exc:
                 self.events.put(("scan_error", str(exc)))
         threading.Thread(target=task, daemon=True).start()
@@ -4249,7 +4342,10 @@ class GameGraveApp(tk.Tk):
                     if self._cancel_scan.is_set():
                         self._scan_canceled_status()
                         continue
-                    self.games, self.other_games, self.mod_folders, self.old_files, self.recordings, self.screenshots, self.save_findings, warning = payload
+                    (self.games, self.other_games, self.mod_folders, self.old_files,
+                     self.recordings, self.screenshots, self.save_findings, warning,
+                     self.old_files_scan_status, self.old_files_scan_message,
+                     self.old_files_scanned_root) = payload
                     self.profile_report = None  # Profiles must be re-inspected after inventory changes.
                     self.scan_percent.set(100)
                     self.scan_progress_text.set("Scan complete · 100%")
