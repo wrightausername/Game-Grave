@@ -18,6 +18,7 @@ from screenshots import find_old_screenshots
 from graveyard import build_graveyard
 from graveyard_protection import set_item_protection
 from gg_desktop.models import merge_games
+from old_files_scope import scan_old_files_scope
 
 
 @dataclass
@@ -33,6 +34,9 @@ class Inventory:
     graveyard: list = field(default_factory=list)
     scanned_at: str = ""
     warnings: list[str] = field(default_factory=list)
+    old_files_scan_status: str = "not_scanned"
+    old_files_scan_message: str = ""
+    old_files_scan_root: str = ""
 
 
 STAGES = ("Steam and launchers", "Mod Radar", "Old files", "Game captures", "Protected saves")
@@ -62,11 +66,26 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
         games=staged.steam, cancel=canceled,
     )
     stage(2, STAGES[2])
+    old_scope = str(settings.get("scan_folder", str(Path.home() / "Downloads")))
+    staged.old_files_scan_root = old_scope
     try:
-        staged.files = scan_old_files(Path(settings.get("scan_folder", str(Path.home() / "Downloads"))),
-                                     int(settings.get("files_stale_days", 180)), cancel=canceled)
+        roots = [g.install_path for g in staged.games
+                 if getattr(g, "install_path", None)]
+        roots.extend(str(m.path) for m in staged.mods if getattr(m, "path", None))
+        old_results = scan_old_files_scope(
+            old_scope, int(settings.get("files_stale_days", 180)),
+            cancel=canceled, known_game_roots=roots)
+        staged.files = list(old_results.files)
+        staged.old_files_scan_status = old_results.status
+        staged.old_files_scan_message = old_results.message
+        if old_results.status != "complete":
+            staged.warnings.append("Old Files scan incomplete: " + old_results.message)
     except (ValueError, OSError) as exc:
-        staged.warnings.append("Old Files folder unavailable (" + type(exc).__name__ + ").")
+        if canceled():
+            raise ScanCanceled("Old Files scan canceled.")
+        staged.old_files_scan_status = "failed"
+        staged.old_files_scan_message = str(exc)
+        staged.warnings.append("Old Files scan not completed: " + str(exc)[:180])
     stage(3, STAGES[3])
     days = min(int(settings.get("files_stale_days", 180)),
                int(settings.get("graveyard_days", 365)))
