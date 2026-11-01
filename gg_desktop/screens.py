@@ -78,6 +78,7 @@ class ScreenMethods:
     def _new(self, title: str, subtitle: str) -> ScrollPage:
         page = self.page_for(title)
         themes = {
+            "Ready Room": ("ready", "GAMEPLAY • PATCHES • RECOVERY"),
             "Games": ("games", "YOUR GAME LIBRARY"),
             "Mods": ("mods", "MOD RADAR"),
             "Old Files": ("oldfiles", "ARCHIVE CLEANUP"),
@@ -139,6 +140,238 @@ class ScreenMethods:
     def _go_launcher(self, launcher):
         self._pending_launcher_filter = launcher
         self.navigate("Games")
+
+    def ready_room_page(self):
+        """Pre-game home for verified installs, user notes and Steam announcements.
+
+        This is NOT a background launcher or game-hook service. Optional news
+        and official artwork are fetched on demand with low worker priority
+        and skipped while a game is detected.
+        """
+        from gg_desktop.ready_room_data import (
+            prioritize_games, launch_guard_summary, game_news_batch,
+        )
+        from gg_desktop.premium_panels import _load_local_art
+        from gg_desktop.steam_artwork import prime_visible_covers
+        from shiboken6 import isValid
+        from datetime import datetime
+
+        page = self._new(
+            "Ready Room",
+            "Your games, recent activity and official Steam announcements in one place.")
+        if self._not_scanned(page):
+            return
+        favorites = tuple(self.settings.get("ready_room_favorites", []))
+        selected = prioritize_games(self.inventory.games, favorites, limit=9)
+        page.content.addWidget(FeatureStrip([
+            ("PICK UP", "Your recent installations"),
+            ("CHECK", "Local game evidence"),
+            ("DISCOVER", "Steam announcements"),
+            ("PROTECT", "Saves and mods"),
+        ]))
+        banner, intro = panel(padding=16)
+        intro.addWidget(section_title(
+            "TONIGHT'S LINEUP", "Installed games first; no game hooks or overlays"))
+        intro.addWidget(label(
+            "Ready Room checks what Game Grave has verified locally. "
+            "Installed does NOT mean every mod, save or update is compatible. "
+            "Your personal notes and favorites stay on this PC.",
+            "subtle", wrap=True))
+        page.content.addWidget(banner)
+
+        art_targets = []
+        for game in selected[:7]:
+            card, content = panel(padding=11)
+            content.setSpacing(6)
+            line = row(spacing=13)
+            image = QLabel()
+            image.setFixedSize(84, 112)
+            image.setAlignment(Qt.AlignCenter)
+            image.setStyleSheet(
+                "background:#0B1823;border:1px solid #365064;"
+                "color:#9CB7CB;font-size:10px;")
+            pix = _load_local_art(game, 84, 112)
+            if not pix.isNull():
+                image.setPixmap(pix)
+            else:
+                image.setText("NO OFFICIAL\nCOVER")
+            line.addWidget(image)
+            art_targets.append((game, image))
+            words = QWidget()
+            word_col = column(spacing=5, margins=(0, 0, 0, 0))
+            words.setLayout(word_col)
+            name = label(game.name, "sectionTitle", wrap=True)
+            word_col.addWidget(name)
+            status, description = launch_guard_summary(game)
+            status_label = label(f"{game.launcher}  •  {status}", "findingTitle")
+            word_col.addWidget(status_label)
+            word_col.addWidget(label(description, "subtle", wrap=True))
+            last = ("Last played: " + age_text(game.last_played_at)
+                    if game.last_played_at is not None
+                    else "Last played: not supplied by this launcher")
+            word_col.addWidget(label(last, "caption"))
+            line.addWidget(words, 1)
+            content.addLayout(line)
+
+            actions = QWidget()
+            bar = row(spacing=7)
+            actions.setLayout(bar)
+            bar.addWidget(button("Open game folder",
+                                 lambda g=game: self._open_folder(g.install_path)))
+            pins = set(self.settings.get("ready_room_favorites", []))
+            pin_btn = button("Unpin favorite" if game.key in pins else "Pin favorite")
+            def toggle_pin(_=False, g=game, ctrl=pin_btn):
+                updated = dict(self.settings)
+                keys = [x for x in updated.get("ready_room_favorites", [])
+                        if isinstance(x, str) and len(x) <= 450]
+                if g.key in keys:
+                    keys.remove(g.key)
+                elif len(keys) < 100:
+                    keys.append(g.key)
+                updated["ready_room_favorites"] = keys
+                try:
+                    save_settings(updated)
+                except (OSError, ValueError) as exc:
+                    self.error("Could not save favorite", str(exc))
+                    return
+                self.settings = updated
+                ctrl.setText("Unpin favorite" if g.key in keys else "Pin favorite")
+                self.status.setText(
+                    "Ready Room favorite updated. It will move to the top next visit.")
+            pin_btn.clicked.connect(toggle_pin)
+            bar.addWidget(pin_btn)
+
+            notes = self.settings.get("ready_room_notes", {})
+            existing_note = notes.get(game.key, "") if isinstance(notes, dict) else ""
+            note_button = button("Edit session note…" if existing_note else "Add session note…")
+            note_text = label(
+                "NEXT TIME: " + existing_note[:240]
+                if existing_note else "Write a private reminder about where to pick up.",
+                "caption", wrap=True)
+            def edit_note(_=False, g=game, btn=note_button, display=note_text):
+                existing = self.settings.get("ready_room_notes", {})
+                notes = dict(existing) if isinstance(existing, dict) else {}
+                current = str(notes.get(g.key, ""))[:500]
+                value, accepted = QInputDialog.getMultiLineText(
+                    self, "Session note: " + g.name,
+                    "What should you remember next time? (stored locally)", current)
+                if not accepted:
+                    return
+                value = value.strip()[:500]
+                if value:
+                    notes[g.key] = value
+                else:
+                    notes.pop(g.key, None)
+                if len(notes) > 100:
+                    self.error("Note limit reached",
+                               "Remove an older note before adding more.")
+                    return
+                updated = dict(self.settings)
+                updated["ready_room_notes"] = notes
+                try:
+                    save_settings(updated)
+                except (OSError, ValueError) as exc:
+                    self.error("Cannot save session note", str(exc))
+                    return
+                self.settings = updated
+                display.setText("NEXT TIME: " + value if value else
+                                "Write a private reminder about where to pick up.")
+                btn.setText("Edit session note…" if value else "Add session note…")
+            note_button.clicked.connect(edit_note)
+            bar.addWidget(note_button)
+            bar.addStretch()
+            content.addWidget(actions)
+            content.addWidget(note_text)
+            page.content.addWidget(card)
+        if not selected:
+            _box_notice(page, "No verified installed games. Run Scan PC to find your library.")
+
+        # Fetch only the artwork needed by the visible top cards.
+        def artwork_loaded(number):
+            if not number or self.current_route != "Ready Room":
+                return
+            for game, widget in art_targets:
+                if not isValid(widget):
+                    continue
+                pix = _load_local_art(game, 84, 112)
+                if not pix.isNull():
+                    widget.setText("")
+                    widget.setPixmap(pix)
+        if selected:
+            self.job(lambda _emitter: prime_visible_covers(selected[:7]),
+                     artwork_loaded, error_title="Game art unavailable")
+
+        news_panel, news_col = panel(padding=16)
+        news_col.addWidget(section_title(
+            "PATCH WATCH  /  STEAM ANNOUNCEMENTS",
+            "Prioritized by pinned and recently played titles"))
+        news_col.addWidget(label(
+            "Game Grave shows Steam-sourced announcements only where an exact "
+            "Steam AppID is verified. A Steam announcement is not proof an update "
+            "has been installed or that mods are compatible. "
+            "Other publishers will be added as supported feeds are validated.",
+            "subtle", wrap=True))
+        feed_status = label("Retrieving recent announcements on demand…", "caption")
+        news_col.addWidget(feed_status)
+        feed_rows = QWidget()
+        feed_layout = column(spacing=9, margins=(0, 0, 0, 0))
+        feed_rows.setLayout(feed_layout)
+        news_col.addWidget(feed_rows)
+        controls = QWidget()
+        control_row = row(spacing=8)
+        controls.setLayout(control_row)
+        refresh = button("Refresh Steam announcements", kind="primary")
+        control_row.addWidget(refresh)
+        control_row.addStretch()
+        news_col.addWidget(controls)
+        page.content.addWidget(news_panel)
+
+        def populate_news(results):
+            if self.current_route != "Ready Room" or not isValid(feed_rows):
+                return
+            from gg_desktop.widgets import destroy_layout
+            destroy_layout(feed_layout)
+            if not results:
+                feed_status.setText(
+                    "No supported announcements found, the service is unavailable, "
+                    "or fetching was deferred during gameplay.")
+                return
+            feed_status.setText(
+                f"{len(results)} Steam-sourced announcements · Retrieved only on demand")
+            for game_name, article in results:
+                item, body = panel(padding=10)
+                body.addWidget(label(
+                    f"{game_name}  •  {article.kind}  •  "
+                    + (datetime.fromtimestamp(article.published).strftime("%b %d, %Y")
+                       if article.published else "Date unavailable"), "caption"))
+                body.addWidget(label(article.title, "findingTitle", wrap=True))
+                if article.summary:
+                    body.addWidget(label(article.summary, "subtle", wrap=True))
+                body.addWidget(button(
+                    "Read on Steam",
+                    lambda url=article.url: QDesktopServices.openUrl(QUrl(url)),
+                    kind="link"))
+                feed_layout.addWidget(item)
+
+        def update_news(_=False, force=False):
+            if self.current_route != "Ready Room":
+                return
+            refresh.setEnabled(False)
+            feed_status.setText("Checking Steam announcements without disturbing gameplay…")
+            def finished(results):
+                if not isValid(refresh):
+                    return
+                refresh.setEnabled(True)
+                populate_news(results)
+            self.job(lambda _emitter: game_news_batch(selected, limit=3, force=force),
+                     finished, error_title="Steam news unavailable")
+        refresh.clicked.connect(lambda _=False: update_news(force=True))
+        update_news()
+        page.content.addWidget(label(
+            "More Ready Room functionality is being built: verified mod-change "
+            "warnings, richer session history, performance comparisons and Game "
+            "Time Machine recovery. None of those claims are simulated here.",
+            "caption", wrap=True))
 
     def games_page(self):
         page = self._new("Games", "All installed games Game Grave can verify, in one list across supported launchers.")
