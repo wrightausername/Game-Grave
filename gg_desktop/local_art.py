@@ -105,6 +105,28 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
                 root / "config" / "grid" / f"{app_id}.jpg",
                 root / "config" / "grid" / f"{app_id}.png",
             ))
+            # Steam custom grid artwork is usually per-user, not under
+            # Steam/config/grid. Bounded ID-only directories keep this cheap.
+            userdata = root / "userdata"
+            try:
+                if userdata.is_dir() and not userdata.is_symlink():
+                    inspected = 0
+                    for account in userdata.iterdir():
+                        if not account.name.isdecimal() or not account.is_dir() or account.is_symlink():
+                            continue
+                        grid = account / "config" / "grid"
+                        candidate.extend((
+                            grid / f"{app_id}p.jpg",
+                            grid / f"{app_id}p.png",
+                            grid / f"{app_id}p.webp",
+                            grid / f"{app_id}.jpg",
+                            grid / f"{app_id}.png",
+                        ))
+                        inspected += 1
+                        if inspected >= 12:
+                            break
+            except (OSError, ValueError):
+                pass
         from gg_desktop.steam_artwork import cached_steam_cover
         official = cached_steam_cover(app_id)
         if official:
@@ -123,7 +145,11 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
 
 
 def game_cover_path(game) -> str:
-    """Return an absolute local image path or an empty string (no guessing)."""
+    """Use a deliberate game-specific choice first, then exact official sources."""
+    from gg_desktop.custom_game_art import override_path
+    chosen = override_path(game)
+    if chosen:
+        return chosen
     return _cover_path(str(getattr(game, "launcher", "")),
                        str(getattr(game, "app_id", "") or ""),
                        str(getattr(game, "install_path", "") or ""))
