@@ -798,3 +798,180 @@ QPushButton#referenceSecondary:hover {
     border-color:#C94B65;background:#24202A;
 }
 """
+
+
+/* LOCKED: second Crimson Command Mod Shelf mockup, native Windows typography.
+   Uses standard installed Windows families. No bundled or redistributed fonts.
+   Design font: Bahnschrift (wide/condensed gaming UI), body: Segoe UI Variable.
+   Specificity deliberately outranks earlier legacy/experiment styles. */
+STYLE += r"""
+QWidget {
+    font-family: "Segoe UI Variable", "Segoe UI", "Arial";
+    font-size: 12px;
+}
+QFrame#navRail, QFrame#scanCommandBar {
+    background: #090D14;
+}
+QLabel#brand {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    color:#F7F4F8;font-weight:900;font-size:24px;letter-spacing:1.2px;
+}
+QLabel#brandEdition, QLabel#scanControlHeading, QLabel#brandKicker,
+QLabel#featureHeroKicker, QLabel#sceneKicker {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:11px;font-weight:800;letter-spacing:1.1px;
+}
+QLabel#brandEdition {
+    color:#F04460;
+}
+QLabel#scanControlStatus {
+    font-family:"Segoe UI Variable","Segoe UI",sans-serif;
+    font-size:12px;color:#D6DDE7;
+}
+QPushButton#navButton {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:14px;font-weight:600;letter-spacing:.2px;
+    color:#ECF2F6;padding:11px 12px;min-height:23px;
+}
+QPushButton#navButton[active="true"] {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #8F132E, stop:.52 #3B1424, stop:1 #17121A);
+    border:1px solid #D33854;border-left:3px solid #FF465F;
+    color:#FFFFFF;font-weight:800;border-radius:4px;
+}
+QPushButton#mainScanControl {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:18px;font-weight:900;letter-spacing:1.5px;
+    color:#FFFFFF;
+    border:1px solid #FF5B73;
+    border-radius:5px;
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #B82D44,stop:.45 #8F1A31,stop:1 #4B1323);
+}
+QPushButton#mainScanControl:hover {
+    background:#B62643;border:1px solid #FF7E8E;
+}
+QFrame#modCommandFilters {
+    background:#10151E;
+    border:1px solid #3F2936;border-radius:5px;
+    padding:3px;
+}
+QFrame#modCommandFilters QLineEdit,
+QFrame#modCommandFilters QComboBox {
+    background:#0B111A;
+    color:#F3F5FA;
+    border:1px solid #394756;
+    border-radius:4px;
+    selection-background-color:#9D2947;
+    padding:8px 12px;min-height:25px;
+    font-family:"Segoe UI Variable","Segoe UI",sans-serif;
+    font-size:12px;
+}
+QFrame#modCommandFilters QLineEdit:focus,
+QFrame#modCommandFilters QComboBox:focus {
+    border:1px solid #EE4E69;
+}
+QFrame#modCommandFilters QPushButton#modViewMode {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    background:#101A24;color:#B5C7D3;border:1px solid #364653;
+    border-radius:4px;padding:9px 12px;min-height:22px;
+    font-size:12px;font-weight:800;
+}
+QFrame#modCommandFilters QPushButton#modViewMode[active="true"] {
+    background:#92253F;color:#FFFFFF;border-color:#FA5470;
+}
+QFrame#referenceHero {
+    border:1px solid #842B46;
+    border-radius:6px;
+    border-bottom:3px solid #D43B58;
+}
+QFrame#referenceHeroTile {
+    border:1px solid #9C304A;
+    border-radius:4px;
+    background:#160E18;
+}
+QFrame#referenceLibrary {
+    background:#0B111A;
+    border:1px solid #334352;
+    border-top:1px solid #823047;
+    border-radius:6px;
+}
+QLabel#modShelfSectionTitle, QLabel#sectionTitle,
+QLabel#premiumTitle, QLabel#editorialEmptyTitle,
+QLabel#modShelfHeadline, QLabel#pageTitle {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-style:normal;
+    font-weight:800;
+    color:#F4F4F7;
+    letter-spacing:.3px;
+}
+QLabel#modShelfSectionTitle {
+    font-size:22px;
+}
+QLabel#modShelfHeadline, QLabel#editorialEmptyTitle {
+    font-size:29px;
+}
+QLabel#premiumTitle {
+    font-size:23px;
+}
+QFrame#modLocationCard {
+    background:#111922;
+    border:1px solid #374756;
+    border-radius:5px;
+    border-bottom:3px solid #562B3A;
+}
+QFrame#modLocationCard:hover {
+    border:1px solid #E44B67;
+    border-bottom:3px solid #E44B67;
+    background:#161924;
+}
+QFrame#modLocationCard[selected="true"] {
+    border:2px solid #FF4367;
+    border-bottom:3px solid #FF4367;
+    background:#2A1525;
+}
+QFrame#modLocationCard QLabel#findingTitle {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:14px;font-weight:800;
+    color:#FFFFFF;
+}
+QFrame#modLocationCard QLabel#premiumState {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    color:#F3CCD6;font-size:12px;font-weight:800;
+}
+QFrame#premiumInspector {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #1E111C,stop:.38 #0C121B,stop:1 #09131D);
+    border:1px solid #753247;
+    border-radius:6px;
+}
+QFrame#premiumInspector QLabel#premiumTitle {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:24px;font-weight:800;color:#F7F7F9;
+}
+QFrame#premiumInspector QLabel#sceneKicker {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:17px;font-weight:900;letter-spacing:.6px;
+    color:#F4F1F5;
+}
+QFrame#premiumInspector QLabel#premiumMetric {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:21px;font-weight:900;color:#FA5972;
+}
+QPushButton#primary, QPushButton#captureSlideshowPlay {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:13px;font-weight:900;letter-spacing:.4px;
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #D53250,stop:1 #771B36);
+    color:white;border:1px solid #FF5E75;border-radius:5px;
+    padding:10px 15px;
+}
+QPushButton#primary:hover {
+    background:#C33552;border-color:#FF8695;
+}
+QLabel#archiveTileTitle, QLabel#archiveTileMetric,
+QLabel#archiveTileCount, QLabel#captureSlideshowHeading,
+QLabel#captureSlideshowCount, QLabel#scanControlHeading {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+}
+"""
