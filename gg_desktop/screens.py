@@ -807,7 +807,8 @@ class ScreenMethods:
             lambda: self.navigate("Mods"),
             lambda: self.navigate("Captures"),
             on_choose_cover=self._choose_game_cover,
-            on_reset_cover=self._reset_game_cover)
+            on_reset_cover=self._reset_game_cover,
+            on_steam_cover=self._use_steam_store_cover)
         game_workspace_row.addWidget(self.game_inspector, 0, Qt.AlignTop)
         # Start empty and populate once from the same filtered/sorted rows as
         # the table. No mismatch between search results and visible covers.
@@ -930,6 +931,91 @@ class ScreenMethods:
         self.status.setText("Selected cover saved locally for " + game.name +
                             ". No game installation files changed.")
 
+    def _use_steam_store_cover(self, game):
+        """Explicitly attach official Steam art by confirmed store title/AppID.
+
+        Never infer an Epic/GOG/Xbox game identity from a fuzzy title match.
+        Only the user can associate these two records. No file changes to
+        launchers or installed game directories are permitted.
+        """
+        from gg_desktop.steam_artwork import (
+            lookup_steam_game_name, fetch_steam_cover,
+        )
+        from gg_desktop.custom_game_art import choose_custom_cover
+        from gg_desktop.local_art import invalidate_cover_cache
+        from performance_guard import GameActivityDetector
+        from types import SimpleNamespace
+        import re
+
+        if GameActivityDetector().active():
+            self.info("Gameplay has priority",
+                      "Artwork lookup is paused while a game is active.")
+            return
+        suggestion = str(getattr(game, "app_id", "") or "")
+        if not suggestion.isdecimal() or game.launcher != "Steam":
+            suggestion = ""
+        appid, accepted = QInputDialog.getText(
+            self, "Official Steam cover source",
+            "Open this game's Steam Store page to find its AppID (the "
+            "number after /app/ in the URL).\n\n"
+            "Enter the exact Steam AppID. Game Grave verifies the listing "
+            "name before asking you to associate its artwork:",
+            text=suggestion)
+        if not accepted:
+            return
+        appid = appid.strip()
+        if not re.fullmatch(r"[1-9][0-9]{0,9}", appid):
+            self.error("Invalid Steam AppID",
+                       "Enter only the numeric game ID from the Steam Store URL.")
+            return
+        self.status.setText("Checking official Steam listing for AppID " + appid)
+        def resolved(title):
+            if getattr(self, "current_route", "") != "Games":
+                return
+            if not title:
+                self.error("Steam listing unavailable",
+                           "Could not verify an official game listing for AppID "
+                           + appid + ". Choose an image file instead.")
+                return
+            if not self.confirm(
+                "Use this game's official Steam artwork?",
+                "Steam listing: " + title + "\n"
+                "Your installed game: " + game.name + "\n\n"
+                "These may be different editions or titles. Only proceed "
+                "if you personally confirm they are the same game. "
+                "This choice affects artwork, not game identity or launchers."):
+                return
+            steam_record = SimpleNamespace(
+                launcher="Steam", app_id=appid,
+                install_path=str(getattr(game, "install_path", "")))
+            self.status.setText(
+                "Downloading official Steam cover for " + title + "…")
+            def downloaded(local):
+                if not local:
+                    self.error("Steam cover unavailable",
+                               "No usable official Steam portrait art was returned. "
+                               "You can still choose an image file yourself.")
+                    return
+                try:
+                    choose_custom_cover(game, local)
+                except (OSError, ValueError) as exc:
+                    self.error("Could not save Steam cover", str(exc))
+                    return
+                invalidate_cover_cache()
+                if getattr(self, "current_route", "") == "Games":
+                    self._gallery_keys = None
+                    self._refresh_games_gallery(self._filtered_games)
+                    self.game_inspector.set_game(game)
+                self.status.setText(
+                    "Verified Steam cover saved locally for " + game.name)
+            self.job(
+                lambda _emit: fetch_steam_cover(
+                    steam_record, game_active=GameActivityDetector().active,
+                    force=True),
+                downloaded, error_title="Official cover retrieval failed")
+        self.job(lambda _emit: lookup_steam_game_name(appid),
+                 resolved, error_title="Steam game listing unavailable")
+
     def _reset_game_cover(self, game):
         from gg_desktop.custom_game_art import clear_custom_cover
         from gg_desktop.local_art import invalidate_cover_cache
@@ -1002,12 +1088,14 @@ class ScreenMethods:
             else "▤  Show advanced inventory list")
 
     def _focus_game_from_gallery(self, game):
-        """Select the exact verified game row, preserving its existing actions."""
+        """Inspect the chosen game without unexpectedly resetting the gallery."""
         if not hasattr(self, "game_table"):
             return
-        self.game_search.setText("")
-        self.game_filter.setCurrentIndex(0)
-        self.game_sort.setCurrentText("Name A to Z")
+        existing = next((i for i, row in enumerate(getattr(self, "_shown_games", []))
+                         if row.key == game.key), None)
+        if existing is None:
+            self.game_search.setText(game.name)
+            self.game_filter.setCurrentIndex(0)
         for index, item in enumerate(getattr(self, "_shown_games", [])):
             if item.key == game.key:
                 self.game_table.selectRow(index)
@@ -1317,6 +1405,8 @@ class ScreenMethods:
         menu.addAction("View Game DNA", lambda: self.navigate("Game DNA"))
         menu.addAction("Choose game cover image…",
                        lambda: self._choose_game_cover(game))
+        menu.addAction("Find verified cover using Steam AppID…",
+                       lambda: self._use_steam_store_cover(game))
         menu.addAction("Reset manual game cover…",
                        lambda: self._reset_game_cover(game))
         if ("steam_uninstall" in game.capabilities and game.app_id
