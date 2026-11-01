@@ -24,6 +24,15 @@ QFrame#routeNavigationBar {
     border-top: 1px solid #322331;
     min-height: 44px;
 }
+QLabel#detectedLauncherPill {
+    color: #C8E4F1;
+    background: #14232D;
+    border: 1px solid #386279;
+    border-radius: 9px;
+    padding: 5px 9px;
+    font-size: 10px;
+    font-weight: 800;
+}
 QLabel#routeBreadcrumb {
     color: #D8D1D9;
     font-family: "Georgia", "Segoe UI", serif;
