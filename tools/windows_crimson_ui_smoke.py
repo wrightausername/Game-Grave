@@ -490,6 +490,8 @@ def main():
             app.processEvents()
             assert window.mod_grid_btn.property("active") is True
             assert cards[1].isVisible(), "Grid view must bring back game cover tiles"
+            window.page.verticalScrollBar().setValue(0)
+            app.processEvents()
             mockup_screen = root / "_ci_temp" / "crimson-mods-populated-SYNTHETIC-1440.png"
             assert window.grab().save(str(mockup_screen)), (
                 "Failed to render approved Mod Shelf interaction state")
