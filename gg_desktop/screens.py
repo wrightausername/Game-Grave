@@ -217,7 +217,7 @@ class ScreenMethods:
             bar = row(spacing=7)
             actions.setLayout(bar)
             bar.addWidget(button("Open game folder",
-                                 lambda g=game: self._open_folder(g.install_path)))
+                                 lambda _=False, g=game: self._open_folder(g.install_path)))
             pins = set(self.settings.get("ready_room_favorites", []))
             pin_btn = button("Unpin favorite" if game.key in pins else "Pin favorite")
             def toggle_pin(_=False, g=game, ctrl=pin_btn):
@@ -349,7 +349,7 @@ class ScreenMethods:
                     body.addWidget(label(article.summary, "subtle", wrap=True))
                 body.addWidget(button(
                     "Read on Steam",
-                    lambda url=article.url: QDesktopServices.openUrl(QUrl(url)),
+                    lambda _=False, url=article.url: QDesktopServices.openUrl(QUrl(url)),
                     kind="link"))
                 feed_layout.addWidget(item)
 
