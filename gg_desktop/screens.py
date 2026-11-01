@@ -45,6 +45,7 @@ from gg_desktop.tab_panels import (
 )
 from gg_desktop.premium_panels import GameInspector, ModInspector, mod_gallery
 from gg_desktop.reference_hero import ReferenceHero
+from gg_desktop.voice import PAGE_LANGUAGE, EMPTY_STATES, ACTIONS
 
 
 def _table_text(table: QTableWidget, r: int, c: int, value) -> None:
@@ -78,6 +79,7 @@ class ScreenMethods:
 
     def _new(self, title: str, subtitle: str) -> ScrollPage:
         page = self.page_for(title)
+        subtitle = PAGE_LANGUAGE.get(title, ("", subtitle))[1]
         themes = {
             "Ready Room": ("ready", "GAMEPLAY • PATCHES • RECOVERY"),
             "Games": ("games", "YOUR GAME LIBRARY"),
@@ -93,11 +95,11 @@ class ScreenMethods:
         if title == "Games":
             actual_size, unknown = reported_game_bytes(self.inventory.games)
             metrics = (
-                ("Installed games", len(self.inventory.games), "Verified records"),
-                ("Known game size", human_size(actual_size), "Reported by launchers"),
-                ("Launchers", len({g.launcher for g in self.inventory.games}),
-                 "Detected sources"),
-                ("Unknown sizes", unknown, "Not assumed empty"),
+                ("Games found", len(self.inventory.games), "Recorded installs"),
+                ("Known size", human_size(actual_size), "Launcher-reported"),
+                ("Sources", len({g.launcher for g in self.inventory.games}),
+                 "Different launchers"),
+                ("No size yet", unknown, "Not reported"),
             )
             page.content.addWidget(ReferenceHero(
                 "games", "Games", subtitle, metrics))
@@ -109,14 +111,11 @@ class ScreenMethods:
                         for m in self.inventory.mods]
             known = sum(max(0, v) for v in measured)
             metrics = (
-                ("Games with mods", len(groups), "Verified install links"),
-                ("Mod locations", len(self.inventory.mods), "Discovered locations"),
-                ("Mod storage",
-                 (human_size(known) if measured and known else "Unknown"),
-                 "Sizes may overlap"),
-                ("Conflicts", "—", "Not assessed"),
-                ("Updates", "—", "Not verified"),
-                ("Orphans", "—", "Not proven by age"),
+                ("Games linked", len(groups), "Direct folder matches"),
+                ("Mod folders", len(self.inventory.mods), "Places we found"),
+                ("Size reported",
+                 (human_size(known) if measured and known else "—"),
+                 "May include overlap"),
             )
             page.content.addWidget(ReferenceHero(
                 "mods", "Mods", subtitle, metrics))
@@ -139,10 +138,16 @@ class ScreenMethods:
         if self.inventory.scanned_at:
             return False
         frame, stack = panel(padding=18)
-        stack.addWidget(label("YOUR STORAGE. YOUR DECISION.", "eyebrow"))
-        stack.addWidget(label("Run Scan PC to see what's actually installed. "
-                              "Game Grave does not invent activity or disk usage.", "subtle", wrap=True))
-        stack.addWidget(button("Scan PC now", self.start_scan, kind="primary"))
+        frame.setObjectName("beforeFirstScan")
+        stack.addWidget(label("WE HAVEN'T LOOKED YET.", "editorialEmptyTitle"))
+        stack.addWidget(label(
+            "Start with a scan. We'll look for games, mods and captures in "
+            "the places we recognize. Your files stay put.",
+            "editorialBody", wrap=True))
+        stack.addWidget(button("Find my games", self.start_scan, kind="primary"))
+        stack.addWidget(label(
+            "Scanning is read-only. Heavy work pauses when you're playing.",
+            "editorialFootnote", wrap=True))
         page.content.addWidget(frame)
         return True
 
@@ -1537,34 +1542,30 @@ class ScreenMethods:
             main_col.addWidget(GraveyardEmptyArt())
             incomplete = bool(self.inventory.warnings)
             main_col.addWidget(label(
-                "SCAN INCOMPLETE • NO VERIFIED FINDINGS" if incomplete
-                else "NO ITEMS FOUND", "premiumTitle"))
+                EMPTY_STATES["GraveyardPartial"][0] if incomplete
+                else EMPTY_STATES["Graveyard"][0], "editorialEmptyTitle"))
             main_col.addWidget(label(
-                "Some locations were inaccessible; a zero count does not "
-                "prove the PC is clear. Review scan warnings above."
-                if incomplete else
-                "No eligible game-related leftovers were found in this scan. "
-                "Protected locations are never removed automatically.",
-                "subtle", wrap=True))
-            main_col.addWidget(button("SCAN PC AGAIN", self.start_scan,
+                EMPTY_STATES["GraveyardPartial"][1] if incomplete
+                else EMPTY_STATES["Graveyard"][1],
+                "editorialBody", wrap=True))
+            main_col.addWidget(button("Look again", self.start_scan,
                                       kind="primary"))
             main_col.addStretch(1)
             empty_row.addWidget(main, 7)
             sidebar, side_col = panel(padding=16)
             sidebar.setObjectName("graveyardScanInspector")
-            side_col.addWidget(section_title("SCAN OPTIONS"))
+            side_col.addWidget(section_title("WHERE ELSE TO LOOK"))
             side_col.addWidget(label(
-                "Change the reviewed location or scan again. "
-                "The Graveyard only shows evidence-backed results; "
-                "it does not make up items to fill the screen.",
-                "caption", wrap=True))
+                "Nothing here? Try another game library or the folder "
+                "where you keep old downloads.",
+                "editorialBody", wrap=True))
             side_col.addWidget(button("Choose old-file folder…",
                                       self._choose_scan_folder))
             side_col.addWidget(button("Old Files / C: scan…",
                                       lambda: self.navigate("Old Files")))
             side_col.addWidget(button("Review Mod Radar",
                                       lambda: self.navigate("Mods")))
-            side_col.addWidget(section_title("WHAT GAME GRAVE CHECKS"))
+            side_col.addWidget(section_title("WHAT SHOWS UP HERE"))
             for item in ("Old or unused game installations",
                          "Launcher and mod-manager leftovers",
                          "Old screenshots and recordings",
@@ -1599,7 +1600,7 @@ class ScreenMethods:
         table_box, table_col = panel(padding=8)
         table_box.setObjectName("graveyardBurialLedger")
         table_col.addWidget(section_title(
-            "THE BURIAL LEDGER", "Select files to review, not automatically delete"))
+            "Found in the Graveyard", "A closer look before anything moves"))
         self.grave_table = data_table(["ITEM", "TYPE", "APPARENT SIZE", "STATUS"])
         self.grave_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.grave_table.setColumnWidth(0, 250)
@@ -2509,7 +2510,7 @@ class ScreenMethods:
         fl = row(spacing=9)
         filter_row.setLayout(fl)
         self.mod_query = QLineEdit()
-        self.mod_query.setPlaceholderText("Search modded games, manager sources or locations…")
+        self.mod_query.setPlaceholderText("Find a game, mod manager or folder…")
         self.mod_query.setAccessibleName("Search discovered mods by game, manager or path")
         fl.addWidget(self.mod_query, 4)
         self.mod_source_filter = QComboBox()
@@ -2522,7 +2523,7 @@ class ScreenMethods:
         self.mod_sort_filter.addItems(
             ["Most locations", "Game A to Z", "Game Z to A"])
         fl.addWidget(self.mod_sort_filter, 2)
-        fl.addWidget(button("↻  SCAN MODS", self.start_scan, kind="primary"))
+        fl.addWidget(button("Scan again", self.start_scan, kind="primary"))
         strip_layout.addWidget(filter_row)
         page.content.addWidget(search_strip)
         mod_workspace = QWidget()
@@ -2534,7 +2535,8 @@ class ScreenMethods:
         gallery, matched, external = mod_gallery(
             self.inventory.games, self.inventory.mods,
             lambda game, locations, source: self.mod_inspector.set_group(
-                game, locations, source), limit=columns * 2, columns=columns)
+                game, locations, source), limit=columns * 2, columns=columns,
+            on_scan=self.start_scan, on_add_library=self._add_game_library_root)
         gallery.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         mod_workspace_row.addWidget(gallery, 1, Qt.AlignTop)
         self.mod_inspector = ModInspector(
@@ -2590,8 +2592,8 @@ class ScreenMethods:
         self.mod_source_filter.currentTextChanged.connect(update_mod_cards)
         self.mod_sort_filter.currentTextChanged.connect(update_mod_cards)
         p, contents = panel()
-        contents.addWidget(section_title("Detected mod and manager storage",
-                                         str(len(self.inventory.mods)) + " findings"))
+        contents.addWidget(section_title("Every folder we found",
+                                         str(len(self.inventory.mods)) + " places"))
         table = data_table(["LOCATION", "SOURCE", "EVIDENCE", "APPARENT SIZE"])
         table.setColumnWidth(0, 305)
         table.setColumnWidth(1, 150)
@@ -2675,7 +2677,7 @@ class ScreenMethods:
         contents.addWidget(controls)
         # Put the engineering inventory below the artwork-led mod workspace.
         # Nothing is guessed or exposed as a one-click cleanup action.
-        more_mods = button("▤  Show detailed mod storage findings",
+        more_mods = button("View the folder list",
                            lambda: toggle_mod_inventory())
         more_mods.setObjectName("referenceSecondary")
         page.content.addWidget(more_mods)
@@ -2684,13 +2686,14 @@ class ScreenMethods:
             visible = not p.isVisible()
             p.setVisible(visible)
             more_mods.setText(
-                "▤  Hide detailed mod storage findings" if visible
-                else "▤  Show detailed mod storage findings")
+                "Hide the folder list" if visible
+                else "View the folder list")
         page.content.addWidget(p)
         page.content.addWidget(mod_radar_panel(self.inventory.mods))
         page.content.addWidget(label(
-            "All managed mod locations remain protected. Read-only inventory "
-            "cannot establish whether a mod is unused.", "warning", wrap=True))
+            "An old timestamp isn't proof a mod is abandoned. We won't move "
+            "a managed mod just because it's been sitting there.",
+            "editorialFootnote", wrap=True))
 
     def old_files_page(self):
         page = self._new("Old Files",
