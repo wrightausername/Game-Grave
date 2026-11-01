@@ -75,10 +75,12 @@ def _image(label, game, *, w=320, h=186):
         label.setToolTip("Local game art found on this PC")
     else:
         if game is not None:
-            label.setText("OFFICIAL COVER UNAVAILABLE")
+            label.setText("COVER ART\nNOT FOUND")
+            label.setWordWrap(True)
             label.setStyleSheet(
                 "background:#0A1824;color:#BDD0DE;border:1px dashed #345064;"
-                "font-size:11px;font-weight:700;")
+                "font-family:'Bahnschrift','Segoe UI';"
+                "font-size:12px;font-weight:800;letter-spacing:.4px;")
             label.setToolTip("No matching game artwork in cache.")
         else:
             from gg_desktop.poster_art import generated_game_poster
