@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 import json
+import hashlib
 import shutil
 from pathlib import Path
 import re
@@ -68,6 +69,23 @@ def prioritize_games(games: Iterable, favorite_keys=(), limit=12) -> list:
         -(getattr(g, "last_played_at", None) or 0),
         str(getattr(g, "name", "")).casefold()))
     return records[:max(0, limit)]
+
+
+def tonight_pick(games, *, day: str, offset: int = 0):
+    """Deterministic daily discovery from actual verified local installs.
+
+    Never claims the title is ready, playable or compatible with installed mods.
+    Does not use telemetry, random background work or the user's wishlist.
+    """
+    choices = [g for g in games
+               if "Installed" in str(getattr(g, "status", ""))
+               and str(getattr(g, "key", ""))]
+    choices.sort(key=lambda g: str(getattr(g, "key", "")))
+    if not choices:
+        return None
+    seed = hashlib.sha256(str(day).encode("utf-8")).digest()
+    start = int.from_bytes(seed[:4], "big") % len(choices)
+    return choices[(start + offset) % len(choices)]
 
 
 def launch_guard_summary(game, *, free_bytes=None) -> tuple[str, str]:
