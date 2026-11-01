@@ -1943,6 +1943,18 @@ class ScreenMethods:
         summary_col.addWidget(categories)
         report_stats = label("", "caption", wrap=True)
         summary_col.addWidget(report_stats)
+        sorting = QWidget()
+        sorting_line = row(spacing=9)
+        sorting.setLayout(sorting_line)
+        sorting_line.addWidget(label("Sort breakdown", "caption"))
+        other_sort = QComboBox()
+        other_sort.setAccessibleName("Sort Other Storage by size, folder name, category or file count")
+        other_sort.addItems([
+            "Largest first", "Smallest first", "Folder A to Z", "Folder Z to A",
+            "Most files", "Fewest files", "Category A to Z"])
+        sorting_line.addWidget(other_sort)
+        sorting_line.addStretch()
+        summary_col.addWidget(sorting)
         table = data_table(["FOLDER / ROOT FILE", "CATEGORY", "APPARENT SIZE", "FILES COUNTED"])
         table.setMinimumHeight(430)
         table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -1966,7 +1978,7 @@ class ScreenMethods:
 
         import threading
         from performance_guard import GameActivityDetector, CooperativeGameplayPause
-        current = {"report": None, "root": None}
+        current = {"report": None, "root": None, "visible": []}
         active_scan = getattr(self, "_other_storage_cancel_event", None)
         if active_scan is None:
             active_scan = threading.Event()
@@ -2025,7 +2037,19 @@ class ScreenMethods:
                     f"{name}: {human_size(total)} apparent"
                     for name, total in sorted(lines.items(), key=lambda x: -x[1])
                 ) or "No measurable folders found.")
-            shown = report.folders[:150]
+            key = other_sort.currentText()
+            funcs = {
+                "Largest first": lambda f: (-f.apparent_bytes, f.name.casefold()),
+                "Smallest first": lambda f: (f.apparent_bytes, f.name.casefold()),
+                "Folder A to Z": lambda f: (f.name.casefold(),),
+                "Folder Z to A": lambda f: (f.name.casefold(),),
+                "Most files": lambda f: (-f.files_seen, f.name.casefold()),
+                "Fewest files": lambda f: (f.files_seen, f.name.casefold()),
+                "Category A to Z": lambda f: (f.category.casefold(), f.name.casefold()),
+            }
+            shown = sorted(report.folders, key=funcs.get(key, funcs["Largest first"]),
+                           reverse=key == "Folder Z to A")[:150]
+            current["visible"] = shown
             table.setRowCount(len(shown))
             for index, item in enumerate(shown):
                 for colno, value in enumerate((
@@ -2054,10 +2078,10 @@ class ScreenMethods:
 
         def selected_folder():
             idx = _selected_indices(table)
-            data = current["report"]
-            if not idx or data is None or idx[0] >= len(data.folders):
+            rows = current.get("visible", [])
+            if not idx or idx[0] >= len(rows):
                 return None
-            return data.folders[idx[0]]
+            return rows[idx[0]]
 
         def analyze(scope=None):
             if getattr(self, "_other_storage_running", False):
@@ -2169,6 +2193,9 @@ class ScreenMethods:
         open_folder.clicked.connect(open_selected)
         back.clicked.connect(lambda _=False: analyze())
         disk_choices.currentIndexChanged.connect(refresh_drive)
+        other_sort.currentTextChanged.connect(
+            lambda _=None: show_report(current["report"])
+            if current["report"] is not None else None)
         refresh_drive()
         # refresh_drive may have cleared the disabled state of an ongoing job.
         if getattr(self, "_other_storage_running", False):
