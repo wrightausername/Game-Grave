@@ -18,6 +18,8 @@ from screenshots import find_old_screenshots
 from graveyard import build_graveyard
 from graveyard_protection import set_item_protection
 from gg_desktop.models import merge_games
+from performance_guard import GameActivityDetector, CooperativeGameplayPause, background_worker_priority
+from old_files_scope import scan_old_files_scope
 
 
 @dataclass
@@ -33,6 +35,9 @@ class Inventory:
     graveyard: list = field(default_factory=list)
     scanned_at: str = ""
     warnings: list[str] = field(default_factory=list)
+    old_files_scan_status: str = "not_scanned"
+    old_files_scan_message: str = ""
+    old_files_scan_root: str = ""
 
 
 STAGES = ("Steam and launchers", "Mod Radar", "Old files", "Game captures", "Protected saves")
@@ -44,7 +49,31 @@ class ScanCanceled(InterruptedError):
 
 def scan_inventory(settings: dict, canceled: Callable[[], bool],
                    progress: Callable[[int, str], None] | None = None) -> Inventory:
-    """Read-only scan, built off-thread; partial noncritical failures are explicit."""
+    """Read-only scan that yields to gameplay and uses background I/O priority."""
+    detector = GameActivityDetector()
+    last_percent = 0
+
+    def report(percent: int, label: str) -> None:
+        nonlocal last_percent
+        last_percent = percent
+        if progress:
+            progress(percent, label)
+
+    def on_pause(paused: bool) -> None:
+        if progress:
+            progress(last_percent,
+                "Paused: game or fullscreen application is running" if paused
+                else "Resuming low-priority scan")
+
+    gate = CooperativeGameplayPause(canceled, detector=detector, on_pause=on_pause)
+    with background_worker_priority():
+        return _scan_inventory(settings, gate.checkpoint, report, detector)
+
+
+def _scan_inventory(settings: dict, canceled: Callable[[], bool],
+                    progress: Callable[[int, str], None] | None,
+                    detector: GameActivityDetector) -> Inventory:
+    """Staged inventory; supported scanner callbacks yield between files."""
     def stage(i, name):
         if canceled():
             raise ScanCanceled("Scan canceled. The earlier accepted inventory is unchanged.")
@@ -55,6 +84,7 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
     staged.steam = find_games(list(settings.get("steam_extra_roots", [])), cancel=canceled)
     staged.other = find_launcher_games(list(settings.get("other_library_roots", [])), cancel=canceled)
     staged.games = merge_games(staged.steam, staged.other)
+    detector.set_game_roots(str(g.install_path) for g in staged.games)
     stage(1, STAGES[1])
     staged.mods = find_all_mod_storage(
         list(settings.get("steam_extra_roots", [])),
@@ -62,17 +92,33 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
         games=staged.steam, cancel=canceled,
     )
     stage(2, STAGES[2])
+    old_scope = str(settings.get("scan_folder", str(Path.home() / "Downloads")))
+    staged.old_files_scan_root = old_scope
     try:
-        staged.files = scan_old_files(Path(settings.get("scan_folder", str(Path.home() / "Downloads"))),
-                                     int(settings.get("files_stale_days", 180)), cancel=canceled)
+        roots = [g.install_path for g in staged.games
+                 if getattr(g, "install_path", None)]
+        roots.extend(str(m.path) for m in staged.mods if getattr(m, "path", None))
+        old_results = scan_old_files_scope(
+            old_scope, int(settings.get("files_stale_days", 180)),
+            cancel=canceled, known_game_roots=roots)
+        staged.files = list(old_results.files)
+        staged.old_files_scan_status = old_results.status
+        staged.old_files_scan_message = old_results.message
+        if old_results.status != "complete":
+            staged.warnings.append("Old Files scan incomplete: " + old_results.message)
     except (ValueError, OSError) as exc:
-        staged.warnings.append("Old Files folder unavailable (" + type(exc).__name__ + ").")
+        if canceled():
+            raise ScanCanceled("Old Files scan canceled.")
+        staged.old_files_scan_status = "failed"
+        staged.old_files_scan_message = str(exc)
+        staged.warnings.append("Old Files scan not completed: " + str(exc)[:180])
     stage(3, STAGES[3])
     days = min(int(settings.get("files_stale_days", 180)),
                int(settings.get("graveyard_days", 365)))
     try:
         staged.recordings = find_old_recordings(
-            days, list(settings.get("recording_roots", [])), cancel=canceled)
+            days, list(settings.get("recording_roots", [])),
+            cancel=canceled, include_recent=True)
     except (OSError, ValueError) as exc:
         staged.warnings.append("Recordings partially unavailable (" + type(exc).__name__ + ").")
     if canceled():
@@ -80,7 +126,8 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
     try:
         staged.screenshots = find_old_screenshots(
             days, list(settings.get("screenshot_roots", [])),
-            extra_steam_roots=list(settings.get("steam_extra_roots", [])), cancel=canceled)
+            extra_steam_roots=list(settings.get("steam_extra_roots", [])),
+            games=staged.games, include_recent=True, cancel=canceled)
     except (OSError, ValueError) as exc:
         staged.warnings.append("Screenshots partially unavailable (" + type(exc).__name__ + ").")
     stage(4, STAGES[4])

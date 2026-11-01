@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400" viewBox="0 0 1600 400">
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0.8" y2="1">
+    <stop offset="0" stop-color="#0b0711"/><stop offset=".38" stop-color="#4c0d23"/>
+    <stop offset=".7" stop-color="#9a1230"/><stop offset="1" stop-color="#130811"/>
+  </linearGradient>
+  <radialGradient id="moon" cx=".34" cy=".36" r=".75">
+    <stop offset="0" stop-color="#ffc4c8"/><stop offset=".28" stop-color="#fc5266"/>
+    <stop offset=".72" stop-color="#d72445"/><stop offset="1" stop-color="#790c27"/>
+  </radialGradient>
+  <radialGradient id="glow">
+    <stop offset="0" stop-color="#ff315b" stop-opacity=".65"/><stop offset="1" stop-color="#ff315b" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="fog" x1="0" y1="1" x2="0" y2="0">
+    <stop offset="0" stop-color="#e01e49" stop-opacity=".38"/>
+    <stop offset=".55" stop-color="#8d1435" stop-opacity=".1"/>
+    <stop offset="1" stop-color="#a31530" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="cloak" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#030910"/><stop offset=".55" stop-color="#1f1421"/>
+    <stop offset="1" stop-color="#5b1028"/>
+  </linearGradient>
+</defs>
+<rect width="1600" height="400" fill="url(#sky)"/>
+<path fill="#0a0810" opacity=".68" d="M0 85Q160 10 320 83T650 65Q920 0 1080 80T1600 38V0H0Z"/>
+<path fill="#5a0b25" opacity=".4" d="M0 155Q260 50 495 147T960 112Q1110 20 1600 138V0H0Z"/>
+<circle cx="1010" cy="100" r="242" fill="url(#glow)"/>
+<circle cx="1010" cy="88" r="172" fill="url(#moon)" stroke="#ff889b" stroke-width="3"/>
+<path d="M910 14Q970 28 1020 2M962 170Q1044 125 1158 152M876 82Q926 58 980 80M1044 38l18 28-8 31 35 24" fill="none" stroke="#ffd5d4" stroke-width="3" opacity=".26"/>
+<path d="M848 126l73 22 52-32 66 21 92-42M947 57l38 27 26-9 42 31" fill="none" stroke="#640d25" stroke-width="5" opacity=".33"/>
+<g opacity=".32" fill="#f9a6b7">
+  <circle cx="616" cy="35" r="2"/><circle cx="686" cy="72" r="1"/><circle cx="783" cy="23" r="1"/>
+  <circle cx="1242" cy="39" r="1.5"/><circle cx="1431" cy="54" r="1.2"/>
+</g>
+<path d="M0 240 120 166 216 220 330 116 451 234 555 155 692 248 828 144 950 225 1040 154 1160 239 1279 131 1450 247 1600 167V400H0Z" fill="#1b1020" opacity=".9"/>
+<path d="M0 301 180 215 260 284 400 214 510 279 650 202 785 286 913 203 1006 300 1111 215 1200 277 1345 209 1503 285 1600 230V400H0Z" fill="#120f1b"/>
+<!-- Gothic citadel and broken arch -->
+<g fill="#080a11">
+  <path d="M722 274V133l17-27 18 29v140Z M731 116V92l8-16 10 15v25Z"/>
+  <path d="M767 281V93l24-36 24 35v190Z M783 68V31l8-17 8 16v39Z"/>
+  <path d="M814 284V158l19-28 17 28v127Z"/>
+  <path d="M854 279V102l19-28 20 29v177Z M866 76V45l8-12 9 12v32Z"/>
+  <path d="M898 290V169l12-23 17 20v125Z"/>
+  <path d="M1087 293V98l23-25 56 1 23 25v196h-34V117q-28-29-42 1v175Z"/>
+  <path d="M1102 99l14-35 39-8 24 44Z"/>
+  <path d="M1203 284V152l18-26 20 27v131Z"/>
+</g>
+<g fill="none" stroke="#be2447" stroke-width="2" opacity=".55">
+ <path d="M1131 150v74m-20-37h40M786 134v56m-12-29h24"/>
+</g>
+<!-- Hooded guardian silhouetted against moon on the right -->
+<g transform="translate(1298 14)">
+  <path d="M114 102Q124 66 160 45Q203 63 215 104L209 138Q225 173 243 206
+    Q286 241 318 255L255 252Q273 279 315 300L252 285
+    Q212 292 175 269L115 293 81 315 102 254Q56 266 15 247
+    L59 216Q83 170 95 137Z" fill="url(#cloak)" stroke="#52152e" stroke-width="3"/>
+  <path d="M110 100Q129 65 159 54Q195 75 200 102L182 133 137 141 117 123Z" fill="#09080f" stroke="#872843" stroke-width="3"/>
+  <path d="M132 104Q155 89 183 104L166 133 145 135Z" fill="#040408"/>
+  <path d="M148 111l10 3m16-5-8 4" stroke="#f32d4f" stroke-width="3"/>
+  <path d="M117 137Q93 170 65 220M208 141q31 60 91 96" stroke="#d62a4a" stroke-width="3" fill="none" opacity=".52"/>
+  <path d="M190 177l35 52-14 43-11-44-43-20Z" fill="#110e17"/>
+  <path d="M196 211l36 151" stroke="#121721" stroke-width="11"/>
+  <path d="M229 341l19 2-13 33-15-4Z" fill="#a1314c"/>
+</g>
+<path d="M0 334 99 289 205 338 302 282 395 339 518 277 617 339 742 292 885 341 994 303 1090 344 1198 297 1338 344 1455 282 1600 336V400H0Z" fill="#090811"/>
+<!-- tombstones -->
+<g fill="#0b0a10" stroke="#4e172d" stroke-width="3">
+ <path d="M499 370v-71l24-24 25 24v71Z"/><path d="M607 370v-98l21-22 22 20v100Z"/>
+ <path d="M1130 374v-65l18-19 19 19v65Z"/>
+</g>
+<g fill="none" stroke="#f32b53" stroke-width="4" opacity=".74">
+ <path d="M522 304v44m-17-29h34M628 278v55m-13-33h26M1148 321v38m-14-23h28"/>
+</g>
+<rect width="1600" height="400" fill="url(#fog)"/>
+</svg>

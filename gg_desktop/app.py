@@ -9,16 +9,18 @@ import sys
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
+from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QProgressBar, QVBoxLayout, QWidget, QScrollArea,
 )
 from core import load_settings
 from gg_desktop.backend import Inventory, scan_inventory, ScanCanceled
+from performance_guard import background_worker_priority
 from gg_desktop.theme import STYLE
-from gg_desktop.widgets import label, button, row, column, ScrollPage
+from gg_desktop.widgets import label, button, row, column, ScrollPage, LandscapeArt
+from gg_desktop.visuals import nav_icon
 from gg_desktop.screens import ScreenMethods
 
 ROUTES = (
@@ -26,9 +28,12 @@ ROUTES = (
     ("Games", "▣"),
     ("Mods", "♜"),
     ("Old Files", "▤"),
+    ("Other Storage", "◉"),
+    ("Captures", "▧"),
     ("Graveyard", "♱"),
     ("Game DNA", "⌁"),
     ("Undo Center", "↶"),
+    ("AI Assistant", "✧"),
     ("Settings", "⚙"),
     ("More Tools", "⋯"),
 )
@@ -36,6 +41,9 @@ ROUTES = (
 ROUTE_ALIASES = {
     "Steam Games": "Games", "Other Launchers": "Games",
     "The Graveyard": "Graveyard", "Game Mods": "Mods",
+    "Game Screenshots": "Captures", "In-game Screenshots": "Captures",
+    "Screenshots": "Captures", "Videos": "Captures",
+    "Recordings": "Captures", "Game Recordings": "Captures",
     "Save Vault": "More Tools", "Resurrection Lab": "More Tools",
     "Cleanup History": "More Tools", "Automation": "More Tools",
     "Make Room": "More Tools", "Storage History": "More Tools",
@@ -57,10 +65,38 @@ class Job(QRunnable):
 
     def run(self):
         try:
-            result = self.fn(self.signals.progress.emit)
+            with background_worker_priority():
+                result = self.fn(self.signals.progress.emit)
             self.signals.done.emit(result)
         except Exception as exc:
             self.signals.failed.emit(type(exc).__name__ + ": " + str(exc)[:300])
+
+
+def configure_crimson_dialog_palette(app: QApplication) -> None:
+    """Provide readable dark native/Qt prompts when Windows uses light mode.
+
+    Style sheets cover Qt widget dialogs, while this palette covers child
+    widgets or system styles that otherwise inherit an unusable white-on-white
+    combination for Yes/No, file and typed override prompts.
+    """
+    app.setStyle("Fusion")
+    palette = QPalette(app.palette())
+    for role, hex_color in (
+        (QPalette.Window, "#111B27"),
+        (QPalette.WindowText, "#F5FAFF"),
+        (QPalette.Base, "#0D1722"),
+        (QPalette.AlternateBase, "#1D2C3A"),
+        (QPalette.Text, "#F5FAFF"),
+        (QPalette.Button, "#243446"),
+        (QPalette.ButtonText, "#F5FAFF"),
+        (QPalette.Highlight, "#345E74"),
+        (QPalette.HighlightedText, "#FFFFFF"),
+        (QPalette.ToolTipBase, "#111B27"),
+        (QPalette.ToolTipText, "#F5FAFF"),
+        (QPalette.PlaceholderText, "#ACBDCE"),
+    ):
+        palette.setColor(role, QColor(hex_color))
+    app.setPalette(palette)
 
 
 class CrimsonWindow(ScreenMethods, QMainWindow):
@@ -72,12 +108,14 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.cleaning = False
         self.cancel = threading.Event()
         self.workers = {}
-        self.pool = QThreadPool.globalInstance()
+        self.pool = QThreadPool(self)
+        self.pool.setMaxThreadCount(2)
         self.current_route = "Overview"
+        self._ai_companion = None
         self.setWindowTitle("Game Grave  |  Crimson Command preview")
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg")))
         self.setMinimumSize(960, 650)
-        self.resize(1450, 900)
+        self.resize(1450, 1000)
         self.setStyleSheet(STYLE)
         self._create_shell()
         self.navigate("Overview")
@@ -93,43 +131,68 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
         rail = QFrame()
         rail.setObjectName("navRail")
-        rail.setFixedWidth(219)
-        r = column(spacing=7, margins=(12, 23, 12, 18))
+        rail.setFixedWidth(220)
+        r = column(spacing=5, margins=(10, 20, 10, 12))
         rail.setLayout(r)
-        brand = label("♱   GAME GRAVE", "brand")
-        brand.setStyleSheet("color:#FFFFFF; font-size:20px; font-weight:900;")
-        r.addWidget(brand)
-        kicker = label("CLEANER GAMES.  A LIGHTER PC.", "brandKicker")
+        brand_holder = QWidget()
+        brand_layout = row(spacing=9)
+        brand_holder.setLayout(brand_layout)
+        glyph = QLabel()
+        glyph.setPixmap(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg"))
+                        .pixmap(54, 69))
+        glyph.setFixedSize(54, 69)
+        glyph.setAccessibleName("Game Grave crimson emblem")
+        brand_layout.addWidget(glyph)
+        brand_name = label("GAME\nGRAVE", "brand")
+        brand_name.setStyleSheet(
+            "color:#F5F7FB; font-size:21px; font-weight:900; line-height:1;")
+        brand_layout.addWidget(brand_name, 1)
+        r.addWidget(brand_holder)
+        kicker = label("CLEANER GAMES\nBRIGHTER WORLDS", "brandKicker")
         kicker.setWordWrap(True)
+        kicker.setStyleSheet(
+            "color:#8CA0B3; font-size:9px; letter-spacing:1px;")
         r.addWidget(kicker)
-        r.addSpacing(24)
+        edition = label("CRIMSON COMMAND", "brandEdition")
+        edition.setStyleSheet("color:#FF4056;font-size:10px;font-weight:800;"
+                              "letter-spacing:1px;")
+        r.addWidget(edition)
+        r.addSpacing(13)
         self.nav_buttons = {}
-        for route, icon in ROUTES:
-            control = button(icon + "    " + route,
+        for route, _legacy_icon in ROUTES:
+            control = button(route,
                              lambda _checked=False, route=route: self.navigate(route),
                              kind="navButton")
+            control.setIcon(nav_icon(route))
+            control.setIconSize(QSize(20, 20))
             control.setProperty("active", route == self.current_route)
             control.setAccessibleName(route + " page")
             control.setFocusPolicy(Qt.StrongFocus)
             r.addWidget(control)
             self.nav_buttons[route] = control
         r.addStretch()
-        motto = label("SAME GAMES.\nA CLEANER TOMORROW.", "subtle", wrap=True)
-        motto.setStyleSheet("color:#A1B2C2;font-size:12px;letter-spacing:1px;")
-        r.addWidget(motto)
-        r.addSpacing(15)
-        policy = label("LOCAL FIRST  •  RECYCLE BIN ONLY", "caption", wrap=True)
-        r.addWidget(policy)
+        # Decorative local artwork remains separate from scan findings and
+        # disappears on shorter screens so every navigation control stays usable.
+        self.sidebar_art = LandscapeArt(224, scene="footer")
+        footer_layout = column(margins=(14, 22, 12, 4))
+        self.sidebar_art.setLayout(footer_layout)
+        motto = label('“SAME GAMES.\nA CLEANER\nTOMORROW.”', "subtle", wrap=True)
+        motto.setStyleSheet("color:#D7E1EC;font-size:12px;letter-spacing:2px;")
+        footer_layout.addWidget(motto)
+        footer_layout.addStretch()
+        self.sidebar_art.setVisible(self.height() >= 795)
+        r.addWidget(self.sidebar_art)
         outer.addWidget(rail)
 
         main = QWidget()
         base = column(spacing=6, margins=(0, 0, 0, 0))
         main.setLayout(base)
         top = QWidget()
-        topbox = row(spacing=10, margins=(20, 13, 20, 9))
+        topbox = row(spacing=8, margins=(18, 5, 18, 4))
         top.setLayout(topbox)
         self.status = label("No scan yet. Choose Scan PC to begin.", "subtle", wrap=True)
         topbox.addWidget(self.status, 1)
+        top.setMaximumHeight(39)
         self.cancel_button = button("Cancel scan", self.cancel_scan)
         self.cancel_button.setEnabled(False)
         topbox.addWidget(self.cancel_button)
@@ -150,6 +213,11 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         base.addWidget(self.stack_holder, 1)
         outer.addWidget(main, 1)
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "sidebar_art"):
+            self.sidebar_art.setVisible(event.size().height() >= 795)
+
     def page_for(self, title: str) -> ScrollPage:
         if self.page is not None:
             self.stack_layout.removeWidget(self.page)
@@ -163,7 +231,18 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             control.style().polish(control)
         return self.page
 
+    def open_ai_companion(self):
+        """Non-modal local assistant: persists when navigating any other tab."""
+        from gg_desktop.ai_companion import open_companion
+        open_companion(self)
+
     def navigate(self, route: str):
+        # Assistant is a dockable/pop-out companion, NEVER a page replacement.
+        if route == "AI Assistant":
+            self.open_ai_companion()
+            return
+        # Legacy links to the recording viewer open Captures on its Video tab.
+        self._show_capture_videos = route in ("Videos", "Recordings", "Game Recordings")
         route = ROUTE_ALIASES.get(route, route)
         if route not in self.nav_buttons:
             route = "More Tools"
@@ -172,6 +251,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             "Games": self.games_page,
             "Mods": self.mods_page,
             "Old Files": self.old_files_page,
+            "Other Storage": self.other_storage_page,
+            "Captures": self.captures_page,
             "Graveyard": self.graveyard_page,
             "Game DNA": self.dna_page,
             "Undo Center": self.undo_page,
@@ -234,6 +315,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
                 self.status.setText("Scan canceled. The earlier inventory was not replaced.")
                 return
             self.inventory = inventory
+            # Disk contributions must be re-analyzed after a new scan changes
+            # installed-game ownership; never show a stale Other breakdown.
+            self._other_storage_report = None
+            self._other_storage_report_drive = None
             self.status.setText(
                 f"Scanned {inventory.scanned_at}  •  {len(inventory.games)} game installs, "
                 f"{len(inventory.mods)} mod locations, {len(inventory.graveyard)} Graveyard findings."
@@ -275,6 +360,7 @@ def main() -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Game Grave")
     app.setOrganizationName("Game Grave")
+    configure_crimson_dialog_palette(app)
     app.setStyleSheet(STYLE)
     app.setQuitOnLastWindowClosed(True)
     win = CrimsonWindow()

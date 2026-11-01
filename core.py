@@ -62,6 +62,8 @@ def default_settings() -> dict:
         "ui_layout": "simple",
         "never_touch": [],
         "scan_on_launch": False,
+        "ai_assistant_enabled": False,  # explicit opt-in; no model requests on startup
+        "ai_model": "qwen2.5:1.5b",  # user-installed localhost Ollama model
         "save_review_paths": [],
         "graveyard_watchlist": [],
         "recording_roots": [],  # Optional user-chosen capture folders, read-only scan
@@ -746,6 +748,8 @@ def scan_old_files(folder: Path, min_days: int = 180, cancel: Callable[[], bool]
         dirs[:] = [d for d in dirs if d.lower() not in SCAN_EXCLUDED and not
                    _has_reparse_component(Path(parent) / d)]
         for name in names:
+            if cancel and cancel():
+                raise InterruptedError("Scan paused or canceled")
             path = Path(parent) / name
             if allowed_extensions is not None and path.suffix.lower() not in allowed_extensions:
                 continue
@@ -976,6 +980,16 @@ def recycle_file(path: Path) -> None:
 
 
 def run_auto_cleanup() -> tuple[int, int, str]:
+    """Scheduled cleanup never starts or continues while a game is detected."""
+    from performance_guard import GameActivityDetector, background_worker_priority
+    detector = GameActivityDetector()
+    if detector.active():
+        return 0, 0, "Automatic cleanup deferred: a game is running."
+    with background_worker_priority():
+        return _run_auto_cleanup(detector)
+
+
+def _run_auto_cleanup(detector) -> tuple[int, int, str]:
     cfg = load_settings()
     if not cfg["auto_enabled"]:
         return 0, 0, "Automatic cleanup is disabled."
@@ -983,7 +997,10 @@ def run_auto_cleanup() -> tuple[int, int, str]:
     folder = downloads_dir()
     extensions = AUTO_BASE_EXTENSIONS | (AUTO_EXTRA_EXTENSIONS if cfg["auto_include_archives"] else set())
     try:
-        items = scan_old_files(folder, int(cfg["auto_days"]), allowed_extensions=extensions)
+        items = scan_old_files(folder, int(cfg["auto_days"]),
+                               allowed_extensions=extensions, cancel=detector.active)
+    except InterruptedError:
+        return 0, 0, "Automatic cleanup deferred: game started during scan."
     except (OSError, ValueError) as exc:
         log_event("Automatic cleanup", f"Scan skipped: {exc}")
         return 0, 0, str(exc)
@@ -991,6 +1008,11 @@ def run_auto_cleanup() -> tuple[int, int, str]:
     log_event("Cleanup started", f"Automatic cleanup: {len(items)} candidates reviewed", session_id=session_id)
     done, total_bytes, failed = 0, 0, 0
     for item in items:
+        if detector.active():
+            summary = ("Automatic cleanup stopped when gameplay started; "
+                       f"{done} files previously handled.")
+            log_event("Cleanup deferred", summary, session_id=session_id, source="Automatic")
+            return done, total_bytes, summary
         try:
             if is_protected_path(Path(item.path), cfg.get("never_touch", [])):
                 raise ValueError("Protected by Never Touch list")
