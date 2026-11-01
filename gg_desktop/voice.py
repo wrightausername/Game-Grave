@@ -22,19 +22,19 @@ PAGE_LANGUAGE = {
     ),
     "Mods": (
         "THE MOD SHELF",
-        "The mods you installed are worth keeping track of.",
+        "Mod folders have a habit of spreading. Here's where to keep tabs.",
     ),
     "Old Files": (
         "THE DUSTY CORNER",
-        "Old downloads, logs and leftover files. Take a look before tossing anything.",
+        "Those downloads you meant to clean up six months ago? Start here.",
     ),
     "Other Storage": (
         "WHERE DID THE SPACE GO?",
-        "See what your drive reports, then dig into the folders you choose.",
+        "What's taking the rest of your drive? Choose somewhere to look.",
     ),
     "Captures": (
         "THE GOOD PARTS, ON REPEAT",
-        "All those screenshots you meant to look at again.",
+        "You took the screenshots. Now you can actually enjoy them.",
     ),
     "Graveyard": (
         "NOT QUITE GONE",
