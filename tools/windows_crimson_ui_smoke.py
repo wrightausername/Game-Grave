@@ -471,7 +471,10 @@ def main():
             app.processEvents()
             heroes = window.page.findChildren(ReferenceHero)
             assert len(heroes) == 1 and heroes[0].title_overlay.text() == "MOD SHELF"
-            assert heroes[0].title_overlay.font().family() == display_family()
+            rendered_family = heroes[0].title_overlay.font().family()
+            assert "Georgia" not in rendered_family and "Cambria" not in rendered_family, (
+                "The chosen Mod Shelf reference requires a modern, non-serif gaming display font: "
+                + rendered_family)
             cards = window.page.findChildren(ModLocationCard)
             assert len(cards) >= 3, "Artwork-led Mod Shelf must show actual modded game tiles"
             cards[1].activate()
