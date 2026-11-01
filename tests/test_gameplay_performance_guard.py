@@ -36,6 +36,27 @@ class GameActivityDetectorTests(unittest.TestCase):
         )
         self.assertFalse(detector.active())
 
+    def test_epic_launcher_does_not_pause_forever(self):
+        detector = GameActivityDetector(
+            process_paths=lambda: [
+                r"C:\Program Files\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe",
+            ],
+            fullscreen=lambda: False,
+        )
+        self.assertFalse(detector.active())
+
+    def test_windowed_xbox_and_custom_games_detected_before_inventory(self):
+        for path in (
+            r"C:\XboxGames\Halo Infinite\Content\game.exe",
+            r"D:\Games\MyGame\bin\game.exe",
+            r"E:\EA Games\Battlefield\bf.exe",
+        ):
+            with self.subTest(path=path):
+                detector = GameActivityDetector(
+                    process_paths=lambda path=path: [path], fullscreen=lambda: False,
+                )
+                self.assertTrue(detector.active())
+
     def test_fullscreen_fallback_catches_game_without_process_path(self):
         detector = GameActivityDetector(
             process_paths=lambda: [],
