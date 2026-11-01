@@ -58,14 +58,7 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
     # Do not inspect every image in a game folder. The user selected a game
     # install; only specifically named root poster/cover files may be opened.
     candidate = []
-    try:
-        folder = Path(install_path)
-        candidate.extend(folder / filename for filename in (
-            "cover.jpg", "cover.png", "poster.jpg", "poster.png",
-            "folder.jpg", "folder.png"))
-    except (OSError, ValueError):
-        pass
-
+    # Official Steam library art takes precedence over a game's generic cover.jpg.
     if launcher.casefold() == "steam" and app_id.isascii() and app_id.isdecimal() and len(app_id) <= 12:
         for root in _steam_locations(install_path):
             cache = root / "appcache" / "librarycache"
@@ -86,6 +79,17 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
                 root / "config" / "grid" / f"{app_id}.jpg",
                 root / "config" / "grid" / f"{app_id}.png",
             ))
+        from gg_desktop.steam_artwork import cached_steam_cover
+        official = cached_steam_cover(app_id)
+        if official:
+            candidate.append(Path(official))
+    try:
+        folder = Path(install_path)
+        candidate.extend(folder / filename for filename in (
+            "cover.jpg", "cover.png", "poster.jpg", "poster.png",
+            "folder.jpg", "folder.png"))
+    except (OSError, ValueError):
+        pass
     for p in candidate[:80]:
         if _usable(p):
             return str(p)
@@ -97,3 +101,8 @@ def game_cover_path(game) -> str:
     return _cover_path(str(getattr(game, "launcher", "")),
                        str(getattr(game, "app_id", "") or ""),
                        str(getattr(game, "install_path", "") or ""))
+
+
+def invalidate_cover_cache() -> None:
+    """Call after an official image is successfully cached."""
+    _cover_path.cache_clear()
