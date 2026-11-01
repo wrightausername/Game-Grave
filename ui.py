@@ -4041,6 +4041,9 @@ class GameGraveApp(tk.Tk):
         self.scan_button.configure(state="disabled", bg=RAISED)
         self.cancel_button.configure(state="normal")
         self._scan_started = time.monotonic()
+        self._scan_paused_for_game = False
+        self._scan_pause_started = None
+        self._scan_pause_accumulated = 0.0
         self._scan_stage = 0
         self._scan_stage_name = STAGES[0][0]
         self.scan_percent.set(0)
@@ -4121,8 +4124,15 @@ class GameGraveApp(tk.Tk):
                     self.scan_percent.set(round(100 * sum(w for _, w in STAGES[:self._scan_stage])))
                 elif name == "scan_game_pause":
                     if self.scanning:
-                        self.scan_progress_text.set(
-                            "Paused for gameplay" if payload else "Resuming background scan")
+                        now = time.monotonic()
+                        if payload and not self._scan_paused_for_game:
+                            self._scan_paused_for_game = True
+                            self._scan_pause_started = now
+                        elif not payload and self._scan_paused_for_game:
+                            self._scan_pause_accumulated += (
+                                now - self._scan_pause_started)
+                            self._scan_paused_for_game = False
+                            self._scan_pause_started = None
                         self.status_text.set(
                             "Scan paused while a game is running; cancel remains available."
                             if payload else "Game closed. Resuming low-priority scan.")
@@ -4611,8 +4621,17 @@ class GameGraveApp(tk.Tk):
         except queue.Empty:
             pass
         if self.scanning:
-            elapsed = time.monotonic() - self._scan_started
-            eta = format_eta(eta_seconds(elapsed, self._scan_stage))
-            self.scan_progress_text.set(f"{self._scan_stage_name} · {self.scan_percent.get():.0f}% stages complete "
-                                        f"· {eta} · {int(elapsed)}s elapsed")
+            now = time.monotonic()
+            waiting = (now - self._scan_pause_started
+                       if self._scan_paused_for_game else 0.0)
+            elapsed = max(
+                0, now - self._scan_started - self._scan_pause_accumulated - waiting)
+            if self._scan_paused_for_game:
+                self.scan_progress_text.set(
+                    f"Paused for gameplay · {self.scan_percent.get():.0f}% stages complete")
+            else:
+                eta = format_eta(eta_seconds(elapsed, self._scan_stage))
+                self.scan_progress_text.set(
+                    f"{self._scan_stage_name} · {self.scan_percent.get():.0f}% stages complete "
+                    f"· {eta} · {int(elapsed)}s active scanning")
         self.after(180, self._poll)
