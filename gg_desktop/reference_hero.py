@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
@@ -28,6 +28,7 @@ class ReferenceHero(SceneHeader):
         for child in self.findChildren(QLabel):
             child.hide()
         scene_assets = {
+            "mods": "crimson_mods_scene.svg",
             "dna": "crimson_dna_scene.svg",
             "undo": "crimson_undo_scene.svg",
             "oldfiles": "crimson_oldfiles_scene.svg",
@@ -39,11 +40,33 @@ class ReferenceHero(SceneHeader):
         self.background_art = QSvgRenderer(str(
             Path(__file__).parent / "assets" / asset))
 
+        # Feature-specific palette and an editorial title set. A seven-page
+        # app should not read like the same prebuilt template everywhere.
+        self.kind = str(kind)
+        self.theme_tone = {
+            "dna": "#BC7AFF", "oldfiles": "#57D8F0",
+            "storage": "#57D8F0", "captures": "#F45F7C",
+            "graveyard": "#F05069", "undo": "#F28599",
+        }.get(self.kind, "#F44A64")
         self.title_overlay = QLabel(title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
         self.title_overlay.setStyleSheet(
-            "background:transparent; color:#FFFFFF; font-size:32px;"
-            "font-weight:900; letter-spacing:.3px;")
+            "background:transparent; color:#FFFFFF;"
+            "font-family:'Georgia','Cambria','Segoe UI'; font-size:35px;"
+            "font-weight:800; letter-spacing:1px;")
+        self.eyebrow_overlay = QLabel(
+            {"mods":"MOD ARCHIVES / COMBAT READY",
+             "oldfiles":"THE ARCHIVE / STORAGE AUDIT",
+             "storage":"STORAGE MAP / DISK INTELLIGENCE",
+             "captures":"THE SCREENING ROOM / GAME CAPTURES",
+             "graveyard":"THE GRAVEYARD / REVIEW QUEUE",
+             "dna":"THE GENOME LAB / FILE RELATIONSHIPS",
+             "undo":"THE RECOVERY DESK / REVERSE LOG",
+             "games":"THE GAME LIBRARY / DISCOVERY"}.get(self.kind, "CRIMSON COMMAND"), self)
+        self.eyebrow_overlay.setObjectName("featureHeroKicker")
+        self.eyebrow_overlay.setStyleSheet(
+            "background:transparent;color:"+self.theme_tone+
+            ";font-size:10px;font-weight:850;letter-spacing:2px;")
         self.subtitle_overlay = QLabel(subtitle, self)
         self.subtitle_overlay.setObjectName("referenceHeroSubtitle")
         self.subtitle_overlay.setWordWrap(True)
@@ -85,9 +108,10 @@ class ReferenceHero(SceneHeader):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.width()
-        self.title_overlay.setGeometry(23, 16, max(150, w - 52), 49)
-        self.subtitle_overlay.setGeometry(25, 65, max(150, w - 55), 46)
-        self.metrics.setGeometry(20, 153, max(250, w - 40), 81)
+        self.eyebrow_overlay.setGeometry(89, 17, max(150, w - 115), 18)
+        self.title_overlay.setGeometry(86, 36, max(150, w - 119), 52)
+        self.subtitle_overlay.setGeometry(90, 94, max(150, w - 125), 48)
+        self.metrics.setGeometry(17, 158, max(250, w - 34), 79)
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -102,12 +126,12 @@ class ReferenceHero(SceneHeader):
         p.setClipRect(full)
         if self.background_art.isValid():
             self.background_art.render(p, QRectF(0, -65, w, h + 122))
-        # Red moon atmosphere, while preserving white text contrast.
+        # Preserve artwork on the right; fade only the functional text field.
         shade = QLinearGradient(0, 0, w, 0)
-        shade.setColorAt(0.0, QColor(5, 7, 14, 243))
-        shade.setColorAt(.31, QColor(8, 8, 16, 210))
-        shade.setColorAt(.58, QColor(14, 7, 17, 83))
-        shade.setColorAt(1, QColor(22, 5, 12, 20))
+        shade.setColorAt(0.0, QColor(5, 7, 14, 235))
+        shade.setColorAt(.28, QColor(8, 8, 16, 174))
+        shade.setColorAt(.52, QColor(10, 7, 16, 54))
+        shade.setColorAt(1, QColor(12, 6, 13, 8))
         p.fillRect(full, shade)
         # Darken only the bottom where translucent tiles sit.
         bottom = QLinearGradient(0, h * .49, 0, h)
@@ -115,9 +139,50 @@ class ReferenceHero(SceneHeader):
         bottom.setColorAt(1, QColor(6, 6, 11, 193))
         p.fillRect(full, bottom)
         p.restore()
-        p.setPen(QPen(QColor("#96243B"), 1))
+        p.setPen(QPen(QColor(self.theme_tone), 1))
         p.setBrush(Qt.NoBrush)
-        p.drawRoundedRect(full.adjusted(.5, .5, -.5, -.5), 11, 11)
-        p.setPen(QPen(QColor("#E83250"), 2))
-        p.drawLine(20, h - 1, min(w - 20, w * .45), h - 1)
+        p.drawRoundedRect(full.adjusted(.5, .5, -.5, -.5), 8, 8)
+        # Carved-corner framing and a feature-specific navigation sigil.
+        p.setPen(QPen(QColor(self.theme_tone), 2.4))
+        p.drawLine(15, h - 2, min(w - 20, w*.42), h - 2)
+        p.drawLine(w-132, 0, w-35, 0)
+        p.drawLine(w-35, 0, w-10, 21)
+        p.drawLine(14, 19, 14, 142)
+        # A consistent crest with per-room glyph, not a font-emoji ornament.
+        p.setPen(QPen(QColor(self.theme_tone), 2))
+        p.setBrush(QColor(11, 17, 26, 185))
+        p.drawEllipse(QRectF(24, 50, 51, 51))
+        p.drawEllipse(QRectF(30, 56, 39, 39))
+        cx, cy = 49.5, 75.5
+        if self.kind == "dna":
+            p.drawArc(QRectF(39, 60, 22, 31), 85*16, 185*16)
+            p.drawArc(QRectF(39, 60, 22, 31), 265*16, 185*16)
+            for dy in (-7, 0, 7):
+                p.drawLine(QPointF(43,cy+dy),QPointF(56,cy+dy))
+        elif self.kind == "undo":
+            p.drawArc(QRectF(36, 63, 27, 27), 5*16, 292*16)
+            p.drawLine(QPointF(33,68),QPointF(39,81))
+            p.drawLine(QPointF(33,68),QPointF(46,67))
+        elif self.kind == "graveyard":
+            p.drawRoundedRect(QRectF(41,63,17,27),5,5)
+            p.drawLine(QPointF(cx,65),QPointF(cx,83))
+            p.drawLine(QPointF(cx-7,72),QPointF(cx+7,72))
+        elif self.kind == "captures":
+            p.drawRoundedRect(QRectF(38,65,23,19),3,3)
+            p.drawEllipse(QPointF(49,74),5,5)
+            p.drawLine(QPointF(40,62),QPointF(59,62))
+        elif self.kind == "mods":
+            p.drawRect(QRectF(41,64,18,23))
+            p.drawEllipse(QPointF(50,65),3,3)
+            p.drawLine(QPointF(38,73),QPointF(42,73))
+            p.drawLine(QPointF(59,78),QPointF(63,78))
+        elif self.kind in ("storage","oldfiles"):
+            p.drawRect(QRectF(37,65,25,20))
+            for dy in (69,75,81):
+                p.drawLine(QPointF(42,dy),QPointF(55,dy))
+        else:
+            p.drawRoundedRect(QRectF(36,68,27,16),5,5)
+            p.drawEllipse(QPointF(55,75),2,2)
+            p.drawLine(QPointF(42,72),QPointF(42,80))
+            p.drawLine(QPointF(38,76),QPointF(46,76))
         p.end()
