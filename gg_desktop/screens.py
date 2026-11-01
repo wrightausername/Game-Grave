@@ -2670,10 +2670,11 @@ class ScreenMethods:
                 for item in report.folders:
                     lines[item.category] += item.apparent_bytes
             categories.setText(
-                "\n".join(
-                    f"{name}: {human_size(total)} apparent"
-                    for name, total in sorted(lines.items(), key=lambda x: -x[1])
-                ) or "No measurable folders found.")
+                f"{len(lines)} measured category group(s)  •  "
+                "The chart shows their proportional share. "
+                "Use the sortable list below to inspect individual folders."
+                if lines else
+                "No measurable category data. See skipped/unclassified coverage above.")
             key = other_sort.currentText()
             funcs = {
                 "Largest first": lambda f: (-f.apparent_bytes, f.name.casefold()),
