@@ -8,12 +8,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen, QFont, QFontDatabase
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from gg_desktop.visuals import SceneHeader
 from gg_desktop.voice import PAGE_LANGUAGE
+from gg_desktop.typography import display_family, text_family
 
 
 class ReferenceHero(SceneHeader):
@@ -49,12 +50,12 @@ class ReferenceHero(SceneHeader):
             "storage": "#57D8F0", "captures": "#F45F7C",
             "graveyard": "#F05069", "undo": "#F28599",
         }.get(self.kind, "#F44A64")
-        self.title_overlay = QLabel(title, self)
+        self.title_overlay = QLabel(
+            "THE MOD SHELF" if self.kind == "mods" else title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
+        self.title_overlay.setFont(QFont(display_family(), 42, QFont.Bold))
         self.title_overlay.setStyleSheet(
-            "background:transparent; color:#FFFFFF;"
-            "font-family:'Georgia','Cambria','Segoe UI'; font-size:47px;"
-            "font-weight:800; letter-spacing:-.2px;")
+            "background:transparent;color:#FFFFFF;letter-spacing:1px;")
         route_for_kind = {
             "mods": "Mods", "oldfiles": "Old Files",
             "storage": "Other Storage", "captures": "Captures",
@@ -62,45 +63,48 @@ class ReferenceHero(SceneHeader):
             "undo": "Undo Center", "games": "Games",
         }.get(self.kind)
         editorial = PAGE_LANGUAGE.get(route_for_kind, ("GAME GRAVE", ""))[0]
-        self.eyebrow_overlay = QLabel(editorial, self)
+        self.eyebrow_overlay = QLabel(
+            "MODS / YOUR LIBRARY" if self.kind == "mods" else editorial, self)
         self.eyebrow_overlay.setObjectName("featureHeroKicker")
+        self.eyebrow_overlay.setFont(QFont(display_family(), 11, QFont.DemiBold))
         self.eyebrow_overlay.setStyleSheet(
             "background:transparent;color:"+self.theme_tone+
-            ";font-size:11px;font-weight:800;letter-spacing:1.5px;")
+            ";letter-spacing:1.6px;")
         self.subtitle_overlay = QLabel(subtitle, self)
         self.subtitle_overlay.setObjectName("referenceHeroSubtitle")
         self.subtitle_overlay.setWordWrap(True)
+        self.subtitle_overlay.setFont(QFont(text_family(), 11))
         self.subtitle_overlay.setStyleSheet(
-            "background:transparent;color:#DFDCE3;"
-            "font-size:15px;line-height:1.3;")
+            "background:transparent;color:#DFDCE3;")
 
         self.metrics = QWidget(self)
         self.metrics.setObjectName("referenceHeroMetrics")
         self.metrics.setVisible(self._has_metrics)
         row = QHBoxLayout(self.metrics)
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(0)
+        row.setSpacing(7)
         for i, (name, value, note) in enumerate(list(metrics)[:6]):
             tile = QFrame(self.metrics)
             tile.setObjectName("referenceHeroTile")
             tile.setStyleSheet(
                 "QFrame#referenceHeroTile{"
-                "background:rgba(8,10,16,226);"
-                "border:0;border-left:1px solid #5D3D4B;border-radius:0;}")
+                "background:rgba(12,8,18,219);"
+                "border:1px solid #933049;border-radius:4px;}")
             col = QVBoxLayout(tile)
-            col.setContentsMargins(17, 11, 9, 8)
-            col.setSpacing(3)
+            col.setContentsMargins(13, 7, 9, 6)
+            col.setSpacing(1)
             top = QLabel(str(name).upper())
+            top.setFont(QFont(display_family(), 9, QFont.DemiBold))
             top.setStyleSheet(
-                "background:transparent;color:#D6BEC8;"
-                "font-size:10px;font-weight:700;letter-spacing:1px;")
+                "background:transparent;color:#E8C1CB;letter-spacing:.5px;")
             count = QLabel(str(value))
+            count.setFont(QFont(display_family(), 23, QFont.Bold))
             count.setStyleSheet(
-                "background:transparent;color:#FFFFFF;"
-                "font-family:'Georgia','Segoe UI';font-size:27px;font-weight:800;")
+                "background:transparent;color:#FFFFFF;")
             foot = QLabel(str(note))
+            foot.setFont(QFont(text_family(), 8))
             foot.setStyleSheet(
-                "background:transparent;color:#92A3B0;font-size:10px;")
+                "background:transparent;color:#A7AFB9;")
             foot.setWordWrap(True)
             for widget in (top, count, foot):
                 col.addWidget(widget)
@@ -109,10 +113,10 @@ class ReferenceHero(SceneHeader):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.width()
-        self.eyebrow_overlay.setGeometry(37, 34, max(150, w - 76), 25)
-        self.title_overlay.setGeometry(32, 64, max(150, w - 71), 62)
-        self.subtitle_overlay.setGeometry(36, 131, max(150, w - 73), 52)
-        self.metrics.setGeometry(17, 190, max(250, w - 34), 73)
+        self.eyebrow_overlay.setGeometry(36, 28, max(150, w - 80), 21)
+        self.title_overlay.setGeometry(32, 55, max(150, w - 64), 64)
+        self.subtitle_overlay.setGeometry(36, 122, max(150, w - 73), 42)
+        self.metrics.setGeometry(17, 186, max(250, w - 34), 81)
 
     def paintEvent(self, event):
         p = QPainter(self)
