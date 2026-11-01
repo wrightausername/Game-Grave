@@ -1732,212 +1732,367 @@ class ScreenMethods:
                  ready, error_title="Could not safely preview image")
 
     def dna_page(self):
+        """Forensic workbench: one game, its verified links, and clear unknowns.
+
+        A full-size interactive relationship diagram is the primary graphic.
+        Only source-evidenced paths are associated with a particular game.
+        No fabricated footprint totals, fake reclaim space, or automatic purge.
+        """
+        from shiboken6 import isValid
+        from PySide6.QtGui import QIcon
+        from gg_desktop.models import _path_key
+        from gg_desktop.premium_panels import _load_local_art
+        from gg_desktop.steam_artwork import prime_visible_covers, verified_steam_id
+        from game_intelligence import build_game_dna
+
         page = self._new(
             "Game DNA",
-            "Digital forensics for your games: explore real installation links, mods, saves and uncertain data.")
+            "Break down your games. Trace verified installs, mods and protected "
+            "data in an interactive forensic map.")
         if self._not_scanned(page):
             return
-        from game_intelligence import build_game_dna
-        from gg_desktop.widgets import destroy_layout
+
         dna = build_game_dna(
             self.inventory.steam, self.inventory.other,
             self.inventory.mods, self.inventory.saves)
-        games = dna.get("games", [])
+        records = list(dna.get("games", []))
+        indexed = {_path_key(game.install_path): game
+                   for game in self.inventory.games
+                   if getattr(game, "install_path", "")}
+        record_for = lambda item: indexed.get(_path_key(item["install_path"]))
+        pending_art = set()
+
         page.content.addWidget(FeatureStrip([
-            ("ANALYZE", "Verified installations"),
-            ("DETECT", "Source-aware mod links"),
-            ("MAP", "Interactive relationships"),
-            ("EXPLAIN", "Why files are protected"),
-            ("REVIEW", "No automatic cleanup"),
+            ("SCAN", "Source-aware inventory"),
+            ("LINK", "Evidence, not names"),
+            ("MAP", "Explore related files"),
+            ("REVIEW", "Unknowns stay protected"),
         ]))
-        selection, selection_col = panel(padding=12)
-        selection_col.addWidget(section_title(
-            "SELECT AN INSTALLED GAME", f"{len(games)} supported game records"))
-        selector_row = QWidget()
-        select_line = row(spacing=11)
-        selector_row.setLayout(select_line)
+
+        toolbar, controls = panel(padding=12)
+        toolbar.setObjectName("dnaForensicControls")
+        controls.addWidget(section_title(
+            "GAME DNA LAB  /  SELECT AN INSTALLED GAME",
+            f"{len(records)} inventory record(s)"))
+        bar = QWidget()
+        bar_row = row(spacing=9)
+        bar.setLayout(bar_row)
+        drive_picker = QComboBox()
+        drive_picker.setAccessibleName("Filter Game DNA to a game drive")
+        drives = sorted({Path(g["install_path"]).anchor for g in records
+                         if Path(g["install_path"]).anchor})
+        drive_picker.addItems(["All Drives", *drives])
+        drive_picker.setMaximumWidth(142)
+        bar_row.addWidget(drive_picker)
         choose = QComboBox()
-        choose.setMinimumWidth(280)
-        choose.setAccessibleName("Game for digital relationship analysis")
-        choose.addItems([
-            f"{game['game']}  •  {game['launcher']}" for game in games
-        ])
-        select_line.addWidget(choose, 3)
-        select_line.addWidget(button(
-            "See game installations", lambda: self.navigate("Games")))
-        select_line.addStretch(1)
-        selection_col.addWidget(selector_row)
-        page.content.addWidget(selection)
+        choose.setObjectName("dnaGameSelector")
+        choose.setAccessibleName("Game to inspect in full-size forensic relationship map")
+        choose.setMinimumWidth(260)
+        bar_row.addWidget(choose, 1)
+        bar_row.addWidget(button(
+            "↻  Run DNA Scan", self.start_scan, kind="primary"))
+        controls.addWidget(bar)
+        controls.addWidget(label(
+            "Read-only metadata. A link is shown only when its source or "
+            "path supports it; unverified saves, caches and leftovers stay "
+            "unattributed and protected.",
+            "caption", wrap=True))
+        page.content.addWidget(toolbar)
 
-        # This screen is an interactive relationship map, NOT another stats
-        # dashboard with invented percentages or fictional game disk sizes.
         workspace = QWidget()
-        board_row = row(spacing=12)
-        workspace.setLayout(board_row)
-        overview, overview_col = panel(padding=10)
-        overview_col.addWidget(section_title(
-            "GAME DNA  /  RELATIONSHIP MAP", "Tap any file group to inspect"))
+        work_row = row(spacing=12)
+        workspace.setLayout(work_row)
+        map_panel, map_col = panel(padding=12)
+        map_panel.setObjectName("dnaRelationshipStudio")
+        map_col.addWidget(section_title(
+            "GAME FOOTPRINT MAP", "Select a glowing node to inspect its evidence"))
         relationship = RelationshipMap()
-        overview_col.addWidget(relationship)
-        board_row.addWidget(overview, 7)
+        relationship.setObjectName("dnaFullscreenRelationshipMap")
+        relationship.setMinimumHeight(382)
+        relationship.setMaximumHeight(382)
+        relationship.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        map_col.addWidget(relationship)
+        map_caption = label(
+            "Cyan: source evidence. Red: review or unknown. "
+            "File relationships are not proof that something is unused.",
+            "caption", wrap=True)
+        map_col.addWidget(map_caption)
+        map_col.addStretch(1)
+        work_row.addWidget(map_panel, 7)
 
-        inspector, inspector_col = panel(padding=14)
-        inspector_col.addWidget(section_title("EVIDENCE INSPECTOR", "OFFICIAL GAME ART"))
-        # Match Steam art by a verified install path + Steam AppID, never by
-        # a guessed title. Unsupported launchers show no fabricated artwork.
-        from gg_desktop.premium_panels import _load_local_art
-        from gg_desktop.steam_artwork import prime_visible_covers, verified_steam_id
-        from shiboken6 import isValid
-        from gg_desktop.models import _path_key
-        inventory_by_path = {_path_key(g.install_path): g for g in self.inventory.games
-                             if getattr(g, "install_path", None)}
+        inspector, inspector_col = panel(padding=12)
+        inspector.setObjectName("dnaEvidenceInspector")
+        inspector_col.addWidget(section_title("EVIDENCE INSPECTOR", "Selected game"))
         dna_art = QLabel()
-        dna_art.setMinimumHeight(225)
-        dna_art.setMaximumHeight(255)
-        dna_art.setAlignment(Qt.AlignCenter)
         dna_art.setObjectName("dnaOfficialCover")
+        dna_art.setFixedHeight(166)
+        dna_art.setAlignment(Qt.AlignCenter)
         dna_art.setStyleSheet(
-            "background:#081522;border:1px solid #A82E48;border-radius:12px;"
-            "color:#B9CBD9;font-size:11px;font-weight:700;")
+            "background:#0B1420;border:1px solid #743047;border-radius:10px;"
+            "color:#B6C9D5;font-size:11px;font-weight:700;")
         inspector_col.addWidget(dna_art)
-        cover_requested = set()
-        def load_dna_cover(index):
-            if not (0 <= index < len(games)):
-                dna_art.setPixmap(QPixmap())
-                relationship.set_cover(None)
-                dna_art.setText("NO GAME SELECTED")
-                return
-            selected = games[index]
-            record = inventory_by_path.get(_path_key(selected["install_path"]))
-            if record is None:
-                dna_art.setPixmap(QPixmap())
-                relationship.set_cover(None)
-                dna_art.setText("OFFICIAL COVER UNAVAILABLE")
-                return
-            art = _load_local_art(record, 305, 245)
-            if not art.isNull():
-                dna_art.setText("")
-                dna_art.setPixmap(art)
-                relationship.set_cover(art)
-                return
-            dna_art.setPixmap(QPixmap())
-            relationship.set_cover(None)
-            dna_art.setText("OFFICIAL COVER UNAVAILABLE")
-            ident = verified_steam_id(record)
-            if ident and ident not in cover_requested:
-                cover_requested.add(ident)
-                expected_key = str(selected["id"])
-                def art_ready(count):
-                    if (count and self.current_route == "Game DNA" and
-                            isValid(dna_art) and 0 <= choose.currentIndex() < len(games) and
-                            str(games[choose.currentIndex()]["id"]) == expected_key):
-                        fresh = _load_local_art(record, 305, 245)
-                        if not fresh.isNull():
-                            dna_art.setText("")
-                            dna_art.setPixmap(fresh)
-                            relationship.set_cover(fresh)
-                self.job(lambda _p: prime_visible_covers([record], limit=1),
-                         art_ready, error_title="Steam art unavailable")
         game_title = label("Select a game", "sectionTitle", wrap=True)
         inspector_col.addWidget(game_title)
-        relation_title = label("INSTALLED GAME", "eyebrow", wrap=True)
+        relation_title = label("INSTALL  /  SOURCE EVIDENCE", "eyebrow", wrap=True)
         inspector_col.addWidget(relation_title)
         meaning = label("", "subtle", wrap=True)
         inspector_col.addWidget(meaning)
         evidence = label("", "caption", wrap=True)
         inspector_col.addWidget(evidence)
-        tools = QWidget()
-        tline = column(spacing=8)
-        tools.setLayout(tline)
-        open_install = button(
-            "Open verified install folder",
-            lambda: self._open_folder(games[choose.currentIndex()]["install_path"])
-            if 0 <= choose.currentIndex() < len(games) else None)
-        tline.addWidget(open_install)
-        tline.addWidget(button("Review associated mods", lambda: self.navigate("Mods")))
-        tline.addWidget(button("Open Graveyard safeguards", lambda: self.navigate("Graveyard")))
-        inspector_col.addWidget(tools)
+        inspector_col.addWidget(button(
+            "Open verified install", lambda: self._open_folder(
+                records[choose.currentData()]["install_path"])
+            if choose.currentData() is not None else None))
+        inspector_col.addWidget(button(
+            "Review Mods", lambda: self.navigate("Mods")))
         inspector_col.addStretch(1)
-        board_row.addWidget(inspector, 3)
+        work_row.addWidget(inspector, 3)
         page.content.addWidget(workspace)
 
-        associations, a_col = panel(padding=13)
-        a_col.addWidget(section_title("DIRECTLY LINKED FILE LOCATIONS"))
-        linked_text = label("", "subtle", wrap=True)
-        a_col.addWidget(linked_text)
-        page.content.addWidget(associations)
+        evidence_panel, evidence_col = panel(padding=13)
+        evidence_col.addWidget(section_title(
+            "VERIFIED FILE FOOTPRINT", "No guessed or overlapping total"))
+        footprint_summary = label(
+            "Select a game to see its confirmed installation size and linked mod evidence.",
+            "findingTitle", wrap=True)
+        evidence_col.addWidget(footprint_summary)
+        linked_text = label(
+            "Unmatched saves, screenshots, caches and old files remain protected.",
+            "subtle", wrap=True)
+        evidence_col.addWidget(linked_text)
+        page.content.addWidget(evidence_panel)
+
+        results_panel, results_col = panel(padding=12)
+        header = QWidget()
+        header_row = row(spacing=10)
+        header.setLayout(header_row)
+        header_row.addWidget(label("GAME DNA RESULTS", "sectionTitle"), 1)
+        search = QLineEdit()
+        search.setPlaceholderText("Search your game library…")
+        search.setAccessibleName("Search game DNA results by installed game")
+        search.setMaximumWidth(240)
+        header_row.addWidget(search)
+        sorting = QComboBox()
+        sorting.addItems(["Largest install first", "Name A to Z",
+                          "Smallest install first"])
+        sorting.setAccessibleName("Sort Game DNA results")
+        sorting.setMaximumWidth(180)
+        header_row.addWidget(sorting)
+        results_col.addWidget(header)
+        table = data_table(
+            ["GAME", "LAUNCHER", "KNOWN INSTALL SIZE",
+             "LINKED MOD LOCATIONS", "EVIDENCE STATUS"])
+        table.setObjectName("dnaGamesResults")
+        table.setMinimumHeight(245)
+        table.setRowCount(0)
+        table.setColumnWidth(0, 270)
+        table.setColumnWidth(1, 115)
+        table.setColumnWidth(2, 150)
+        table.setColumnWidth(3, 155)
+        results_col.addWidget(table)
+        results_col.addWidget(label(
+            "Game sizes come from launcher records, not a rescan of game binaries. "
+            "Linked mods can overlap installation sizes and must not be added "
+            "to a fictitious total. Save ownership is unknown unless verified.",
+            "caption", wrap=True))
+        page.content.addWidget(results_panel)
 
         explanations = {
-            "Install": "Existing launcher installation. It is protected by default. "
-                       "Files within it are not automatically considered unused.",
-            "Mods": "Associated mod storage uses game install path or trusted Steam "
-                    "Workshop identifiers. A relationship does not prove the mod is inactive.",
-            "Saves": "Save/profile ownership has not been verified. "
-                     "Discovered saves stay protected even when their names match a game.",
-            "Captures": "Screenshots and recordings are scanned independently. "
-                        "They are NOT assumed to belong to this game from filenames alone.",
-            "Configs": "Configuration and settings files can be required to run "
-                       "the game. Game DNA does not mark them disposable from age alone.",
-            "Leftovers": "Leftovers cannot be established by a missing game manifest "
-                         "alone. Unmatched files stay protected until reviewed.",
+            "Install": (
+                "Launcher installation evidence, not an actual launch test.",
+                "Opening its folder does not modify game files."),
+            "Mods": (
+                "Directly linked mod or addon locations, matched by trusted "
+                "install path or Steam Workshop ID.",
+                "A linked mod is not automatically obsolete."),
+            "Saves": (
+                "Save locations are protected. Ownership is not verified "
+                "from filename similarities.",
+                "Use Save Vault before attempting cleanup or recovery."),
+            "Captures": (
+                "Screenshots and recordings have separate capture inventory.",
+                "They cannot be reliably tied to this game by their file names alone."),
+            "Configs": (
+                "Configuration files can be required to start the game.",
+                "Game Grave does not classify them as junk based on age."),
+            "Leftovers": (
+                "Potential leftovers require independent evidence and review.",
+                "The absence of a launcher record does not prove files are safe to remove."),
         }
+
+        def active_dna():
+            ident = choose.currentData()
+            return records[ident] if isinstance(ident, int) and 0 <= ident < len(records) else None
+
+        def load_game_cover(item):
+            original = record_for(item)
+            dna_art.setPixmap(QPixmap())
+            relationship.set_cover(None)
+            if original is None:
+                dna_art.setText("OFFICIAL COVER NOT FOUND")
+                return
+            artwork = _load_local_art(original, 235, 165)
+            if not artwork.isNull():
+                dna_art.setText("")
+                dna_art.setPixmap(artwork)
+                relationship.set_cover(artwork)
+                return
+            dna_art.setText("OFFICIAL COVER NOT FOUND")
+            steam_id = verified_steam_id(original)
+            if steam_id and steam_id not in pending_art:
+                pending_art.add(steam_id)
+                key = str(item["id"])
+                def downloaded(count):
+                    if (count and self.current_route == "Game DNA"
+                            and isValid(dna_art) and active_dna()
+                            and str(active_dna()["id"]) == key):
+                        pix = _load_local_art(original, 235, 165)
+                        if not pix.isNull():
+                            dna_art.setText("")
+                            dna_art.setPixmap(pix)
+                            relationship.set_cover(pix)
+                self.job(lambda _emit: prime_visible_covers([original], limit=1),
+                         downloaded, error_title="Official Steam artwork unavailable")
 
         def inspect_node(name):
             relation_title.setText(name.upper() + "  /  EVIDENCE")
-            meaning.setText(explanations.get(name, "No verified relationship."))
-            if not games or choose.currentIndex() < 0:
-                evidence.setText("No verified game inventory.")
-                return
-            game = games[choose.currentIndex()]
-            if name == "Mods":
+            description, caveat = explanations.get(name, ("Unknown", "Keep protected."))
+            meaning.setText(description)
+            item = active_dna()
+            if not item:
+                evidence.setText(caveat)
+            elif name == "Mods":
                 evidence.setText(
-                    f"{len(game['assets'])} directly associated mod/storage location(s). "
-                    "Nothing here is marked safe to delete.")
+                    f"{len(item.get('assets', []))} directly associated location(s).\n" +
+                    caveat)
             elif name == "Install":
                 evidence.setText(
-                    "Install: " + str(game["install_path"]) +
-                    "\nSource: " + str(game["launcher"]))
+                    "Path: " + str(item["install_path"]) +
+                    "\nSource: " + str(item.get("launcher", "Unknown")))
             else:
-                evidence.setText(
-                    "Not automatically attributed to this game. "
-                    "Check source evidence before acting.")
+                evidence.setText(caveat)
 
-        def show(index):
-            if not (0 <= index < len(games)):
-                game_title.setText("No Game DNA records found")
-                load_dna_cover(-1)
-                relationship.set_game("No game found", {})
-                meaning.setText(
-                    "Run Scan PC and verify a supported launcher installation.")
-                linked_text.setText("No associated locations to display.")
-                open_install.setEnabled(False)
+        def display_dna(_=None):
+            item = active_dna()
+            if item is None:
+                relationship.set_game("NO GAME", {})
+                relationship.set_cover(None)
+                game_title.setText("No game selected")
+                dna_art.setText("NO COVER")
+                footprint_summary.setText("No verified game record.")
+                linked_text.setText("Run Scan PC to discover gaming installations.")
+                inspect_node("Install")
                 return
-            game = games[index]
-            game_title.setText(game["game"])
-            load_dna_cover(index)
-            associated = len(game["assets"])
-            relationship.set_game(game["game"], {
-                "Install": "Verified record",
-                "Mods": f"{associated} linked",
-                "Saves": "Unverified",
+            game_title.setText(item["game"])
+            record = record_for(item)
+            mod_assets = item.get("assets", [])
+            evidence_states = {
+                "Install": ("Recorded" if record else "Unknown"),
+                "Mods": f"{len(mod_assets)} linked",
+                "Saves": "Not attributed",
                 "Captures": "Independent",
                 "Configs": "Protected",
-                "Leftovers": "Unknown",
-            })
+                "Leftovers": "Unverified",
+            }
+            relationship.set_game(item["game"], evidence_states)
+            load_game_cover(item)
+            size = readable_bytes(record.size_bytes) if record else "Unknown"
+            footprint_summary.setText(
+                "INSTALL: " + size + " (launcher-reported)     "
+                f"MODS: {len(mod_assets)} verified association(s)     "
+                "SAVES / CACHES / LEFTOVERS: unverified")
             linked_text.setText(
-                (("\n\n").join(
-                    str(asset["source"]) + "  •  " + str(asset["path"]) +
-                    "\n" + str(asset.get("evidence", "Source association only"))
-                    for asset in game["assets"][:12]) or
-                 "No mod or add-on locations could be directly matched to this game.")
-                + f"\n\n{len(dna.get('unresolved', []))} unresolved global finding(s) "
-                "remain protected, not assumed removable.")
-            open_install.setEnabled(True)
+                ("\n\n".join(
+                    str(asset.get("source", "Mod source")) + "  •  " +
+                    str(asset.get("path", "")) + "\n" +
+                    str(asset.get("evidence", "Source association only"))
+                    for asset in mod_assets[:7])
+                 or "No directly evidenced mod locations for this game.") +
+                f"\n\n{len(dna.get('unresolved', []))} global unresolved "
+                "finding(s) remain protected and unattributed.")
             inspect_node("Install")
+
+        def fill_options(_=None):
+            wanted = drive_picker.currentText()
+            previous = active_dna()
+            wanted_path = _path_key(previous["install_path"]) if previous else None
+            available = [
+                (i, g) for i, g in enumerate(records)
+                if wanted == "All Drives" or
+                Path(g["install_path"]).anchor == wanted
+            ]
+            choose.blockSignals(True)
+            choose.clear()
+            preferred = 0
+            for position, (actual, item) in enumerate(available):
+                choose.addItem(item["game"] + "  •  " + item["launcher"], actual)
+                if wanted_path and _path_key(item["install_path"]) == wanted_path:
+                    preferred = position
+            if available:
+                choose.setCurrentIndex(preferred)
+            choose.blockSignals(False)
+            display_dna()
+            fill_results()
+
+        def fill_results(_=None):
+            query = search.text().strip().casefold()
+            wanted = drive_picker.currentText()
+            choices = [(i, g) for i, g in enumerate(records)
+                       if (wanted == "All Drives" or
+                           Path(g["install_path"]).anchor == wanted)
+                       and (not query or query in
+                            (g["game"] + " " + g["launcher"]).casefold())]
+            mode = sorting.currentText()
+            def known_size(entry):
+                obj = record_for(entry[1])
+                return obj.size_bytes if obj and obj.size_bytes is not None else -1
+            if mode == "Largest install first":
+                choices.sort(key=lambda x: (-known_size(x), x[1]["game"].casefold()))
+            elif mode == "Smallest install first":
+                choices.sort(key=lambda x: (known_size(x), x[1]["game"].casefold()))
+            else:
+                choices.sort(key=lambda x: x[1]["game"].casefold())
+            shown = choices[:80]
+            table.setRowCount(len(shown))
+            for row_index, (dna_index, item) in enumerate(shown):
+                record = record_for(item)
+                entries = (
+                    item["game"], item["launcher"],
+                    readable_bytes(record.size_bytes) if record else "Unknown",
+                    str(len(item.get("assets", []))),
+                    "Linked record" if record else "Ownership uncertain",
+                )
+                for colno, text_value in enumerate(entries):
+                    _table_text(table, row_index, colno, text_value)
+                if record is not None:
+                    small = _load_local_art(record, 80, 40)
+                    if not small.isNull():
+                        table.item(row_index, 0).setIcon(QIcon(small))
+                table.item(row_index, 0).setData(Qt.UserRole, dna_index)
+                table.setRowHeight(row_index, 46)
+            self._dna_results_visible = len(shown)
+
+        def choose_from_table(row_index, _column):
+            cell = table.item(row_index, 0)
+            if cell is None:
+                return
+            dna_index = cell.data(Qt.UserRole)
+            if dna_index is None:
+                return
+            for combobox_index in range(choose.count()):
+                if choose.itemData(combobox_index) == dna_index:
+                    choose.setCurrentIndex(combobox_index)
+                    page.verticalScrollBar().setValue(0)
+                    break
+
+        choose.currentIndexChanged.connect(display_dna)
+        drive_picker.currentIndexChanged.connect(fill_options)
+        search.textChanged.connect(fill_results)
+        sorting.currentTextChanged.connect(fill_results)
+        table.cellDoubleClicked.connect(choose_from_table)
         relationship.selected.connect(inspect_node)
-        choose.currentIndexChanged.connect(show)
-        show(choose.currentIndex())
-        if not games:
+        fill_options()
+        if not records:
             _box_notice(page,
                         "No verified Game DNA relationships yet. Unknown files stay protected.")
 
