@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QEvent, QTimer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from gg_desktop.capture_image import ScreenshotImage, request_screenshot
@@ -75,6 +75,7 @@ class CaptureSlideshow(QFrame):
         self.timer.setSingleShot(True)
         self.timer.setInterval(SLIDE_INTERVAL_MS)
         self.timer.timeout.connect(self._advance)
+        self.host.installEventFilter(self)
         if not self.records:
             self.playing = False
             self.preview.set_status("No game screenshots detected. Scan PC to build your gallery.")
@@ -97,7 +98,8 @@ class CaptureSlideshow(QFrame):
             f"{datetime.fromtimestamp(item.modified):%b %d, %Y at %I:%M %p}")
         # Reuse the existing identity-checking asynchronous image loader.
         # It rejects stale replies when a different sourcePath is selected.
-        request_screenshot(self.host, item, self.preview)
+        if self.isVisible():
+            request_screenshot(self.host, item, self.preview)
         self._schedule_next()
 
     def _schedule_next(self):
@@ -140,11 +142,20 @@ class CaptureSlideshow(QFrame):
 
     def showEvent(self, event):
         super().showEvent(event)
-        self._schedule_next()
+        self._display()
 
     def hideEvent(self, event):
         self.timer.stop()
         super().hideEvent(event)
+
+    def eventFilter(self, watched, event):
+        if watched is self.host:
+            if event.type() == QEvent.WindowDeactivate:
+                self.timer.stop()
+            elif event.type() == QEvent.WindowActivate and self.isVisible():
+                # Reactivation resumes exactly where the slideshow left off.
+                QTimer.singleShot(0, self._schedule_next)
+        return super().eventFilter(watched, event)
 
     def set_records(self, records):
         """Keep slideshow consistent after deliberate fullscreen review."""
