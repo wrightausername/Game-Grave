@@ -67,8 +67,8 @@ class GameCover(QFrame):
         self.game = game
         self._select = on_selected
         self.setObjectName("gameCover")
-        self.setFixedHeight(238)
-        self.setMinimumWidth(154)
+        self.setFixedHeight(211)
+        self.setMinimumWidth(195)
         self.setCursor(Qt.PointingHandCursor)
         self.setToolTip(f"{game.name}\n{game.launcher}\n{game.install_path}")
         self.setAccessibleName("Select game: " + game.name)
@@ -76,8 +76,8 @@ class GameCover(QFrame):
         art = QLabel()
         art.setObjectName("gameCoverArt")
         art.setAlignment(Qt.AlignCenter)
-        art.setFixedHeight(143)
-        art.setMinimumWidth(140)
+        art.setFixedHeight(134)
+        art.setMinimumWidth(185)
         from gg_desktop.local_art import game_cover_path
         source = game_cover_path(game)
         if source:
@@ -95,14 +95,14 @@ class GameCover(QFrame):
                 image = reader.read()
                 if not image.isNull():
                     pixmap = QPixmap.fromImage(image).scaled(
-                        230, 143, Qt.KeepAspectRatioByExpanding,
+                        290, 134, Qt.KeepAspectRatioByExpanding,
                         Qt.SmoothTransformation)
                     art.setPixmap(pixmap)
                     art.setToolTip("Local artwork: " + source)
         if art.pixmap() is None or art.pixmap().isNull():
             # Original game-styled art, clearly marked as a generated fallback.
             from gg_desktop.poster_art import generated_game_poster
-            art.setPixmap(generated_game_poster(game.name, 170, 143))
+            art.setPixmap(generated_game_poster(game.name, 265, 134))
             art.setToolTip("Original Game Grave artwork, not an official game cover")
         layout.addWidget(art)
         name = QLabel(game.name)
@@ -124,14 +124,14 @@ class GameCover(QFrame):
         super().mouseReleaseEvent(event)
 
 
-def game_gallery(games, selected_callback, *, limit=8):
+def game_gallery(games, selected_callback, *, limit=9):
     """Artwork-led game library grid, backed only by actual installations.
 
     The full searchable record table remains below. This is visual navigation,
     not an alternative data source or storage-deletion authority.
     """
     section = QFrame()
-    section.setObjectName("dashboardPanel")
+    section.setObjectName("referenceLibrary")
     layout = _layout(section, gap=10)
     layout.addWidget(_small("YOUR GAME LIBRARY  •  VERIFIED INSTALLATIONS",
                             "sectionTitle"))
@@ -149,8 +149,8 @@ def game_gallery(games, selected_callback, *, limit=8):
     for index, game in enumerate(games[:limit]):
         grid.addWidget(GameCover(game,
                        lambda g=game: selected_callback(g)),
-                       index // 4, index % 4)
-    for col in range(4):
+                       index // 3, index % 3)
+    for col in range(3):
         grid.setColumnStretch(col, 1)
     layout.addWidget(shelf)
     if len(games) > limit:
