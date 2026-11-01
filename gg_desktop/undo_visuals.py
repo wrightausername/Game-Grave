@@ -88,7 +88,7 @@ class RecoveryActionTile(QPushButton):
     recovery controls. No timer, animation or filesystem operations here.
     """
     def __init__(self, title: str, detail: str, kind: str, parent=None):
-        super().__init__(parent)
+        super().__init__(title, parent)
         self.title = title
         self.detail = detail
         self.kind = kind
@@ -130,7 +130,7 @@ class RecoveryActionTile(QPushButton):
                 p.drawLine(QPointF(35,midy),QPointF(35+dx,midy+dy))
         p.setPen(QColor("#F3EFF0"))
         p.setFont(QFont("Segoe UI",11,QFont.Bold))
-        p.drawText(QRectF(66, 12, max(50,w-76),27),Qt.AlignVCenter,self.title)
+        p.drawText(QRectF(66, 12, max(50,w-76),27),Qt.AlignVCenter,self.title.upper())
         p.setPen(QColor("#94ACBC"))
         p.setFont(QFont("Segoe UI",9))
         p.drawText(QRectF(66, 40, max(50,w-76),h-45),
