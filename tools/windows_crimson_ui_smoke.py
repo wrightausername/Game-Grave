@@ -291,6 +291,53 @@ def main():
             assert full.isVisible() and full.isEnabled(), (
                 "Full Scan must be directly visible, not buried in a dropdown.")
             assert full.mapTo(window.page, QPoint(0, 0)).y() < window.page.height()
+
+            # After a scan, users must get a genuinely data-driven chart AND
+            # the detailed sortable file/folder list on the SAME page.
+            from gg_desktop.dashboard import _drive_choices
+            from gg_desktop.storage_breakdown import OtherStorageBreakdown
+            from gg_desktop.scan_progress import CrimsonScanProgress
+            from other_storage import OtherStorageReport, FolderUsage
+            drive = _drive_choices()[0]
+            window._other_selected_drive = drive
+            window._other_storage_report_drive = drive
+            window._other_storage_report = OtherStorageReport(
+                root=drive,
+                folders=(
+                    FolderUsage("Program Files", drive + "Program Files",
+                                "Apps and shared app data", 5000, 2),
+                    FolderUsage("Windows", drive + "Windows",
+                                "Windows / system", 3000, 1)),
+                analyzed_bytes=8000, entries_seen=7,
+                skipped_entries=2, excluded_games=1,
+                complete=False, limitation="Partial synthetic scan",
+                elapsed_seconds=3.0,
+                category_totals=(
+                    ("Apps and shared app data", 5000),
+                    ("Windows / system", 3000)),
+                root_entries_count=2,
+            )
+            window.navigate("Other Storage")
+            app.processEvents()
+            chart = window.page.findChild(
+                OtherStorageBreakdown, "otherStorageBreakdownChart")
+            assert chart is not None and chart.isVisible(), (
+                "Completed and partial Other Storage scans must show a chart")
+            assert chart.measured_total == 8000
+            assert len(chart.segments) == 2
+            assert "PARTIAL COVERAGE" in window.page.findChild(
+                QLabel, "otherStorageBreakdownCoverage").text()
+            assert any(t.rowCount() >= 2
+                       for t in window.page.findChildren(QTableWidget)), (
+                "The sortable folder results must remain below the visual chart.")
+            other_progress = window.page.findChild(
+                CrimsonScanProgress, "otherStorageScanProgress")
+            assert other_progress is not None, (
+                "Other Storage scans must have the new segmented loading bar.")
+            assert isinstance(window.progress, CrimsonScanProgress), (
+                "Main system scan must use the same Crimson progress system.")
+            window._other_storage_report = None
+            window._other_storage_report_drive = None
             window.navigate("Overview")
             app.processEvents()
             assert window.page.findChildren(HeroBanner), "Hero must be a real native vector widget"
