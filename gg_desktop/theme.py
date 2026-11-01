@@ -532,3 +532,65 @@ QPushButton#readyRoomDiagnostics:hover {
     background:#271D28; border-color:#A34357;
 }
 """
+
+
+# Deliberate, feature-specific craft layer. The actual Qt widgets and real
+# inventory remain interactive; none of these panels use screenshot overlays.
+STYLE += r"""
+QFrame#archiveCategoryTile {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #102638, stop:.55 #0C1C2B, stop:1 #090D17);
+    border:1px solid #286E84;
+    border-top:2px solid #3DA9C6;
+    border-radius:5px;
+}
+QLabel#archiveTileTitle {color:#CEE8F0;font-weight:800;font-size:12px;}
+QLabel#archiveTileMetric {color:#F2F9FD;font-weight:900;font-size:20px;}
+QLabel#archiveTileCount {color:#8CA9B7;font-size:10px;}
+QFrame#captureSlideshow {
+    background: #070D15;
+    border: 1px solid #793044;
+    border-top: 2px solid #B22C47;
+    border-radius: 6px;
+}
+QLabel#captureSlideshowHeading {
+    color:#F5E3E9;font-family:"Georgia","Segoe UI",serif;
+    font-size:17px;font-weight:750;letter-spacing:1px;
+}
+QLabel#captureSlideshowCount {
+    color:#77D8EA;font-size:14px;font-weight:900;
+}
+QLabel#captureSlideshowDescription {
+    color:#C5BAC4;font-size:11px;
+}
+QLabel#captureSlideshowNote {
+    color:#91AEC3;font-size:10px;
+}
+QPushButton#captureSlideshowPlay {
+    background:#752036;border:1px solid #DC4561;color:#FFFFFF;
+    border-radius:4px;min-height:29px;padding:6px 16px;
+}
+QPushButton#captureSlideshowPlay:hover {background:#AB2B45;}
+QFrame#dnaRelationshipStudio {
+    border:1px solid #38657C;
+    border-top:2px solid #69D9EA;
+    border-radius:5px;
+    background:#091420;
+}
+QFrame#dnaEvidenceInspector {
+    background:#0C1622;border:1px solid #8A2E4B;
+    border-radius:5px;
+}
+QFrame#graveyardEmptyPanel {
+    background:#080F1B;border:1px solid #305F77;
+    border-top:2px solid #4AAFC9;border-radius:6px;
+}
+QFrame#graveyardScanInspector {
+    background:#101B27;border:1px solid #294455;
+    border-radius:6px;
+}
+QFrame#undoRecoveryStatusPanel {
+    background:#10121C;border:1px solid #884052;
+    border-radius:6px;
+}
+"""
