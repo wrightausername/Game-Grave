@@ -15,7 +15,7 @@ def main():
     os.environ.setdefault("QT_QPA_PLATFORM", "windows")
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root))
-    from PySide6.QtWidgets import QApplication, QTableWidget, QFrame
+    from PySide6.QtWidgets import QApplication, QTableWidget, QFrame, QWidget
     from core import SteamGame, OldFile
     from launchers import LauncherGame
     from graveyard import build_graveyard
@@ -24,9 +24,12 @@ def main():
     from gg_desktop.capture_image import ScreenshotImage
     from gg_desktop.widgets import HeroBanner
     from gg_desktop.visuals import SceneHeader, RelationshipMap
-    from gg_desktop.undo_visuals import UndoStatusDial
-    from gg_desktop.tab_panels import GraphicCard, GameCover
-    from gg_desktop.premium_panels import GameInspector, ModInspector
+    from gg_desktop.undo_visuals import UndoStatusDial, RecoveryActionTile
+    from gg_desktop.tab_panels import GraphicCard, GameCover, ArchiveCategoryTile
+    from gg_desktop.premium_panels import GameInspector, ModInspector, ModRadarScope
+    from gg_desktop.capture_slideshow import CaptureSlideshow
+    from gg_desktop.dna_layers import GenomeLayerMap
+    from gg_desktop.storage_dials import DriveUsageDial
     from gg_desktop.reference_hero import ReferenceHero
     from PySide6.QtCore import QPoint
     from PySide6.QtWidgets import QTabWidget, QStackedWidget, QDockWidget
@@ -145,7 +148,8 @@ def main():
             assert window.progress.objectName() == "mainScanProgress"
             for name in ("crimson_hero.svg", "crimson_sunset.svg",
                          "crimson_fog.svg", "crimson_footer.svg",
-                         "crimson_dna_scene.svg", "crimson_undo_scene.svg"):
+                         "crimson_dna_scene.svg", "crimson_undo_scene.svg",
+                         "crimson_mods_scene.svg"):
                 asset = root / "gg_desktop" / "assets" / name
                 assert QSvgRenderer(str(asset)).isValid(), (
                     "Invalid cinematic local visual: " + name)
@@ -204,12 +208,31 @@ def main():
                 if route == "Mods":
                     assert len(window.page.findChildren(ModInspector)) == 1, (
                         "Mod Radar requires a source-aware right-side inspector")
+                    assert len(window.page.findChildren(ModRadarScope)) == 1, (
+                        "Mods needs a native high-DPI radar")
+                    assert window.page.findChild(QFrame, "modCommandFilters"), (
+                        "Mods needs a searchable visual game library")
+                if route == "Old Files":
+                    assert len(window.page.findChildren(ArchiveCategoryTile)) == 5, (
+                        "Old Files must have five original category shelves")
+                if route == "Captures":
+                    galleries = window.page.findChildren(CaptureSlideshow)
+                    assert len(galleries) == 1 and galleries[0].timer.interval() == 5000, (
+                        "Captures must be an actual 5-second image-first theater")
+                if route == "Graveyard":
+                    assert window.page.findChild(QFrame, "graveyardBurialLedger")
+                    assert window.page.findChild(QFrame, "graveyardEvidenceInspector")
+                if route == "Other Storage":
+                    assert len(window.page.findChildren(DriveUsageDial)) == 1
+                    assert window.page.findChild(QWidget, "otherStorageMapRoom")
                 if route == "Game DNA":
                     dna_art = window.page.findChildren(RelationshipMap)
                     assert dna_art and dna_art[0].game_name == "Sample Steam Game", (
                         "Game DNA visual map must use actual scan data")
                     assert window.page.findChild(QFrame, "dnaRelationshipStudio")
                     assert dna_art[0].minimumHeight() >= 380
+                    assert len(window.page.findChildren(GenomeLayerMap)) == 1, (
+                        "DNA needs an evidence-aware layered file map")
                     assert dna_art[0].mapTo(window.page, QPoint(0, 0)).y() < 660, (
                         "Main forensic map must start above the fold.")
                     assert window.page.findChild(QTableWidget, "dnaGamesResults")
@@ -222,6 +245,7 @@ def main():
                 if route == "Undo Center":
                     dials = window.page.findChildren(UndoStatusDial)
                     assert len(dials) == 1, "Undo Center needs real recovery status."
+                    assert len(window.page.findChildren(RecoveryActionTile)) == 4
                     assert window.page.findChild(QTableWidget, "undoHistoryTable")
                     assert any("Browse Recycle Bin" in b.text()
                                for b in window.page.findChildren(QPushButton))
