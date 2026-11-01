@@ -26,6 +26,8 @@ def main():
     from gg_desktop.visuals import SceneHeader, RelationshipMap, RecoveryRoute
     from gg_desktop.tab_panels import GraphicCard, GameCover
     from gg_desktop.premium_panels import GameInspector, ModInspector
+    from gg_desktop.reference_hero import ReferenceHero
+    from PySide6.QtCore import QPoint
     from PySide6.QtWidgets import QTabWidget, QStackedWidget, QDockWidget
     from PySide6.QtGui import QPalette
     from PIL import Image
@@ -149,6 +151,15 @@ def main():
                 if route == "Games":
                     assert len(window.page.findChildren(GameCover)) == 3, (
                         "Games gallery must present actual verified game records")
+                    hero = window.page.findChildren(ReferenceHero)
+                    assert len(hero) == 1 and hero[0].height() >= 240, (
+                        "Approved Games layout needs a cinematic metrics header")
+                    assert not window.game_inventory_panel.isVisible(), (
+                        "Advanced game table must not dominate the default visual screen")
+                    first = window.page.findChildren(GameCover)[0]
+                    gap = first.mapTo(window.game_gallery_frame, QPoint(0, 0)).y()
+                    assert 0 <= gap < 145, (
+                        f"Qt stretched artwork gallery vertically: first card starts {gap}px down")
                     inspectors = window.page.findChildren(GameInspector)
                     assert len(inspectors) == 1 and inspectors[0].game is not None, (
                         "Games tab requires a live selection-driven inspector")
