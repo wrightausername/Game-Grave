@@ -430,6 +430,96 @@ class ScreenMethods:
                      finished, error_title="Steam news unavailable")
         refresh.clicked.connect(lambda _=False: update_news(force=True))
         update_news()
+
+        from gg_desktop.ready_room_data import tonight_pick
+        recommendation, recommendation_col = panel(padding=14)
+        recommendation_col.addWidget(section_title(
+            "WHAT SHOULD I PLAY TONIGHT?", "Discover a game you already own"))
+        pick_title = label("", "sectionTitle", wrap=True)
+        pick_reason = label("", "subtle", wrap=True)
+        recommendation_col.addWidget(pick_title)
+        recommendation_col.addWidget(pick_reason)
+        daily_offset = {"value": 0, "game": None}
+        today = datetime.now().strftime("%Y-%m-%d")
+        def show_tonight_pick():
+            game = tonight_pick(self.inventory.games, day=today,
+                                offset=daily_offset["value"])
+            daily_offset["game"] = game
+            if game is None:
+                pick_title.setText("No verified installed game yet")
+                pick_reason.setText("Scan your gaming library before choosing tonight's game.")
+                return
+            status, evidence = launch_guard_summary(game)
+            pick_title.setText(game.name)
+            pick_reason.setText(
+                "From your actual installed library. " + game.launcher +
+                "  •  " + status + ". " + evidence)
+        show_tonight_pick()
+        pick_actions = QWidget()
+        pick_line = row(spacing=8)
+        pick_actions.setLayout(pick_line)
+        pick_line.addWidget(button(
+            "Choose another", lambda: (
+                daily_offset.__setitem__("value", daily_offset["value"] + 1),
+                show_tonight_pick())))
+        def launch_pick():
+            item = daily_offset["game"]
+            if item is None:
+                return
+            from gg_desktop.steam_artwork import verified_steam_id
+            steam_id = verified_steam_id(item)
+            if steam_id:
+                QDesktopServices.openUrl(QUrl("steam://rungameid/" + steam_id))
+            else:
+                self._open_folder(item.install_path)
+        pick_line.addWidget(button("Open selected game", launch_pick, kind="primary"))
+        pick_line.addStretch()
+        recommendation_col.addWidget(pick_actions)
+        page.content.insertWidget(
+            patch_feed_insert_at + (2 if supported_sources else 1),
+            recommendation)
+
+        moments, moments_col = panel(padding=14)
+        moments_col.addWidget(section_title(
+            "LATEST GAMING MOMENT", "Only your real detected screenshots"))
+        recent_shots = sorted(self.inventory.screenshots,
+                              key=lambda r: getattr(r, "modified", 0),
+                              reverse=True)
+        if recent_shots:
+            from gg_desktop.capture_image import ScreenshotImage, request_screenshot
+            capture = recent_shots[0]
+            moments_col.addWidget(label(
+                Path(capture.path).name + "  •  " +
+                datetime.fromtimestamp(capture.modified).strftime("%b %d, %Y"),
+                "caption", wrap=True))
+            preview = ScreenshotImage(height=220)
+            preview.set_status(
+                "Preview on request. No image decoding while a game is running.")
+            moments_col.addWidget(preview)
+            def load_latest():
+                from performance_guard import GameActivityDetector
+                if GameActivityDetector().active():
+                    self.status.setText(
+                        "Screenshot preview deferred while a game is active.")
+                    return
+                request_screenshot(self, capture, preview)
+            moment_buttons = QWidget()
+            buttons_row = row(spacing=8)
+            moment_buttons.setLayout(buttons_row)
+            buttons_row.addWidget(button("Preview latest", load_latest))
+            buttons_row.addWidget(button(
+                "Review Captures…", lambda: self.navigate("Captures"),
+                kind="primary"))
+            buttons_row.addStretch()
+            moments_col.addWidget(moment_buttons)
+        else:
+            moments_col.addWidget(label(
+                "No detected gaming screenshots. Captures can discover them "
+                "during a user-approved PC scan, without examining personal "
+                "pictures by extension alone.", "subtle", wrap=True))
+        page.content.insertWidget(
+            patch_feed_insert_at + (3 if supported_sources else 2), moments)
+
         # A single low-cost OS drive-capacity check on Ready Room visits can
         # reveal real storage changes without continuous monitoring or file scans.
         storage_panel, storage_col = panel(padding=14)
