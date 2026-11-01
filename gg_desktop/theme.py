@@ -878,6 +878,16 @@ QFrame#modCommandFilters QPushButton#modViewMode {
 QFrame#modCommandFilters QPushButton#modViewMode[active="true"] {
     background:#92253F;color:#FFFFFF;border-color:#FA5470;
 }
+QLabel#referenceHeroTitle, QLabel#referenceHeroPrefix {
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-weight:900;letter-spacing:1px;
+}
+QLabel#referenceHeroTitle {
+    font-size:44px;
+}
+QLabel#referenceHeroPrefix {
+    font-size:27px;
+}
 QFrame#referenceHero {
     border:1px solid #842B46;
     border-radius:6px;
