@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from core import human_size, age_text
 from gg_desktop.local_art import game_cover_path
 from gg_desktop.voice import EMPTY_STATES
+from gg_desktop.typography import display_family, text_family
 
 
 def _label(text, role="", wrap=True):
@@ -310,8 +311,9 @@ class ModLocationCard(QFrame):
         super().__init__()
         self.setObjectName("modLocationCard")
         self.setMinimumWidth(140)
-        self.setFixedHeight(240)
+        self.setFixedHeight(294)
         self.setCursor(Qt.PointingHandCursor)
+        self.setProperty("selected", False)
         self._choose = on_selected
         self.game_name = game.name if game is not None else str(source or "Other locations")
         self.source_name = (str(source) if source else "Linked game")
@@ -321,27 +323,44 @@ class ModLocationCard(QFrame):
                 str(getattr(mod, "source", "")) + " " +
                 str(getattr(mod, "path", "")) for mod in locations]]
         ).casefold()
-        layout = _col(self, spacing=4, margins=(7, 7, 7, 8))
+        layout = _col(self, spacing=5, margins=(5, 5, 5, 9))
         art = QLabel()
-        _image(art, game, w=140, h=166)
+        _image(art, game, w=162, h=200)
+        art.setObjectName("modCardArtwork")
         if game is None:
             art.setText(str(source or "Unlinked folder"))
             art.setAlignment(Qt.AlignCenter)
             art.setWordWrap(True)
             art.setObjectName("modSourcePlaceholder")
-            art.setMinimumHeight(166)
+            art.setMinimumHeight(200)
         layout.addWidget(art)
         title = game.name if game else str(source or "Other locations")
-        layout.addWidget(_label(title[:45], "findingTitle"))
-        layout.addWidget(_label(
-            f"{len(locations)} mod folder(s)", "premiumState"))
-        layout.addWidget(_label(
-            "Inside this install" if game else "Not linked to a game", "caption"))
+        name_label = _label(title[:42], "findingTitle")
+        name_label.setFont(QFont(display_family(), 12, QFont.Bold))
+        name_label.setToolTip(title)
+        layout.addWidget(name_label)
+        count_label = _label(f"{len(locations)} mod folder(s)", "premiumState")
+        count_label.setFont(QFont(display_family(), 10, QFont.DemiBold))
+        layout.addWidget(count_label)
+        context_label = _label(
+            "Game-linked" if game else "Unlinked source", "caption")
+        context_label.setFont(QFont(text_family(), 9))
+        layout.addWidget(context_label)
         layout.addStretch()
+
+    def activate(self):
+        """The selection border follows the live inspector, not a fake active state."""
+        parent = self.parentWidget()
+        if parent is not None:
+            for card in parent.findChildren(ModLocationCard, Qt.FindDirectChildrenOnly):
+                card.setProperty("selected", card is self)
+                card.style().unpolish(card)
+                card.style().polish(card)
+        self._choose()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton and self.rect().contains(event.pos()):
-            self._choose()
+            self.activate()
         super().mouseReleaseEvent(event)
 
 
@@ -355,7 +374,7 @@ def mod_gallery(games, mods, on_selected, *, limit=10, columns=5,
     if not mods:
         column.addWidget(ModShelfEmpty(on_scan, on_add_library))
         return box, pairs, unknown
-    column.addWidget(_label("Your mod shelf", "modShelfSectionTitle"))
+    column.addWidget(_label("YOUR MODDED GAMES", "modShelfSectionTitle"))
     column.addWidget(_label(
         "Select a game to see the mod folders we could link to its install. "
         "Unlinked manager folders have their own place on the shelf.",
@@ -372,7 +391,7 @@ def mod_gallery(games, mods, on_selected, *, limit=10, columns=5,
     grid_holder.setObjectName("modCardGrid")
     grid = QGridLayout(grid_holder)
     grid.setContentsMargins(0, 3, 0, 3)
-    grid.setSpacing(10)
+    grid.setSpacing(11)
     columns = max(1, min(5, int(columns)))
     for i, (game, found, source) in enumerate(targets[:limit]):
         grid.addWidget(ModLocationCard(
@@ -381,6 +400,9 @@ def mod_gallery(games, mods, on_selected, *, limit=10, columns=5,
             source=source), i // columns, i % columns)
     for col in range(columns):
         grid.setColumnStretch(col, 1)
+    if grid.count():
+        first = grid.itemAt(0).widget()
+        first.setProperty("selected", True)
     column.addWidget(grid_holder)
     if len(targets) > limit:
         column.addWidget(_label(
@@ -431,10 +453,10 @@ class ModRadarScope(QWidget):
         p.setPen(QPen(QColor("#EF536E"), 2.4))
         p.drawArc(int(x-radius*.95), int(y-radius*.95),
                   int(radius*1.9), int(radius*1.9), 29*16, 54*16)
-        p.setFont(QFont("Segoe UI", 24, QFont.Bold))
+        p.setFont(QFont(display_family(), 24, QFont.Bold))
         p.setPen(QColor("#FEF3F5"))
         p.drawText(int(x-60), int(y-30), 120, 48, Qt.AlignCenter, str(self._count))
-        p.setFont(QFont("Segoe UI", 8, QFont.Bold))
+        p.setFont(QFont(display_family(), 9, QFont.Bold))
         p.setPen(QColor("#DCA7B3"))
         p.drawText(int(x-95), int(y+17), 190, 22, Qt.AlignCenter, "LOCATIONS")
         p.end()
@@ -452,13 +474,14 @@ class ModInspector(QFrame):
         self._on_review = on_review
         self._on_scan = on_scan
         self.locations = []
-        col = _col(self, spacing=11)
-        col.addWidget(_label("A CLOSER LOOK", "sceneKicker"))
+        col = _col(self, spacing=9)
+        col.addWidget(_label("MOD CONTROL CENTER", "sceneKicker"))
         self.scope = ModRadarScope()
         col.addWidget(self.scope)
         self.art = QLabel()
         col.addWidget(self.art)
         self.title = _label("Pick a game", "premiumTitle")
+        self.title.setFont(QFont(display_family(), 19, QFont.Bold))
         col.addWidget(self.title)
         self.count = _label("0 locations", "premiumMetric")
         col.addWidget(self.count)
@@ -475,12 +498,12 @@ class ModInspector(QFrame):
         self.review_btn.setObjectName("primary")
         self.review_btn.clicked.connect(self.review_selected)
         col.addWidget(self.review_btn)
-        self.scan_btn = QPushButton("Look for more")
+        self.scan_btn = QPushButton("RUN MOD SCAN")
         self.scan_btn.clicked.connect(self._on_scan)
         col.addWidget(self.scan_btn)
         col.addWidget(_label(
-            "Old doesn't mean unwanted. We won't remove your active mods "
-            "or manager profiles based on a timestamp.",
+            "Files aren't called leftovers because they're old. "
+            "Review the source and protections before moving anything.",
             "editorialFootnote"))
         col.addStretch()
         self.set_group(None, [])
@@ -489,7 +512,7 @@ class ModInspector(QFrame):
         self.locations = list(locations)
         self.title.setText(game.name if game is not None else
                            str(source or "Pick a folder"))
-        self.count.setText(f"{len(self.locations)} location(s)")
+        self.count.setText(f"{len(self.locations)} FOUND FOLDERS")
         self.scope.set_count(len(self.locations))
         self.provenance.setText(
             "Found inside this game's install folder" if game is not None
