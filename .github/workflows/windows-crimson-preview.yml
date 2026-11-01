@@ -58,6 +58,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Crimson premium panels regression tests failed.' }
           python -m unittest tests.test_capture_slideshow -v
           if ($LASTEXITCODE -ne 0) { throw 'Capture slideshow regression tests failed.' }
+          python -m unittest tests.test_launcher_discovery -v
+          if ($LASTEXITCODE -ne 0) { throw 'Cross-launcher RDR2 discovery tests failed.' }
+          python -m unittest tests.test_crimson_navigation -v
+          if ($LASTEXITCODE -ne 0) { throw 'Back/breadcrumb navigation tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
       - name: Upload actual Qt screen captures for design review
