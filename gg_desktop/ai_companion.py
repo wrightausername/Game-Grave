@@ -113,7 +113,7 @@ class AiCompanion(QDockWidget):
         self.show()
 
     def _floating_changed(self, floating):
-        self.detach_btn.setText("Docked ✓" if floating else "Pop out ↗")
+        self.detach_btn.setText("Dock right" if floating else "Pop out ↗")
         self.status_label.setText(
             "Pop-out is independent: switch tabs in Game Grave while chatting."
             if floating else
