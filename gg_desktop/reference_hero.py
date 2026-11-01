@@ -21,8 +21,9 @@ class ReferenceHero(SceneHeader):
     def __init__(self, kind, title, subtitle, metrics=()):
         super().__init__(kind, title, subtitle, note="CRIMSON COMMAND")
         self.setObjectName("referenceHero")
-        self.setMinimumHeight(248)
-        self.setMaximumHeight(248)
+        self._has_metrics = bool(metrics)
+        self.setMinimumHeight(248 if self._has_metrics else 192)
+        self.setMaximumHeight(248 if self._has_metrics else 192)
         self.setAccessibleName(title + ". " + subtitle)
         for child in self.findChildren(QLabel):
             child.hide()
@@ -42,6 +43,7 @@ class ReferenceHero(SceneHeader):
 
         self.metrics = QWidget(self)
         self.metrics.setObjectName("referenceHeroMetrics")
+        self.metrics.setVisible(self._has_metrics)
         row = QHBoxLayout(self.metrics)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(10)
