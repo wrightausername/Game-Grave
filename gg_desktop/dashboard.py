@@ -193,7 +193,8 @@ def _enqueue_mod(window, mod):
     window.settings = changed
     refresh_graveyard(window.inventory, changed)
     window._pending_grave_key = "mod:" + str(Path(path)).casefold()
-    window.navigate("Graveyard")
+    window.status.setText(
+        "Added to Graveyard review queue. Stayed on this page; nothing moved.")
 
 
 def render_dashboard(window):
