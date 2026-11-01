@@ -37,6 +37,21 @@ class SteamNews:
     kind: str
 
 
+# Developer-owned patch landing pages manually verified in November 2026.
+# Do not infer a publisher's identity from a launcher or title substring.
+# These are navigational links, not live fetched or authenticated patch data.
+OFFICIAL_PATCH_PAGES = {
+    "cyberpunk 2077": ("CD PROJEKT RED", "https://www.cyberpunk.net/en/news/"),
+    "baldur's gate 3": ("Larian Studios", "https://baldursgate3.game/news"),
+    "warframe": ("Digital Extremes", "https://www.warframe.com/en/patch-notes/pc"),
+}
+
+
+def official_patch_source_for(game) -> tuple[str, str] | None:
+    name = str(getattr(game, "name", "")).strip().casefold()
+    return OFFICIAL_PATCH_PAGES.get(name)
+
+
 def verified_appid(game) -> str:
     if str(getattr(game, "launcher", "")).casefold() != "steam":
         return ""
