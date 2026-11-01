@@ -26,6 +26,7 @@ from gg_desktop.screens import ScreenMethods
 
 ROUTES = (
     ("Overview", "⌂"),
+    ("Ready Room", "◈"),
     ("Games", "▣"),
     ("Mods", "♜"),
     ("Old Files", "▤"),
@@ -256,6 +257,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             route = "More Tools"
         methods = {
             "Overview": self.overview_page,
+            "Ready Room": self.ready_room_page,
             "Games": self.games_page,
             "Mods": self.mods_page,
             "Old Files": self.old_files_page,
