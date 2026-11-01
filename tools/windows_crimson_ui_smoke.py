@@ -68,9 +68,17 @@ def main():
         st = oldzip.stat()
         old = OldFile(str(oldzip), st.st_size, st.st_mtime,
                       st.st_dev, st.st_ino, st.st_mtime_ns, st.st_nlink)
-        steam = [SteamGame("455", "Sample Steam Game", str(synthetic),
-                           str(synthetic / "Steam" / "Sample"),
-                           1200000, None, "Unknown")]
+        # Simulate an actual Steam library-cache image on the disposable drive.
+        # Both Games and DNA must render the same cache-backed cover by AppID.
+        steam_root = synthetic / "Steam"
+        steam_install = steam_root / "steamapps" / "common" / "Sample Steam Game"
+        steam_install.mkdir(parents=True)
+        art_cache = steam_root / "appcache" / "librarycache"
+        art_cache.mkdir(parents=True)
+        Image.new("RGB", (600, 900), (112, 38, 70)).save(
+            art_cache / "455_library_600x900.jpg")
+        steam = [SteamGame("455", "Sample Steam Game", str(steam_root),
+                           str(steam_install), 1200000, None, "Unknown")]
         other = [
             LauncherGame("Sample Epic Game", "Epic Games",
                          str(synthetic / "Epic" / "Sample"),
@@ -120,7 +128,8 @@ def main():
             assert filters[0].findText("Steam") >= 0
             assert window.page.findChildren(QCheckBox), "Missing Graveyard queue checkboxes"
             for name in ("crimson_hero.svg", "crimson_sunset.svg",
-                         "crimson_fog.svg", "crimson_footer.svg"):
+                         "crimson_fog.svg", "crimson_footer.svg",
+                         "crimson_dna_scene.svg", "crimson_undo_scene.svg"):
                 asset = root / "gg_desktop" / "assets" / name
                 assert QSvgRenderer(str(asset)).isValid(), (
                     "Invalid cinematic local visual: " + name)
@@ -174,12 +183,34 @@ def main():
                     dna_art = window.page.findChildren(RelationshipMap)
                     assert dna_art and dna_art[0].game_name == "Sample Steam Game", (
                         "Game DNA visual map must use actual scan data")
+                    official = window.page.findChild(QLabel, "dnaOfficialCover")
+                    assert official is not None and official.pixmap() is not None and (
+                        not official.pixmap().isNull()), (
+                        "Game DNA must display the verified Steam cached cover")
+                    assert not dna_art[0]._cover.isNull(), (
+                        "Game DNA relationship map must share the selected Steam cover")
                 if route == "Undo Center":
                     assert len(window.page.findChildren(RecoveryRoute)) == 1
                 if route == "Settings":
                     categories = window.page.findChildren(QStackedWidget)
                     assert len(categories) == 1 and categories[0].count() == 8, (
                         "Settings must show real controls in eight organized sections")
+            # Ready Room must be a real navigable page, with no live web traffic
+            # in disposable CI. Production network calls are independently tested.
+            from unittest.mock import patch
+            with patch("gg_desktop.steam_artwork.prime_visible_covers",
+                       return_value=0), patch(
+                    "gg_desktop.ready_room_data.game_news_batch", return_value=[]):
+                window.navigate("Ready Room")
+                window.pool.waitForDone(3000)
+                app.processEvents()
+                assert window.current_route == "Ready Room"
+                ready_buttons = {b.text() for b in window.page.findChildren(QPushButton)}
+                for expected in ("Record baseline", "Compare changes",
+                                 "Game Time Machine…", "Record benchmark results…"):
+                    assert expected in ready_buttons, (
+                        "Missing Ready Room action: " + expected)
+
             # The optional assistant stays visible while the user navigates.
             # This test never invokes the model or installs anything.
             window.settings["ai_assistant_enabled"] = True
