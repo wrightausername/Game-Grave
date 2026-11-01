@@ -2128,6 +2128,7 @@ class ScreenMethods:
         page.content.addWidget(settings_root)
 
         general, general_col = panel(padding=16)
+        general_col.setAlignment(Qt.AlignTop)
         general_col.addWidget(section_title("GENERAL  /  STARTUP"))
         launch_scan = QCheckBox("Scan local gaming inventory when Game Grave starts")
         launch_scan.setChecked(bool(self.settings.get("scan_on_launch", False)))
@@ -2164,6 +2165,7 @@ class ScreenMethods:
         contents.addWidget(label(
             "Automatic cleanup remains OFF. Every actual Recycle Bin move "
             "requires separate approval.", "warning", wrap=True))
+        p.layout().setAlignment(Qt.AlignTop)
         settings_pages.addWidget(p)
 
         p, stack = panel()
@@ -2220,6 +2222,7 @@ class ScreenMethods:
         br.addWidget(button("Protect a folder", add_rule))
         br.addWidget(button("Remove selected personal rule…", remove_rule, kind="danger"))
         stack.addWidget(buttons)
+        p.layout().setAlignment(Qt.AlignTop)
         settings_pages.addWidget(p)
 
         p, stack = panel()
@@ -2269,6 +2272,7 @@ class ScreenMethods:
         br.addWidget(button("Add game capture folder", lambda: modify_shots()))
         br.addWidget(button("Remove selected", lambda: modify_shots(True)))
         stack.addWidget(buttons)
+        p.layout().setAlignment(Qt.AlignTop)
         settings_pages.addWidget(p)
 
         p, ai_stack = panel()
@@ -2391,6 +2395,7 @@ class ScreenMethods:
         ai_toggle.toggled.connect(set_ai_enabled)
         if self.settings.get("ai_assistant_enabled") and not is_ai_installed():
             ai_status.setText("AI not installed. Disable and re-enable to set up automatically.")
+        p.layout().setAlignment(Qt.AlignTop)
         settings_pages.addWidget(p)
 
         p, stack = panel()
@@ -2402,9 +2407,11 @@ class ScreenMethods:
             "subtle", wrap=True))
         stack.addWidget(button("Open classic appearance and advanced settings",
                                self._launch_classic_tools))
+        p.layout().setAlignment(Qt.AlignTop)
         settings_pages.addWidget(p)
 
         backup, backup_col = panel(padding=16)
+        backup_col.setAlignment(Qt.AlignTop)
         backup_col.addWidget(section_title("BACKUP & RESTORE"))
         backup_col.addWidget(label(
             "Undo Center restores only exact matching Windows Recycle Bin items. "
@@ -2417,6 +2424,7 @@ class ScreenMethods:
         settings_pages.addWidget(backup)
 
         about, about_col = panel(padding=16)
+        about_col.setAlignment(Qt.AlignTop)
         about_col.addWidget(section_title("GAME GRAVE  /  CRIMSON COMMAND"))
         about_col.addWidget(label(
             "Gaming-aware, safety-first Windows storage inventory. "
