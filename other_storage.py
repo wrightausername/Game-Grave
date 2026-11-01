@@ -93,12 +93,15 @@ def analyze_other_storage(
     installed_games: Iterable[str] = (),
     *,
     scope: str | Path | None = None,
-    max_entries: int = MAX_ENTRIES,
-    max_seconds: float = MAX_SECONDS,
+    max_entries: int | None = MAX_ENTRIES,
+    max_seconds: float | None = MAX_SECONDS,
     cancel: Callable[[], bool] | None = None,
     notify: Callable[[int, str], None] | None = None,
 ) -> OtherStorageReport:
-    """Explicit-click, bounded metadata walk; no file contents are opened.
+    """User-approved metadata walk with optional Quick Scan limits.
+
+    None for both limits is Full Scan: no arbitrary time or entry cutoff.
+    Cancellation, inaccessible-file skips and reparse protection still apply.
 
     Installed-game directories are excluded from the breakdown where they are
     known, but folder sizes remain apparent estimates, NOT the source of the
@@ -109,9 +112,12 @@ def analyze_other_storage(
     if (not root.is_dir() or not _same_volume(root, drive_root)
             or _has_reparse_component(root)):
         raise ValueError("This folder is outside the selected drive or redirected.")
-    if not 1 <= max_entries <= MAX_ENTRIES:
+    if max_entries is not None and (type(max_entries) is not int or
+                                     not 1 <= max_entries <= MAX_ENTRIES):
         raise ValueError("Invalid maximum directory-entry limit.")
-    if not 0 < max_seconds <= 120:
+    if max_seconds is not None and (not isinstance(max_seconds, (float, int)) or
+                                    isinstance(max_seconds, bool) or
+                                    not 0 < max_seconds <= 120):
         raise ValueError("Invalid analysis time limit.")
     known_game_dirs = {
         _path_id(path) for path in installed_games
@@ -135,7 +141,7 @@ def analyze_other_storage(
         if cancel and cancel():
             incomplete = "Scan canceled. Only a partial sample is shown."
             break
-        if time.monotonic() - start > max_seconds:
+        if max_seconds is not None and time.monotonic() - start > max_seconds:
             incomplete = "Time limit reached. Some folders remain unmeasured."
             break
         folder, group = stack.pop()
@@ -154,13 +160,13 @@ def analyze_other_storage(
             with iterator:
                 for entry in iterator:
                     examined += 1
-                    if examined > max_entries:
+                    if max_entries is not None and examined > max_entries:
                         incomplete = "Item limit reached. Some folders remain unmeasured."
                         break
                     if cancel and cancel():
                         incomplete = "Scan canceled. Only a partial sample is shown."
                         break
-                    if time.monotonic() - start > max_seconds:
+                    if max_seconds is not None and time.monotonic() - start > max_seconds:
                         incomplete = "Time limit reached. Some folders remain unmeasured."
                         break
                     location = Path(entry.path)
@@ -198,9 +204,11 @@ def analyze_other_storage(
                 break
         except (OSError, PermissionError):
             skip_count += 1
-        if notify and examined % 8000 < 250:
-            notify(min(99, int(100 * examined / max_entries)),
-                   f"Examined {examined:,} file/folder entries")
+        if notify and examined and examined % 8000 < 250:
+            notify(min(99, int(100 * examined / max_entries))
+                   if max_entries is not None else 0,
+                   f"Examined {examined:,} file/folder entries"
+                   + (" (Full Scan, no fixed limit)" if max_entries is None else ""))
 
     grouped = []
     for name, path in top_folder_paths.items():
@@ -216,13 +224,16 @@ def analyze_other_storage(
     grouped.sort(key=lambda row: (-row.apparent_bytes, row.name.casefold()))
     if len(grouped) > MAX_FOLDER_ROWS:
         grouped = grouped[:MAX_FOLDER_ROWS]
-        incomplete = incomplete or "Only the 150 largest root entries are listed."
+        # This is a display limit, not a scan limit. All visited entries
+        # contributed to category totals.
     if skip_count and not incomplete:
         incomplete = "Some protected/inaccessible files or junctions were excluded."
     if game_count and not incomplete:
         incomplete = "Known installed-game folders were excluded where identified."
     if notify:
-        notify(100, "Read-only storage analysis completed")
+        notify(100 if not incomplete else 0,
+               "Read-only storage analysis completed" if not incomplete
+               else "Read-only storage analysis stopped with partial coverage")
     return OtherStorageReport(
         root=str(root),
         folders=tuple(grouped),
