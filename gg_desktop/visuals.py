@@ -14,8 +14,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
-    QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen,
-    QPolygonF, QRadialGradient,
+    QColor, QFont, QIcon, QLinearGradient, QPainter, QPainterPath, QPen,
+    QPixmap, QPolygonF, QRadialGradient,
 )
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
@@ -436,3 +436,69 @@ class RecoveryRoute(QWidget):
         p.drawText(QRectF(10, 120, w-20, 27),
                    Qt.AlignCenter,
                    "Restore availability requires an exact Windows Recycle Bin match. No expiry date is assumed.")
+
+
+def nav_icon(route: str) -> QIcon:
+    """Crisp 24px native vector icons, no font-dependent Unicode glyphs."""
+    px = QPixmap(26, 26)
+    px.fill(Qt.transparent)
+    p = QPainter(px)
+    p.setRenderHint(QPainter.Antialiasing)
+    p.setPen(_pen("#C4D5E4", 2))
+    p.setBrush(Qt.NoBrush)
+    shape = route.casefold()
+    if "game dna" in shape:
+        for i in range(9):
+            y = 3 + i * 2.5
+            x = 13 + 6 * math.sin(i * .70)
+            p.drawPoint(QPointF(x, y))
+            p.drawPoint(QPointF(26-x, y))
+            if i % 2 == 0:
+                _line(p, (x, y), (26-x, y), "#76BED3", 1)
+    elif "game" in shape or "mods" in shape:
+        if "mods" in shape:
+            _gear(p, 13, 13, 10, "#C4D5E4")
+        else:
+            _controller(p, 13, 15, .135)
+    elif "overview" in shape:
+        p.drawPolyline(QPolygonF([
+            QPointF(3,12), QPointF(13,4), QPointF(23,12)]))
+        p.drawRect(QRectF(7,11,12,12))
+        p.drawLine(13,16,13,23)
+    elif "old files" in shape:
+        p.drawRoundedRect(QRectF(6,3,14,20),2,2)
+        p.drawLine(10,11,17,11)
+        p.drawLine(10,15,17,15)
+        p.drawLine(10,19,15,19)
+    elif "capture" in shape:
+        p.drawRoundedRect(QRectF(3,5,20,16),3,3)
+        p.drawEllipse(QPointF(16,10),2,2)
+        p.drawPolyline(QPolygonF([
+            QPointF(5,19), QPointF(11,13), QPointF(15,17),
+            QPointF(18,14), QPointF(22,19)]))
+    elif "graveyard" in shape:
+        p.drawRoundedRect(QRectF(7,8,12,14),2,2)
+        p.drawLine(4,7,22,7)
+        p.drawLine(10,4,16,4)
+        p.drawLine(11,11,11,19)
+        p.drawLine(15,11,15,19)
+    elif "undo" in shape:
+        p.drawArc(QRectF(5,4,17,17), 30*16, 278*16)
+        p.drawPolyline(QPolygonF([
+            QPointF(4,7), QPointF(5,15), QPointF(12,11)]))
+    elif "ai" in shape:
+        p.drawLine(13,2,13,24)
+        p.drawLine(2,13,24,13)
+        p.drawLine(7,7,19,19)
+        p.drawLine(19,7,7,19)
+    elif "settings" in shape:
+        _gear(p,13,13,10,"#C4D5E4")
+    elif "storage" in shape:
+        p.drawEllipse(QRectF(4,4,18,18))
+        p.drawArc(QRectF(8,8,10,10),20*16,260*16)
+    else:
+        for x in (6,13,20):
+            p.setBrush(QColor("#C4D5E4"))
+            p.drawEllipse(QPointF(x,13),1.7,1.7)
+    p.end()
+    return QIcon(px)
