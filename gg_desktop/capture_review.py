@@ -13,7 +13,7 @@ from dataclasses import replace
 import time
 import uuid
 
-from PySide6.QtCore import Qt, QEvent
+from PySide6.QtCore import Qt, QEvent, QTimer
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 from shiboken6 import isValid
@@ -81,7 +81,8 @@ class CaptureReviewDialog(QDialog):
         ):
             controls.addWidget(widget)
         outer.addLayout(controls)
-        self._display()
+        self.state.setText("Use arrow keys or swipe to review images.")
+        self.picture.setText("Preparing fullscreen review…")
 
     @staticmethod
     def _button(text, action):
@@ -92,6 +93,8 @@ class CaptureReviewDialog(QDialog):
 
     def start_fullscreen(self):
         self.setWindowState(self.windowState() | Qt.WindowFullScreen)
+        # Decode only after a visible dialog can receive the worker callback.
+        QTimer.singleShot(0, self._display)
         return self.exec()
 
     def _set_busy(self, state):
