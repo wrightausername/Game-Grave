@@ -70,9 +70,35 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
                 f"{app_id}_library_hero.jpg",
             ):
                 candidate.append(cache / name)
-            for name in ("library_600x900.jpg", "library_600x900.png",
-                         "library_600x900.webp", "header.jpg"):
-                candidate.append(cache / app_id / name)
+            # Modern Steam (2025+) places assets in app-specific directories;
+            # some titles use a nested content-hash directory, and some only
+            # have the @2x capsule. Check the single verified AppID folder,
+            # NEVER recurse through the complete Steam artwork cache.
+            art_root = cache / app_id
+            preferred = (
+                "library_600x900_2x.jpg", "library_600x900.jpg",
+                "library_600x900_2x.png", "library_600x900.png",
+                "library_600x900.webp", "library_capsule.jpg",
+                "header.jpg", "library_header.jpg",
+            )
+            candidate.extend(art_root / name for name in preferred)
+            try:
+                if art_root.is_dir() and not art_root.is_symlink():
+                    hashes = []
+                    for child in art_root.iterdir():
+                        # Require Steam's hash-like directory names, not
+                        # arbitrary paths or symlinks from untrusted files.
+                        if (child.is_dir() and not child.is_symlink() and
+                                len(child.name) in (32, 40) and
+                                all(letter in "0123456789abcdefABCDEF"
+                                    for letter in child.name)):
+                            hashes.append(child)
+                            if len(hashes) >= 24:
+                                break
+                    for folder in hashes:
+                        candidate.extend(folder / name for name in preferred)
+            except (OSError, PermissionError):
+                pass
             candidate.extend((
                 root / "config" / "grid" / f"{app_id}p.jpg",
                 root / "config" / "grid" / f"{app_id}p.png",
@@ -90,7 +116,7 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
             "folder.jpg", "folder.png"))
     except (OSError, ValueError):
         pass
-    for p in candidate[:80]:
+    for p in candidate[:320]:
         if _usable(p):
             return str(p)
     return ""
