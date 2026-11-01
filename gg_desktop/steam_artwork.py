@@ -260,7 +260,7 @@ def prime_visible_covers(games, *, limit: int = 9, active=None,
     larger catch-up batch with force. Every download is sequential, bounded
     and performed by a low CPU/disk priority worker. No continuous service.
     """
-    from gg_desktop.local_art import game_cover_path, invalidate_cover_cache
+    from gg_desktop.local_art import game_needs_portrait, invalidate_cover_cache
     from performance_guard import GameActivityDetector, background_worker_priority
     detector = active or GameActivityDetector()
     downloaded = 0
@@ -270,7 +270,7 @@ def prime_visible_covers(games, *, limit: int = 9, active=None,
             if detector.active():
                 break
             ident = verified_steam_id(game)
-            if not ident or ident in seen or (not force and game_cover_path(game)):
+            if not ident or ident in seen or (not force and not game_needs_portrait(game)):
                 continue
             seen.add(ident)
             if fetch_steam_cover(game, game_active=detector.active, force=force):
