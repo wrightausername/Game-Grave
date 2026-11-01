@@ -1412,7 +1412,57 @@ class ScreenMethods:
         board_row.addWidget(overview, 7)
 
         inspector, inspector_col = panel(padding=14)
-        inspector_col.addWidget(section_title("EVIDENCE INSPECTOR"))
+        inspector_col.addWidget(section_title("EVIDENCE INSPECTOR", "OFFICIAL GAME ART"))
+        # Match Steam art by a verified install path + Steam AppID, never by
+        # a guessed title. Unsupported launchers show no fabricated artwork.
+        from gg_desktop.premium_panels import _load_local_art
+        from gg_desktop.steam_artwork import prime_visible_covers, verified_steam_id
+        from shiboken6 import isValid
+        from gg_desktop.models import _path_key
+        inventory_by_path = {_path_key(g.install_path): g for g in self.inventory.games
+                             if getattr(g, "install_path", None)}
+        dna_art = QLabel()
+        dna_art.setMinimumHeight(225)
+        dna_art.setMaximumHeight(255)
+        dna_art.setAlignment(Qt.AlignCenter)
+        dna_art.setObjectName("dnaOfficialCover")
+        dna_art.setStyleSheet(
+            "background:#081522;border:1px solid #A82E48;border-radius:12px;"
+            "color:#B9CBD9;font-size:11px;font-weight:700;")
+        inspector_col.addWidget(dna_art)
+        cover_requested = set()
+        def load_dna_cover(index):
+            if not (0 <= index < len(games)):
+                dna_art.setPixmap(QPixmap())
+                dna_art.setText("NO GAME SELECTED")
+                return
+            selected = games[index]
+            record = inventory_by_path.get(_path_key(selected["install_path"]))
+            if record is None:
+                dna_art.setPixmap(QPixmap())
+                dna_art.setText("OFFICIAL COVER UNAVAILABLE")
+                return
+            art = _load_local_art(record, 305, 245)
+            if not art.isNull():
+                dna_art.setText("")
+                dna_art.setPixmap(art)
+                return
+            dna_art.setPixmap(QPixmap())
+            dna_art.setText("OFFICIAL COVER UNAVAILABLE")
+            ident = verified_steam_id(record)
+            if ident and ident not in cover_requested:
+                cover_requested.add(ident)
+                expected_key = str(selected["id"])
+                def art_ready(count):
+                    if (count and self.current_route == "Game DNA" and
+                            isValid(dna_art) and 0 <= choose.currentIndex() < len(games) and
+                            str(games[choose.currentIndex()]["id"]) == expected_key):
+                        fresh = _load_local_art(record, 305, 245)
+                        if not fresh.isNull():
+                            dna_art.setText("")
+                            dna_art.setPixmap(fresh)
+                self.job(lambda _p: prime_visible_covers([record], limit=1),
+                         art_ready, error_title="Steam art unavailable")
         game_title = label("Select a game", "sectionTitle", wrap=True)
         inspector_col.addWidget(game_title)
         relation_title = label("INSTALLED GAME", "eyebrow", wrap=True)
@@ -1480,6 +1530,7 @@ class ScreenMethods:
         def show(index):
             if not (0 <= index < len(games)):
                 game_title.setText("No Game DNA records found")
+                load_dna_cover(-1)
                 relationship.set_game("No game found", {})
                 meaning.setText(
                     "Run Scan PC and verify a supported launcher installation.")
@@ -1488,6 +1539,7 @@ class ScreenMethods:
                 return
             game = games[index]
             game_title.setText(game["game"])
+            load_dna_cover(index)
             associated = len(game["assets"])
             relationship.set_game(game["game"], {
                 "Install": "Verified record",
