@@ -232,6 +232,14 @@ class ModLocationCard(QFrame):
         self.setFixedHeight(240)
         self.setCursor(Qt.PointingHandCursor)
         self._choose = on_selected
+        self.game_name = game.name if game is not None else str(source or "Other locations")
+        self.source_name = (str(source) if source else "Linked game")
+        self.location_count = len(locations)
+        self.search_tokens = " ".join(
+            [self.game_name, self.source_name, *[
+                str(getattr(mod, "source", "")) + " " +
+                str(getattr(mod, "path", "")) for mod in locations]]
+        ).casefold()
         layout = _col(self, spacing=4, margins=(7, 7, 7, 8))
         art = QLabel()
         _image(art, game, w=140, h=166)
@@ -290,6 +298,7 @@ def mod_gallery(games, mods, on_selected, *, limit=10, columns=5):
         targets.extend((None, found, source) for source, found in
                        sorted(sources.items(), key=lambda row: (-len(row[1]), row[0])))
     grid_holder = QWidget()
+    grid_holder.setObjectName("modCardGrid")
     grid = QGridLayout(grid_holder)
     grid.setContentsMargins(0, 3, 0, 3)
     grid.setSpacing(10)
