@@ -28,7 +28,7 @@ class ReferenceHero(SceneHeader):
         for child in self.findChildren(QLabel):
             child.hide()
         self.background_art = QSvgRenderer(str(
-            Path(__file__).parent / "assets" / "crimson_ruins.svg"))
+            Path(__file__).parent / "assets" / "crimson_reference_scene.svg"))
 
         self.title_overlay = QLabel(title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
