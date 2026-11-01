@@ -2154,13 +2154,6 @@ class ScreenMethods:
         record_for = lambda item: indexed.get(_path_key(item["install_path"]))
         pending_art = set()
 
-        page.content.addWidget(FeatureStrip([
-            ("ANALYZE", "Installed game evidence"),
-            ("DETECT", "Mods and addons"),
-            ("MAP", "Linked file layers"),
-            ("LINK", "Proven relationships"),
-            ("REVIEW", "Unknowns protected"),
-        ]))
 
         toolbar, controls = panel(padding=12)
         toolbar.setObjectName("dnaForensicControls")
@@ -2221,7 +2214,7 @@ class ScreenMethods:
         genome_layers = GenomeLayerMap()
         genome_layers.setObjectName("dnaGenomeLayers")
         inspector_col.addWidget(genome_layers)
-        inspector_col.addWidget(section_title("EVIDENCE INSPECTOR", "Selected game"))
+        inspector_col.addWidget(section_title("What we know", "Choose a game to inspect"))
         dna_art = QLabel()
         dna_art.setObjectName("dnaOfficialCover")
         dna_art.setFixedHeight(166)
@@ -2250,7 +2243,7 @@ class ScreenMethods:
 
         evidence_panel, evidence_col = panel(padding=13)
         evidence_col.addWidget(section_title(
-            "VERIFIED FILE FOOTPRINT", "No guessed or overlapping total"))
+            "What belongs to this game?", "Only links backed by a path or game record"))
         footprint_summary = label(
             "Select a game to see its confirmed installation size and linked mod evidence.",
             "findingTitle", wrap=True)
@@ -2265,7 +2258,7 @@ class ScreenMethods:
         header = QWidget()
         header_row = row(spacing=10)
         header.setLayout(header_row)
-        header_row.addWidget(label("GAME DNA RESULTS", "sectionTitle"), 1)
+        header_row.addWidget(label("Games worth investigating", "sectionTitle"), 1)
         search = QLineEdit()
         search.setPlaceholderText("Search your game library…")
         search.setAccessibleName("Search game DNA results by installed game")
@@ -2689,7 +2682,8 @@ class ScreenMethods:
                 "Hide the folder list" if visible
                 else "View the folder list")
         page.content.addWidget(p)
-        page.content.addWidget(mod_radar_panel(self.inventory.mods))
+        if self.inventory.mods:
+            page.content.addWidget(mod_radar_panel(self.inventory.mods))
         page.content.addWidget(label(
             "An old timestamp isn't proof a mod is abandoned. We won't move "
             "a managed mod just because it's been sitting there.",
@@ -2700,7 +2694,7 @@ class ScreenMethods:
                          "Review older ordinary files in the folder you selected. Never removes a folder automatically.")
         p, contents = panel()
         root = str(self.settings.get("scan_folder", ""))
-        heading = label("Reviewed folder: " + root, "subtle", wrap=True)
+        heading = label("Looking in: " + root, "editorialFootnote", wrap=True)
         contents.addWidget(heading)
         actions = QWidget()
         top = row()
@@ -2755,27 +2749,27 @@ class ScreenMethods:
         if state != "complete" or not self.inventory.files:
             empty, stack = panel(padding=18)
             if state == "complete":
-                stack.addWidget(label("✓  NO OLD FILES FOUND", "sectionTitle"))
+                stack.addWidget(label("Nothing gathering dust here.", "editorialEmptyTitle"))
                 stack.addWidget(label(
                     f"No files older than {self.settings.get('files_stale_days', 180)} "
                     f"days were detected in {root}. "
-                    "Nothing to review or move to the Recycle Bin.",
+                    "No files met that age filter, so there's nothing to review.",
                     "subtle", wrap=True))
             elif state == "partial":
-                stack.addWidget(label("SCAN INCOMPLETE", "sectionTitle"))
+                stack.addWidget(label("We couldn't check everything.", "editorialEmptyTitle"))
                 stack.addWidget(label(
                     "Game Grave couldn't inspect every eligible location. "
                     "The findings below are partial, and zero matches do not "
                     "mean the drive is completely clear. " + status_message,
                     "warning", wrap=True))
             else:
-                stack.addWidget(label("OLD FILES SCAN COULD NOT FINISH",
-                                      "sectionTitle"))
+                stack.addWidget(label("We had to stop looking.",
+                                      "editorialEmptyTitle"))
                 stack.addWidget(label(
                     "The selected location was not fully scanned. "
                     "No clean-results claim is being made. " + status_message,
                     "warning", wrap=True))
-            stack.addWidget(button("Rescan Old Files", run_old_scan,
+            stack.addWidget(button("Scan this folder again", run_old_scan,
                                    kind="primary"))
             page.content.addWidget(p)
             page.content.addWidget(empty)
@@ -2957,23 +2951,22 @@ class ScreenMethods:
             "Other Storage",
             "See which folders contribute to storage outside the games Game Grave has identified.")
         intro, intro_col = panel(padding=14)
-        intro_col.addWidget(section_title("What is 'Other' storage?"))
+        intro_col.addWidget(section_title("What counts as 'Other'?"))
         intro_col.addWidget(label(
-            "'Other' in Storage Overview is your drive's used space minus known "
-            "launcher-reported game sizes. It can contain Windows, applications, "
-            "documents, media, caches, and games with unknown sizes. It is NOT "
-            "necessarily junk, and this difference is not a verified folder breakdown.",
+            "It's the used space we haven't accounted for with launcher-reported "
+            "game sizes. Windows, apps, photos and unrecognized games can all "
+            "be in there. Don't mistake it for junk.",
             "subtle", wrap=True))
         intro_col.addWidget(label(
-            "Choose Analyze to examine local file and folder metadata, without "
-            "opening file contents, uploading anything, or deleting anything. "
-            "Results are estimated file sizes, not an exact accounting of physical disk usage.",
+            "A scan can show the folders we can reach, without opening or "
+            "changing their files. Sizes are estimates; inaccessible folders "
+            "and unscanned parts of the drive stay unaccounted for.",
             "warning", wrap=True))
         # The explanation belongs in the inspector, not as a blocking wall of
         # text between the illustrated Map Room header and its scan controls.
 
         selection, sc = panel(padding=14)
-        sc.addWidget(section_title("Analyze another part of your drive"))
+        sc.addWidget(section_title("Choose a drive. We'll show you what's in it."))
         selectors = QWidget()
         rowline = row(spacing=9)
         selectors.setLayout(rowline)
@@ -3044,7 +3037,7 @@ class ScreenMethods:
 
         summary, summary_col = panel(padding=14)
         summary_col.addWidget(section_title(
-            "VISUAL STORAGE BREAKDOWN", "Measured categories + detailed results"))
+            "The space we could account for", "Based on this scan, not the whole disk"))
         summary_col.addWidget(label(
             "The graphic shows only bytes actually categorized during your "
             "read-only scan. Its percentages do NOT describe the whole drive or "
@@ -3061,7 +3054,7 @@ class ScreenMethods:
         coverage_note.setObjectName("otherStorageBreakdownCoverage")
         summary_col.addWidget(coverage_note)
         summary_col.addWidget(section_title(
-            "FILE / FOLDER RESULTS", "Browsable list below the graphic"))
+            "Take a closer look", "Open a folder before you decide what to keep"))
         categories = label("No scanned categories yet.", "subtle", wrap=True)
         summary_col.addWidget(categories)
         report_stats = label("", "caption", wrap=True)
@@ -3522,9 +3515,9 @@ class ScreenMethods:
         photo_table.hide()
         if not shots:
             photo_col.addWidget(label(
-                "No in-game screenshots found yet. Scan PC or add a specific "
-                "capture folder under Settings. No sample image will be substituted.",
-                "subtle", wrap=True))
+                "No screenshots in sight. Try another scan or tell Game Grave "
+                "where your capture folder lives in Settings.",
+                "editorialBody", wrap=True))
 
         def current_photo():
             indices = _selected_indices(photo_table)
@@ -3651,10 +3644,10 @@ class ScreenMethods:
         video_col.addWidget(video_table)
         if not recordings:
             video_col.addWidget(label(
-                "No game recordings detected yet. Scan PC or add a capture "
-                "folder in Settings. Personal videos are not categorized as games "
-                "based only on file extension.",
-                "subtle", wrap=True))
+                "No game clips turned up in the folders checked. You can add "
+                "your recording folder in Settings. Personal videos aren't "
+                "assumed to be gameplay.",
+                "editorialBody", wrap=True))
 
         def current_clip():
             indices = _selected_indices(video_table)
@@ -3782,7 +3775,7 @@ class ScreenMethods:
         history_header = QWidget()
         title_row = row(spacing=9)
         history_header.setLayout(title_row)
-        history_title = label("RECOVERY LEDGER / RECENTLY DELETED", "sectionTitle")
+        history_title = label("What you've moved", "sectionTitle")
         title_row.addWidget(history_title, 1)
         history_search = QLineEdit()
         history_search.setPlaceholderText("Search deleted items…")
@@ -3820,7 +3813,7 @@ class ScreenMethods:
 
         status_panel, status_col = panel(padding=14)
         status_panel.setObjectName("undoRecoveryStatusPanel")
-        status_col.addWidget(section_title("RECOVERY STATUS", "Actual recorded evidence"))
+        status_col.addWidget(section_title("Is it still there?", "Windows decides"))
         dial = UndoStatusDial()
         status_col.addWidget(dial)
         selected_name = label("Select an item", "sectionTitle", wrap=True)
@@ -3899,7 +3892,7 @@ class ScreenMethods:
             else:
                 rows.sort(key=lambda e: str(e.get("time", "")), reverse=True)
             state["visible"] = rows
-            history_title.setText(f"RECENTLY DELETED  ({len(rows)} shown)")
+            history_title.setText(f"What you've moved  ({len(rows)} shown)")
             table.setRowCount(len(rows))
             for i, rec in enumerate(rows):
                 filename = Path(str(rec.get("path", ""))).name or "Unknown"
