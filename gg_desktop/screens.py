@@ -2030,8 +2030,12 @@ class ScreenMethods:
             current["report"] = report
             current["root"] = report.root
             lines = defaultdict(int)
-            for item in report.folders:
-                lines[item.category] += item.apparent_bytes
+            if getattr(report, "category_totals", ()):
+                for name, total in report.category_totals:
+                    lines[name] += total
+            else:
+                for item in report.folders:
+                    lines[item.category] += item.apparent_bytes
             categories.setText(
                 "\n".join(
                     f"{name}: {human_size(total)} apparent"
@@ -2065,6 +2069,8 @@ class ScreenMethods:
                 f"{human_size(report.analyzed_bytes)} apparent bytes measured  •  "
                 f"{report.skipped_entries:,} entries inaccessible/skipped  •  "
                 f"{report.excluded_games:,} recognized game directories excluded.\n"
+                f"Showing {len(report.folders)} of "
+                f"{getattr(report, 'root_entries_count', len(report.folders))} root entries. "
                 f"Coverage: {report.limitation}")
             scan_state.setText(
                 ("Read-only storage analysis completed. " if report.complete
