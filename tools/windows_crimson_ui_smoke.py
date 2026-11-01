@@ -133,7 +133,11 @@ def main():
             assert scan_control is window.scan_button and cancel_control is window.cancel_button
             assert scan_control.isVisible() and scan_control.isEnabled(), (
                 "Main Scan PC action must be visible and usable on the current page")
-            assert scan_control.minimumHeight() >= 50 and scan_control.minimumWidth() >= 155
+            print("Main scan rendered size:", scan_control.width(),
+                  scan_control.height(), "minimum:", scan_control.minimumWidth(),
+                  scan_control.minimumHeight())
+            assert scan_control.width() >= 155 and scan_control.height() >= 50, (
+                "Main Scan PC must render as a prominent large button.")
             assert scan_control.mapTo(window, QPoint(0, 0)).x() < window.width() * .50, (
                 "Main Scan PC action must not be hidden in the far top-right corner")
             assert cancel_control.isVisible() and not cancel_control.isEnabled(), (
