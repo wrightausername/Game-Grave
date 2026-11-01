@@ -4,6 +4,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from gg_desktop.ready_room_data import launch_guard_summary, official_patch_source_for
+from gg_desktop.ready_room_data import tonight_pick
 
 
 class LaunchGuardTests(unittest.TestCase):
@@ -47,3 +48,17 @@ class PublisherSourcesTests(unittest.TestCase):
     def test_similar_name_is_not_attributed_to_different_game(self):
         unknown = SimpleNamespace(name="Cyberpunk 2077 Multiplayer Fan Clone")
         self.assertIsNone(official_patch_source_for(unknown))
+
+class TonightPickTests(unittest.TestCase):
+    def test_choice_is_stable_for_day_and_uses_only_installed_games(self):
+        games = [
+            SimpleNamespace(name="A", key="A", status="Installed (Steam record)"),
+            SimpleNamespace(name="B", key="B", status="Unverified folder"),
+            SimpleNamespace(name="C", key="C", status="Installed (launcher evidence)"),
+        ]
+        a = tonight_pick(games, day="2026-11-01")
+        b = tonight_pick(games, day="2026-11-01")
+        self.assertIs(a, b)
+        self.assertNotEqual(a.name, "B")
+        self.assertNotEqual(tonight_pick(games, day="2026-11-01", offset=1).key,
+                            a.key)
