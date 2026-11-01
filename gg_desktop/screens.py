@@ -2126,6 +2126,7 @@ class ScreenMethods:
         rowline.addWidget(disk_choices)
         scan_mode = QComboBox()
         scan_mode.addItems(["Quick Scan", "Full Scan"])
+        scan_mode.setCurrentText(getattr(self, "_other_storage_scan_mode", "Quick Scan"))
         scan_mode.setAccessibleName("Other Storage scan depth")
         scan_mode.setToolTip("Quick: 220,000 entries / 25 seconds. Full: no entry/time cap.")
         rowline.addWidget(scan_mode)
@@ -2342,6 +2343,7 @@ class ScreenMethods:
                 self.error("No drive found", "Select a connected local fixed drive.")
                 return
             full_scan = scan_mode.currentText() == "Full Scan"
+            self._other_storage_scan_mode = scan_mode.currentText()
             mode_name = "Full Scan" if full_scan else "Quick Scan"
             proposed = str(scope or drive)
             terms = ("No entry or time limit. Can run a long time; Cancel is always available."
@@ -2403,7 +2405,8 @@ class ScreenMethods:
 
             def done(outcome):
                 self._other_storage_running = False
-                scan_clock.stop()
+                if isValid(scan_clock):
+                    scan_clock.stop()
                 if isValid(scan_timing) and scan_started["at"] is not None:
                     elapsed = max(0, time.monotonic() - scan_started["at"])
                     scan_timing.setText("Scan ended after " + self._seconds_human(elapsed))
