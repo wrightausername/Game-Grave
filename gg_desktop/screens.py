@@ -1470,6 +1470,54 @@ class ScreenMethods:
                          "Review apparent storage, understand protections, and approve individual Recycle Bin moves.")
         if self._not_scanned(page):
             return
+        if not self.inventory.graveyard:
+            from gg_desktop.graveyard_empty_art import GraveyardEmptyArt
+            empty_workspace = QWidget()
+            empty_row = row(spacing=12)
+            empty_workspace.setLayout(empty_row)
+            main, main_col = panel(padding=16)
+            main.setObjectName("graveyardEmptyPanel")
+            main_col.addWidget(GraveyardEmptyArt())
+            incomplete = bool(self.inventory.warnings)
+            main_col.addWidget(label(
+                "SCAN INCOMPLETE • NO VERIFIED FINDINGS" if incomplete
+                else "NO ITEMS FOUND", "premiumTitle"))
+            main_col.addWidget(label(
+                "Some locations were inaccessible; a zero count does not "
+                "prove the PC is clear. Review scan warnings above."
+                if incomplete else
+                "No eligible game-related leftovers were found in this scan. "
+                "Protected locations are never removed automatically.",
+                "subtle", wrap=True))
+            main_col.addWidget(button("SCAN PC AGAIN", self.start_scan,
+                                      kind="primary"))
+            main_col.addStretch(1)
+            empty_row.addWidget(main, 7)
+            sidebar, side_col = panel(padding=16)
+            sidebar.setObjectName("graveyardScanInspector")
+            side_col.addWidget(section_title("SCAN OPTIONS"))
+            side_col.addWidget(label(
+                "Change the reviewed location or scan again. "
+                "The Graveyard only shows evidence-backed results; "
+                "it does not make up items to fill the screen.",
+                "caption", wrap=True))
+            side_col.addWidget(button("Choose old-file folder…",
+                                      self._choose_scan_folder))
+            side_col.addWidget(button("Old Files / C: scan…",
+                                      lambda: self.navigate("Old Files")))
+            side_col.addWidget(button("Review Mod Radar",
+                                      lambda: self.navigate("Mods")))
+            side_col.addWidget(section_title("WHAT GAME GRAVE CHECKS"))
+            for item in ("Old or unused game installations",
+                         "Launcher and mod-manager leftovers",
+                         "Old screenshots and recordings",
+                         "Scanned caches and temporary files",
+                         "Protected saves and active mods are not bulk cleanup"):
+                side_col.addWidget(label("•  " + item, "caption", wrap=True))
+            side_col.addStretch(1)
+            empty_row.addWidget(sidebar, 3)
+            page.content.addWidget(empty_workspace)
+            return
         page.content.addWidget(graveyard_overview(self.inventory.graveyard))
         page.content.addWidget(graveyard_mix_panel(self.inventory.graveyard))
         page.content.addWidget(FeatureStrip([
@@ -2060,8 +2108,8 @@ class ScreenMethods:
             "GAME FOOTPRINT MAP", "Select a glowing node to inspect its evidence"))
         relationship = RelationshipMap()
         relationship.setObjectName("dnaFullscreenRelationshipMap")
-        relationship.setMinimumHeight(382)
-        relationship.setMaximumHeight(382)
+        relationship.setMinimumHeight(510)
+        relationship.setMaximumHeight(510)
         relationship.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         map_col.addWidget(relationship)
         map_caption = label(
@@ -2564,7 +2612,6 @@ class ScreenMethods:
             if not self.inventory.files:
                 return
         page.content.addWidget(old_files_categories(self.inventory.files))
-        page.content.addWidget(old_file_age_chart(self.inventory.files))
         sorter = QWidget()
         sort_row = row(spacing=9)
         sorter.setLayout(sort_row)
@@ -2695,7 +2742,36 @@ class ScreenMethods:
         table.customContextMenuRequested.connect(old_file_context_menu)
         contents.addWidget(button("Move reviewed individual files to Recycle Bin…",
                                   remove, kind="danger"))
-        page.content.addWidget(p)
+        # Approved archive-cleanup composition: evidence table on the left,
+        # genuinely computed age chart and safe quick actions on the right.
+        old_workspace = QWidget()
+        old_row = row(spacing=12)
+        old_workspace.setLayout(old_row)
+        old_row.addWidget(p, 7)
+        right = QWidget()
+        right_col = column(spacing=12)
+        right.setLayout(right_col)
+        right_col.addWidget(old_file_age_chart(self.inventory.files))
+        insights, insights_col = panel(padding=13)
+        insights_col.addWidget(section_title("CLEANUP INSIGHTS"))
+        total_bytes = sum(max(0, int(f.size)) for f in self.inventory.files)
+        insights_col.addWidget(label(
+            human_size(total_bytes) + " apparent bytes in reviewed findings",
+            "premiumMetric", wrap=True))
+        insights_col.addWidget(label(
+            "This is not guaranteed reclaimable space. Items in Windows "
+            "Recycle Bin may still occupy disk storage.",
+            "caption", wrap=True))
+        insights_col.addWidget(section_title("QUICK ACTIONS"))
+        insights_col.addWidget(button("Choose a folder…", self._choose_scan_folder))
+        insights_col.addWidget(button("Rescan selected location", run_old_scan,
+                                      kind="primary"))
+        insights_col.addWidget(button("Review in Graveyard",
+                                      lambda: self.navigate("Graveyard")))
+        right_col.addWidget(insights)
+        right_col.addStretch(1)
+        old_row.addWidget(right, 3)
+        page.content.addWidget(old_workspace)
         page.content.addWidget(label(
             "File age does not prove disuse. Old Files never removes installed games or "
             "managed profile folders. Recycle Bin is reversible only while Windows holds a matching item.",
@@ -3478,6 +3554,9 @@ class ScreenMethods:
         history_sort.setMaximumWidth(147)
         title_row.addWidget(history_sort)
         history_col.addWidget(history_header)
+        recovery_timeline = RecoveryRoute()
+        recovery_timeline.setObjectName("undoRecoveryTimeline")
+        history_col.addWidget(recovery_timeline)
 
         table = data_table(["ITEM", "ACTION", "ORIGINAL LOCATION", "SIZE", "RECORDED", "STATE"])
         table.setObjectName("undoHistoryTable")
@@ -3542,6 +3621,7 @@ class ScreenMethods:
             current = selected_record()
             dial.set_records(state["entries"])
             if current is None:
+                recovery_timeline.set_record("No recovery record", "Not checked")
                 selected_name.setText("No item selected")
                 selected_path.setText("Select a history record, then verify it.")
                 selected_state.setText("Not checked")
@@ -3552,6 +3632,8 @@ class ScreenMethods:
             selected_path.setText("Original location: " + str(current.get("path", "Unknown")) +
                                   "\nLogged size: " + readable_bytes(current.get("size")))
             status = str(current.get("state", "Not checked"))
+            recovery_timeline.set_record(
+                str(current.get("path", "Unknown")), status)
             selected_state.setText(
                 "Recorded status: " + status + "\n" +
                 str(current.get("note", "A new Windows check is required.")))
