@@ -336,6 +336,11 @@ def main():
                 "Other Storage scans must have the new segmented loading bar.")
             assert isinstance(window.progress, CrimsonScanProgress), (
                 "Main system scan must use the same Crimson progress system.")
+            # CI-only synthetic visualization for human visual review, not user data.
+            breakdown_preview = root / "_ci_temp" / (
+                "crimson-other-storage-breakdown-SYNTHETIC-1440.png")
+            assert window.grab().save(str(breakdown_preview)), (
+                "Failed to capture populated scan breakdown and results list.")
             window._other_storage_report = None
             window._other_storage_report_drive = None
             window.navigate("Overview")
