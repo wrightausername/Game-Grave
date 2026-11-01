@@ -1575,20 +1575,14 @@ class ScreenMethods:
             empty_row.addWidget(sidebar, 3)
             page.content.addWidget(empty_workspace)
             return
-        page.content.addWidget(graveyard_overview(self.inventory.graveyard))
-        page.content.addWidget(graveyard_mix_panel(self.inventory.graveyard))
-        page.content.addWidget(FeatureStrip([
-            ("FIND", "Scanned game clutter"),
-            ("UNDERSTAND", "Review evidence"),
-            ("PROTECT", "Keep what matters"),
-            ("RECOVER", "Recycle with Undo checks"),
-        ]))
-
+        # The reference leads with review controls and the burial ledger.
+        # Diagnostic metrics and category charts remain available beneath it,
+        # rather than hiding the useful list below three generic card strips.
         filters = QWidget()
         controls = row()
         filters.setLayout(controls)
         self.grave_search = QLineEdit()
-        self.grave_search.setPlaceholderText("Search findings and paths…")
+        self.grave_search.setPlaceholderText("Search games, files, mods or source paths…")
         controls.addWidget(self.grave_search, 3)
         self.grave_type = QComboBox()
         self.grave_type.addItems(["All types"] + sorted({e.category for e in self.inventory.graveyard}))
@@ -1596,12 +1590,16 @@ class ScreenMethods:
         self.grave_state = QComboBox()
         self.grave_state.addItems(["All findings", "Ready for review", "Protected / preview only"])
         controls.addWidget(self.grave_state, 2)
+        controls.addWidget(button("↻  SCAN", self.start_scan, kind="primary"))
         page.content.addWidget(filters)
 
         content = QWidget()
         cr = row(spacing=12)
         content.setLayout(cr)
         table_box, table_col = panel(padding=8)
+        table_box.setObjectName("graveyardBurialLedger")
+        table_col.addWidget(section_title(
+            "THE BURIAL LEDGER", "Select files to review, not automatically delete"))
         self.grave_table = data_table(["ITEM", "TYPE", "APPARENT SIZE", "STATUS"])
         self.grave_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.grave_table.setColumnWidth(0, 250)
@@ -1619,9 +1617,35 @@ class ScreenMethods:
         table_col.addWidget(actions)
         cr.addWidget(table_box, 7)
         detail, detail_col = panel()
+        detail.setObjectName("graveyardEvidenceInspector")
         self.grave_detail = detail_col
         cr.addWidget(detail, 3)
         page.content.addWidget(content)
+        # The scan intelligence is secondary to the review action, as in the
+        # approved Graveyard composition.
+        insights_toggle = button("▤  Show discovery breakdown",
+                                 kind="referenceSecondary")
+        page.content.addWidget(insights_toggle)
+        insights = QWidget()
+        insight_col = column(spacing=9)
+        insights.setLayout(insight_col)
+        insight_col.addWidget(graveyard_overview(self.inventory.graveyard))
+        insight_col.addWidget(graveyard_mix_panel(self.inventory.graveyard))
+        insight_col.addWidget(FeatureStrip([
+            ("FIND", "Scanned game clutter"),
+            ("UNDERSTAND", "Review evidence"),
+            ("PROTECT", "Keep what matters"),
+            ("RECOVER", "Recycle with Undo checks"),
+        ]))
+        insights.setVisible(False)
+        page.content.addWidget(insights)
+        def show_grave_insights():
+            visible = not insights.isVisible()
+            insights.setVisible(visible)
+            insights_toggle.setText(
+                "▤  Hide discovery breakdown" if visible
+                else "▤  Show discovery breakdown")
+        insights_toggle.clicked.connect(show_grave_insights)
         guidance, guidance_col = panel(padding=12)
         reviewable = sum(e.can_recycle and e.old_file is not None
                          for e in self.inventory.graveyard)
@@ -1706,7 +1730,15 @@ class ScreenMethods:
             elif protection is None and status == "Protected / inspect":
                 self.grave_table.setRowHeight(i, 37)
             else:
-                self.grave_table.setRowHeight(i, 37)
+                self.grave_table.setRowHeight(i, 45)
+            # Local UI coloring of real evidence; no fake recoverability.
+            status_item = self.grave_table.item(i, 3)
+            if status_item is not None:
+                from PySide6.QtGui import QColor
+                status_item.setForeground(QColor(
+                    "#4AD6E9" if status == "Reviewable"
+                    else "#F0B065" if "Unprotect" in status
+                    else "#A7BCCB"))
         selected_key = getattr(self, "_pending_grave_key", None)
         if selected_key is not None:
             for i, e in enumerate(self._shown_graves):
@@ -1726,6 +1758,8 @@ class ScreenMethods:
     def _grave_details(self):
         from gg_desktop.widgets import destroy_layout
         destroy_layout(self.grave_detail)
+        self.grave_detail.addWidget(section_title(
+            "EVIDENCE INSPECTOR", "Protection • source • safe actions"))
         entries = self._selected_grave_entries()
         if not entries:
             self.grave_detail.addWidget(label("Select a finding", "sectionTitle"))
