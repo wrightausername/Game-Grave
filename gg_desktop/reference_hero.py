@@ -30,6 +30,10 @@ class ReferenceHero(SceneHeader):
         scene_assets = {
             "dna": "crimson_dna_scene.svg",
             "undo": "crimson_undo_scene.svg",
+            "oldfiles": "crimson_oldfiles_scene.svg",
+            "storage": "crimson_storage_scene.svg",
+            "captures": "crimson_captures_scene.svg",
+            "graveyard": "crimson_graveyard_scene.svg",
         }
         asset = scene_assets.get(str(kind), "crimson_reference_scene.svg")
         self.background_art = QSvgRenderer(str(
