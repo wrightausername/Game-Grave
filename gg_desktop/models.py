@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 import os
 from typing import Iterable
@@ -81,6 +81,25 @@ def merge_games(steam: Iterable, others: Iterable) -> list[GameRecord]:
     for path, rows in groups.items():
         if len(rows) == 1:
             output.append(rows[0])
+            continue
+        # A local executable or supporting installed-app registration does not
+        # claim a second store license. It corroborates the source which owns
+        # the original manifest, instead of creating false "ambiguous" status.
+        supplemental = {"Custom library", "Local game files",
+                        "Windows installed games"}
+        primary = [r for r in rows if r.launcher not in supplemental]
+        if len(primary) == 1 and all(
+                r is primary[0] or r.launcher in supplemental
+                or (r.launcher == "Rockstar Games"
+                    and primary[0].launcher in ("Steam", "Epic Games"))
+                for r in rows):
+            main = primary[0]
+            supporting = [r.launcher for r in rows if r is not main]
+            output.append(replace(
+                main, install_evidence=main.install_evidence +
+                ("; corroborated by local " + ", ".join(sorted(set(supporting))) +
+                 " evidence (not additional storefront ownership)"
+                 if supporting else "")))
             continue
         claimed_by = tuple(sorted({p for row in rows for p in row.claimed_by}))
         # Different records from Steam plus the same launcher may describe one
