@@ -9,10 +9,10 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QColor, QFont, QImageReader, QPixmap, QLinearGradient, QPainter, QPen
 from PySide6.QtWidgets import (
-    QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QScrollArea,
+    QFrame, QGridLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QScrollArea,
     QVBoxLayout, QWidget,
 )
 
@@ -56,38 +56,64 @@ class GraphicCard(QFrame):
 
 
 class GameCover(QFrame):
-    """Clickable, fully laid-out visual game card backed by one real record.
+    """Local-art game card using verified game records, never invented covers.
 
-    Native labels avoid painter clipping on nested Windows scroll areas.
-    No fictional cover art or network image lookups.
+    Steam cache posters (when present) are decoded locally and bounded. Other
+    launchers may provide an explicit cover in the game's installed root.
+    No remote API, no download and no placeholder pretending to be real art.
     """
     def __init__(self, game, on_selected):
         super().__init__()
         self.game = game
         self._select = on_selected
         self.setObjectName("gameCover")
-        self.setFixedHeight(187)
-        self.setMinimumWidth(156)
+        self.setFixedHeight(238)
+        self.setMinimumWidth(154)
         self.setCursor(Qt.PointingHandCursor)
         self.setToolTip(f"{game.name}\n{game.launcher}\n{game.install_path}")
         self.setAccessibleName("Select game: " + game.name)
-        layout = _layout(self, pad=(9, 8, 9, 8), gap=3)
-        symbol = QLabel("🎮")
-        symbol.setObjectName("coverSymbol")
-        symbol.setAlignment(Qt.AlignCenter)
-        symbol.setFixedHeight(77)
-        symbol.setStyleSheet(
-            "background: #153340; color:#46D0E9; border:1px solid #315B6B;"
-            "border-radius:6px; font-size:30px;")
-        # A title monogram is more honest than fake, potentially copyrighted
-        # game cover art. Use the game name in the accessibility description.
-        initials = "".join(w[0] for w in game.name.split()[:2]).upper()[:2]
-        symbol.setText(initials)
-        layout.addWidget(symbol)
+        layout = _layout(self, pad=(7, 7, 7, 8), gap=4)
+        art = QLabel()
+        art.setObjectName("gameCoverArt")
+        art.setAlignment(Qt.AlignCenter)
+        art.setFixedHeight(143)
+        art.setMinimumWidth(140)
+        from gg_desktop.local_art import game_cover_path
+        source = game_cover_path(game)
+        if source:
+            reader = QImageReader(source)
+            reader.setAutoTransform(True)
+            size = reader.size()
+            if (size.isValid() and 0 < size.width() <= 8192
+                    and 0 < size.height() <= 8192
+                    and size.width() * size.height() <= 32_000_000):
+                scale = min(1.0, 420 / max(size.width(), size.height()))
+                if scale < 1:
+                    reader.setScaledSize(QSize(
+                        max(1, round(size.width() * scale)),
+                        max(1, round(size.height() * scale))))
+                image = reader.read()
+                if not image.isNull():
+                    pixmap = QPixmap.fromImage(image).scaled(
+                        230, 143, Qt.KeepAspectRatioByExpanding,
+                        Qt.SmoothTransformation)
+                    art.setPixmap(pixmap)
+                    art.setToolTip("Local artwork: " + source)
+        if art.pixmap() is None or art.pixmap().isNull():
+            # Rich but clearly generated fallback, not a fabricated store cover.
+            art.setText(game.name[:42].upper())
+            art.setWordWrap(True)
+            art.setStyleSheet(
+                "background:qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+                "stop:0 #401626,stop:0.55 #142B3B,stop:1 #08121D);"
+                "border:1px solid #8C3046;border-radius:7px;"
+                "font-size:16px;font-weight:800;color:#F5FAFF;padding:9px;")
+            art.setToolTip("No local game cover found; generated title fallback")
+        layout.addWidget(art)
         name = QLabel(game.name)
         name.setObjectName("findingTitle")
         name.setWordWrap(True)
-        name.setMaximumHeight(36)
+        name.setMaximumHeight(39)
         layout.addWidget(name)
         launcher = _small(game.launcher)
         launcher.setStyleSheet("color:#64D2EC;")
@@ -103,33 +129,39 @@ class GameCover(QFrame):
         super().mouseReleaseEvent(event)
 
 
-def game_gallery(games, selected_callback, *, limit=4):
-    """Four full visual cards; the complete inventory remains in the table.
+def game_gallery(games, selected_callback, *, limit=8):
+    """Artwork-led game library grid, backed only by actual installations.
 
-    No nested QScrollArea means no Windows render clipping or hidden row.
+    The full searchable record table remains below. This is visual navigation,
+    not an alternative data source or storage-deletion authority.
     """
     section = QFrame()
     section.setObjectName("dashboardPanel")
-    layout = _layout(section)
-    layout.addWidget(_small("YOUR GAME LIBRARY  •  VERIFIED INSTALLATIONS", "sectionTitle"))
+    layout = _layout(section, gap=10)
+    layout.addWidget(_small("YOUR GAME LIBRARY  •  VERIFIED INSTALLATIONS",
+                            "sectionTitle"))
     layout.addWidget(_small(
-        "Select a game card to inspect the source and actions below. "
-        "Local vector visuals, no fake game covers."))
+        "Select a cover to inspect its verified install and actions. "
+        "Artwork is loaded from local caches when available."))
     if not games:
-        layout.addWidget(_small("No verified games yet. Run Scan PC to populate the shelf."))
+        layout.addWidget(_small("No verified games yet. Run Scan PC to populate the library."))
         return section
     shelf = QWidget()
-    shelf.setFixedHeight(202)
-    shelf_row = _layout(shelf, vertical=False, pad=(1, 5, 1, 1), gap=11)
-    for game in games[:limit]:
-        shelf_row.addWidget(
-            GameCover(game, lambda g=game: selected_callback(g)), 1)
-    shelf_row.addStretch(1)
+    grid = QGridLayout(shelf)
+    grid.setContentsMargins(0, 5, 0, 3)
+    grid.setHorizontalSpacing(10)
+    grid.setVerticalSpacing(11)
+    for index, game in enumerate(games[:limit]):
+        grid.addWidget(GameCover(game,
+                       lambda g=game: selected_callback(g)),
+                       index // 4, index % 4)
+    for col in range(4):
+        grid.setColumnStretch(col, 1)
     layout.addWidget(shelf)
     if len(games) > limit:
         layout.addWidget(_small(
             f"Showing {limit} of {len(games)} verified games. "
-            "Use the search and full list underneath for the rest."))
+            "Use search and the full list below for the rest."))
     return section
 
 
