@@ -75,6 +75,43 @@ QTabWidget#captureTabs QTabBar::tab:selected {
     background: #38202C;
     border-bottom: 3px solid #FF4357;
 }
+/* Approved Crimson Command tab system. Same shell, distinct vector scenes. */
+QFrame#sceneHeader {
+    background: #0D1924; border: 1px solid #304758; border-radius: 11px;
+}
+QLabel#sceneTitle {
+    color: #F5F9FC; font-size: 30px; font-weight: 900;
+    letter-spacing: .4px; background: transparent;
+}
+QLabel#sceneDescription {
+    color: #B2C4D2; font-size: 12px; background: transparent;
+}
+QLabel#sceneKicker {
+    color: #43D6F2; font-size: 10px; font-weight: 800;
+    letter-spacing: 2px; background: transparent;
+}
+QFrame#graphicCard {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #10212C, stop:1 #0B1520);
+    border: 1px solid #315065; border-radius: 9px;
+}
+QLabel#graphicValue {
+    color: #F4F8FB; font-size: 20px; font-weight: 800;
+}
+QFrame#featureStep {
+    background: #111E29; border: 1px solid #2B4456; border-radius: 8px;
+}
+QLabel#featureNumber {
+    color: #43D6F2; font-size: 20px; font-weight: 800;
+}
+QFrame#radarFocus {
+    background: #0B2831; border: 1px solid #236477; border-radius: 10px;
+}
+QPushButton#gameCover {
+    background: #10212C; border: 1px solid #315064;
+    border-radius: 9px; padding:0;
+}
+QPushButton#gameCover:hover { border: 2px solid #43D6F2; }
 QWidget#navRail { background: #0B111A; border-right: 1px solid #25303C; }
 QFrame#panel, QFrame#metricCard, QFrame#actionCard, QFrame#infoCard, QFrame#heroBottom {
     background: #111922; border: 1px solid #2A3541; border-radius: 11px;
