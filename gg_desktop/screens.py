@@ -854,6 +854,7 @@ class ScreenMethods:
         self.game_table.customContextMenuRequested.connect(self._games_context_menu)
         self._cover_requests_inflight = False
         self._cover_attempted_ids = set()
+        self._manual_cover_batch_offset = 0
         self._fill_games()
 
     def _reset_games_art_page(self, *_):
@@ -887,11 +888,18 @@ class ScreenMethods:
             self.info("Steam covers", "No missing verified Steam covers in this view. "
                       "Other launchers can use Choose Cover in the game inspector.")
             return
-        work = missing[:24]
+        # Rotate batches so repeated clicks can reach the *entire* library,
+        # even when the earliest games have no public Steam cover at all.
+        start = getattr(self, "_manual_cover_batch_offset", 0)
+        if start >= len(missing):
+            start = 0
+        work = missing[start:start + 12]
+        self._manual_cover_batch_offset = (start + len(work)) % len(missing)
         self._cover_requests_inflight = True
         self.art_refresh.setEnabled(False)
         self.status.setText(
-            f"Looking up official Steam artwork for {len(work)} games "
+            f"Looking up official Steam artwork for {len(work)} of "
+            f"{len(missing)} missing games "
             "(background-priority, pauses for gameplay)…")
         def done(count):
             self._cover_requests_inflight = False
@@ -906,7 +914,7 @@ class ScreenMethods:
             self.status.setText(
                 f"Recovered {count} official Steam covers. "
                 "Some games may not have public cover assets; no art was guessed.")
-        self.job(lambda _p: prime_visible_covers(work, limit=24, force=True),
+        self.job(lambda _p: prime_visible_covers(work, limit=12, force=True),
                  done, error_title="Steam artwork lookup unavailable")
 
     def _choose_game_cover(self, game):
