@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 from pathlib import Path
 from typing import Callable
 
@@ -56,9 +57,54 @@ def looks_like_recording(path: Path, root: Path, *, user_selected: bool = False)
     return False
 
 
+def _scoped_recording_candidates(root: Path, limit: int, cancel=None) -> list[OldFile]:
+    """Bounded metadata-only scan for recent and old clips in accepted roots.
+
+    No thumbnails, video decoding, filesystem writes, or general drive scans.
+    Personal media outside known capture paths are not treated as gaming clips.
+    """
+    output: list[OldFile] = []
+    inspected = 0
+    hidden = {"family", "personal", "private", "camera roll", "vacation"}
+    for parent, dirs, filenames in os.walk(root, followlinks=False):
+        if cancel and cancel():
+            raise InterruptedError("Recording scan cancelled")
+        current = Path(parent)
+        if _has_reparse_component(current):
+            dirs[:] = []
+            continue
+        depth = len(current.relative_to(root).parts)
+        if depth >= 3:
+            dirs[:] = []
+        else:
+            dirs[:] = [d for d in dirs
+                       if d.casefold() not in hidden
+                       and not _has_reparse_component(current / d)][:50]
+        for filename in filenames:
+            inspected += 1
+            if inspected > 20_000 or len(output) >= limit:
+                return output
+            path = current / filename
+            if path.suffix.casefold() not in RECORDING_EXTENSIONS:
+                continue
+            if _has_reparse_component(path):
+                continue
+            try:
+                st = path.lstat()
+                if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+                    continue
+            except OSError:
+                continue
+            output.append(OldFile(
+                str(path), st.st_size, st.st_mtime,
+                st.st_dev, st.st_ino, st.st_mtime_ns, st.st_nlink,
+            ))
+    return output
+
+
 def find_old_recordings(days: int = 180, custom_roots: list[str] | None = None,
                         *, home: Path | None = None, cancel: Callable[[], bool] | None = None,
-                        max_matches: int = 2500) -> list[OldFile]:
+                        max_matches: int = 2500, include_recent: bool = False) -> list[OldFile]:
     """Read file metadata only. Avoid junctions, duplicate roots and live game data."""
     if days < 1 or max_matches < 1:
         raise ValueError("Days and max_matches must be positive")
@@ -82,9 +128,13 @@ def find_old_recordings(days: int = 180, custom_roots: list[str] | None = None,
             break
         # Extra headroom for personal videos that do not match capture hints.
         # The scan itself never modifies files.
-        candidates = scan_old_files(root, days, cancel=cancel,
-                                    allowed_extensions=set(RECORDING_EXTENSIONS),
-                                    max_matches=max(remaining * 4, remaining))
+        candidates = (
+            _scoped_recording_candidates(root, max(remaining * 4, remaining), cancel)
+            if include_recent else
+            scan_old_files(root, days, cancel=cancel,
+                           allowed_extensions=set(RECORDING_EXTENSIONS),
+                           max_matches=max(remaining * 4, remaining))
+        )
         for file in candidates:
             path = Path(file.path)
             identity = os.path.normcase(os.path.abspath(file.path)).casefold()
