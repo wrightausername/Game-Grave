@@ -43,6 +43,7 @@ from gg_desktop.tab_panels import (
     graveyard_mix_panel, old_file_age_chart, clear_empty_panel,
 )
 from gg_desktop.premium_panels import GameInspector, ModInspector, mod_gallery
+from gg_desktop.reference_hero import ReferenceHero
 
 
 def _table_text(table: QTableWidget, r: int, c: int, value) -> None:
@@ -86,7 +87,31 @@ class ScreenMethods:
             "Settings": ("settings", "CUSTOMIZE GAME GRAVE"),
             "Captures": ("captures", "YOUR GAMING CAPTURES"),
         }
-        if title in themes:
+        if title == "Games":
+            actual_size, unknown = reported_game_bytes(self.inventory.games)
+            metrics = (
+                ("Installed games", len(self.inventory.games), "Verified records"),
+                ("Known game size", human_size(actual_size), "Reported by launchers"),
+                ("Launchers", len({g.launcher for g in self.inventory.games}),
+                 "Detected sources"),
+                ("Unknown sizes", unknown, "Not assumed empty"),
+            )
+            page.content.addWidget(ReferenceHero(
+                "games", "Games", subtitle, metrics))
+        elif title == "Mods":
+            from gg_desktop.premium_panels import group_mod_locations
+            groups, _unmatched = group_mod_locations(
+                self.inventory.games, self.inventory.mods)
+            metrics = (
+                ("Mod locations", len(self.inventory.mods), "Discovered locations"),
+                ("Linked games", len(groups), "Verified path matches"),
+                ("Sources", len({str(getattr(m, "source", "Unknown"))
+                                 for m in self.inventory.mods}), "Reported sources"),
+                ("Protection", "ON", "No automatic deletion"),
+            )
+            page.content.addWidget(ReferenceHero(
+                "mods", "Mods", subtitle, metrics))
+        elif title in themes:
             scene, kicker = themes[title]
             page.content.addWidget(SceneHeader(scene, title.upper(), subtitle, note=kicker))
         else:
