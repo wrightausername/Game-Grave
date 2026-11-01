@@ -100,15 +100,10 @@ class GameCover(QFrame):
                     art.setPixmap(pixmap)
                     art.setToolTip("Local artwork: " + source)
         if art.pixmap() is None or art.pixmap().isNull():
-            # Rich but clearly generated fallback, not a fabricated store cover.
-            art.setText(game.name[:42].upper())
-            art.setWordWrap(True)
-            art.setStyleSheet(
-                "background:qlineargradient(x1:0,y1:0,x2:1,y2:1,"
-                "stop:0 #401626,stop:0.55 #142B3B,stop:1 #08121D);"
-                "border:1px solid #8C3046;border-radius:7px;"
-                "font-size:16px;font-weight:800;color:#F5FAFF;padding:9px;")
-            art.setToolTip("No local game cover found; generated title fallback")
+            # Original game-styled art, clearly marked as a generated fallback.
+            from gg_desktop.poster_art import generated_game_poster
+            art.setPixmap(generated_game_poster(game.name, 170, 143))
+            art.setToolTip("Original Game Grave artwork, not an official game cover")
         layout.addWidget(art)
         name = QLabel(game.name)
         name.setObjectName("findingTitle")
