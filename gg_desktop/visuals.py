@@ -18,6 +18,7 @@ from PySide6.QtGui import (
     QPixmap, QPolygonF, QRadialGradient,
 )
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtSvg import QSvgRenderer
 
 RED = QColor("#F84359")
 CYAN = QColor("#43D6F2")
@@ -95,6 +96,9 @@ class SceneHeader(QFrame):
     def __init__(self, kind: str, title: str, subtitle: str, *, note: str = ""):
         super().__init__()
         self.kind = kind
+        # Crisp original cinematic artwork, not a rasterized UI mockup.
+        self.art = QSvgRenderer(str(Path(__file__).parent / "assets" /
+                                    "crimson_ruins.svg"))
         self.setObjectName("sceneHeader")
         self.setMinimumHeight(184)
         self.setMaximumHeight(211)
@@ -136,11 +140,21 @@ class SceneHeader(QFrame):
         p.setBrush(bg)
         p.drawRoundedRect(QRectF(0, 0, w, h), 11, 11)
         p.save()
-        p.setClipRect(QRectF(w * .52, 1, w * .48 - 1, h - 2))
-        # Delicate technical outlines instead of giant bright red light floods.
-        p.setPen(_pen("#203747", 1))
-        for y in range(15, h + 14, 24):
-            p.drawLine(QPointF(w * .54, y), QPointF(w + 15, y))
+        p.setClipRect(QRectF(0, 0, w, h))
+        if self.art.isValid():
+            self.art.render(p, QRectF(0, -12, w, h + 42))
+        # Preserve the restrained matte palette and legible titles from the
+        # approved shared shell. Artwork is vivid only on the right.
+        mask = QLinearGradient(0, 0, max(1, w * .80), 0)
+        mask.setColorAt(0, QColor(5, 10, 17, 247))
+        mask.setColorAt(.43, QColor(6, 11, 18, 222))
+        mask.setColorAt(.72, QColor(7, 12, 19, 135))
+        mask.setColorAt(1, QColor(7, 12, 19, 12))
+        p.fillRect(QRectF(0, 0, w, h), mask)
+        p.restore()
+        p.save()
+        p.setClipRect(QRectF(w * .61, 1, w * .39 - 1, h - 2))
+        p.setOpacity(.48)
         p.translate(w - 360, h / 2 + 6)
         if self.kind == "games":
             self._game_shelf(p)
