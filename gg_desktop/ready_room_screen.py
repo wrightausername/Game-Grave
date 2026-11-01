@@ -96,8 +96,8 @@ def render_ready_room(window):
     if header and header.widget():
         hero = header.widget()
         if hero.objectName() == "referenceHero":
-            hero.setMinimumHeight(140)
-            hero.setMaximumHeight(140)
+            hero.setMinimumHeight(116)
+            hero.setMaximumHeight(116)
 
     favorites = tuple(window.settings.get("ready_room_favorites", ()))
     selected_games = prioritize_games(window.inventory.games, favorites, limit=9)
@@ -117,6 +117,7 @@ def render_ready_room(window):
     top.setLayout(top_row)
     left = QWidget()
     left_col = column(spacing=12)
+    left_col.setAlignment(Qt.AlignTop)
     left.setLayout(left_col)
     top_row.addWidget(left, 7)
     right = QWidget()
@@ -127,12 +128,16 @@ def render_ready_room(window):
 
     lineup, lineup_col = _card(
         "★  YOUR LINEUP",
-        "Your pinned and most recently played installed games.", min_height=295)
+        "Your pinned and most recently played installed games.", min_height=345)
+    lineup.setFixedHeight(365)
+    lineup_col.setAlignment(Qt.AlignTop)
     left_col.addWidget(lineup)
+    left_col.addStretch(1)
 
     art_strip = QWidget()
     art_row = row(spacing=8)
     art_strip.setLayout(art_row)
+    art_strip.setFixedHeight(166)
     art_buttons = []
     for index, game in enumerate(display_games):
         entry = QWidget()
@@ -163,6 +168,7 @@ def render_ready_room(window):
     chosen_row = QWidget()
     chosen_body = row(spacing=13)
     chosen_row.setLayout(chosen_body)
+    chosen_row.setFixedHeight(129)
     cover = QLabel()
     cover.setObjectName("readyRoomSelectedCover")
     cover.setFixedSize(100, 126)
