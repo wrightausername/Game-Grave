@@ -211,6 +211,9 @@ class ScreenMethods:
         self.game_details_col = self.game_details.layout()
         self.game_details.setVisible(False)
         game_left_col.addWidget(self.game_details)
+        # Keep the visual gallery flush with its heading even when the
+        # selected-game inspector is taller than the current game row count.
+        game_left_col.addStretch(1)
         self.game_search.textChanged.connect(self._fill_games)
         self.game_filter.currentTextChanged.connect(self._fill_games)
         self.game_sort.currentTextChanged.connect(self._fill_games)
@@ -1232,7 +1235,8 @@ class ScreenMethods:
             self.inventory.games, self.inventory.mods,
             lambda game, locations, source: self.mod_inspector.set_group(
                 game, locations, source), limit=9)
-        mod_workspace_row.addWidget(gallery, 1)
+        gallery.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        mod_workspace_row.addWidget(gallery, 1, Qt.AlignTop)
         self.mod_inspector = ModInspector(
             lambda m: self._open_folder(str(getattr(m, "path", ""))),
             self._send_mod_to_graveyard, self.start_scan)
