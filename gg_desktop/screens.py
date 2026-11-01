@@ -42,6 +42,7 @@ from gg_desktop.tab_panels import (
     game_gallery, mod_radar_panel, old_files_categories, graveyard_overview,
     clear_empty_panel,
 )
+from gg_desktop.premium_panels import GameInspector, ModInspector, mod_gallery
 
 
 def _table_text(table: QTableWidget, r: int, c: int, value) -> None:
@@ -151,9 +152,25 @@ class ScreenMethods:
         statrow.addWidget(MetricCard("Known reported sizes", human_size(known), "Not equal to disk space reclaimed"))
         statrow.addWidget(MetricCard("Size unknown", str(unknown), "Never assumed to be zero", tone="amber"))
         page.content.addWidget(stats)
-        page.content.addWidget(game_gallery(
+        # The artwork-led library and the selection inspector share one
+        # workspace. All detail actions still call the existing safe APIs.
+        game_workspace = QWidget()
+        game_workspace_row = row(spacing=14)
+        game_workspace.setLayout(game_workspace_row)
+        game_left = QWidget()
+        game_left_col = column(spacing=12)
+        game_left.setLayout(game_left_col)
+        game_workspace_row.addWidget(game_left, 1)
+        self.game_inspector = GameInspector(
+            self._inspect_game_record,
+            lambda g: self._open_folder(g.install_path),
+            lambda: self.navigate("Mods"),
+            lambda: self.navigate("Captures"))
+        game_workspace_row.addWidget(self.game_inspector, 0, Qt.AlignTop)
+        game_left_col.addWidget(game_gallery(
             self.inventory.games,
-            lambda game: self._focus_game_from_gallery(game), limit=4))
+            lambda game: self._focus_game_from_gallery(game), limit=8))
+        page.content.addWidget(game_workspace)
         p, pcol = panel()
         self.game_table = data_table(["GAME", "LAUNCHER", "SIZE", "LAST PLAYED", "EVIDENCE"])
         self.game_table.setColumnWidth(0, 245)
@@ -162,10 +179,10 @@ class ScreenMethods:
         self.game_table.setColumnWidth(3, 145)
         self.game_table.setMinimumHeight(370)
         pcol.addWidget(self.game_table)
-        page.content.addWidget(p)
+        game_left_col.addWidget(p)
         self.game_details = panel()[0]
         self.game_details_col = self.game_details.layout()
-        page.content.addWidget(self.game_details)
+        game_left_col.addWidget(self.game_details)
         self.game_search.textChanged.connect(self._fill_games)
         self.game_filter.currentTextChanged.connect(self._fill_games)
         self.game_sort.currentTextChanged.connect(self._fill_games)
@@ -239,9 +256,13 @@ class ScreenMethods:
         destroy_layout(self.game_details_col)
         selected = _selected_indices(self.game_table)
         if not selected or selected[0] >= len(getattr(self, "_shown_games", [])):
+            if hasattr(self, "game_inspector"):
+                self.game_inspector.set_game(None)
             self.game_details_col.addWidget(label("Select a game to see source evidence and safe actions.", "subtle"))
             return
         game = self._shown_games[selected[0]]
+        if hasattr(self, "game_inspector"):
+            self.game_inspector.set_game(game)
         self.game_details_col.addWidget(label(game.name, "sectionTitle", wrap=True))
         for line in (
             f"Launcher: {game.launcher}",
@@ -1174,6 +1195,24 @@ class ScreenMethods:
             ("PROTECT", "Profiles stay safe"),
             ("REVIEW", "Manual Graveyard action"),
         ]))
+        mod_workspace = QWidget()
+        mod_workspace_row = row(spacing=14)
+        mod_workspace.setLayout(mod_workspace_row)
+        gallery, matched, external = mod_gallery(
+            self.inventory.games, self.inventory.mods,
+            lambda game, locations, source: self.mod_inspector.set_group(
+                game, locations, source), limit=8)
+        mod_workspace_row.addWidget(gallery, 1)
+        self.mod_inspector = ModInspector(
+            lambda m: self._open_folder(str(getattr(m, "path", ""))),
+            self._send_mod_to_graveyard, self.start_scan)
+        mod_workspace_row.addWidget(self.mod_inspector, 0, Qt.AlignTop)
+        if matched:
+            self.mod_inspector.set_group(matched[0][0], matched[0][1])
+        elif external:
+            self.mod_inspector.set_group(
+                None, external, "External / unattributed sources")
+        page.content.addWidget(mod_workspace)
         p, contents = panel()
         contents.addWidget(section_title("Detected mod and manager storage",
                                          str(len(self.inventory.mods)) + " findings"))
@@ -1238,6 +1277,13 @@ class ScreenMethods:
             menu.exec(table.viewport().mapToGlobal(point))
         table.setContextMenuPolicy(Qt.CustomContextMenu)
         table.customContextMenuRequested.connect(mod_context_menu)
+        def sync_mod_inspector():
+            selected = _selected_indices(table)
+            if selected and selected[0] < len(self.inventory.mods):
+                m = self.inventory.mods[selected[0]]
+                self.mod_inspector.set_group(
+                    None, [m], str(getattr(m, "source", "Unknown")))
+        table.itemSelectionChanged.connect(sync_mod_inspector)
         tools.addWidget(button("Explain selected source", inspect_selected))
         def queue_selected_mod():
             selected = _selected_indices(table)
