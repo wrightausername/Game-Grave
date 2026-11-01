@@ -3741,7 +3741,7 @@ class ScreenMethods:
         counts recorded verification states, never promises future retention.
         """
         from shiboken6 import isValid
-        from gg_desktop.undo_visuals import UndoStatusDial
+        from gg_desktop.undo_visuals import UndoStatusDial, RecoveryActionTile
 
         page = self._new(
             "Undo Center",
@@ -3749,15 +3749,20 @@ class ScreenMethods:
             "Nothing is overwritten automatically.")
 
         actions, actions_col = panel(padding=12)
+        actions.setObjectName("undoRecoveryCommands")
         tiles = QWidget()
         tiles_row = row(spacing=10)
         tiles.setLayout(tiles_row)
-        restore_tile = button("↶  Restore Items\nVerify and recover", kind="primary")
-        recycle_tile = button("▤  Browse Recycle Bin\nView deleted items")
-        history_tile = button("☷  Deletion History\nSearch local records")
-        settings_tile = button("⚙  Undo Settings\nSafety and protection")
+        restore_tile = RecoveryActionTile(
+            "RESTORE ITEMS", "Verify first, recover only if available", "restore")
+        recycle_tile = RecoveryActionTile(
+            "RECYCLE BIN", "Browse Windows' local Recycle Bin", "bin")
+        history_tile = RecoveryActionTile(
+            "DELETION HISTORY", "Search the local action ledger", "history")
+        settings_tile = RecoveryActionTile(
+            "UNDO SETTINGS", "Protection and safety rules", "settings")
         for action_button in (restore_tile, recycle_tile, history_tile, settings_tile):
-            action_button.setMinimumHeight(68)
+            action_button.setMinimumHeight(84)
             action_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             tiles_row.addWidget(action_button, 1)
         actions_col.addWidget(tiles)
@@ -3768,10 +3773,11 @@ class ScreenMethods:
         workspace.setLayout(layout)
 
         history_panel, history_col = panel(padding=13)
+        history_panel.setObjectName("undoBurialHistory")
         history_header = QWidget()
         title_row = row(spacing=9)
         history_header.setLayout(title_row)
-        history_title = label("RECENTLY DELETED", "sectionTitle")
+        history_title = label("RECOVERY LEDGER / RECENTLY DELETED", "sectionTitle")
         title_row.addWidget(history_title, 1)
         history_search = QLineEdit()
         history_search.setPlaceholderText("Search deleted items…")
