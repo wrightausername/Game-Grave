@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
-from gg_desktop.ready_room_data import launch_guard_summary
+from gg_desktop.ready_room_data import launch_guard_summary, official_patch_source_for
 
 
 class LaunchGuardTests(unittest.TestCase):
@@ -36,3 +36,14 @@ class LaunchGuardTests(unittest.TestCase):
         game = SimpleNamespace(status="Unverified folder",
                                install_path="/does-not-matter")
         self.assertEqual(launch_guard_summary(game)[0], "Unknown")
+
+class PublisherSourcesTests(unittest.TestCase):
+    def test_known_game_has_official_publisher_destination(self):
+        known = SimpleNamespace(name="Cyberpunk 2077")
+        source = official_patch_source_for(known)
+        self.assertEqual(source[0], "CD PROJEKT RED")
+        self.assertTrue(source[1].startswith("https://www.cyberpunk.net/"))
+
+    def test_similar_name_is_not_attributed_to_different_game(self):
+        unknown = SimpleNamespace(name="Cyberpunk 2077 Multiplayer Fan Clone")
+        self.assertIsNone(official_patch_source_for(unknown))
