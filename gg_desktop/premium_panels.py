@@ -88,7 +88,8 @@ class GameInspector(QFrame):
     """Persistent selection detail area with only verified available actions."""
 
     def __init__(self, on_details, on_open, on_mods, on_captures,
-                 on_choose_cover=None, on_reset_cover=None):
+                 on_choose_cover=None, on_reset_cover=None,
+                 on_steam_cover=None):
         super().__init__()
         self.setObjectName("premiumInspector")
         self.setMinimumWidth(335)
@@ -139,6 +140,13 @@ class GameInspector(QFrame):
                     and on_choose_cover(self.game))
         self.choose_cover_btn.setVisible(on_choose_cover is not None)
         layout.addWidget(self.choose_cover_btn)
+        self.steam_cover_btn = QPushButton("Find official Steam cover by AppID…")
+        self.steam_cover_btn.setObjectName("steamStoreCoverLookup")
+        self.steam_cover_btn.clicked.connect(
+            lambda: self.game is not None and on_steam_cover is not None
+                    and on_steam_cover(self.game))
+        self.steam_cover_btn.setVisible(on_steam_cover is not None)
+        layout.addWidget(self.steam_cover_btn)
         self.reset_cover_btn = QPushButton("Restore official artwork")
         self.reset_cover_btn.setObjectName("resetGameCover")
         self.reset_cover_btn.clicked.connect(
@@ -161,6 +169,7 @@ class GameInspector(QFrame):
         self.mods_btn.setEnabled(active)
         self.captures_btn.setEnabled(active)
         self.choose_cover_btn.setEnabled(active)
+        self.steam_cover_btn.setEnabled(active)
         from gg_desktop.custom_game_art import override_path
         self.reset_cover_btn.setEnabled(active and bool(override_path(game)) if active else False)
         self.name.setText(game.name if active else "Choose a game from the library")
