@@ -51,11 +51,23 @@ class ReferenceHero(SceneHeader):
             "graveyard": "#F05069", "undo": "#F28599",
         }.get(self.kind, "#F44A64")
         self.title_overlay = QLabel(
-            "THE MOD SHELF" if self.kind == "mods" else title, self)
+            "MOD SHELF" if self.kind == "mods" else title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
-        self.title_overlay.setFont(QFont(display_family(), 42, QFont.Bold))
+        display = QFont(display_family(), 42, QFont.Bold)
+        display.setItalic(self.kind == "mods")
+        self.title_overlay.setFont(display)
         self.title_overlay.setStyleSheet(
-            "background:transparent;color:#FFFFFF;letter-spacing:1px;")
+            "background:transparent;color:" +
+            ("#FF4561" if self.kind == "mods" else "#FFFFFF") +
+            ";letter-spacing:1px;")
+        self.title_prefix = QLabel("THE" if self.kind == "mods" else "", self)
+        self.title_prefix.setObjectName("referenceHeroPrefix")
+        prefix_font = QFont(display_family(), 26, QFont.Bold)
+        prefix_font.setItalic(True)
+        self.title_prefix.setFont(prefix_font)
+        self.title_prefix.setStyleSheet(
+            "background:transparent;color:#F9F2F4;letter-spacing:1px;")
+        self.title_prefix.setVisible(self.kind == "mods")
         route_for_kind = {
             "mods": "Mods", "oldfiles": "Old Files",
             "storage": "Other Storage", "captures": "Captures",
@@ -113,9 +125,15 @@ class ReferenceHero(SceneHeader):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.width()
-        self.eyebrow_overlay.setGeometry(36, 28, max(150, w - 80), 21)
-        self.title_overlay.setGeometry(32, 55, max(150, w - 64), 64)
-        self.subtitle_overlay.setGeometry(36, 122, max(150, w - 73), 42)
+        if self.kind == "mods":
+            self.eyebrow_overlay.setGeometry(36, 12, max(150, w - 80), 20)
+            self.title_prefix.setGeometry(35, 35, max(150, w - 70), 36)
+            self.title_overlay.setGeometry(31, 69, max(150, w - 62), 62)
+            self.subtitle_overlay.setGeometry(37, 140, max(150, w - 74), 38)
+        else:
+            self.eyebrow_overlay.setGeometry(36, 28, max(150, w - 80), 21)
+            self.title_overlay.setGeometry(32, 55, max(150, w - 64), 64)
+            self.subtitle_overlay.setGeometry(36, 122, max(150, w - 73), 42)
         self.metrics.setGeometry(17, 186, max(250, w - 34), 81)
 
     def paintEvent(self, event):
