@@ -202,7 +202,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.scan_button.setToolTip(
             "Read-only inventory of installed games, related storage, mods, "
             "captures and other sources. Pauses for gameplay.")
-        self.scan_button.setMinimumSize(166, 55)
+        self.scan_button.setMinimumWidth(180)
+        self.scan_button.setFixedHeight(58)
         topbox.addWidget(self.scan_button)
         self.cancel_button = button("Cancel Scan", self.cancel_scan)
         self.cancel_button.setObjectName("mainCancelScan")
