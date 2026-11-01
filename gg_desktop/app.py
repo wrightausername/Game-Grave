@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
-from PySide6.QtGui import QColor, QIcon, QPalette, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QIcon, QPalette, QKeySequence, QShortcut, QFont
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QProgressBar, QVBoxLayout, QWidget, QScrollArea,
@@ -20,6 +20,7 @@ from core import load_settings
 from gg_desktop.backend import Inventory, scan_inventory, ScanCanceled
 from performance_guard import background_worker_priority
 from gg_desktop.theme import STYLE
+from gg_desktop.typography import text_family, display_family
 from gg_desktop.widgets import label, button, row, column, ScrollPage, LandscapeArt
 from gg_desktop.visuals import nav_icon
 from gg_desktop.scan_progress import CrimsonScanProgress
@@ -150,9 +151,9 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         glyph.setAccessibleName("Game Grave crimson emblem")
         brand_layout.addWidget(glyph)
         brand_name = label("GAME\nGRAVE", "brand")
+        brand_name.setFont(QFont(display_family(), 22, QFont.Bold))
         brand_name.setStyleSheet(
-            "color:#F9F0F3;font-family:'Georgia','Segoe UI';"
-            "font-size:22px;font-weight:800;letter-spacing:.6px;")
+            "color:#F9F0F3;letter-spacing:.6px;")
         brand_layout.addWidget(brand_name, 1)
         r.addWidget(brand_holder)
         kicker = label("KEEP THE GAMES.\nKNOW THE CLUTTER.", "brandKicker")
@@ -184,9 +185,9 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         footer_layout = column(margins=(14, 22, 12, 4))
         self.sidebar_art.setLayout(footer_layout)
         motto = label('NOTHING LEAVES\nWITHOUT YOUR SAY-SO.', "subtle", wrap=True)
+        motto.setFont(QFont(display_family(), 12, QFont.DemiBold))
         motto.setStyleSheet(
-            "color:#E3DBE1;font-family:'Georgia','Segoe UI';"
-            "font-size:12px;letter-spacing:.5px;")
+            "color:#E3DBE1;letter-spacing:.5px;")
         footer_layout.addWidget(motto)
         footer_layout.addStretch()
         self.sidebar_art.setVisible(self.height() >= 795)
@@ -507,6 +508,8 @@ def main() -> int:
     app.setApplicationName("Game Grave")
     app.setOrganizationName("Game Grave")
     configure_crimson_dialog_palette(app)
+    # Installed Windows fonts only; no bundled or redistributed font files.
+    app.setFont(QFont(text_family(), 10))
     app.setStyleSheet(STYLE)
     app.setQuitOnLastWindowClosed(True)
     win = CrimsonWindow()
