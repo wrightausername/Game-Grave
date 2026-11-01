@@ -38,7 +38,17 @@ def _foreground_is_fullscreen() -> bool:
                         ("rcWork", Rect), ("dwFlags", wintypes.DWORD)]
 
         user32 = ctypes.WinDLL("user32", use_last_error=True)
+        # Explicit pointer-sized signatures are essential on 64-bit Windows.
         user32.GetForegroundWindow.restype = wintypes.HWND
+        user32.GetWindowThreadProcessId.argtypes = [
+            wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+        user32.GetWindowRect.argtypes = [
+            wintypes.HWND, ctypes.POINTER(Rect)]
+        user32.GetWindowRect.restype = wintypes.BOOL
+        user32.GetMonitorInfoW.argtypes = [
+            wintypes.HMONITOR, ctypes.POINTER(MonitorInfo)]
+        user32.GetMonitorInfoW.restype = wintypes.BOOL
         user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
         user32.MonitorFromWindow.restype = wintypes.HMONITOR
         hwnd = user32.GetForegroundWindow()
@@ -85,6 +95,7 @@ class GameActivityDetector:
         self._last_checked: float | None = None
         self._last_active = False
         self._game_roots: tuple[str, ...] = ()
+        self._game_prefixes: tuple[str, ...] = ()
         self._process_paths = process_paths or self._running_process_paths
         self._fullscreen = fullscreen or _foreground_is_fullscreen
 
@@ -115,16 +126,36 @@ class GameActivityDetector:
                 if path and path not in clean:
                     clean.append(path)
         self._game_roots = tuple(clean[:5000])
+        # Store prefixes once instead of rebuilding thousands on each query.
+        self._game_prefixes = tuple(root + "\\" for root in self._game_roots)
         self._last_checked = None
 
     def _looks_like_game(self, raw: str) -> bool:
         path = _normalize_windows_path(raw)
-        # Known Steam and other standard game installs, excluding launchers.
+        if not path.endswith(".exe"):
+            return False
+        # Launcher clients are often running all day. Never interpret them
+        # as an active game merely because they live inside a store folder.
         if any(marker in path for marker in (
-            "\\steamapps\\common\\", "\\gog games\\",
-            "\\epic games\\", "\\ubisoft game launcher\\games\\")):
+            "\\epic games\\launcher\\",
+            "\\gog galaxy\\",
+            "\\riot games\\riot client\\",
+            "\\ea desktop\\",
+            "\\ubisoft game launcher\\upc.exe",
+            "\\ubisoft game launcher\\ubisoftconnect.exe",
+        )):
+            return False
+        if any(marker in path for marker in (
+            "\\steamapps\\common\\",
+            "\\gog games\\", "\\epic games\\",
+            "\\ubisoft game launcher\\games\\",
+            "\\riot games\\league of legends\\",
+            "\\riot games\\valorant\\",
+            "\\xboxgames\\", "\\ea games\\",
+            "\\games\\",  # Custom Windows game-library roots
+        )):
             return True
-        return any(path.startswith(root + "\\") for root in self._game_roots)
+        return any(path.startswith(prefix) for prefix in self._game_prefixes)
 
     def active(self) -> bool:
         now = self._clock()
@@ -137,8 +168,12 @@ class GameActivityDetector:
             running = any(self._looks_like_game(p) for p in self._process_paths())
             self._last_active = bool(running or self._fullscreen())
         except (OSError, ValueError, TypeError):
-            # A failed detector must not crash an otherwise read-only scan.
-            self._last_active = bool(self._fullscreen())
+            # An unavailable process list must never crash a scan. The
+            # fullscreen fallback is independent and may still pause it.
+            try:
+                self._last_active = bool(self._fullscreen())
+            except (OSError, ValueError, TypeError):
+                self._last_active = False
         return self._last_active
 
 
