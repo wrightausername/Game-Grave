@@ -1146,13 +1146,71 @@ class ScreenMethods:
         actions = QWidget()
         top = row()
         actions.setLayout(top)
-        top.addWidget(button("Change scan folder", self._choose_scan_folder))
-        top.addWidget(button("Rescan", self.start_scan))
+        from old_files_scope import is_fixed_drive_root
+        top.addWidget(button("Choose folder…", self._choose_scan_folder))
+        if is_fixed_drive_root(Path("C:\\\\")):
+            top.addWidget(button(
+                "Select C: drive…", self._choose_old_files_c_drive))
+        top.addWidget(button("Scan selected location", self.start_scan, kind="primary"))
         top.addStretch()
         contents.addWidget(actions)
+        drive_scope = is_fixed_drive_root(Path(root))
+        if drive_scope:
+            contents.addWidget(label(
+                "Whole-drive mode: only safe non-system folders are inspected, "
+                "up to 160,000 entries or 25 seconds. Results can be incomplete. "
+                "Installed games and protected locations are excluded. "
+                "No files are deleted by scanning.",
+                "warning", wrap=True))
         if self._not_scanned(page):
             page.content.addWidget(p)
             return
+        previous_root = str(getattr(self.inventory, "old_files_scan_root", ""))
+        if previous_root != root:
+            note, note_col = panel(padding=18)
+            note_col.addWidget(section_title("Ready to scan the selected location"))
+            note_col.addWidget(label(
+                "Your scan location changed from " + (previous_root or "the previous default") +
+                " to " + root +
+                ". Click Scan selected location to view actual results. "
+                "Previous results are not displayed as if they came from this location.",
+                "subtle", wrap=True))
+            note_col.addWidget(button("Scan this location", self.start_scan,
+                                      kind="primary"))
+            page.content.addWidget(p)
+            page.content.addWidget(note)
+            return
+        state = str(getattr(self.inventory, "old_files_scan_status", "complete"))
+        status_message = str(getattr(self.inventory, "old_files_scan_message", ""))
+        if state != "complete" or not self.inventory.files:
+            empty, stack = panel(padding=18)
+            if state == "complete":
+                stack.addWidget(label("✓  NO OLD FILES FOUND", "sectionTitle"))
+                stack.addWidget(label(
+                    f"No files older than {self.settings.get('files_stale_days', 180)} "
+                    f"days were detected in {root}. "
+                    "Nothing to review or move to the Recycle Bin.",
+                    "subtle", wrap=True))
+            elif state == "partial":
+                stack.addWidget(label("SCAN INCOMPLETE", "sectionTitle"))
+                stack.addWidget(label(
+                    "Game Grave couldn't inspect every eligible location. "
+                    "The findings below are partial, and zero matches do not "
+                    "mean the drive is completely clear. " + status_message,
+                    "warning", wrap=True))
+            else:
+                stack.addWidget(label("OLD FILES SCAN COULD NOT FINISH",
+                                      "sectionTitle"))
+                stack.addWidget(label(
+                    "The selected location was not fully scanned. "
+                    "No clean-results claim is being made. " + status_message,
+                    "warning", wrap=True))
+            stack.addWidget(button("Rescan Old Files", self.start_scan,
+                                   kind="primary"))
+            page.content.addWidget(p)
+            page.content.addWidget(empty)
+            if not self.inventory.files:
+                return
         table = data_table(["FILE", "SIZE", "MODIFIED", "PROTECTION"])
         table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         table.setRowCount(min(len(self.inventory.files), 500))
@@ -1207,9 +1265,16 @@ class ScreenMethods:
                           f"{len(outcome['skipped'])} skipped." +
                           ("\n" + "\n".join(outcome["skipped"][:8])
                            if outcome["skipped"] else ""))
+            managed_paths = tuple(
+                str(game.install_path) for game in self.inventory.games
+                if getattr(game, "install_path", None))
+            managed_paths += tuple(
+                str(mod.path) for mod in self.inventory.mods
+                if getattr(mod, "path", None))
             self.job(lambda _progress: recycle_old_files(
                 selected, rules, session, review_root=reviewed_root,
-                min_age_days=days), complete, error_title="Old Files cleanup blocked")
+                min_age_days=days, managed_roots=managed_paths),
+                complete, error_title="Old Files cleanup blocked")
         def old_file_context_menu(point):
             row_idx = self._right_clicked_row(table, point)
             if row_idx is None or row_idx >= len(rows):
@@ -1835,25 +1900,61 @@ class ScreenMethods:
                     "Emptying the Recycle Bin or source path conflicts may prevent recovery.",
                     warning=True)
 
+    def _choose_old_files_c_drive(self):
+        """Deliberately opt in to a read-only bounded C-drive scan."""
+        from old_files_scope import is_fixed_drive_root
+        root = Path("C:\\\\")
+        if not is_fixed_drive_root(root):
+            self.error("C: is unavailable", "Only an existing local fixed C: drive can be scanned.")
+            return
+        if not self.confirm(
+            "Select your entire C: drive for Old Files?",
+            "Game Grave will READ file names, sizes and modified dates across "
+            "permitted parts of C:\\\\. "
+            "Windows folders, installed programs, Game Grave's protected "
+            "locations, junctions and known game installs are excluded. "
+            "The scan is limited to 25 seconds or 160,000 entries and "
+            "may return partial findings. Old does not mean unused. "
+            "Nothing is deleted automatically."):
+            return
+        updated = dict(self.settings)
+        updated["scan_folder"] = str(root)
+        try:
+            save_settings(updated)
+        except (OSError, ValueError) as exc:
+            self.error("Cannot save C: scan choice", str(exc))
+            return
+        self.settings = updated
+        self.status.setText("C: selected. Use Scan selected location to inspect old files.")
+        self.navigate("Old Files")
+
     def _choose_scan_folder(self):
         chosen = QFileDialog.getExistingDirectory(self, "Select ordinary Old Files scan folder",
                                 str(self.settings.get("scan_folder", str(Path.home()))))
         if not chosen:
             return
+        from old_files_scope import accepted_old_files_scope, is_fixed_drive_root
         target = Path(chosen)
-        if not safe_scan_root(target) or is_protected_path(target, []):
-            self.error("Folder not allowed",
-                       "Choose a normal local documents/download folder, not a drive root, "
-                       "game install, mod manager or protected system directory.")
+        if is_fixed_drive_root(target):
+            self._choose_old_files_c_drive() if str(target).upper().startswith("C:") else (
+                self.info("Choose a regular folder",
+                          "Drive-wide review is currently available through the C: button."))
             return
-        self.settings["scan_folder"] = str(target)
+        if not accepted_old_files_scope(target):
+            self.error("Folder not allowed",
+                       "Choose an ordinary local downloads/documents folder, "
+                       "not a game install, mod manager, redirected path or Windows directory.")
+            return
+        updated = dict(self.settings)
+        updated["scan_folder"] = str(target)
         try:
-            save_settings(self.settings)
-        except OSError as exc:
+            save_settings(updated)
+        except (OSError, ValueError) as exc:
             self.error("Cannot save folder preference", str(exc))
             return
-        self.status.setText("Scan folder saved. Scan PC before reviewing files.")
-        self.navigate("Settings")
+        self.settings = updated
+        self.status.setText("Old Files folder saved. Select Scan to inspect it.")
+        self.navigate("Old Files")
 
     def settings_page(self):
         page = self._new("Settings", "Appearance, scan folders, Never Touch rules and local-only privacy controls.")
