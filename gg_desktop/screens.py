@@ -926,6 +926,18 @@ class ScreenMethods:
             "Cover Images (*.jpg *.jpeg *.png *.webp)")
         if not path:
             return
+        from PySide6.QtGui import QImageReader
+        reader = QImageReader(path)
+        image_size = reader.size()
+        if (not image_size.isValid() or
+                not 64 <= image_size.width() <= 8192 or
+                not 64 <= image_size.height() <= 8192 or
+                image_size.width() * image_size.height() > 32_000_000):
+            self.error("Invalid cover",
+                       "Please choose a real JPG, PNG or WebP game cover. "
+                       "The image must be at least 64 × 64 pixels and "
+                       "within safe decoding limits.")
+            return
         try:
             saved = choose_custom_cover(game, path)
         except (OSError, ValueError) as exc:
