@@ -22,6 +22,7 @@ from performance_guard import background_worker_priority
 from gg_desktop.theme import STYLE
 from gg_desktop.widgets import label, button, row, column, ScrollPage, LandscapeArt
 from gg_desktop.visuals import nav_icon
+from gg_desktop.scan_progress import CrimsonScanProgress
 from gg_desktop.screens import ScreenMethods
 
 ROUTES = (
@@ -221,9 +222,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         heading_layout.addWidget(self.status)
         topbox.addWidget(heading, 1)
         base.addWidget(top)
-        self.progress = QProgressBar()
+        self.progress = CrimsonScanProgress()
         self.progress.setObjectName("mainScanProgress")
-        self.progress.setFixedHeight(11)
         self.progress.setTextVisible(False)
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
@@ -349,6 +349,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             remaining = "Estimating remaining time…"
         self.scan_timing.setText(
             "Elapsed " + self._seconds_human(elapsed) + "  •  " + remaining)
+        self.progress.advance_pulse()
 
     def start_scan(self, *, old_files_full: bool | None = None):
         if self.scanning or self.cleaning:
@@ -366,7 +367,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.scan_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self.progress.show()
+        self.progress.setRange(0, 100)
         self.progress.setValue(0)
+        self.progress.set_paused(False)
+        self.progress.set_stage("Scanning local gaming records")
         self.status.setText("Scanning local gaming records. No files are being changed.")
         settings = dict(self.settings)
         settings["old_files_full_scan"] = self._scan_full_old_files
@@ -375,6 +379,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
         def progress(percent, stage):
             self._scan_paused_for_game = str(stage).startswith("Paused:")
+            self.progress.set_paused(self._scan_paused_for_game)
+            self.progress.set_stage(stage)
             self._scan_stage_is_old_files = (
                 str(stage).startswith("Examined") and
                 self._scan_full_old_files)
