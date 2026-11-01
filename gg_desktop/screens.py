@@ -2154,10 +2154,11 @@ class ScreenMethods:
         pending_art = set()
 
         page.content.addWidget(FeatureStrip([
-            ("SCAN", "Source-aware inventory"),
-            ("LINK", "Evidence, not names"),
-            ("MAP", "Explore related files"),
-            ("REVIEW", "Unknowns stay protected"),
+            ("ANALYZE", "Installed game evidence"),
+            ("DETECT", "Mods and addons"),
+            ("MAP", "Linked file layers"),
+            ("LINK", "Proven relationships"),
+            ("REVIEW", "Unknowns protected"),
         ]))
 
         toolbar, controls = panel(padding=12)
@@ -2213,6 +2214,12 @@ class ScreenMethods:
 
         inspector, inspector_col = panel(padding=12)
         inspector.setObjectName("dnaEvidenceInspector")
+        inspector_col.addWidget(section_title(
+            "FILE MAP / SOURCE LAYERS", "Verified links are illuminated"))
+        from gg_desktop.dna_layers import GenomeLayerMap
+        genome_layers = GenomeLayerMap()
+        genome_layers.setObjectName("dnaGenomeLayers")
+        inspector_col.addWidget(genome_layers)
         inspector_col.addWidget(section_title("EVIDENCE INSPECTOR", "Selected game"))
         dna_art = QLabel()
         dna_art.setObjectName("dnaOfficialCover")
@@ -2366,6 +2373,7 @@ class ScreenMethods:
         def display_dna(_=None):
             item = active_dna()
             if item is None:
+                genome_layers.set_evidence(install=False, linked_mods=False)
                 relationship.set_game("NO GAME", {})
                 relationship.set_cover(None)
                 game_title.setText("No game selected")
@@ -2386,6 +2394,8 @@ class ScreenMethods:
                 "Leftovers": "Unverified",
             }
             relationship.set_game(item["game"], evidence_states)
+            genome_layers.set_evidence(
+                install=bool(record), linked_mods=bool(mod_assets))
             load_game_cover(item)
             size = readable_bytes(record.size_bytes) if record else "Unknown"
             footprint_summary.setText(
