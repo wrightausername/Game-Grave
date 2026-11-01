@@ -477,6 +477,12 @@ class ScreenMethods:
             health_report.setPlainText("Reading bounded mod metadata…")
             snapshot_mods = tuple(self.inventory.mods)
             def job(_emit):
+                try:
+                    return True, inspect()
+                except (OSError, ValueError, InterruptedError, RuntimeError) as exc:
+                    return False, type(exc).__name__ + ": " + str(exc)[:240]
+
+            def inspect():
                 from performance_guard import background_worker_priority
                 with background_worker_priority():
                     state = capture_game_state(g, snapshot_mods)
@@ -489,6 +495,9 @@ class ScreenMethods:
                             "\nNo restorable copies were created.")
                     report = compare_game_state(previous, state)
                     headline = (
+                        ("No source-verified mod folders were linked to this game. "
+                         "Game-wide mod compatibility cannot be assessed.\n"
+                         if not state["linked_mod_roots"] else "") +
                         "Change observations: " + str(report.get("total_changes", 0)) +
                         "\nPotential mod/config review: " +
                         str(report.get("potential_mod_review", 0)) +
@@ -501,13 +510,16 @@ class ScreenMethods:
                         Path(str(row.get("path", ""))).name
                         for row in report.get("changes", [])[:40]]
                     return headline + "\n".join(lines + details)
-            def finished(message):
+            def finished(result):
                 self._health_inspecting = False
+                success, message = result
                 if isValid(health_report):
                     health_report.setPlainText(message)
                     make_baseline.setEnabled(True)
                     compare_baseline.setEnabled(True)
                     update_health_status()
+                if not success:
+                    self.status.setText("Mod Health could not complete: " + message[:90])
             self.job(job, finished, error_title="Mod Health analysis unavailable")
         make_baseline.clicked.connect(lambda _=False: start_mod_health(record=True))
         compare_baseline.clicked.connect(lambda _=False: start_mod_health(record=False))
@@ -531,8 +543,58 @@ class ScreenMethods:
         machine_col.addWidget(kit_actions)
         page.content.addWidget(time_machine)
 
+        performance, perf_col = panel(padding=14)
+        perf_col.addWidget(section_title(
+            "PERFORMANCE WATCH", "Your benchmarks, without game hooks"))
+        perf_col.addWidget(label(
+            "Record results from the same in-game benchmark or trusted FPS tool "
+            "after each update. No Game Grave FPS overlay, process injection, "
+            "background frame sampling or anti-cheat interaction.",
+            "subtle", wrap=True))
+        from gg_desktop.performance_watch import (
+            read_benchmarks, add_benchmark, benchmark_summary,
+        )
+        perf_status = label("", "findingTitle", wrap=True)
+        perf_col.addWidget(perf_status)
+        def show_perf(_=None):
+            g = chosen_health_game()
+            perf_status.setText(
+                benchmark_summary(read_benchmarks(g)) if g else
+                "Choose a game in Mod Health above to log a benchmark.")
+        health_selector.currentIndexChanged.connect(show_perf)
+        show_perf()
+        def record_perf():
+            game = chosen_health_game()
+            if game is None:
+                return
+            avg, ok = QInputDialog.getDouble(
+                self, "Performance Watch: " + game.name,
+                "Average FPS from a reproducible benchmark:", 60.0, 1, 2000, 1)
+            if not ok:
+                return
+            low, ok = QInputDialog.getDouble(
+                self, "Performance Watch: " + game.name,
+                "1% low FPS from the same test:", min(avg, 50), 1, avg, 1)
+            if not ok:
+                return
+            note, accepted = QInputDialog.getText(
+                self, "Benchmark conditions",
+                "Optional scene, graphics settings or driver version:")
+            if not accepted:
+                return
+            try:
+                add_benchmark(game, avg, low, note)
+                show_perf()
+                self.status.setText(
+                    "Benchmark recorded locally; no game telemetry was collected.")
+            except (OSError, ValueError) as exc:
+                self.error("Could not save benchmark", str(exc))
+        perf_col.addWidget(button(
+            "Record benchmark results…", record_perf, kind="primary"))
+        page.content.addWidget(performance)
+
         page.content.addWidget(label(
-            "Next release milestones: optional FPS benchmarking, validated "
+            "Next release milestones: automatic opt-in FPS benchmarking, validated "
             "per-mod version support, automatic save snapshots where a game has "
             "a verified save location, and broader publisher news coverage. "
             "Game Grave does not claim to measure FPS or verify mod compatibility yet.",
