@@ -58,7 +58,9 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
     # Do not inspect every image in a game folder. The user selected a game
     # install; only specifically named root poster/cover files may be opened.
     candidate = []
-    # Official Steam library art takes precedence over a game's generic cover.jpg.
+    wide_fallback = []
+    # Prefer real portrait capsules. A landscape header is a last-resort
+    # temporary visual, never a substitute for fetching official portrait art.
     if launcher.casefold() == "steam" and app_id.isascii() and app_id.isdecimal() and len(app_id) <= 12:
         for root in _steam_locations(install_path):
             cache = root / "appcache" / "librarycache"
@@ -66,10 +68,12 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
                 f"{app_id}_library_600x900.jpg",
                 f"{app_id}_library_600x900.png",
                 f"{app_id}_library_600x900.webp",
-                f"{app_id}_header.jpg",
-                f"{app_id}_library_hero.jpg",
             ):
                 candidate.append(cache / name)
+            wide_fallback.extend((
+                cache / f"{app_id}_header.jpg",
+                cache / f"{app_id}_library_hero.jpg",
+            ))
             # Modern Steam (2025+) places assets in app-specific directories;
             # some titles use a nested content-hash directory, and some only
             # have the @2x capsule. Check the single verified AppID folder,
@@ -79,9 +83,10 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
                 "library_600x900_2x.jpg", "library_600x900.jpg",
                 "library_600x900_2x.png", "library_600x900.png",
                 "library_600x900.webp", "library_capsule.jpg",
-                "header.jpg", "library_header.jpg",
             )
             candidate.extend(art_root / name for name in preferred)
+            wide_fallback.extend(art_root / name for name in
+                                 ("header.jpg", "library_header.jpg"))
             try:
                 if art_root.is_dir() and not art_root.is_symlink():
                     hashes = []
@@ -97,6 +102,8 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
                                 break
                     for folder in hashes:
                         candidate.extend(folder / name for name in preferred)
+                        wide_fallback.extend(folder / name for name in
+                                             ("header.jpg", "library_header.jpg"))
             except (OSError, PermissionError):
                 pass
             candidate.extend((
@@ -141,6 +148,9 @@ def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
     for p in candidate[:320]:
         if _usable(p):
             return str(p)
+    for p in wide_fallback[:90]:
+        if _usable(p):
+            return str(p)
     return ""
 
 
@@ -153,6 +163,20 @@ def game_cover_path(game) -> str:
     return _cover_path(str(getattr(game, "launcher", "")),
                        str(getattr(game, "app_id", "") or ""),
                        str(getattr(game, "install_path", "") or ""))
+
+
+def game_needs_portrait(game) -> bool:
+    """A landscape Steam header may show, but the real library portrait is missing."""
+    if str(getattr(game, "launcher", "")).casefold() != "steam":
+        return False
+    from gg_desktop.custom_game_art import override_path
+    if override_path(game):
+        return False
+    path = game_cover_path(game)
+    if not path:
+        return True
+    name = Path(path).name.casefold()
+    return ("header" in name or "hero" in name)
 
 
 def invalidate_cover_cache() -> None:
