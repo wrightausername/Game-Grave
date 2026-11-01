@@ -352,7 +352,7 @@ class ModLocationCard(QFrame):
         """The selection border follows the live inspector, not a fake active state."""
         parent = self.parentWidget()
         if parent is not None:
-            for card in parent.findChildren(ModLocationCard, Qt.FindDirectChildrenOnly):
+            for card in parent.findChildren(ModLocationCard, options=Qt.FindDirectChildrenOnly):
                 card.setProperty("selected", card is self)
                 card.style().unpolish(card)
                 card.style().polish(card)
