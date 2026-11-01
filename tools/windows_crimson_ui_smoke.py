@@ -265,6 +265,11 @@ def main():
                 window.resize(1440, 1050)
                 app.processEvents()
                 assert window.grab().save(str(approved))
+                full_ready_room = root / "_ci_temp" / (
+                    "crimson-ready-room-full-content-1440.png")
+                assert window.page.body.grab().save(str(full_ready_room)), (
+                    "Could not render complete approved Ready Room for visual review.")
+                assert full_ready_room.stat().st_size > 14000
                 window.ready_room_diagnostics_page()
                 window.pool.waitForDone(3000)
                 app.processEvents()
