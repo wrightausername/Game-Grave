@@ -2641,9 +2641,10 @@ class ScreenMethods:
         p, stack = panel()
         stack.addWidget(section_title("Appearance and privacy"))
         stack.addWidget(label(
-            "Crimson Command is a local UI preview. No account, telemetry, "
-            "external images or automatic server polling. Older appearance themes "
-            "remain available in the original Game Grave interface.",
+            "Storage scans operate locally and optional analytics remain off "
+            "unless enabled. On-demand Steam artwork, official news, licensing "
+            "and optional AI components may use network services. "
+            "See the complete legal notice and Privacy Notice before public release.",
             "subtle", wrap=True))
         stack.addWidget(button("Open classic appearance and advanced settings",
                                self._launch_classic_tools))
@@ -2663,17 +2664,35 @@ class ScreenMethods:
                                     lambda: self.navigate("More Tools")))
         settings_pages.addWidget(backup)
 
+        from gg_desktop.legal_notice import LEGAL_NOTICE, LEGAL_NOTICE_VERSION
         about, about_col = panel(padding=16)
         about_col.setAlignment(Qt.AlignTop)
         about_col.addWidget(section_title("GAME GRAVE  /  CRIMSON COMMAND"))
         about_col.addWidget(label(
-            "Gaming-aware, safety-first Windows storage inventory. "
-            "Local-only scans, optional local AI, user-approved Recycle Bin "
-            "cleanup, and readable Undo logs. This is still an engineering "
-            "preview; it is not the stable 1.0 release.",
+            "Gaming-aware, safety-first Windows storage and recovery inventory. "
+            "Scans examine local metadata; optional official artwork, news and "
+            "license features may use external services when enabled. "
+            "Cleanup always requires approval. This is an engineering preview.",
             "subtle", wrap=True))
         about_col.addWidget(button("Open More Tools",
                                    lambda: self.navigate("More Tools")))
+        about_col.addWidget(section_title("LEGAL & DISCLAIMERS",
+                                           "Important product and liability information"))
+        about_col.addWidget(label(
+            "Read this notice before using Game Grave to scan, recycle or restore. "
+            "Your files, game saves and mod configurations can be irreplaceable. "
+            "This disclosure is not a replacement for a separately accepted EULA, "
+            "Privacy Notice, or non-waivable consumer rights.",
+            "warning", wrap=True))
+        about_col.addWidget(label(LEGAL_NOTICE_VERSION, "caption"))
+        legal_text = QPlainTextEdit(about)
+        legal_text.setObjectName("aboutLegalNotice")
+        legal_text.setAccessibleName("Game Grave full legal disclaimer and product notice")
+        legal_text.setReadOnly(True)
+        legal_text.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        legal_text.setMinimumHeight(540)
+        legal_text.setPlainText(LEGAL_NOTICE)
+        about_col.addWidget(legal_text)
         settings_pages.addWidget(about)
 
         def select_category(index):
