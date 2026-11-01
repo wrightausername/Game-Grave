@@ -100,10 +100,13 @@ class GameCover(QFrame):
                     art.setPixmap(pixmap)
                     art.setToolTip("Local artwork: " + source)
         if art.pixmap() is None or art.pixmap().isNull():
-            # Original game-styled art, clearly marked as a generated fallback.
-            from gg_desktop.poster_art import generated_game_poster
-            art.setPixmap(generated_game_poster(game.name, 265, 134))
-            art.setToolTip("Original Game Grave artwork, not an official game cover")
+            # No fabricated cover. A plain title label is preferable to an
+            # AI-like placeholder for a real, verified game.
+            art.setText("OFFICIAL COVER UNAVAILABLE")
+            art.setStyleSheet(
+                "background:#0A1824;color:#A8C1D3;border:1px dashed #345064;"
+                "font-size:11px;font-weight:700;")
+            art.setToolTip("No matching Steam/launcher artwork found yet.")
         layout.addWidget(art)
         name = QLabel(game.name)
         name.setObjectName("findingTitle")
@@ -138,7 +141,7 @@ def game_gallery(games, selected_callback, *, limit=9, empty_message=None):
                             "sectionTitle"))
     layout.addWidget(_small(
         "Select a cover to inspect its verified install and actions. "
-        "Artwork is loaded from local caches when available."))
+        "Official Steam artwork is loaded locally or fetched on demand. Missing covers are never invented."))
     if not games:
         layout.addWidget(_small(
             empty_message or "No verified games yet. Run Scan PC to populate the library."))
