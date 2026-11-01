@@ -217,8 +217,17 @@ class ScreenMethods:
             actions = QWidget()
             bar = row(spacing=7)
             actions.setLayout(bar)
-            bar.addWidget(button("Open game folder",
-                                 lambda _=False, g=game: self._open_folder(g.install_path)))
+            from gg_desktop.steam_artwork import verified_steam_id
+            steam_game_id = verified_steam_id(game)
+            if steam_game_id:
+                bar.addWidget(button(
+                    "Launch in Steam",
+                    lambda _=False, appid=steam_game_id:
+                        QDesktopServices.openUrl(QUrl("steam://rungameid/" + appid)),
+                    kind="primary"))
+            else:
+                bar.addWidget(button("Open game folder",
+                                     lambda _=False, g=game: self._open_folder(g.install_path)))
             pins = set(self.settings.get("ready_room_favorites", []))
             pin_btn = button("Unpin favorite" if game.key in pins else "Pin favorite")
             def toggle_pin(_=False, g=game, ctrl=pin_btn):
@@ -368,10 +377,146 @@ class ScreenMethods:
                      finished, error_title="Steam news unavailable")
         refresh.clicked.connect(lambda _=False: update_news(force=True))
         update_news()
+        health_panel, health_col = panel(padding=16)
+        health_col.addWidget(section_title(
+            "MOD HEALTH  /  CHANGE DETECTIVE",
+            "Read-only snapshots; no mod manager modifications"))
+        health_col.addWidget(label(
+            "Select a verified installation to record a local mod-file metadata baseline "
+            "or compare a new observation. This never runs automatically and cannot "
+            "prove compatibility, a game crash, or a complete backup. "
+            "During gameplay, analysis yields to the running game.",
+            "subtle", wrap=True))
+        health_selector = QComboBox()
+        health_selector.setAccessibleName("Game for on-demand Mod Health comparisons")
+        health_selector.addItems([g.name + "  •  " + g.launcher for g in selected])
+        health_selector.setEnabled(bool(selected))
+        health_col.addWidget(health_selector)
+        health_status = label("Select a game to inspect its baseline.", "caption", wrap=True)
+        health_col.addWidget(health_status)
+        health_report = QPlainTextEdit()
+        health_report.setReadOnly(True)
+        health_report.setMinimumHeight(150)
+        health_report.setMaximumHeight(235)
+        health_report.setAccessibleName("Read only Game Grave mod health change report")
+        health_report.setPlainText(
+            "No automatic analysis. Click Record baseline once a mod configuration "
+            "is working, or Compare changes after you suspect something changed.")
+        health_col.addWidget(health_report)
+        actions = QWidget()
+        health_buttons = row(spacing=8)
+        actions.setLayout(health_buttons)
+        make_baseline = button("Record baseline", kind="primary")
+        compare_baseline = button("Compare changes")
+        recovery_tools = button("Game Time Machine…", self._kit_versions)
+        health_buttons.addWidget(make_baseline)
+        health_buttons.addWidget(compare_baseline)
+        health_buttons.addWidget(recovery_tools)
+        health_buttons.addStretch()
+        health_col.addWidget(actions)
+        page.content.addWidget(health_panel)
+        from gg_desktop.ready_room_health import (
+            load_game_baseline, capture_game_state, save_game_baseline,
+            compare_game_state,
+        )
+
+        def chosen_health_game():
+            ix = health_selector.currentIndex()
+            return selected[ix] if 0 <= ix < len(selected) else None
+
+        def update_health_status(_=None):
+            g = chosen_health_game()
+            if not g:
+                health_status.setText("No installed games were detected.")
+                return
+            previous = load_game_baseline(g)
+            health_status.setText(
+                "Local baseline: " + str(previous.get("captured_at", "Unknown"))
+                if previous else "No local baseline for this game yet.")
+        health_selector.currentIndexChanged.connect(update_health_status)
+        update_health_status()
+
+        def start_mod_health(*, record=False):
+            g = chosen_health_game()
+            if not g or getattr(self, "_health_inspecting", False):
+                return
+            from performance_guard import GameActivityDetector
+            if GameActivityDetector().active():
+                self.info("Gameplay has priority",
+                          "Stop playing before using the optional deep mod comparison. "
+                          "Game Grave will not compete with an active game.")
+                return
+            if record and not self.confirm(
+                "Record a new mod metadata baseline?",
+                "This replaces the previous baseline for " + g.name +
+                ". It only stores recognized mod-file sizes and timestamps locally. "
+                "It is NOT a backup of mod files, saves or game binaries."):
+                return
+            self._health_inspecting = True
+            make_baseline.setEnabled(False)
+            compare_baseline.setEnabled(False)
+            health_report.setPlainText("Reading bounded mod metadata…")
+            snapshot_mods = tuple(self.inventory.mods)
+            def job(_emit):
+                from performance_guard import background_worker_priority
+                with background_worker_priority():
+                    state = capture_game_state(g, snapshot_mods)
+                    previous = load_game_baseline(g)
+                    if record:
+                        target = save_game_baseline(g, state)
+                        return "Baseline saved locally: " + str(target) + "\n" + (
+                            "Linked mod roots: " + str(state["linked_mod_roots"]) +
+                            "\nMetadata entries: " + str(len(state["observation"]["entries"])) +
+                            "\nNo restorable copies were created.")
+                    report = compare_game_state(previous, state)
+                    headline = (
+                        "Change observations: " + str(report.get("total_changes", 0)) +
+                        "\nPotential mod/config review: " +
+                        str(report.get("potential_mod_review", 0)) +
+                        "\nCoverage: " + ("complete for bounded observed roots"
+                                         if report["complete"] else "partial or unknown") +
+                        "\n\n")
+                    lines = report.get("lines", [])
+                    details = [
+                        str(row.get("change", "Changed")) + ": " +
+                        Path(str(row.get("path", ""))).name
+                        for row in report.get("changes", [])[:40]]
+                    return headline + "\n".join(lines + details)
+            def finished(message):
+                self._health_inspecting = False
+                if isValid(health_report):
+                    health_report.setPlainText(message)
+                    make_baseline.setEnabled(True)
+                    compare_baseline.setEnabled(True)
+                    update_health_status()
+            self.job(job, finished, error_title="Mod Health analysis unavailable")
+        make_baseline.clicked.connect(lambda _=False: start_mod_health(record=True))
+        compare_baseline.clicked.connect(lambda _=False: start_mod_health(record=False))
+
+        time_machine, machine_col = panel(padding=14)
+        machine_col.addWidget(section_title(
+            "GAME TIME MACHINE", "Snapshots must be real and verified"))
+        machine_col.addWidget(label(
+            "Use verified Resurrection Kit manifests to compare versions, "
+            "identify missing pieces, and rehearse restoration safely. "
+            "Mod Health baselines above contain metadata only. They cannot "
+            "restore a working game or replace a validated backup.",
+            "subtle", wrap=True))
+        kit_actions = QWidget()
+        kit_row = row(spacing=8)
+        kit_actions.setLayout(kit_row)
+        kit_row.addWidget(button("Compare Kits", self._compare_kits))
+        kit_row.addWidget(button("Rehearse restore", self._rehearse_kit))
+        kit_row.addWidget(button("Create Kit", self._create_kit, kind="primary"))
+        kit_row.addStretch()
+        machine_col.addWidget(kit_actions)
+        page.content.addWidget(time_machine)
+
         page.content.addWidget(label(
-            "More Ready Room functionality is being built: verified mod-change "
-            "warnings, richer session history, performance comparisons and Game "
-            "Time Machine recovery. None of those claims are simulated here.",
+            "Next release milestones: optional FPS benchmarking, validated "
+            "per-mod version support, automatic save snapshots where a game has "
+            "a verified save location, and broader publisher news coverage. "
+            "Game Grave does not claim to measure FPS or verify mod compatibility yet.",
             "caption", wrap=True))
 
     def games_page(self):
