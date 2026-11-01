@@ -12,7 +12,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QFont, QImageReader, QPixmap, QLinearGradient, QPainter, QPen
 from PySide6.QtWidgets import (
-    QFrame, QGridLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QScrollArea,
+    QFrame, QGridLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QSizePolicy, QScrollArea,
     QVBoxLayout, QWidget,
 )
 
@@ -132,6 +132,7 @@ def game_gallery(games, selected_callback, *, limit=9):
     """
     section = QFrame()
     section.setObjectName("referenceLibrary")
+    section.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
     layout = _layout(section, gap=10)
     layout.addWidget(_small("YOUR GAME LIBRARY  •  VERIFIED INSTALLATIONS",
                             "sectionTitle"))
@@ -142,6 +143,8 @@ def game_gallery(games, selected_callback, *, limit=9):
         layout.addWidget(_small("No verified games yet. Run Scan PC to populate the library."))
         return section
     shelf = QWidget()
+    row_count = (min(len(games), limit) + 2) // 3
+    shelf.setFixedHeight(row_count * 211 + max(0, row_count - 1) * 11 + 8)
     grid = QGridLayout(shelf)
     grid.setContentsMargins(0, 5, 0, 3)
     grid.setHorizontalSpacing(10)
@@ -152,7 +155,7 @@ def game_gallery(games, selected_callback, *, limit=9):
                        index // 3, index % 3)
     for col in range(3):
         grid.setColumnStretch(col, 1)
-    layout.addWidget(shelf)
+    layout.addWidget(shelf, 0, Qt.AlignTop)
     if len(games) > limit:
         layout.addWidget(_small(
             f"Showing {limit} of {len(games)} verified games. "
