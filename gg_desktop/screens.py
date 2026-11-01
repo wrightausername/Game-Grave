@@ -199,9 +199,12 @@ class ScreenMethods:
             "Your personal notes and favorites stay on this PC.",
             "subtle", wrap=True))
         page.content.addWidget(banner)
+        # The patch feed belongs immediately below the introduction, not
+        # hidden after seven long cards and multiple scroll screens.
+        patch_feed_insert_at = page.content.count()
 
         art_targets = []
-        for game in selected[:7]:
+        for game in selected[:4]:
             card, content = panel(padding=11)
             content.setSpacing(6)
             line = row(spacing=13)
@@ -313,6 +316,9 @@ class ScreenMethods:
             content.addWidget(actions)
             content.addWidget(note_text)
             page.content.addWidget(card)
+        if len(selected) > 4:
+            page.content.addWidget(button(
+                "Browse all detected games…", lambda: self.navigate("Games")))
         if not selected:
             _box_notice(page, "No verified installed games. Run Scan PC to find your library.")
 
@@ -328,7 +334,7 @@ class ScreenMethods:
                     widget.setText("")
                     widget.setPixmap(pix)
         if selected:
-            self.job(lambda _emitter: prime_visible_covers(selected[:7]),
+            self.job(lambda _emitter: prime_visible_covers(selected[:4]),
                      artwork_loaded, error_title="Game art unavailable")
 
         news_panel, news_col = panel(padding=16)
@@ -354,7 +360,7 @@ class ScreenMethods:
         control_row.addWidget(refresh)
         control_row.addStretch()
         news_col.addWidget(controls)
-        page.content.addWidget(news_panel)
+        page.content.insertWidget(patch_feed_insert_at, news_panel)
         supported_sources = []
         seen_sources = set()
         for game in selected:
@@ -381,7 +387,7 @@ class ScreenMethods:
                     lambda _=False, url=address:
                         QDesktopServices.openUrl(QUrl(url)), kind="link"))
                 publisher_col.addWidget(item)
-            page.content.addWidget(publisher_panel)
+            page.content.insertWidget(patch_feed_insert_at + 1, publisher_panel)
 
         def populate_news(results):
             if self.current_route != "Ready Room" or not isValid(feed_rows):
