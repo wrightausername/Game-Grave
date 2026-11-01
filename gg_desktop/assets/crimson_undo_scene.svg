@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 280">
+<defs>
+<linearGradient id="bg" x1="0" x2="1"><stop stop-color="#080B14"/><stop offset=".48" stop-color="#140B18"/><stop offset="1" stop-color="#431629"/></linearGradient>
+<radialGradient id="halo"><stop stop-color="#ED4766" stop-opacity=".34"/><stop offset="1" stop-color="#F33152" stop-opacity="0"/></radialGradient>
+<pattern id="line" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M50 0H0V50" stroke="#A73B50" stroke-width=".6" fill="none" opacity=".22"/></pattern>
+</defs>
+<rect width="1320" height="280" fill="url(#bg)"/><rect width="1320" height="280" fill="url(#line)"/>
+<ellipse cx="1050" cy="132" rx="280" ry="180" fill="url(#halo)"/>
+<g stroke="#EE425E" fill="none" opacity=".42" stroke-width="1.5">
+<circle cx="1032" cy="136" r="123"/><circle cx="1032" cy="136" r="101" stroke-dasharray="2 10"/>
+<circle cx="1032" cy="136" r="75" stroke="#70CEED"/>
+</g>
+<path d="M975 80 A86 86 0 1 1 969 204" stroke="#FF536F" stroke-width="13" stroke-linecap="round" fill="none"/>
+<path d="M947 183L960 219L989 193" fill="#FF536F"/>
+<g stroke="#C8E8F0" stroke-width="2" opacity=".72" fill="none">
+<path d="M987 133V109H1065L1088 132V186H987Z"/>
+<path d="M996 118H1031L1044 131H1080M1002 152H1066M1002 163H1060"/>
+</g>
+<g fill="#F14E69">
+<path d="M854 93L898 93L920 115L970 115" stroke="#F14E69" stroke-width="2" fill="none"/>
+<path d="M1100 164H1180L1195 147H1280" stroke="#F14E69" stroke-width="2" fill="none"/>
+<circle cx="852" cy="93" r="4"/><circle cx="1280" cy="147" r="4"/>
+</g>
+<g font-family="Segoe UI, sans-serif" font-size="11" font-weight="700" letter-spacing="2" fill="#DBA9B7">
+<text x="805" y="76">VERIFY</text><text x="1150" y="129">RESTORE</text><text x="815" y="235">NO OVERWRITE</text></g>
+</svg>
