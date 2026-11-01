@@ -17,6 +17,35 @@ COLORS = {
 }
 
 STYLE = r"""
+/* Handcrafted route ribbon: navigation does not disappear on long panels. */
+QFrame#routeNavigationBar {
+    background: #0A111C;
+    border-bottom: 1px solid #3F2635;
+    border-top: 1px solid #322331;
+    min-height: 44px;
+}
+QLabel#routeBreadcrumb {
+    color: #D8D1D9;
+    font-family: "Georgia", "Segoe UI", serif;
+    font-size: 13px; font-weight: 700;
+    letter-spacing: 1px; background: transparent;
+}
+QPushButton#routeBackButton, QPushButton#routeHomeButton {
+    background: #101923;
+    color: #F4E8EC;
+    border: 1px solid #B23E55;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 7px 17px;
+    min-height: 25px;
+}
+QPushButton#routeBackButton:hover, QPushButton#routeHomeButton:hover {
+    background: #3B1827; border: 1px solid #FF526F;
+}
+QPushButton#routeBackButton:disabled, QPushButton#routeHomeButton:disabled {
+    color: #71808C; border-color: #25313F; background: #0D151F;
+}
 QMainWindow, QWidget#appRoot, QScrollArea, QWidget#scrollBody { background: #080C13; color: #F4F7FC; }
 QWidget { font-family: "Segoe UI Variable", "Segoe UI", Arial; font-size: 12px; color: #F4F7FC; }
 /* All confirmation, destructive-action, text-entry, info and file dialogs
