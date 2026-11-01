@@ -4637,7 +4637,8 @@ class GameGraveApp(tk.Tk):
                     f"· {eta} · {int(elapsed)}s active scanning")
         # Idle Tk wakeups are unnecessary while a game has the foreground.
         # Keep responsive progress updates for work actually in progress.
-        busy = (self.scanning or self.cleanup_running or
+        busy = (getattr(self, "scanning", False) or
+                getattr(self, "cleanup_running", False) or
                 getattr(self, "_update_download_active", False) or
                 getattr(self, "_selfcheck_busy", False))
         self.after(180 if busy else 1200, self._poll)
