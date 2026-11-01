@@ -9,8 +9,8 @@ import os
 from collections import Counter
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize, QPointF
-from PySide6.QtGui import QColor, QFont, QImageReader, QPainter, QPen, QPixmap, QRadialGradient
+from PySide6.QtCore import Qt, QSize, QPointF, QRectF
+from PySide6.QtGui import QColor, QFont, QImageReader, QPainter, QPen, QPixmap, QRadialGradient, QLinearGradient
 from PySide6.QtWidgets import (
     QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,
     QVBoxLayout, QWidget,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from core import human_size, age_text
 from gg_desktop.local_art import game_cover_path
+from gg_desktop.voice import EMPTY_STATES
 
 
 def _label(text, role="", wrap=True):
@@ -222,6 +223,86 @@ def group_mod_locations(games, mods):
     return pairs, unattributed
 
 
+class ModShelfEmpty(QFrame):
+    """Original quiet, illustrated empty mod shelf. Not a pretend game cover.
+
+    Readable actions on the left; a spare stack of unlabelled game binders
+    on the right. No animations, no fabricated data, no scans on show.
+    """
+    def __init__(self, on_scan=None, on_add_library=None):
+        super().__init__()
+        self.setObjectName("modShelfEmpty")
+        self.setMinimumHeight(282)
+        self.setSizePolicy(
+            self.sizePolicy().horizontalPolicy(), self.sizePolicy().verticalPolicy())
+        stage = QHBoxLayout(self)
+        stage.setContentsMargins(22, 24, 18, 23)
+        stage.setSpacing(12)
+        words = QWidget()
+        words.setObjectName("modShelfCopy")
+        column = QVBoxLayout(words)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(12)
+        column.addWidget(_label("THE MOD SHELF  /  00", "modShelfKicker"))
+        column.addWidget(_label(EMPTY_STATES["Mods"][0], "modShelfHeadline"))
+        body = _label(EMPTY_STATES["Mods"][1], "modShelfDescription")
+        column.addWidget(body)
+        column.addSpacing(9)
+        if on_scan is not None:
+            rescan = QPushButton("Scan again")
+            rescan.setObjectName("primary")
+            rescan.setAccessibleName("Scan again for game mod locations")
+            rescan.clicked.connect(on_scan)
+            column.addWidget(rescan)
+        if on_add_library is not None:
+            add = QPushButton("Add a game folder…")
+            add.setObjectName("referenceSecondary")
+            add.setAccessibleName("Add a game library folder")
+            add.clicked.connect(on_add_library)
+            column.addWidget(add)
+        column.addStretch(1)
+        stage.addWidget(words, 5)
+        stage.addStretch(3)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        p.fillRect(self.rect(), QColor("#090F17"))
+        glow = QRadialGradient(QPointF(w*.82, h*.58), max(110,w*.44))
+        glow.setColorAt(0, QColor(142, 37, 62, 108))
+        glow.setColorAt(1, QColor(20, 20, 27, 0))
+        p.fillRect(self.rect(), glow)
+        # Game binders without fictional posters or implied installations.
+        midx, floor = w*.82, h*.81
+        unit = max(16.0, min(42.0, w*.065))
+        for i, (tilt, height, tint) in enumerate(
+                ((-10, 139, "#1E3B47"), (0, 174, "#412333"), (7, 153, "#242D3F"))):
+            x = midx+(i-1)*(unit+9)
+            y = floor-height
+            p.save()
+            p.translate(x, floor)
+            p.rotate(tilt)
+            spine = QLinearGradient(0,-height,unit,0)
+            spine.setColorAt(0, QColor(tint))
+            spine.setColorAt(1, QColor("#080E15"))
+            p.setBrush(spine)
+            p.setPen(QPen(QColor("#58636C"), 1.8))
+            p.drawRoundedRect(QRectF(0, -height, unit, height), 2, 2)
+            p.setPen(QPen(QColor("#B34157"), 2.0))
+            p.drawLine(QPointF(5,-height+18), QPointF(unit-5,-height+18))
+            p.setPen(QPen(QColor("#658C9A"), 1.3))
+            p.drawLine(QPointF(7,-height+32), QPointF(unit-7,-height+32))
+            p.drawLine(QPointF(7,-height+39), QPointF(unit-7,-height+39))
+            p.drawEllipse(QPointF(unit*.5,-33), 6, 6)
+            p.restore()
+        p.setPen(QPen(QColor("#4B2637"), 4))
+        p.drawLine(QPointF(w*.62, floor+14), QPointF(w*.99, floor+14))
+        p.setPen(QPen(QColor("#B14159"), 1))
+        p.drawLine(QPointF(w*.62, floor+22), QPointF(w*.99, floor+22))
+        p.end()
+
+
 class ModLocationCard(QFrame):
     """Visual selection without a promise of safe removal or conflict detection."""
 
@@ -244,14 +325,18 @@ class ModLocationCard(QFrame):
         art = QLabel()
         _image(art, game, w=140, h=166)
         if game is None:
-            from gg_desktop.poster_art import generated_game_poster
-            art.setPixmap(generated_game_poster(str(source or "MOD SOURCE"), 140, 166))
+            art.setText(str(source or "Unlinked folder"))
+            art.setAlignment(Qt.AlignCenter)
+            art.setWordWrap(True)
+            art.setObjectName("modSourcePlaceholder")
+            art.setMinimumHeight(166)
         layout.addWidget(art)
         title = game.name if game else str(source or "Other locations")
         layout.addWidget(_label(title[:45], "findingTitle"))
-        layout.addWidget(_label(f"{len(locations)} discovered location(s)", "premiumState"))
-        layout.addWidget(_label("Verified install root" if game
-                                else "External / unattributed", "caption"))
+        layout.addWidget(_label(
+            f"{len(locations)} mod folder(s)", "premiumState"))
+        layout.addWidget(_label(
+            "Inside this install" if game else "Not linked to a game", "caption"))
         layout.addStretch()
 
     def mouseReleaseEvent(self, event):
@@ -260,35 +345,21 @@ class ModLocationCard(QFrame):
         super().mouseReleaseEvent(event)
 
 
-def mod_gallery(games, mods, on_selected, *, limit=10, columns=5):
+def mod_gallery(games, mods, on_selected, *, limit=10, columns=5,
+                on_scan=None, on_add_library=None):
     """Gallery of actual mod locations, grouped by known game or detected source."""
     pairs, unknown = group_mod_locations(games, mods)
     box = QFrame()
     box.setObjectName("referenceLibrary")
     column = _col(box, spacing=11)
-    column.addWidget(_label("MOD LIBRARY  /  REAL SCAN EVIDENCE", "sectionTitle"))
-    column.addWidget(_label(
-        "Game-linked cards require a verified install-path match. "
-        "External mod-manager folders remain separate and protected.", "caption"))
     if not mods:
-        from gg_desktop.poster_art import generated_game_poster
-        illustration = QLabel()
-        illustration.setObjectName("noModsArtwork")
-        illustration.setAlignment(Qt.AlignCenter)
-        illustration.setPixmap(
-            generated_game_poster("MOD RADAR • SCAN READY", 630, 208))
-        illustration.setMinimumHeight(225)
-        column.addWidget(illustration)
-        empty = _label("NO MOD LOCATIONS FOUND", "premiumTitle")
-        empty.setAlignment(Qt.AlignCenter)
-        column.addWidget(empty)
-        message = _label(
-            "This scan found no verified mod or manager storage. "
-            "Nothing is marked safe to delete. The cards appear here "
-            "when sources are discovered.", "caption")
-        message.setAlignment(Qt.AlignCenter)
-        column.addWidget(message)
+        column.addWidget(ModShelfEmpty(on_scan, on_add_library))
         return box, pairs, unknown
+    column.addWidget(_label("Your mod shelf", "modShelfSectionTitle"))
+    column.addWidget(_label(
+        "Select a game to see the mod folders we could link to its install. "
+        "Unlinked manager folders have their own place on the shelf.",
+        "modShelfSectionNote"))
     targets = [(game, found, None) for game, found in pairs]
     if unknown:
         sources = {}
@@ -382,61 +453,59 @@ class ModInspector(QFrame):
         self._on_scan = on_scan
         self.locations = []
         col = _col(self, spacing=11)
-        col.addWidget(_label("MOD RADAR  /  LIVE INVENTORY", "sceneKicker"))
+        col.addWidget(_label("A CLOSER LOOK", "sceneKicker"))
         self.scope = ModRadarScope()
         col.addWidget(self.scope)
         self.art = QLabel()
         col.addWidget(self.art)
-        self.title = _label("Select a mod source", "premiumTitle")
+        self.title = _label("Pick a game", "premiumTitle")
         col.addWidget(self.title)
         self.count = _label("0 locations", "premiumMetric")
         col.addWidget(self.count)
         self.provenance = _label("", "caption")
         col.addWidget(self.provenance)
-        col.addWidget(_label("DETECTED SOURCE BREAKDOWN", "sceneKicker"))
+        col.addWidget(_label("WHERE WE FOUND IT", "sceneKicker"))
         self.sources = _label("", "premiumPath")
         col.addWidget(self.sources)
-        col.addWidget(_label("SAFE ACTIONS", "sceneKicker"))
-        self.open_btn = QPushButton("Open selected mod folder")
+        col.addWidget(_label("WHAT YOU CAN DO", "sceneKicker"))
+        self.open_btn = QPushButton("Open folder")
         self.open_btn.clicked.connect(self.open_selected)
         col.addWidget(self.open_btn)
-        self.review_btn = QPushButton("Send location to Graveyard review…")
+        self.review_btn = QPushButton("Review in Graveyard…")
         self.review_btn.setObjectName("primary")
         self.review_btn.clicked.connect(self.review_selected)
         col.addWidget(self.review_btn)
-        self.scan_btn = QPushButton("Scan PC again")
+        self.scan_btn = QPushButton("Look for more")
         self.scan_btn.clicked.connect(self._on_scan)
         col.addWidget(self.scan_btn)
         col.addWidget(_label(
-            "Source and storage evidence are not proof of an orphan, conflict, "
-            "safe deletion or available update. Protections remain active.",
-            "caption"))
+            "Old doesn't mean unwanted. We won't remove your active mods "
+            "or manager profiles based on a timestamp.",
+            "editorialFootnote"))
         col.addStretch()
         self.set_group(None, [])
 
     def set_group(self, game, locations, source=None):
         self.locations = list(locations)
         self.title.setText(game.name if game is not None else
-                           str(source or "Select a mod source"))
+                           str(source or "Pick a folder"))
         self.count.setText(f"{len(self.locations)} location(s)")
         self.scope.set_count(len(self.locations))
         self.provenance.setText(
-            "Inside a verified installed game folder" if game is not None
-            else "Source group / no proven installed-game association")
+            "Found inside this game's install folder" if game is not None
+            else "We couldn't link this folder to a game install")
         self.sources.setText("\n".join(
             f"{name}: {count} location(s)" for name, count in
             Counter(str(getattr(m, "source", "Unknown"))
                     for m in self.locations).most_common(6))
-            or "No mod locations selected")
+            or "Choose a game or folder to see its source")
         self.open_btn.setEnabled(bool(self.locations))
         self.review_btn.setEnabled(bool(self.locations))
         self.review_btn.setText(
-            "Review first location in Graveyard…"
-            if len(self.locations) > 1 else "Send location to Graveyard review…")
+            "Review first folder in Graveyard…"
+            if len(self.locations) > 1 else "Review in Graveyard…")
         _image(self.art, game, w=320, h=158)
-        if game is None:
-            from gg_desktop.poster_art import generated_game_poster
-            self.art.setPixmap(generated_game_poster("MOD RADAR", 300, 158))
+        self.art.setVisible(game is not None)
 
     def open_selected(self):
         if self.locations:
