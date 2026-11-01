@@ -733,11 +733,14 @@ def safe_scan_root(path: Path) -> bool:
 
 
 def scan_old_files(folder: Path, min_days: int = 180, cancel: Callable[[], bool] | None = None,
-                   allowed_extensions: set[str] | None = None, max_matches: int = 50000) -> list[OldFile]:
+                   allowed_extensions: set[str] | None = None,
+                   max_matches: int | None = 50000,
+                   notify: Callable[[int, str], None] | None = None) -> list[OldFile]:
     if not safe_scan_root(folder):
         raise ValueError("Choose an existing folder that is not a system directory or drive root.")
     cutoff = time.time() - max(1, min_days) * 86400
     found: list[OldFile] = []
+    inspected = 0
     for parent, dirs, names in os.walk(folder, followlinks=False):
         if cancel and cancel():
             raise InterruptedError("Scan canceled")
@@ -748,8 +751,11 @@ def scan_old_files(folder: Path, min_days: int = 180, cancel: Callable[[], bool]
         dirs[:] = [d for d in dirs if d.lower() not in SCAN_EXCLUDED and not
                    _has_reparse_component(Path(parent) / d)]
         for name in names:
+            inspected += 1
             if cancel and cancel():
                 raise InterruptedError("Scan paused or canceled")
+            if notify and inspected % 3000 == 0:
+                notify(0, f"Examined {inspected:,} old-file candidates (folder scan)")
             path = Path(parent) / name
             if allowed_extensions is not None and path.suffix.lower() not in allowed_extensions:
                 continue
@@ -761,7 +767,7 @@ def scan_old_files(folder: Path, min_days: int = 180, cancel: Callable[[], bool]
                     found.append(OldFile(str(path), state.st_size, state.st_mtime,
                                          state.st_dev, state.st_ino, state.st_mtime_ns,
                                          state.st_nlink))
-                    if len(found) >= max_matches:
+                    if max_matches is not None and len(found) >= max_matches:
                         return found
             except (OSError, ValueError):
                 continue
