@@ -2505,7 +2505,9 @@ class ScreenMethods:
 
         overview = label("", "subtle", wrap=True)
         sc.addWidget(overview)
-        progress = QProgressBar()
+        from gg_desktop.scan_progress import CrimsonScanProgress
+        progress = CrimsonScanProgress()
+        progress.setObjectName("otherStorageScanProgress")
         progress.setRange(0, 100)
         progress.setValue(0)
         progress.hide()
@@ -2522,6 +2524,7 @@ class ScreenMethods:
         def update_scan_timing():
             if scan_started["at"] is None:
                 return
+            progress.advance_pulse()
             elapsed = max(0, time.monotonic() - scan_started["at"])
             if not getattr(self, "_other_storage_running", False):
                 return
@@ -2751,6 +2754,8 @@ class ScreenMethods:
             self._other_storage_running = True
             scan_started.update(at=time.monotonic(), mode=mode_name, progress=0)
             scan_clock.start()
+            progress.set_paused(False)
+            progress.set_stage(mode_name + ": examining local metadata")
             update_scan_timing()
             scan_state.setText(mode_name + ": examining local metadata…")
             progress.setRange(0, 0 if full_scan else 100)
@@ -2782,6 +2787,8 @@ class ScreenMethods:
 
             def progress_cb(percent, message):
                 if isValid(scan_state):
+                    progress.set_stage(message)
+                    progress.set_paused(message.startswith("Paused for gameplay"))
                     scan_started["progress"] = max(0, int(percent))
                     update_scan_timing()
                     if full_scan:
