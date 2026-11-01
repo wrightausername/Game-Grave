@@ -254,6 +254,54 @@ QProgressBar { background: #24303D; border: none; border-radius: 5px; text-align
 QProgressBar::chunk { background: #42D4F2; border-radius: 5px; }
 QToolTip { color: white; background: #172633; border: 1px solid #5C7D92; padding: 6px; }
 
+/* Main system scan control: deliberate, high-visibility action on every tab.
+   Always visible at the beginning of the content area, not in a top corner. */
+QFrame#scanCommandBar {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #15111B, stop:.55 #111C27, stop:1 #0A151D);
+    border: 1px solid #804053;
+    border-bottom: 2px solid #B93A50;
+    border-radius: 9px;
+}
+QPushButton#mainScanControl {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #DF2B4B, stop:1 #A51C36);
+    border: 2px solid #FF687F;
+    border-radius: 10px;
+    color: #FFFFFF; font-size: 17px; font-weight: 900;
+    padding: 12px 18px;
+}
+QPushButton#mainScanControl:hover {
+    background: #F03555; border-color: #FF9BAA;
+}
+QPushButton#mainScanControl:disabled {
+    background: #502431; color: #DEB6C0;
+    border: 1px solid #765461;
+}
+QPushButton#mainCancelScan {
+    background: #172633; border: 1px solid #71899B;
+    border-radius: 9px; color: #F0F6FC;
+    font-size: 12px; font-weight: 800;
+}
+QPushButton#mainCancelScan:hover {
+    background: #4A1828; border-color: #F95C70;
+}
+QPushButton#mainCancelScan:disabled {
+    background: #14202A; border-color: #324252; color: #788D9C;
+}
+QLabel#scanControlHeading {
+    color: #F76680; font-size: 10px;
+    font-weight: 900; letter-spacing: 2px;
+}
+QLabel#scanControlStatus {
+    color: #CDDCE7; font-size: 12px;
+}
+QProgressBar#mainScanProgress { background:#15212C; border:1px solid #485A67;
+    border-radius:5px; min-height:11px; }
+QProgressBar#mainScanProgress::chunk {
+    background:#F64A64; border-radius:5px;
+}
+
 /* Crimson Command reference dashboard: compact glass panels and high contrast */
 QFrame#dashboardPanel, QFrame#heroMetric {
     background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
