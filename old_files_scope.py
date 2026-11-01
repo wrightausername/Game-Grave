@@ -151,10 +151,16 @@ def scan_old_files_scope(
     status = "complete"
     reason = "Drive scan completed (protected and system areas excluded)."
     started = time.monotonic()
+    inaccessible = 0
+
+    def on_error(_exc):
+        nonlocal inaccessible
+        inaccessible += 1
 
     # os.walk calls scandir; followlinks remains disabled and every entry is
     # rechecked before following it, protecting against junctions/reparse.
-    for parent, dirs, names in os.walk(root, followlinks=False):
+    for parent, dirs, names in os.walk(root, followlinks=False,
+                                       onerror=on_error):
         if cancel and cancel():
             raise InterruptedError("Old Files drive scan canceled.")
         if time.monotonic() - started >= max_seconds:
@@ -219,7 +225,10 @@ def scan_old_files_scope(
                     break
         if status != "complete":
             break
+    if inaccessible:
+        status = "partial"
+        reason += f" {inaccessible} folder(s) could not be accessed."
     return OldFilesScopeResult(
         files=tuple(result), status=status, message=reason,
-        inspected=visited, skipped=skipped,
+        inspected=visited, skipped=skipped + inaccessible,
     )
