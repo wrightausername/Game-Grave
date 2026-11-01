@@ -800,10 +800,8 @@ QPushButton#referenceSecondary:hover {
 """
 
 
-/* LOCKED: second Crimson Command Mod Shelf mockup, native Windows typography.
-   Uses standard installed Windows families. No bundled or redistributed fonts.
-   Design font: Bahnschrift (wide/condensed gaming UI), body: Segoe UI Variable.
-   Specificity deliberately outranks earlier legacy/experiment styles. */
+# LOCKED: second Crimson Mod Shelf design. Installed Windows fonts only.
+# Bahnschrift is the display family; Segoe is reserved for dense working text.
 STYLE += r"""
 QWidget {
     font-family: "Segoe UI Variable", "Segoe UI", "Arial";
