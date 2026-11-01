@@ -192,6 +192,15 @@ def main():
                     app.processEvents()
                     assert inspectors[0].game.key == window._shown_games[1].key, (
                         "Selecting a different game must update its right-side inspector")
+                    assert window.page.findChild(QPushButton, "chooseGameCover"), (
+                        "Games must allow per-title artwork selection for non-Steam launchers")
+                    assert window.page.findChild(QPushButton, "steamStoreCoverLookup"), (
+                        "Games must allow manually verified Steam AppID artwork.")
+                    assert any("Fetch missing Steam covers" in b.text()
+                               for b in window.page.findChildren(QPushButton)), (
+                        "Games must provide a visible official artwork recovery control")
+                    assert window.art_page_status.text().startswith("Page 1 / 1")
+                    assert not window.art_next.isEnabled()
                 if route == "Mods":
                     assert len(window.page.findChildren(ModInspector)) == 1, (
                         "Mod Radar requires a source-aware right-side inspector")
