@@ -112,6 +112,62 @@ QFrame#gameCover {
     border-radius: 9px; padding:0;
 }
 QFrame#gameCover:hover { border: 2px solid #43D6F2; }
+
+/* Approved artwork-first library and the evidence-backed right inspectors. */
+QFrame#premiumInspector {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #21121E, stop:.25 #14131D, stop:1 #09131B);
+    border:1px solid #A42A43;
+    border-radius:12px;
+}
+QFrame#premiumInspector QLabel {
+    background:transparent;
+}
+QLabel#premiumTitle {
+    color:#F7F8FD; font-size:21px; font-weight:850;
+}
+QLabel#premiumMetric {
+    color:#F9F9FE; font-size:26px; font-weight:900;
+}
+QLabel#premiumState {
+    color:#62E6A0; font-size:12px; font-weight:700;
+}
+QLabel#premiumPath {
+    color:#C4D5E4; font-size:11px;
+    background:#0D1A25;
+    border:1px solid #304858;
+    border-radius:7px; padding:9px;
+}
+QFrame#premiumInspector QPushButton#primary {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #A41936,stop:.5 #C52843,stop:1 #7E162B);
+    color:#FFF;
+    border:1px solid #FF5069;
+    min-height:27px;
+}
+QFrame#premiumInspector QPushButton:hover {
+    border:1px solid #FF6578;
+}
+QFrame#modLocationCard {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #261726, stop:.58 #152434, stop:1 #111721);
+    border:1px solid #7A3449;
+    border-radius:11px;
+}
+QFrame#modLocationCard:hover {
+    background:#2B2031;
+    border:2px solid #FF4C65;
+}
+QFrame#gameCover {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #271622, stop:.45 #192A39, stop:1 #0B1520);
+    border:1px solid #714053;
+    border-radius:10px;
+}
+QFrame#gameCover:hover {
+    border:2px solid #FF4B63;
+}
+
 QWidget#navRail { background: #0B111A; border-right: 1px solid #25303C; }
 QFrame#panel, QFrame#metricCard, QFrame#actionCard, QFrame#infoCard, QFrame#heroBottom {
     background: #111922; border: 1px solid #2A3541; border-radius: 11px;
