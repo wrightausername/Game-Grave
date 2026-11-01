@@ -149,43 +149,6 @@ class ReferenceHero(SceneHeader):
         p.drawLine(w-132, 0, w-35, 0)
         p.drawLine(w-35, 0, w-10, 21)
         p.drawLine(18, 39, 18, 164)
-        # A consistent crest with per-room glyph, not a font-emoji ornament.
-        p.setPen(QPen(QColor(self.theme_tone), 2))
-        p.setBrush(QColor(11, 17, 26, 185))
-        p.drawEllipse(QRectF(24, 173, 40, 40))
-        p.drawEllipse(QRectF(28, 177, 32, 32))
-        # Editorial title takes precedence over unnecessary ornamentation.
-        # The small crest is deliberately quiet and never covers any text.
-        cx, cy = 44.0, 194.0
-        if self.kind == "dna":
-            p.drawArc(QRectF(39, 60, 22, 31), 85*16, 185*16)
-            p.drawArc(QRectF(39, 60, 22, 31), 265*16, 185*16)
-            for dy in (-7, 0, 7):
-                p.drawLine(QPointF(43,cy+dy),QPointF(56,cy+dy))
-        elif self.kind == "undo":
-            p.drawArc(QRectF(36, 63, 27, 27), 5*16, 292*16)
-            p.drawLine(QPointF(33,68),QPointF(39,81))
-            p.drawLine(QPointF(33,68),QPointF(46,67))
-        elif self.kind == "graveyard":
-            p.drawRoundedRect(QRectF(41,63,17,27),5,5)
-            p.drawLine(QPointF(cx,65),QPointF(cx,83))
-            p.drawLine(QPointF(cx-7,72),QPointF(cx+7,72))
-        elif self.kind == "captures":
-            p.drawRoundedRect(QRectF(38,65,23,19),3,3)
-            p.drawEllipse(QPointF(49,74),5,5)
-            p.drawLine(QPointF(40,62),QPointF(59,62))
-        elif self.kind == "mods":
-            p.drawRect(QRectF(41,64,18,23))
-            p.drawEllipse(QPointF(50,65),3,3)
-            p.drawLine(QPointF(38,73),QPointF(42,73))
-            p.drawLine(QPointF(59,78),QPointF(63,78))
-        elif self.kind in ("storage","oldfiles"):
-            p.drawRect(QRectF(37,65,25,20))
-            for dy in (69,75,81):
-                p.drawLine(QPointF(42,dy),QPointF(55,dy))
-        else:
-            p.drawRoundedRect(QRectF(36,68,27,16),5,5)
-            p.drawEllipse(QPointF(55,75),2,2)
-            p.drawLine(QPointF(42,72),QPointF(42,80))
-            p.drawLine(QPointF(38,76),QPointF(46,76))
+        # The title and the artwork are the focal points. No repeated badge
+        # ornaments that make the panels look like a generic game dashboard.
         p.end()
