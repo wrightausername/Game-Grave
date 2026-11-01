@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTabWidget, QTableWidget,
-    QTableWidgetItem, QVBoxLayout, QWidget,
+    QTableWidgetItem, QVBoxLayout, QWidget, QStackedWidget,
 )
 from core import (
     human_size, age_text, is_game_neglected, is_protected_path, is_unchanged,
@@ -2103,7 +2103,54 @@ class ScreenMethods:
         self.navigate("Old Files")
 
     def settings_page(self):
-        page = self._new("Settings", "Appearance, scan folders, Never Touch rules and local-only privacy controls.")
+        page = self._new(
+            "Settings",
+            "Customize Game Grave, scanning, protected paths, optional AI and appearance.")
+        # Real Settings controls, grouped into a consistent two-column hub.
+        # No fake launch/tray/update switches from the visual reference.
+        settings_root = QWidget()
+        settings_row = row(spacing=13)
+        settings_root.setLayout(settings_row)
+        category_nav = QListWidget()
+        category_nav.setObjectName("settingsCategories")
+        category_nav.setMaximumWidth(240)
+        category_nav.setMinimumWidth(205)
+        category_nav.setSpacing(5)
+        category_nav.addItems([
+            "General", "Scan & Cleanup", "Never Touch",
+            "Captures", "AI Assistant", "Appearance & Privacy",
+            "Backup & Restore", "About",
+        ])
+        settings_pages = QStackedWidget()
+        settings_pages.setObjectName("settingsPanels")
+        settings_row.addWidget(category_nav, 1)
+        settings_row.addWidget(settings_pages, 3)
+        page.content.addWidget(settings_root)
+
+        general, general_col = panel(padding=16)
+        general_col.addWidget(section_title("GENERAL  /  STARTUP"))
+        launch_scan = QCheckBox("Scan local gaming inventory when Game Grave starts")
+        launch_scan.setChecked(bool(self.settings.get("scan_on_launch", False)))
+        general_col.addWidget(launch_scan)
+        general_col.addWidget(label(
+            "Scan on launch is read-only. Automatic file deletion remains disabled, "
+            "and every Recycle Bin action requires separate authorization.",
+            "subtle", wrap=True))
+        def save_scan_on_launch(value):
+            updated = dict(self.settings)
+            updated["scan_on_launch"] = bool(value)
+            try:
+                save_settings(updated)
+                self.settings = updated
+            except (OSError, ValueError) as exc:
+                launch_scan.blockSignals(True)
+                launch_scan.setChecked(not bool(value))
+                launch_scan.blockSignals(False)
+                self.error("Could not save startup preference", str(exc))
+        launch_scan.toggled.connect(save_scan_on_launch)
+        general_col.addWidget(button("Scan PC now", self.start_scan, kind="primary"))
+        settings_pages.addWidget(general)
+
         p, contents = panel()
         contents.addWidget(section_title("Scan preferences"))
         contents.addWidget(label(
@@ -2117,7 +2164,7 @@ class ScreenMethods:
         contents.addWidget(label(
             "Automatic cleanup remains OFF. Every actual Recycle Bin move "
             "requires separate approval.", "warning", wrap=True))
-        page.content.addWidget(p)
+        settings_pages.addWidget(p)
 
         p, stack = panel()
         stack.addWidget(section_title("Never Touch", "User-controlled rules"))
@@ -2173,7 +2220,7 @@ class ScreenMethods:
         br.addWidget(button("Protect a folder", add_rule))
         br.addWidget(button("Remove selected personal rule…", remove_rule, kind="danger"))
         stack.addWidget(buttons)
-        page.content.addWidget(p)
+        settings_pages.addWidget(p)
 
         p, stack = panel()
         stack.addWidget(section_title("In-game screenshots", "Optional locations"))
@@ -2222,7 +2269,7 @@ class ScreenMethods:
         br.addWidget(button("Add game capture folder", lambda: modify_shots()))
         br.addWidget(button("Remove selected", lambda: modify_shots(True)))
         stack.addWidget(buttons)
-        page.content.addWidget(p)
+        settings_pages.addWidget(p)
 
         p, ai_stack = panel()
         ai_stack.addWidget(section_title("AI Assistant", "Optional • fully automatic setup"))
@@ -2242,8 +2289,7 @@ class ScreenMethods:
         ai_toggle = QCheckBox("Enable AI Assistant")
         ai_toggle.setChecked(self.settings.get("ai_assistant_enabled") is True)
         def open_ai_chat():
-            from gg_desktop.ai_dialog import open_local_ai_dialog
-            open_local_ai_dialog(self)
+            self.open_ai_companion()
         ai_open = button("Open AI Assistant", open_ai_chat)
         ai_open.setEnabled(ai_toggle.isChecked() and is_ai_installed())
         ai_stack.addWidget(ai_toggle)
@@ -2342,7 +2388,7 @@ class ScreenMethods:
         ai_toggle.toggled.connect(set_ai_enabled)
         if self.settings.get("ai_assistant_enabled") and not is_ai_installed():
             ai_status.setText("AI not installed. Disable and re-enable to set up automatically.")
-        page.content.addWidget(p)
+        settings_pages.addWidget(p)
 
         p, stack = panel()
         stack.addWidget(section_title("Appearance and privacy"))
@@ -2353,7 +2399,40 @@ class ScreenMethods:
             "subtle", wrap=True))
         stack.addWidget(button("Open classic appearance and advanced settings",
                                self._launch_classic_tools))
-        page.content.addWidget(p)
+        settings_pages.addWidget(p)
+
+        backup, backup_col = panel(padding=16)
+        backup_col.addWidget(section_title("BACKUP & RESTORE"))
+        backup_col.addWidget(label(
+            "Undo Center restores only exact matching Windows Recycle Bin items. "
+            "Resurrection Kits are separate backups and must be verified "
+            "before restoration.", "subtle", wrap=True))
+        backup_col.addWidget(button("Open Undo Center",
+                                    lambda: self.navigate("Undo Center")))
+        backup_col.addWidget(button("Open Resurrection Kit tools",
+                                    lambda: self.navigate("More Tools")))
+        settings_pages.addWidget(backup)
+
+        about, about_col = panel(padding=16)
+        about_col.addWidget(section_title("GAME GRAVE  /  CRIMSON COMMAND"))
+        about_col.addWidget(label(
+            "Gaming-aware, safety-first Windows storage inventory. "
+            "Local-only scans, optional local AI, user-approved Recycle Bin "
+            "cleanup, and readable Undo logs. This is still an engineering "
+            "preview; it is not the stable 1.0 release.",
+            "subtle", wrap=True))
+        about_col.addWidget(button("Open More Tools",
+                                   lambda: self.navigate("More Tools")))
+        settings_pages.addWidget(about)
+
+        def select_category(index):
+            if 0 <= index < settings_pages.count():
+                settings_pages.setCurrentIndex(index)
+                self._settings_category_index = index
+        category_nav.currentRowChanged.connect(select_category)
+        category_nav.setCurrentRow(max(0, min(
+            getattr(self, "_settings_category_index", 0),
+            settings_pages.count() - 1)))
 
     def tools_page(self):
         page = self._new("More Tools", "All existing advanced Game Grave capabilities remain available.")
