@@ -37,6 +37,11 @@ from gg_desktop.widgets import (
     ActionCard, HeroBanner, LandscapeArt, MetricCard, ScrollPage, StorageRing,
     button, column, data_table, label, page_heading, panel, row, section_title,
 )
+from gg_desktop.visuals import SceneHeader, FeatureStrip, RelationshipMap, RecoveryRoute
+from gg_desktop.tab_panels import (
+    game_gallery, mod_radar_panel, old_files_categories, graveyard_overview,
+    clear_empty_panel,
+)
 
 
 def _table_text(table: QTableWidget, r: int, c: int, value) -> None:
@@ -70,8 +75,22 @@ class ScreenMethods:
 
     def _new(self, title: str, subtitle: str) -> ScrollPage:
         page = self.page_for(title)
-        page_heading(page, title, subtitle)
-        if self.inventory.warnings:
+        themes = {
+            "Games": ("games", "YOUR GAME LIBRARY"),
+            "Mods": ("mods", "MOD RADAR"),
+            "Old Files": ("oldfiles", "ARCHIVE CLEANUP"),
+            "Graveyard": ("graveyard", "REVIEW • PROTECT • RECOVER"),
+            "Game DNA": ("dna", "DIGITAL FORENSICS"),
+            "Undo Center": ("undo", "RESTORE • VERIFY • RECOVER"),
+            "Settings": ("settings", "CUSTOMIZE GAME GRAVE"),
+            "Captures": ("captures", "YOUR GAMING CAPTURES"),
+        }
+        if title in themes:
+            scene, kicker = themes[title]
+            page.content.addWidget(SceneHeader(scene, title.upper(), subtitle, note=kicker))
+        else:
+            page_heading(page, title, subtitle)
+        if self.inventory.warnings and title != "Settings":
             _box_notice(page, "Partial scan: " + " ".join(self.inventory.warnings), warning=True)
         return page
 
@@ -132,6 +151,9 @@ class ScreenMethods:
         statrow.addWidget(MetricCard("Known reported sizes", human_size(known), "Not equal to disk space reclaimed"))
         statrow.addWidget(MetricCard("Size unknown", str(unknown), "Never assumed to be zero", tone="amber"))
         page.content.addWidget(stats)
+        page.content.addWidget(game_gallery(
+            self.inventory.games,
+            lambda game: self._focus_game_from_gallery(game), limit=7))
         p, pcol = panel()
         self.game_table = data_table(["GAME", "LAUNCHER", "SIZE", "LAST PLAYED", "EVIDENCE"])
         self.game_table.setColumnWidth(0, 245)
@@ -155,6 +177,25 @@ class ScreenMethods:
         self.game_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.game_table.customContextMenuRequested.connect(self._games_context_menu)
         self._fill_games()
+
+    def _focus_game_from_gallery(self, game):
+        """Select the exact verified game row, preserving its existing actions."""
+        if not hasattr(self, "game_table"):
+            return
+        self.game_search.setText("")
+        self.game_filter.setCurrentIndex(0)
+        self.game_sort.setCurrentText("Name A to Z")
+        for index, item in enumerate(getattr(self, "_shown_games", [])):
+            if item.key == game.key:
+                self.game_table.selectRow(index)
+                target = self.game_table.item(index, 0)
+                if target is not None:
+                    self.game_table.scrollToItem(target)
+                self._game_details()
+                return
+        self.info("Game not in this view",
+                  "The selected installation is outside the first 500 rows. "
+                  "Use its exact name in the Games search filter.")
 
     def _fill_games(self, *_):
         if not hasattr(self, "game_table"):
@@ -457,17 +498,13 @@ class ScreenMethods:
                          "Review apparent storage, understand protections, and approve individual Recycle Bin moves.")
         if self._not_scanned(page):
             return
-        totals = graveyard_totals(self.inventory.graveyard)
-        summary = QWidget()
-        sr = row()
-        summary.setLayout(sr)
-        for title, value, hint, tone in (
-            ("Findings", str(totals["items"]), "Not deleted", "text"),
-            ("Reviewable size", human_size(totals["reviewable_bytes"]), "Apparent, not reclaimed", "cyan"),
-            ("Protected", str(totals["protected_items"]), "Built-in and personal safeguards", "amber"),
-        ):
-            sr.addWidget(MetricCard(title, value, hint, tone=tone))
-        page.content.addWidget(summary)
+        page.content.addWidget(graveyard_overview(self.inventory.graveyard))
+        page.content.addWidget(FeatureStrip([
+            ("FIND", "Scanned game clutter"),
+            ("UNDERSTAND", "Review evidence"),
+            ("PROTECT", "Keep what matters"),
+            ("RECOVER", "Recycle with Undo checks"),
+        ]))
 
         filters = QWidget()
         controls = row()
@@ -1051,9 +1088,16 @@ class ScreenMethods:
             _box_notice(page, "No Game DNA relationships available. Unknown files stay protected.")
 
     def mods_page(self):
-        page = self._new("Mods", "Mod Radar shows potential mod storage without touching profiles, saves or managed assets.")
+        page = self._new("Mods", "Trace detected mod managers, addons and game storage without changing a single file.")
         if self._not_scanned(page):
             return
+        page.content.addWidget(mod_radar_panel(self.inventory.mods))
+        page.content.addWidget(FeatureStrip([
+            ("DETECT", "Source-aware locations"),
+            ("INSPECT", "Evidence and owner"),
+            ("PROTECT", "Profiles stay safe"),
+            ("REVIEW", "Manual Graveyard action"),
+        ]))
         p, contents = panel()
         contents.addWidget(section_title("Detected mod and manager storage",
                                          str(len(self.inventory.mods)) + " findings"))
@@ -1211,6 +1255,7 @@ class ScreenMethods:
             page.content.addWidget(empty)
             if not self.inventory.files:
                 return
+        page.content.addWidget(old_files_categories(self.inventory.files))
         table = data_table(["FILE", "SIZE", "MODIFIED", "PROTECTION"])
         table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         table.setRowCount(min(len(self.inventory.files), 500))
