@@ -9,9 +9,10 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QUrl, QTimer
 from PySide6.QtGui import QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
@@ -1981,7 +1982,29 @@ class ScreenMethods:
         sc.addWidget(progress)
         scan_state = label("Not analyzed yet. Nothing is scanned automatically.", "caption", wrap=True)
         sc.addWidget(scan_state)
+        scan_timing = label("Elapsed 0s  •  Remaining: waiting to scan", "caption", wrap=True)
+        sc.addWidget(scan_timing)
         page.content.addWidget(selection)
+        scan_started = {"at": None, "mode": "Quick Scan", "progress": 0}
+        scan_clock = QTimer(selection)
+        scan_clock.setInterval(1000)
+        def update_scan_timing():
+            if scan_started["at"] is None:
+                return
+            elapsed = max(0, time.monotonic() - scan_started["at"])
+            if not getattr(self, "_other_storage_running", False):
+                return
+            percent = scan_started["progress"]
+            if scan_started["mode"] == "Full Scan":
+                remaining = "Unknown (full filesystem size is not known)"
+            elif 2 <= percent < 95 and elapsed >= 3:
+                estimate = elapsed * (100 - percent) / percent
+                remaining = "Roughly " + self._seconds_human(estimate) + " (entry-rate estimate)"
+            else:
+                remaining = "Estimating (Quick Scan caps at 25s of active analysis)"
+            scan_timing.setText("Elapsed " + self._seconds_human(elapsed)
+                                + "  •  Remaining: " + remaining)
+        scan_clock.timeout.connect(update_scan_timing)
 
         summary, summary_col = panel(padding=14)
         summary_col.addWidget(section_title("Folder and category breakdown"))
@@ -2167,6 +2190,9 @@ class ScreenMethods:
                 if getattr(g, "install_path", None))
             active_scan.clear()
             self._other_storage_running = True
+            scan_started.update(at=time.monotonic(), mode=mode_name, progress=0)
+            scan_clock.start()
+            update_scan_timing()
             scan_state.setText(mode_name + ": examining local metadata…")
             progress.setRange(0, 0 if full_scan else 100)
             if not full_scan:
@@ -2197,6 +2223,8 @@ class ScreenMethods:
 
             def progress_cb(percent, message):
                 if isValid(scan_state):
+                    scan_started["progress"] = max(0, int(percent))
+                    update_scan_timing()
                     if full_scan:
                         progress.setRange(0, 0)
                     elif "Paused for gameplay" not in message:
@@ -2206,6 +2234,10 @@ class ScreenMethods:
 
             def done(outcome):
                 self._other_storage_running = False
+                scan_clock.stop()
+                if isValid(scan_timing) and scan_started["at"] is not None:
+                    elapsed = max(0, time.monotonic() - scan_started["at"])
+                    scan_timing.setText("Scan ended after " + self._seconds_human(elapsed))
                 if isValid(run_scan):
                     run_scan.setEnabled(True)
                     stop_scan.setEnabled(False)
