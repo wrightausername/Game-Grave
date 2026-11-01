@@ -153,7 +153,7 @@ class ScreenMethods:
         page.content.addWidget(stats)
         page.content.addWidget(game_gallery(
             self.inventory.games,
-            lambda game: self._focus_game_from_gallery(game), limit=7))
+            lambda game: self._focus_game_from_gallery(game), limit=4))
         p, pcol = panel()
         self.game_table = data_table(["GAME", "LAUNCHER", "SIZE", "LAST PLAYED", "EVIDENCE"])
         self.game_table.setColumnWidth(0, 245)
