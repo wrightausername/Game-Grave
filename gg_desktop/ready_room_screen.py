@@ -378,7 +378,9 @@ def render_ready_room(window):
         perf_text.setText(benchmark_summary(read_benchmarks(game)))
         official = official_patch_source_for(game)
         official_link.setEnabled(bool(official))
+        official_link.setVisible(bool(official))
         refresh_news.setEnabled(bool(verified_steam_id(game)))
+        refresh_news.setVisible(bool(verified_steam_id(game)))
         if state["news"]:
             patch_title.setText(state["news"][0][1].title)
         else:
@@ -434,11 +436,13 @@ def render_ready_room(window):
         selected_status.setText(game.launcher + " · " + status +
                                 " (launch/mod compatibility unverified)")
         guard_text.setText(evidence)
-        play.setText(
-            "Launch in Steam" if verified_steam_id(game) else "Open Game Folder")
+        steam_ready = bool(verified_steam_id(game))
+        play.setText("Launch in Steam" if steam_ready else "Open Game Folder")
         play.setEnabled(bool(
-            verified_steam_id(game) or "open_folder" in game.capabilities))
-        open_folder.setEnabled("open_folder" in game.capabilities)
+            steam_ready or "open_folder" in game.capabilities))
+        # Do not present two different buttons that both only open a folder.
+        open_folder.setVisible(steam_ready)
+        open_folder.setEnabled(steam_ready and "open_folder" in game.capabilities)
         note_title.setText(game.name)
         memory = read_game_memory(game)
         old_notes = window.settings.get("ready_room_notes", {})
