@@ -56,22 +56,26 @@ class UndoStatusDial(QWidget):
         painter.setFont(QFont("Segoe UI", 8, QFont.DemiBold))
         painter.setPen(QColor("#AEC6D3"))
         painter.drawText(r.adjusted(7, 107, -7, 0), Qt.AlignCenter, "VERIFIED")
-        x = 185
+        # Text must remain legible in a narrow inspector (320px at 1440).
+        # A much larger panel may show more text; nothing may run off the edge.
+        x = min(185, int(self.width() * .57))
+        measure = max(65, self.width() - x - 14)
         painter.setPen(QColor("#F4F7FB"))
-        painter.setFont(QFont("Segoe UI", 15, QFont.DemiBold))
-        painter.drawText(QRectF(x, 30, self.width() - x - 10, 31),
+        painter.setFont(QFont("Segoe UI", 13, QFont.DemiBold))
+        painter.drawText(QRectF(x, 29, measure, 29),
                          Qt.AlignLeft, str(self._total) + " logged")
         painter.setPen(QColor("#65CDDE"))
-        painter.setFont(QFont("Segoe UI", 11, QFont.DemiBold))
-        painter.drawText(QRectF(x, 70, self.width() - x - 12, 28),
-                         Qt.AlignLeft, str(self._verified) + " Windows checks: available")
-        painter.setPen(QColor("#E0A9B2"))
-        painter.drawText(QRectF(x, 102, self.width() - x - 12, 28),
-                         Qt.AlignLeft, str(self._unknown) + " unverified / review")
-        painter.setPen(QColor("#9CB0C1"))
-        painter.setFont(QFont("Segoe UI", 9))
-        painter.drawText(QRectF(x, 138, self.width() - x - 14, 42),
+        painter.setFont(QFont("Segoe UI", 9, QFont.DemiBold))
+        painter.drawText(QRectF(x, 69, measure, 31),
                          Qt.AlignLeft | Qt.TextWordWrap,
-                         "Availability is rechecked when restoring. "
-                         "Windows can empty the bin at any time.")
+                         str(self._verified) + " available")
+        painter.setPen(QColor("#E0A9B2"))
+        painter.drawText(QRectF(x, 102, measure, 31),
+                         Qt.AlignLeft | Qt.TextWordWrap,
+                         str(self._unknown) + " unverified")
+        painter.setPen(QColor("#9CB0C1"))
+        painter.setFont(QFont("Segoe UI", 8))
+        painter.drawText(QRectF(x, 139, measure, 45),
+                         Qt.AlignLeft | Qt.TextWordWrap,
+                         "Windows rechecks when restoring; recovery is not guaranteed.")
         painter.end()
