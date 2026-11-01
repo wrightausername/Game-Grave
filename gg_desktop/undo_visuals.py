@@ -6,9 +6,9 @@ No fictitious retention time, cumulative recoverable bytes, or rate display.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget, QPushButton
 
 
 class UndoStatusDial(QWidget):
@@ -79,3 +79,60 @@ class UndoStatusDial(QWidget):
                          Qt.AlignLeft | Qt.TextWordWrap,
                          "Windows rechecks when restoring; recovery is not guaranteed.")
         painter.end()
+
+
+class RecoveryActionTile(QPushButton):
+    """Purpose-drawn recovery command tile with a distinct etched pictogram.
+
+    All clicks are ordinary Qt button actions bound to the existing reversible
+    recovery controls. No timer, animation or filesystem operations here.
+    """
+    def __init__(self, title: str, detail: str, kind: str, parent=None):
+        super().__init__(parent)
+        self.title = title
+        self.detail = detail
+        self.kind = kind
+        self.setObjectName("undoActionTile")
+        self.setMinimumHeight(80)
+        self.setAccessibleName(title + ". " + detail)
+        self.setToolTip(detail)
+        self.setCursor(Qt.PointingHandCursor)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        highlighted = self.underMouse()
+        accent = QColor("#E84764" if self.kind == "restore" else "#50BED7")
+        p.setPen(QPen(accent if highlighted else QColor("#465768"), 1.5))
+        p.setBrush(QColor("#2E1723" if highlighted else "#0D1924"))
+        p.drawRoundedRect(QRectF(1, 1, w-2, h-2), 5, 5)
+        p.setPen(QPen(accent, 2.4, Qt.SolidLine, Qt.RoundCap))
+        midx, midy = 34, h * .5
+        if self.kind == "restore":
+            p.drawArc(QRectF(19,midy-15,31,31),30*16,288*16)
+            p.drawLine(QPointF(19,midy-4),QPointF(19,midy+10))
+            p.drawLine(QPointF(19,midy+10),QPointF(30,midy+2))
+        elif self.kind == "bin":
+            p.drawLine(QPointF(21,midy-14),QPointF(48,midy-14))
+            p.drawLine(QPointF(26,midy-19),QPointF(44,midy-19))
+            p.drawRoundedRect(QRectF(24,midy-11,21,29),2,2)
+            p.drawLine(QPointF(32,midy-5),QPointF(32,midy+10))
+            p.drawLine(QPointF(38,midy-5),QPointF(38,midy+10))
+        elif self.kind == "history":
+            p.drawEllipse(QRectF(19,midy-16,32,32))
+            p.drawLine(QPointF(35,midy),QPointF(35,midy-10))
+            p.drawLine(QPointF(35,midy),QPointF(43,midy+5))
+        else:
+            p.drawEllipse(QRectF(22,midy-14,25,25))
+            p.drawEllipse(QRectF(30,midy-6,9,9))
+            for dx,dy in ((0,-18), (0,16), (-17,0), (17,0)):
+                p.drawLine(QPointF(35,midy),QPointF(35+dx,midy+dy))
+        p.setPen(QColor("#F3EFF0"))
+        p.setFont(QFont("Segoe UI",11,QFont.Bold))
+        p.drawText(QRectF(66, 12, max(50,w-76),27),Qt.AlignVCenter,self.title)
+        p.setPen(QColor("#94ACBC"))
+        p.setFont(QFont("Segoe UI",9))
+        p.drawText(QRectF(66, 40, max(50,w-76),h-45),
+                   Qt.AlignTop|Qt.TextWordWrap,self.detail)
+        p.end()
