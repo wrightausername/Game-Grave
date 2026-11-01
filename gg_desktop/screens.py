@@ -113,7 +113,7 @@ class ScreenMethods:
                 "mods", "Mods", subtitle, metrics))
         elif title in themes:
             scene, kicker = themes[title]
-            page.content.addWidget(SceneHeader(scene, title.upper(), subtitle, note=kicker))
+            page.content.addWidget(ReferenceHero(scene, title, subtitle))
         else:
             page_heading(page, title, subtitle)
         if self.inventory.warnings and title != "Settings":
@@ -1231,7 +1231,7 @@ class ScreenMethods:
         gallery, matched, external = mod_gallery(
             self.inventory.games, self.inventory.mods,
             lambda game, locations, source: self.mod_inspector.set_group(
-                game, locations, source), limit=8)
+                game, locations, source), limit=9)
         mod_workspace_row.addWidget(gallery, 1)
         self.mod_inspector = ModInspector(
             lambda m: self._open_folder(str(getattr(m, "path", ""))),
