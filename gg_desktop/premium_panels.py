@@ -72,15 +72,10 @@ def _image(label, game, *, w=320, h=186):
         label.setPixmap(pixmap)
         label.setToolTip("Local game art found on this PC")
     else:
-        title = str(getattr(game, "name", "") or "NO ART AVAILABLE")
-        label.setText(title.upper()[:55])
-        label.setWordWrap(True)
-        label.setStyleSheet(
-            "background:qlineargradient(x1:0,y1:0,x2:1,y2:1,"
-            "stop:0 #541529, stop:.55 #142839, stop:1 #0A131C);"
-            "border:1px solid #A0354A;border-radius:9px;"
-            "font-size:19px;font-weight:900;color:#FAF5F8;padding:14px;")
-        label.setToolTip("Generated title card: no local cover available")
+        from gg_desktop.poster_art import generated_game_poster
+        title = str(getattr(game, "name", "") or "MOD RADAR")
+        label.setPixmap(generated_game_poster(title, min(w, 320), h))
+        label.setToolTip("Original Game Grave artwork, not official game cover art")
 
 
 class GameInspector(QFrame):
@@ -205,7 +200,8 @@ class ModLocationCard(QFrame):
         art = QLabel()
         _image(art, game, w=210, h=115)
         if game is None:
-            art.setText("MOD SOURCE")
+            from gg_desktop.poster_art import generated_game_poster
+            art.setPixmap(generated_game_poster(str(source or "MOD SOURCE"), 172, 115))
         layout.addWidget(art)
         title = game.name if game else str(source or "Other locations")
         layout.addWidget(_label(title[:45], "findingTitle"))
@@ -325,7 +321,8 @@ class ModInspector(QFrame):
             if len(self.locations) > 1 else "Send location to Graveyard review…")
         _image(self.art, game, w=320, h=158)
         if game is None:
-            self.art.setText("MOD RADAR")
+            from gg_desktop.poster_art import generated_game_poster
+            self.art.setPixmap(generated_game_poster("MOD RADAR", 300, 158))
 
     def open_selected(self):
         if self.locations:
