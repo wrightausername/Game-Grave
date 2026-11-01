@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
-from PySide6.QtGui import QColor, QIcon, QPalette
+from PySide6.QtGui import QColor, QIcon, QPalette, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QProgressBar, QVBoxLayout, QWidget, QScrollArea,
@@ -114,6 +114,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.pool = QThreadPool(self)
         self.pool.setMaxThreadCount(2)
         self.current_route = "Overview"
+        self._navigation_history = []
         self._ai_companion = None
         self.setWindowTitle("Game Grave  |  Crimson Command preview")
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg")))
@@ -121,7 +122,9 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.resize(1450, 1000)
         self.setStyleSheet(STYLE)
         self._create_shell()
-        self.navigate("Overview")
+        self.back_shortcut = QShortcut(QKeySequence("Alt+Left"), self)
+        self.back_shortcut.activated.connect(self.go_back)
+        self.navigate("Overview", remember=False)
         if self.settings.get("scan_on_launch", False):
             QTimer.singleShot(0, self.start_scan)
 
@@ -222,6 +225,25 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         heading_layout.addWidget(self.status)
         topbox.addWidget(heading, 1)
         base.addWidget(top)
+        # Always-visible navigation, independent of each page's scroll position.
+        nav = QFrame()
+        nav.setObjectName("routeNavigationBar")
+        navline = row(spacing=12, margins=(18, 7, 18, 7))
+        nav.setLayout(navline)
+        self.back_button = button("←  BACK", self.go_back)
+        self.back_button.setObjectName("routeBackButton")
+        self.back_button.setAccessibleName("Back to previous Game Grave page")
+        self.back_button.setToolTip("Back to the last page (Alt+Left)")
+        self.back_button.setEnabled(False)
+        navline.addWidget(self.back_button)
+        self.breadcrumbs = label("CRIMSON COMMAND  /  OVERVIEW", "routeBreadcrumb")
+        self.breadcrumbs.setAccessibleName("Current page breadcrumb")
+        navline.addWidget(self.breadcrumbs, 1)
+        self.home_button = button("⌂  READY ROOM", lambda: self.navigate("Ready Room"))
+        self.home_button.setObjectName("routeHomeButton")
+        self.home_button.setAccessibleName("Go to Ready Room")
+        navline.addWidget(self.home_button)
+        base.addWidget(nav)
         self.progress = CrimsonScanProgress()
         self.progress.setObjectName("mainScanProgress")
         self.progress.setTextVisible(False)
@@ -266,7 +288,28 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         from gg_desktop.ai_companion import open_companion
         open_companion(self)
 
-    def navigate(self, route: str):
+    def _update_route_navigation(self):
+        current = self.current_route.upper()
+        if self._navigation_history:
+            previous = self._navigation_history[-1].upper()
+            self.breadcrumbs.setText(f"{previous}  /  {current}")
+            self.breadcrumbs.setToolTip(
+                "Previous: " + self._navigation_history[-1] +
+                "  |  Current: " + self.current_route)
+        else:
+            self.breadcrumbs.setText("CRIMSON COMMAND  /  " + current)
+            self.breadcrumbs.setToolTip("Current: " + self.current_route)
+        self.back_button.setEnabled(bool(self._navigation_history))
+        self.home_button.setEnabled(self.current_route != "Ready Room")
+
+    def go_back(self):
+        """Pop exactly one navigation step; never add it back to history."""
+        if not self._navigation_history:
+            return
+        previous = self._navigation_history.pop()
+        self.navigate(previous, remember=False)
+
+    def navigate(self, route: str, *, remember: bool = True):
         # Assistant is a dockable/pop-out companion, NEVER a page replacement.
         if route == "AI Assistant":
             self.open_ai_companion()
@@ -276,6 +319,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         route = ROUTE_ALIASES.get(route, route)
         if route not in self.nav_buttons:
             route = "More Tools"
+        if remember and route != self.current_route:
+            self._navigation_history.append(self.current_route)
+            # Memory bounded even if someone navigates a thousand times.
+            del self._navigation_history[:-40]
         methods = {
             "Overview": self.overview_page,
             "Ready Room": self.ready_room_page,
@@ -291,6 +338,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             "More Tools": self.tools_page,
         }
         methods[route]()
+        self._update_route_navigation()
 
     def job(self, fn, on_success, *, error_title="Operation not completed", progress=None):
         job = Job(fn)
