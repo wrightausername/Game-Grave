@@ -771,6 +771,25 @@ class ScreenMethods:
                                  "Recently played", "Oldest played", "Name A to Z", "Launcher"])
         filters.addWidget(self.game_sort, 2)
         page.content.addWidget(ctrl)
+        art_tools = QWidget()
+        art_row = row(spacing=9)
+        art_tools.setLayout(art_row)
+        art_row.addWidget(label("OFFICIAL GAME COVER GALLERY", "sectionTitle"))
+        self._art_page = 0
+        self.art_page_status = label("Page 1", "caption")
+        art_row.addWidget(self.art_page_status)
+        art_row.addStretch()
+        self.art_prev = button("◀ Previous", self._previous_games_art_page)
+        self.art_next = button("Next ▶", self._next_games_art_page)
+        self.art_refresh = button("Fetch missing Steam covers",
+            self._fetch_missing_game_covers, kind="primary")
+        self.art_prev.setAccessibleName("Previous game cover gallery page")
+        self.art_next.setAccessibleName("Next game cover gallery page")
+        self.art_refresh.setAccessibleName("Fetch missing official Steam artwork")
+        art_row.addWidget(self.art_prev)
+        art_row.addWidget(self.art_next)
+        art_row.addWidget(self.art_refresh)
+        page.content.addWidget(art_tools)
 
         # The artwork-led library and the selection inspector share one
         # workspace. All detail actions still call the existing safe APIs.
@@ -786,7 +805,9 @@ class ScreenMethods:
             self._inspect_game_record,
             lambda g: self._open_folder(g.install_path),
             lambda: self.navigate("Mods"),
-            lambda: self.navigate("Captures"))
+            lambda: self.navigate("Captures"),
+            on_choose_cover=self._choose_game_cover,
+            on_reset_cover=self._reset_game_cover)
         game_workspace_row.addWidget(self.game_inspector, 0, Qt.AlignTop)
         # Start empty and populate once from the same filtered/sorted rows as
         # the table. No mismatch between search results and visible covers.
@@ -820,9 +841,9 @@ class ScreenMethods:
         # Keep the visual gallery flush with its heading even when the
         # selected-game inspector is taller than the current game row count.
         game_left_col.addStretch(1)
-        self.game_search.textChanged.connect(self._fill_games)
-        self.game_filter.currentTextChanged.connect(self._fill_games)
-        self.game_sort.currentTextChanged.connect(self._fill_games)
+        self.game_search.textChanged.connect(self._reset_games_art_page)
+        self.game_filter.currentTextChanged.connect(self._reset_games_art_page)
+        self.game_sort.currentTextChanged.connect(self._reset_games_art_page)
         self.game_table.itemSelectionChanged.connect(self._game_details)
         self.game_table.cellDoubleClicked.connect(
             lambda row_idx, _column: self._inspect_game_record(
@@ -834,6 +855,97 @@ class ScreenMethods:
         self._cover_attempted_ids = set()
         self._fill_games()
 
+    def _reset_games_art_page(self, *_):
+        self._art_page = 0
+        self._fill_games()
+
+    def _previous_games_art_page(self):
+        self._art_page = max(0, getattr(self, "_art_page", 0) - 1)
+        self._fill_games()
+
+    def _next_games_art_page(self):
+        last = max(0, (len(getattr(self, "_filtered_games", [])) - 1) // 9)
+        self._art_page = min(last, getattr(self, "_art_page", 0) + 1)
+        self._fill_games()
+
+    def _fetch_missing_game_covers(self):
+        """User-triggered catch-up for up to 24 exact Steam AppIDs."""
+        from gg_desktop.local_art import game_cover_path, invalidate_cover_cache
+        from gg_desktop.steam_artwork import verified_steam_id, prime_visible_covers
+        from performance_guard import GameActivityDetector
+        if getattr(self, "_cover_requests_inflight", False):
+            self.status.setText("Official cover download already underway.")
+            return
+        if GameActivityDetector().active():
+            self.status.setText(
+                "Art downloads deferred while a game is running. FPS first.")
+            return
+        missing = [g for g in getattr(self, "_filtered_games", [])
+                   if verified_steam_id(g) and not game_cover_path(g)]
+        if not missing:
+            self.info("Steam covers", "No missing verified Steam covers in this view. "
+                      "Other launchers can use Choose Cover in the game inspector.")
+            return
+        work = missing[:24]
+        self._cover_requests_inflight = True
+        self.art_refresh.setEnabled(False)
+        self.status.setText(
+            f"Looking up official Steam artwork for {len(work)} games "
+            "(background-priority, pauses for gameplay)…")
+        def done(count):
+            self._cover_requests_inflight = False
+            if hasattr(self, "art_refresh"):
+                self.art_refresh.setEnabled(True)
+            invalidate_cover_cache()
+            self._cover_attempted_ids.update(
+                x.app_id for x in work if verified_steam_id(x))
+            if getattr(self, "current_route", "") == "Games":
+                self._gallery_keys = None
+                self._refresh_games_gallery(self._filtered_games)
+            self.status.setText(
+                f"Recovered {count} official Steam covers. "
+                "Some games may not have public cover assets; no art was guessed.")
+        self.job(lambda _p: prime_visible_covers(work, limit=24, force=True),
+                 done, error_title="Steam artwork lookup unavailable")
+
+    def _choose_game_cover(self, game):
+        """Explicit user choice for titles lacking verifiable store identity."""
+        from gg_desktop.custom_game_art import choose_custom_cover
+        from gg_desktop.local_art import invalidate_cover_cache
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose authentic game cover for " + game.name, "",
+            "Cover Images (*.jpg *.jpeg *.png *.webp)")
+        if not path:
+            return
+        try:
+            saved = choose_custom_cover(game, path)
+        except (OSError, ValueError) as exc:
+            self.error("Cover not saved", str(exc))
+            return
+        invalidate_cover_cache()
+        self._gallery_keys = None
+        if getattr(self, "current_route", "") == "Games":
+            self._refresh_games_gallery(self._filtered_games)
+            self.game_inspector.set_game(game)
+        self.status.setText("Selected cover saved locally for " + game.name +
+                            ". No game installation files changed.")
+
+    def _reset_game_cover(self, game):
+        from gg_desktop.custom_game_art import clear_custom_cover
+        from gg_desktop.local_art import invalidate_cover_cache
+        if not self.confirm("Restore official cover?",
+                            "Remove the manually selected cover for " + game.name +
+                            "? Game Grave will return to its official-store artwork "
+                            "or show that no matching cover was found."):
+            return
+        if clear_custom_cover(game):
+            invalidate_cover_cache()
+            self._gallery_keys = None
+            if getattr(self, "current_route", "") == "Games":
+                self._refresh_games_gallery(self._filtered_games)
+                self.game_inspector.set_game(game)
+            self.status.setText("Custom cover removed for " + game.name)
+
     def _load_official_covers(self, games):
         """Only visible Steam AppIDs, only on demand and off the UI thread."""
         if getattr(self, "_cover_requests_inflight", False):
@@ -841,7 +953,8 @@ class ScreenMethods:
         from gg_desktop.steam_artwork import verified_steam_id
         from gg_desktop.local_art import game_cover_path
         attempted = getattr(self, "_cover_attempted_ids", set())
-        needed = [g for g in games[:9]
+        page_start = 9 * getattr(self, "_art_page", 0)
+        needed = [g for g in games[page_start:page_start + 9]
                   if verified_steam_id(g) and
                   verified_steam_id(g) not in attempted and
                   not game_cover_path(g)]
@@ -861,7 +974,9 @@ class ScreenMethods:
                  fetched, error_title="Official artwork unavailable")
 
     def _refresh_games_gallery(self, rows):
-        keys = tuple(g.key for g in rows[:9])
+        page = getattr(self, "_art_page", 0)
+        visible = rows[page * 9:page * 9 + 9]
+        keys = (page, *[g.key for g in visible])
         if keys == getattr(self, "_gallery_keys", None):
             return
         old = self.game_gallery_frame
@@ -871,7 +986,7 @@ class ScreenMethods:
         old.setParent(None)
         old.deleteLater()
         self.game_gallery_frame = game_gallery(
-            rows, lambda game: self._focus_game_from_gallery(game), limit=9,
+            visible, lambda game: self._focus_game_from_gallery(game), limit=9,
             empty_message=("No installed games match the selected filters."
                            if self.inventory.games else
                            "No verified games yet. Run Scan PC to check your library."))
@@ -926,6 +1041,14 @@ class ScreenMethods:
         else:
             rows.sort(key=lambda g: (g.size_bytes is None,
                                      (g.size_bytes or 0) * (-1 if sort == "Largest known size" else 1)))
+        self._filtered_games = rows
+        last_page = max(0, (len(rows) - 1) // 9)
+        self._art_page = min(getattr(self, "_art_page", 0), last_page)
+        self.art_prev.setEnabled(self._art_page > 0)
+        self.art_next.setEnabled(self._art_page < last_page)
+        self.art_page_status.setText(
+            f"Page {self._art_page + 1} / {last_page + 1} · "
+            f"{len(rows):,} installed games")
         self._refresh_games_gallery(rows)
         self._shown_games = rows[:500]  # bounded presentation, full inventory retained
         self.game_table.setRowCount(len(self._shown_games))
@@ -1192,6 +1315,10 @@ class ScreenMethods:
                   lambda: self._open_folder(game.install_path))
         opener.setEnabled("open_folder" in game.capabilities)
         menu.addAction("View Game DNA", lambda: self.navigate("Game DNA"))
+        menu.addAction("Choose game cover image…",
+                       lambda: self._choose_game_cover(game))
+        menu.addAction("Reset manual game cover…",
+                       lambda: self._reset_game_cover(game))
         if ("steam_uninstall" in game.capabilities and game.app_id
                 and game.app_id.isdecimal()):
             menu.addAction("Uninstall through Steam…",
