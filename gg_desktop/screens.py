@@ -2541,6 +2541,11 @@ class ScreenMethods:
         elif external:
             self.mod_inspector.set_group(
                 None, external, "External / unattributed sources")
+        else:
+            # No selection means no inspector. Don't waste a third of the
+            # screen on a radar saying zero next to an empty-state explanation.
+            # Keep the Qt object in the widget tree for future review/testing.
+            self.mod_inspector.hide()
         page.content.addWidget(mod_workspace)
         # Filter and reflow only existing real tiles; never synthesize games,
         # hide Mod Radar's attribution limits or re-run a scan on every key.
