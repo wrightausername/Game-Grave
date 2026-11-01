@@ -84,8 +84,8 @@ class GameInspector(QFrame):
     def __init__(self, on_details, on_open, on_mods, on_captures):
         super().__init__()
         self.setObjectName("premiumInspector")
-        self.setMinimumWidth(292)
-        self.setMaximumWidth(340)
+        self.setMinimumWidth(335)
+        self.setMaximumWidth(390)
         self.game = None
         self._details = on_details
         self._open = on_open
@@ -192,16 +192,16 @@ class ModLocationCard(QFrame):
     def __init__(self, game, locations, on_selected, source=None):
         super().__init__()
         self.setObjectName("modLocationCard")
-        self.setMinimumWidth(153)
-        self.setFixedHeight(225)
+        self.setMinimumWidth(200)
+        self.setFixedHeight(208)
         self.setCursor(Qt.PointingHandCursor)
         self._choose = on_selected
         layout = _col(self, spacing=4, margins=(7, 7, 7, 8))
         art = QLabel()
-        _image(art, game, w=210, h=115)
+        _image(art, game, w=248, h=135)
         if game is None:
             from gg_desktop.poster_art import generated_game_poster
-            art.setPixmap(generated_game_poster(str(source or "MOD SOURCE"), 172, 115))
+            art.setPixmap(generated_game_poster(str(source or "MOD SOURCE"), 248, 135))
         layout.addWidget(art)
         title = game.name if game else str(source or "Other locations")
         layout.addWidget(_label(title[:45], "findingTitle"))
@@ -216,20 +216,34 @@ class ModLocationCard(QFrame):
         super().mouseReleaseEvent(event)
 
 
-def mod_gallery(games, mods, on_selected, *, limit=8):
+def mod_gallery(games, mods, on_selected, *, limit=9):
     """Gallery of actual mod locations, grouped by known game or detected source."""
     pairs, unknown = group_mod_locations(games, mods)
     box = QFrame()
-    box.setObjectName("dashboardPanel")
+    box.setObjectName("referenceLibrary")
     column = _col(box, spacing=11)
     column.addWidget(_label("MOD LIBRARY  /  REAL SCAN EVIDENCE", "sectionTitle"))
     column.addWidget(_label(
         "Game-linked cards require a verified install-path match. "
         "External mod-manager folders remain separate and protected.", "caption"))
     if not mods:
-        column.addWidget(_label(
-            "No mod storage locations detected. Scan PC before reviewing mods.",
-            "caption"))
+        from gg_desktop.poster_art import generated_game_poster
+        illustration = QLabel()
+        illustration.setObjectName("noModsArtwork")
+        illustration.setAlignment(Qt.AlignCenter)
+        illustration.setPixmap(
+            generated_game_poster("MOD RADAR • SCAN READY", 630, 208))
+        illustration.setMinimumHeight(225)
+        column.addWidget(illustration)
+        empty = _label("NO MOD LOCATIONS FOUND", "premiumTitle")
+        empty.setAlignment(Qt.AlignCenter)
+        column.addWidget(empty)
+        message = _label(
+            "This scan found no verified mod or manager storage. "
+            "Nothing is marked safe to delete. The cards appear here "
+            "when sources are discovered.", "caption")
+        message.setAlignment(Qt.AlignCenter)
+        column.addWidget(message)
         return box, pairs, unknown
     targets = [(game, found, None) for game, found in pairs]
     if unknown:
@@ -247,8 +261,8 @@ def mod_gallery(games, mods, on_selected, *, limit=8):
         grid.addWidget(ModLocationCard(
             game, found,
             lambda g=game, m=found, src=source: on_selected(g, m, src),
-            source=source), i // 4, i % 4)
-    for col in range(4):
+            source=source), i // 3, i % 3)
+    for col in range(3):
         grid.setColumnStretch(col, 1)
     column.addWidget(grid_holder)
     if len(targets) > limit:
@@ -264,8 +278,8 @@ class ModInspector(QFrame):
     def __init__(self, on_open, on_review, on_scan):
         super().__init__()
         self.setObjectName("premiumInspector")
-        self.setMinimumWidth(292)
-        self.setMaximumWidth(340)
+        self.setMinimumWidth(335)
+        self.setMaximumWidth(390)
         self._on_open = on_open
         self._on_review = on_review
         self._on_scan = on_scan
