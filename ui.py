@@ -4043,46 +4043,57 @@ class GameGraveApp(tk.Tk):
         recording_days = min(file_days, self.settings.get("graveyard_days", 365))
 
         def task():
+            from performance_guard import (
+                GameActivityDetector, CooperativeGameplayPause, background_worker_priority,
+            )
+            detector = GameActivityDetector()
+            gate = CooperativeGameplayPause(
+                self._cancel_scan.is_set, detector=detector,
+                on_pause=lambda paused: self.events.put(("scan_game_pause", paused)),
+            )
             try:
-                self.events.put(("scan_stage", (0, STAGES[0][0])))
-                games = find_games(games_extra, cancel=self._cancel_scan.is_set)
-                self._check_scan_cancel()
-                self.events.put(("scan_stage", (1, STAGES[1][0])))
-                other = find_launcher_games(other_roots, cancel=self._cancel_scan.is_set)
-                self._check_scan_cancel()
-                self.events.put(("scan_stage", (2, STAGES[2][0])))
-                mods = find_all_mod_storage(games_extra, mod_roots,
-                                            games=games, cancel=self._cancel_scan.is_set)
-                self._check_scan_cancel()
-                self.events.put(("scan_stage", (3, STAGES[3][0])))
-                try:
-                    files = scan_old_files(chosen_folder, file_days, cancel=self._cancel_scan.is_set)
-                    warning = ""
-                except (ValueError, OSError) as exc:
-                    files = []
-                    warning = str(exc)
-                self._check_scan_cancel()
-                try:
-                    recordings = find_old_recordings(recording_days, recording_roots,
-                                                     cancel=self._cancel_scan.is_set)
-                except (ValueError, OSError) as exc:
-                    recordings = []
-                    warning += ("; " if warning else "") + "Recordings: " + str(exc)
-                self._check_scan_cancel()
-                try:
-                    screenshots = find_old_screenshots(
-                        recording_days, screenshot_roots,
-                        extra_steam_roots=games_extra,
-                        cancel=self._cancel_scan.is_set)
-                except (ValueError, OSError) as exc:
-                    screenshots = []
-                    warning += ("; " if warning else "") + "Screenshots: " + str(exc)
-                self._check_scan_cancel()
-                self.events.put(("scan_stage", (4, STAGES[4][0])))
-                saves = discover_saves()
-                self._check_scan_cancel()
-                self.events.put(("scan_complete", (
-                    games, other, mods, files, recordings, screenshots, saves, warning)))
+                with background_worker_priority():
+                    self.events.put(("scan_stage", (0, STAGES[0][0])))
+                    games = find_games(games_extra, cancel=gate.checkpoint)
+                    detector.set_game_roots(g.install_path for g in games)
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_stage", (1, STAGES[1][0])))
+                    other = find_launcher_games(other_roots, cancel=gate.checkpoint)
+                    detector.set_game_roots([g.install_path for g in games] + [g.install_path for g in other])
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_stage", (2, STAGES[2][0])))
+                    mods = find_all_mod_storage(games_extra, mod_roots,
+                                                games=games, cancel=gate.checkpoint)
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_stage", (3, STAGES[3][0])))
+                    try:
+                        files = scan_old_files(chosen_folder, file_days, cancel=gate.checkpoint)
+                        warning = ""
+                    except (ValueError, OSError) as exc:
+                        files = []
+                        warning = str(exc)
+                    gate.raise_if_canceled()
+                    try:
+                        recordings = find_old_recordings(recording_days, recording_roots,
+                                                         cancel=gate.checkpoint)
+                    except (ValueError, OSError) as exc:
+                        recordings = []
+                        warning += ("; " if warning else "") + "Recordings: " + str(exc)
+                    gate.raise_if_canceled()
+                    try:
+                        screenshots = find_old_screenshots(
+                            recording_days, screenshot_roots,
+                            extra_steam_roots=games_extra,
+                            cancel=gate.checkpoint)
+                    except (ValueError, OSError) as exc:
+                        screenshots = []
+                        warning += ("; " if warning else "") + "Screenshots: " + str(exc)
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_stage", (4, STAGES[4][0])))
+                    saves = discover_saves()
+                    gate.raise_if_canceled()
+                    self.events.put(("scan_complete", (
+                        games, other, mods, files, recordings, screenshots, saves, warning)))
             except Exception as exc:
                 self.events.put(("scan_error", str(exc)))
         threading.Thread(target=task, daemon=True).start()
@@ -4094,6 +4105,13 @@ class GameGraveApp(tk.Tk):
                 if name == "scan_stage":
                     self._scan_stage, self._scan_stage_name = payload
                     self.scan_percent.set(round(100 * sum(w for _, w in STAGES[:self._scan_stage])))
+                elif name == "scan_game_pause":
+                    if self.scanning:
+                        self.scan_progress_text.set(
+                            "Paused for gameplay" if payload else "Resuming background scan")
+                        self.status_text.set(
+                            "Scan paused while a game is running; cancel remains available."
+                            if payload else "Game closed. Resuming low-priority scan.")
                 elif name == "scan_complete":
                     if self._cancel_scan.is_set():
                         self._scan_canceled_status()
