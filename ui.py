@@ -4635,4 +4635,9 @@ class GameGraveApp(tk.Tk):
                 self.scan_progress_text.set(
                     f"{self._scan_stage_name} · {self.scan_percent.get():.0f}% stages complete "
                     f"· {eta} · {int(elapsed)}s active scanning")
-        self.after(180, self._poll)
+        # Idle Tk wakeups are unnecessary while a game has the foreground.
+        # Keep responsive progress updates for work actually in progress.
+        busy = (self.scanning or self.cleanup_running or
+                getattr(self, "_update_download_active", False) or
+                getattr(self, "_selfcheck_busy", False))
+        self.after(180 if busy else 1200, self._poll)
