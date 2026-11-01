@@ -113,25 +113,12 @@ class ScreenMethods:
             )
             page.content.addWidget(ReferenceHero(
                 "mods", "Mods", subtitle, metrics))
-        elif title == "Game DNA":
-            metrics = (
-                ("Installed games", len(self.inventory.games), "Detected installs"),
-                ("Mod locations", len(self.inventory.mods), "Not all attributed"),
-                ("Save locations", len(self.inventory.saves), "Ownership unverified"),
-                ("Safety", "LOCKED", "No automatic deletion"),
-            )
-            page.content.addWidget(ReferenceHero("dna", title, subtitle, metrics))
-        elif title == "Undo Center":
-            history = get_records()[-2000:]
-            metrics = (
-                ("Logged actions", len(history), "Local history only"),
-                ("Restored", sum(r.get("state") == "Restored" for r in history),
-                 "Verified logged state"),
-                ("Needs review", sum(r.get("state") == "Needs review" for r in history),
-                 "Manual attention"),
-                ("Recovery", "WINDOWS", "Exact matching required"),
-            )
-            page.content.addWidget(ReferenceHero("undo", title, subtitle, metrics))
+        elif title in ("Game DNA", "Undo Center"):
+            # Reference designs are full workspaces, not a stack of four
+            # reusable dashboard metric cards. Their functional content
+            # starts immediately below the distinct cinematic header.
+            scene = "dna" if title == "Game DNA" else "undo"
+            page.content.addWidget(ReferenceHero(scene, title, subtitle))
         elif title in themes:
             scene, kicker = themes[title]
             page.content.addWidget(ReferenceHero(scene, title, subtitle))
