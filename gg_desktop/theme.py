@@ -107,11 +107,11 @@ QLabel#featureNumber {
 QFrame#radarFocus {
     background: #0B2831; border: 1px solid #236477; border-radius: 10px;
 }
-QPushButton#gameCover {
+QFrame#gameCover {
     background: #10212C; border: 1px solid #315064;
     border-radius: 9px; padding:0;
 }
-QPushButton#gameCover:hover { border: 2px solid #43D6F2; }
+QFrame#gameCover:hover { border: 2px solid #43D6F2; }
 QWidget#navRail { background: #0B111A; border-right: 1px solid #25303C; }
 QFrame#panel, QFrame#metricCard, QFrame#actionCard, QFrame#infoCard, QFrame#heroBottom {
     background: #111922; border: 1px solid #2A3541; border-radius: 11px;
