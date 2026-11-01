@@ -170,6 +170,7 @@ class ScreenMethods:
         """
         from gg_desktop.ready_room_data import (
             prioritize_games, launch_guard_summary, game_news_batch,
+            official_patch_source_for,
         )
         from gg_desktop.premium_panels import _load_local_art
         from gg_desktop.steam_artwork import prime_visible_covers
@@ -354,6 +355,33 @@ class ScreenMethods:
         control_row.addStretch()
         news_col.addWidget(controls)
         page.content.addWidget(news_panel)
+        supported_sources = []
+        seen_sources = set()
+        for game in selected:
+            source = official_patch_source_for(game)
+            if source and game.name.casefold() not in seen_sources:
+                seen_sources.add(game.name.casefold())
+                supported_sources.append((game.name, source))
+        if supported_sources:
+            publisher_panel, publisher_col = panel(padding=13)
+            publisher_col.addWidget(section_title(
+                "OFFICIAL DEVELOPER PATCH PAGES", "Open the original publisher site"))
+            publisher_col.addWidget(label(
+                "These are verified official destinations, not automatically fetched "
+                "or ranked as the newest patch. Steam announcements appear above.",
+                "caption", wrap=True))
+            for game_name, (publisher, address) in supported_sources[:7]:
+                item = QWidget()
+                source_row = row(spacing=10)
+                item.setLayout(source_row)
+                source_row.addWidget(label(game_name + "  •  " + publisher,
+                                           "findingTitle", wrap=True), 1)
+                source_row.addWidget(button(
+                    "Official patch notes",
+                    lambda _=False, url=address:
+                        QDesktopServices.openUrl(QUrl(url)), kind="link"))
+                publisher_col.addWidget(item)
+            page.content.addWidget(publisher_panel)
 
         def populate_news(results):
             if self.current_route != "Ready Room" or not isValid(feed_rows):
