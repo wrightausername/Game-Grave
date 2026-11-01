@@ -447,3 +447,50 @@ QComboBox, QLineEdit {
 }
 QComboBox:focus,QLineEdit:focus {border:1px solid #F5425D;}
 """
+
+
+# Approved Ready Room: visually quieter than the earlier dense concept.
+# Soft charcoal and burgundy panels, selective crimson for actions only.
+STYLE += r"""
+QFrame#readyRoomCard, QFrame#readyRoomRecapCenter {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+       stop:0 #241B21, stop:.48 #1A191E, stop:1 #14161B);
+    border: 1px solid #49333C;
+    border-radius: 11px;
+}
+QFrame#readyRoomRecapCenter {border:1px solid #78404C;}
+QFrame#readyRoomMetric {
+    background:#191A21;
+    border:1px solid #40313B;
+    border-radius:9px;
+}
+QPushButton#readyRoomGameCover {
+    background:#11131A;
+    border:1px solid #49414B;
+    border-radius:9px; color:#B8C6D0;
+    font-size:10px;
+}
+QPushButton#readyRoomGameCover:hover {
+    border:2px solid #D8435B;
+}
+QPushButton#readyRoomPeriod {
+    background:#25232A; border:1px solid #4A3A45;
+    color:#E9E2E7; border-radius:7px;
+}
+QPushButton#readyRoomSessionControl {
+    background:#9D2138; color:white;
+    border:1px solid #E14B64; border-radius:8px;
+    font-weight:800; min-height:35px;
+}
+QPushButton#readyRoomSessionControl:hover {
+    background:#BE2A45;
+}
+QPushButton#readyRoomDiagnostics {
+    background:#17171D; color:#BFC3CD;
+    border:1px solid #45323D; border-radius:8px;
+    text-align:left; padding:10px;
+}
+QPushButton#readyRoomDiagnostics:hover {
+    background:#271D28; border-color:#A34357;
+}
+"""
