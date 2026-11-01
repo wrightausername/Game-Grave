@@ -1580,20 +1580,24 @@ class ScreenMethods:
         def load_dna_cover(index):
             if not (0 <= index < len(games)):
                 dna_art.setPixmap(QPixmap())
+                relationship.set_cover(None)
                 dna_art.setText("NO GAME SELECTED")
                 return
             selected = games[index]
             record = inventory_by_path.get(_path_key(selected["install_path"]))
             if record is None:
                 dna_art.setPixmap(QPixmap())
+                relationship.set_cover(None)
                 dna_art.setText("OFFICIAL COVER UNAVAILABLE")
                 return
             art = _load_local_art(record, 305, 245)
             if not art.isNull():
                 dna_art.setText("")
                 dna_art.setPixmap(art)
+                relationship.set_cover(art)
                 return
             dna_art.setPixmap(QPixmap())
+            relationship.set_cover(None)
             dna_art.setText("OFFICIAL COVER UNAVAILABLE")
             ident = verified_steam_id(record)
             if ident and ident not in cover_requested:
@@ -1607,6 +1611,7 @@ class ScreenMethods:
                         if not fresh.isNull():
                             dna_art.setText("")
                             dna_art.setPixmap(fresh)
+                            relationship.set_cover(fresh)
                 self.job(lambda _p: prime_visible_covers([record], limit=1),
                          art_ready, error_title="Steam art unavailable")
         game_title = label("Select a game", "sectionTitle", wrap=True)
