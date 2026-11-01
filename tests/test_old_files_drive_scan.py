@@ -76,6 +76,29 @@ class DriveScopeTests(unittest.TestCase):
         self.assertEqual(result.status, "partial")
         self.assertIn("limit", result.message.lower())
 
+    def test_unbounded_drive_scan_has_no_time_entry_match_or_depth_cutoff(self):
+        file = self.create("Users/Sample/Downloads/Subfolder/old.txt", age_days=600)
+        observed = []
+        result = scan_old_files_scope(
+            self.drive, 180, max_entries=None, max_matches=None,
+            max_seconds=None, max_depth=None, notify=lambda n, msg: observed.append((n,msg)))
+        self.assertEqual(result.status, "complete")
+        self.assertEqual([f.path for f in result.files], [str(file)])
+        self.assertTrue(file.exists())
+
+    def test_unbounded_folder_scan_exceeds_quick_match_limit(self):
+        # A small fixture validates the unlimited sentinel; it does not
+        # allocate 50,000 files merely to test one branch.
+        folder = self.drive / "Downloads"
+        folder.mkdir(exist_ok=True)
+        first = self.create("Downloads/one.tmp", age_days=500)
+        second = self.create("Downloads/two.tmp", age_days=500)
+        results = scan_old_files_scope(
+            folder, 180, max_entries=None, max_matches=None,
+            max_seconds=None, max_depth=None)
+        self.assertEqual(results.status, "complete")
+        self.assertEqual({f.path for f in results.files}, {str(first), str(second)})
+
     def test_cancel_does_not_touch_any_files(self):
         file = self.create("Users/Sample/Downloads/safe.txt")
         with self.assertRaises(InterruptedError):
