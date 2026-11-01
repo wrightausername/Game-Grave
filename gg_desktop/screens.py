@@ -758,10 +758,64 @@ class ScreenMethods:
             "Game Grave does not claim to measure FPS or verify mod compatibility yet.",
             "caption", wrap=True))
 
+    def _add_game_library_root(self):
+        """A deliberate fallback for nonstandard Rockstar/Steam/Epic paths."""
+        if self.scanning or self.cleaning:
+            self.info("Scan in progress", "Finish or cancel the current scan first.")
+            return
+        picked = QFileDialog.getExistingDirectory(
+            self, "Choose a game folder or a parent game-library folder")
+        if not picked:
+            return
+        from launchers import _ordinary_install
+        folder = _ordinary_install(picked)
+        if folder is None:
+            self.error("Invalid library folder",
+                       "Choose a normal existing folder, not a root, shortcut, "
+                       "symlink, junction, or protected reparse location.")
+            return
+        chosen = str(folder)
+        roots = list(self.settings.get("other_library_roots", []))
+        if chosen in roots:
+            self.info("Already included", "That folder is already in your scan list.")
+            return
+        if len(roots) >= 15:
+            self.error("Library limit reached",
+                       "A maximum of 15 explicit custom game library folders is supported.")
+            return
+        updated = dict(self.settings)
+        updated["other_library_roots"] = [*roots, chosen]
+        try:
+            save_settings(updated)
+        except OSError as exc:
+            self.error("Could not save library folder", str(exc))
+            return
+        self.settings = updated
+        self.status.setText(
+            "Custom library added. Checking the chosen folder and its immediate "
+            "game directories for verified installation evidence.")
+        self.start_scan()
+
     def games_page(self):
         page = self._new("Games", "All installed games Game Grave can verify, in one list across supported launchers.")
         if self._not_scanned(page):
             return
+        sources = QWidget()
+        source_row = row(spacing=8)
+        sources.setLayout(source_row)
+        source_row.addWidget(label("DISCOVERY SOURCES", "sceneKicker"))
+        present = {src for g in self.inventory.games
+                   for src in getattr(g, "claimed_by", (g.launcher,))}
+        for provider in ("Steam", "Epic Games", "Rockstar Games", "GOG",
+                         "EA", "Ubisoft Connect", "Battle.net",
+                         "Riot Games", "Local game files"):
+            if provider not in present:
+                continue
+            badge = label(provider, "detectedLauncherPill")
+            badge.setToolTip("Found by a read-only scan; review individual evidence.")
+            source_row.addWidget(badge)
+        source_row.addStretch(1)
+        page.content.addWidget(sources)
         ctrl = QWidget()
         filters = row()
         ctrl.setLayout(filters)
@@ -785,6 +839,9 @@ class ScreenMethods:
         self.game_sort.addItems(["Largest known size", "Smallest known size",
                                  "Recently played", "Oldest played", "Name A to Z", "Launcher"])
         filters.addWidget(self.game_sort, 2)
+        filters.addWidget(button("+ ADD GAME FOLDER…",
+                                 self._add_game_library_root,
+                                 kind="referenceSecondary"))
         page.content.addWidget(ctrl)
         art_tools = QWidget()
         art_row = row(spacing=9)
