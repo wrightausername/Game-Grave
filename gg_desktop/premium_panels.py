@@ -87,7 +87,8 @@ def _image(label, game, *, w=320, h=186):
 class GameInspector(QFrame):
     """Persistent selection detail area with only verified available actions."""
 
-    def __init__(self, on_details, on_open, on_mods, on_captures):
+    def __init__(self, on_details, on_open, on_mods, on_captures,
+                 on_choose_cover=None, on_reset_cover=None):
         super().__init__()
         self.setObjectName("premiumInspector")
         self.setMinimumWidth(335)
@@ -128,6 +129,23 @@ class GameInspector(QFrame):
         self.captures_btn = QPushButton("Browse game captures")
         self.captures_btn.clicked.connect(self._captures)
         layout.addWidget(self.captures_btn)
+        self.choose_cover_btn = QPushButton("Choose game cover…")
+        self.choose_cover_btn.setObjectName("chooseGameCover")
+        self.choose_cover_btn.setToolTip(
+            "Choose a real image for this exact game when automatic official "
+            "artwork is unavailable. Files are copied into Game Grave's cache only.")
+        self.choose_cover_btn.clicked.connect(
+            lambda: self.game is not None and on_choose_cover is not None
+                    and on_choose_cover(self.game))
+        self.choose_cover_btn.setVisible(on_choose_cover is not None)
+        layout.addWidget(self.choose_cover_btn)
+        self.reset_cover_btn = QPushButton("Restore official artwork")
+        self.reset_cover_btn.setObjectName("resetGameCover")
+        self.reset_cover_btn.clicked.connect(
+            lambda: self.game is not None and on_reset_cover is not None
+                    and on_reset_cover(self.game))
+        self.reset_cover_btn.setVisible(on_reset_cover is not None)
+        layout.addWidget(self.reset_cover_btn)
         self.hint = _label(
             "Local artwork is optional. Installations, sizes, and activity are never invented.",
             "caption")
@@ -142,6 +160,9 @@ class GameInspector(QFrame):
         self.open_btn.setEnabled(active and "open_folder" in game.capabilities)
         self.mods_btn.setEnabled(active)
         self.captures_btn.setEnabled(active)
+        self.choose_cover_btn.setEnabled(active)
+        from gg_desktop.custom_game_art import override_path
+        self.reset_cover_btn.setEnabled(active and bool(override_path(game)) if active else False)
         self.name.setText(game.name if active else "Choose a game from the library")
         self.status.setText(game.status if active else "Scan PC to populate verified games.")
         self.size.setText(
