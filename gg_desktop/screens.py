@@ -2856,7 +2856,8 @@ class ScreenMethods:
             "opening file contents, uploading anything, or deleting anything. "
             "Results are estimated file sizes, not an exact accounting of physical disk usage.",
             "warning", wrap=True))
-        page.content.addWidget(intro)
+        # The explanation belongs in the inspector, not as a blocking wall of
+        # text between the illustrated Map Room header and its scan controls.
 
         selection, sc = panel(padding=14)
         sc.addWidget(section_title("Analyze another part of your drive"))
@@ -2983,7 +2984,39 @@ class ScreenMethods:
         br.addWidget(back)
         br.addStretch()
         summary_col.addWidget(buttonbar)
-        page.content.addWidget(summary)
+        # Bespoke Map Room: measured category map and folder ledger take 70%,
+        # with real OS drive capacity / scan scope in a separate instrument.
+        other_workspace = QWidget()
+        other_workspace.setObjectName("otherStorageMapRoom")
+        map_row = row(spacing=12)
+        other_workspace.setLayout(map_row)
+        summary.setObjectName("otherStorageMeasuredMap")
+        map_row.addWidget(summary, 7)
+        inspector, inspector_col = panel(padding=13)
+        inspector.setObjectName("otherStorageDriveInspector")
+        inspector_col.addWidget(section_title("DRIVE INSTRUMENT", "Windows capacity evidence"))
+        from gg_desktop.storage_dials import DriveUsageDial
+        drive_dial = DriveUsageDial()
+        inspector_col.addWidget(drive_dial)
+        inspector_col.addWidget(section_title("DETECTION SCOPE"))
+        measured_state = label(
+            "Choose Quick Scan or Full Scan to measure classified folders.",
+            "subtle", wrap=True)
+        measured_state.setObjectName("otherStorageMeasuredState")
+        inspector_col.addWidget(measured_state)
+        inspector_col.addWidget(label(
+            "Drive used ≠ removable junk. Game sizes can overlap, "
+            "and unmeasured folders are never presented as categories.",
+            "caption", wrap=True))
+        inspector_col.addWidget(section_title("NEXT STEPS"))
+        inspector_col.addWidget(button(
+            "Explore Game DNA", lambda: self.navigate("Game DNA")))
+        inspector_col.addWidget(button(
+            "Review Old Files", lambda: self.navigate("Old Files")))
+        inspector_col.addStretch(1)
+        inspector_col.addWidget(intro)
+        map_row.addWidget(inspector, 3)
+        page.content.addWidget(other_workspace)
 
         import threading
         from performance_guard import GameActivityDetector, CooperativeGameplayPause
@@ -3007,6 +3040,9 @@ class ScreenMethods:
             self._other_selected_drive = target
             try:
                 usage = shutil.disk_usage(target)
+                drive_dial.set_disk_usage(
+                    total=usage.total, used=usage.used,
+                    name=str(target).rstrip("\\") + "   /   OS-REPORTED")
                 guessed = sum(max(0, g.size_bytes or 0)
                               for g in self.inventory.games
                               if _game_on_drive(g.install_path, target))
@@ -3018,6 +3054,8 @@ class ScreenMethods:
                     f"OTHER ESTIMATE: {human_size(other)}. "
                     "Launcher sizes may be missing or overlap.")
             except (OSError, ValueError):
+                drive_dial.set_disk_usage(total=None, used=None,
+                                          name="CAPACITY UNAVAILABLE")
                 overview.setText("Could not read local drive capacity.")
             present = getattr(self, "_other_storage_report", None)
             previous_drive = getattr(self, "_other_storage_report_drive", None)
@@ -3029,6 +3067,7 @@ class ScreenMethods:
                 breakdown_chart.hide()
                 coverage_note.setText(
                     "Run Quick Scan or Full Scan to generate a measured breakdown.")
+                measured_state.setText("No measured folder breakdown for this drive.")
                 categories.setText("Not scanned. Choose Quick Scan or Full Scan.")
                 report_stats.setText("Scan only starts after explicit approval.")
                 scan_state.setText("Read-only, on-device category analysis.")
@@ -3043,6 +3082,11 @@ class ScreenMethods:
             current["root"] = report.root
             breakdown_chart.set_report(report)
             breakdown_chart.setVisible(True)
+            measured_state.setText(
+                ("COMPLETED REVIEWED SCOPE" if report.complete
+                 else "PARTIAL SCAN COVERAGE") +
+                "  •  " + human_size(report.analyzed_bytes) +
+                " apparent bytes measured in inspected categories.")
             coverage_note.setText(
                 f"{'Completed allowed scope' if report.complete else 'PARTIAL COVERAGE'}"
                 f"  •  {report.entries_seen:,} entries examined"
