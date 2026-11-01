@@ -23,7 +23,9 @@ def main():
     from gg_desktop.app import CrimsonWindow, configure_crimson_dialog_palette
     from gg_desktop.capture_image import ScreenshotImage
     from gg_desktop.widgets import HeroBanner
-    from PySide6.QtWidgets import QTabWidget
+    from gg_desktop.visuals import SceneHeader, RelationshipMap, RecoveryRoute
+    from gg_desktop.tab_panels import GraphicCard, GameCover
+    from PySide6.QtWidgets import QTabWidget, QStackedWidget, QDockWidget
     from PySide6.QtGui import QPalette
     from PIL import Image
 
@@ -138,6 +140,46 @@ def main():
                 if route == "Graveyard":
                     assert len(window._shown_graves) == 1
                     assert window.grave_table.rowCount() == 1
+                if route in ("Games", "Mods", "Old Files", "Graveyard",
+                             "Game DNA", "Undo Center", "Captures", "Settings"):
+                    art = window.page.findChildren(SceneHeader)
+                    assert len(art) == 1 and art[0].kind, (
+                        "Missing high-DPI, tab-specific scene for " + route)
+                if route == "Games":
+                    assert len(window.page.findChildren(GameCover)) == 3, (
+                        "Games gallery must present actual verified game records")
+                if route == "Game DNA":
+                    dna_art = window.page.findChildren(RelationshipMap)
+                    assert dna_art and dna_art[0].game_name == "Sample Steam Game", (
+                        "Game DNA visual map must use actual scan data")
+                if route == "Undo Center":
+                    assert len(window.page.findChildren(RecoveryRoute)) == 1
+                if route == "Settings":
+                    categories = window.page.findChildren(QStackedWidget)
+                    assert len(categories) == 1 and categories[0].count() == 8, (
+                        "Settings must show real controls in eight organized sections")
+            # The optional assistant stays visible while the user navigates.
+            # This test never invokes the model or installs anything.
+            window.settings["ai_assistant_enabled"] = True
+            window.navigate("Games")
+            before = window.current_route
+            window.navigate("AI Assistant")
+            app.processEvents()
+            docks = window.findChildren(QDockWidget)
+            assert len(docks) == 1 and docks[0].isVisible(), (
+                "AI must open as a companion, not replace the current tab")
+            assert window.current_route == before
+            docks[0].setFloating(True)
+            app.processEvents()
+            assert docks[0].isFloating()
+            window.navigate("Graveyard")
+            app.processEvents()
+            assert window.current_route == "Graveyard"
+            assert docks[0].isVisible()
+            docks[0].setFloating(False)
+            docks[0].hide()
+            window.settings["ai_assistant_enabled"] = False
+
             window.navigate("Captures")
             app.processEvents()
             capture_tabs = window.page.findChildren(QTabWidget)
@@ -204,8 +246,13 @@ def main():
             for route, filename in (
                 ("Overview", "crimson-desktop-1440.png"),
                 ("Games", "crimson-games-1440.png"),
+                ("Mods", "crimson-mods-1440.png"),
+                ("Old Files", "crimson-old-files-1440.png"),
                 ("Graveyard", "crimson-graveyard-1440.png"),
                 ("Game DNA", "crimson-dna-1440.png"),
+                ("Undo Center", "crimson-undo-1440.png"),
+                ("Captures", "crimson-captures-1440.png"),
+                ("Settings", "crimson-settings-1440.png"),
             ):
                 window.navigate(route)
                 window.resize(1440, 900)
