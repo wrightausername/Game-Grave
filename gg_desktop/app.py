@@ -160,7 +160,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         kicker.setStyleSheet(
             "color:#A9ACBA;font-size:10px;letter-spacing:.4px;")
         r.addWidget(kicker)
-        edition = label("CRIMSON / GAME GRAVE", "brandEdition")
+        edition = label("CRIMSON COMMAND", "brandEdition")
         edition.setStyleSheet("color:#FF4056;font-size:10px;font-weight:800;"
                               "letter-spacing:1px;")
         r.addWidget(edition)
