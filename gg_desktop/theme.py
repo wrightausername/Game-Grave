@@ -335,3 +335,67 @@ QPushButton#navButton[active="true"] {
 }
 
 """
+
+# Reference-fidelity layer: screenshots are a visual contract, not static UI.
+STYLE += r"""
+QWidget {font-size:13px;}
+QFrame#referenceHero {background:#100B14; border:1px solid #9A2238; border-radius:12px;}
+QFrame#referenceLibrary {
+    background:#0B0A10; border:1px solid #331724; border-radius:12px;
+}
+QFrame#referenceLibrary QLabel#sectionTitle {
+    font-size:17px;font-weight:850;color:#F6F4F7;
+}
+QFrame#gameCover {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #2B1421, stop:.68 #10121C,stop:1 #070A10);
+    border:1px solid #663344; border-radius:12px; padding:0;
+}
+QFrame#gameCover:hover {
+    background:#2F1724;
+    border:2px solid #FF3D59;
+}
+QFrame#modLocationCard {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #31121F,stop:.62 #12151D,stop:1 #070A10);
+    border:1px solid #673145;border-radius:12px;
+}
+QFrame#modLocationCard:hover {border:2px solid #FF3F5F;}
+QFrame#gameCover QLabel#findingTitle,
+QFrame#modLocationCard QLabel#findingTitle {
+    color:#FCF8FA;font-size:14px;font-weight:850;
+}
+QFrame#premiumInspector {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #230D1B,stop:.36 #150E17,stop:1 #080B13);
+    border:1px solid #A32942;border-radius:13px;
+}
+QFrame#premiumInspector QLabel#premiumTitle {
+    font-size:21px;font-weight:850;color:#FFFFFF;
+}
+QLabel#premiumMetric {font-size:25px;font-weight:850;color:#FFFFFF;}
+QPushButton#referenceSecondary {
+    background:#180F19;color:#EBDBE5;border:1px solid #7B293E;
+    border-radius:9px;font-size:12px;font-weight:750;
+    min-height:28px;text-align:left;padding:11px 14px;
+}
+QPushButton#referenceSecondary:hover {
+    background:#331521;border:1px solid #F3445D;color:white;
+}
+QPushButton#navButton {
+    color:#DBD5DF;font-size:14px;
+    padding:10px 12px; min-height:26px;
+}
+QPushButton#navButton[active="true"] {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #7E1028,stop:.58 #3A101F,stop:1 #140C15);
+    border:1px solid #DF2E4C;border-radius:8px;
+    color:#FFFFFF;font-weight:800;
+}
+QComboBox, QLineEdit {
+    background:#140F19;color:#F5EAF0;
+    border:1px solid #513045;border-radius:8px;
+    min-height:28px;font-size:12px;padding:7px 10px;
+}
+QComboBox:focus,QLineEdit:focus {border:1px solid #F5425D;}
+"""
