@@ -2,7 +2,9 @@
 
 Aging and a missing Steam manifest do not establish abandonment. Only individual
 ordinary files from the explicitly chosen Old Files scan or discovered recording
-folders are eligible for review. Entire games/mod folders are never recyclable here.
+folders are eligible for review. Entire game/mod folders remain protected by default. An explicit one-time
+advanced override on a precisely verified item can request a recoverable
+Windows Recycle Bin move after separate typed confirmation.
 """
 from __future__ import annotations
 
@@ -67,18 +69,28 @@ def build_graveyard(games: list[SteamGame], mods: list[ModFolder], old_files: li
     for f in old_files:
         path = Path(f.path)
         age = max(0, int((now - f.modified) / 86400))
-        if age < min_days or not looks_like_game_archive(path):
+        if age < min_days or looks_like_screenshot(path):
+            # Images are never promoted through generic old-file review.
             continue
         key = str(path).casefold()
         if key in seen:
             continue
         seen.add(key)
         protected = is_protected_path(path, never_touch)
+        gaming_hint = looks_like_game_archive(path)
         results.append(GraveyardEntry(
             key=f"file:{key}", name=path.name, path=str(path),
-            category="Possible mod / game download", apparent_bytes=max(0, f.size),
+            category=("Possible mod / game download" if gaming_hint
+                      else "Old file from reviewed folder"),
+            apparent_bytes=max(0, f.size),
             age_days=age, relationship="Game association unverified",
-            finding=f"Filename resembles gaming content; last modified {age} days ago. Usage is unknown.",
+            finding=(
+                f"Filename resembles gaming content; last modified {age} days ago. "
+                "Usage is unknown." if gaming_hint else
+                f"Found in your explicitly chosen Old Files scan folder; "
+                f"last modified {age} days ago. It may be personal or important. "
+                "Review its contents before recycling. No game association is claimed."
+            ),
             protection="Never Touch / managed game location" if protected else "User review required",
             can_recycle=not protected, old_file=f,
         ))
