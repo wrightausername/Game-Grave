@@ -13,6 +13,7 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from gg_desktop.visuals import SceneHeader
+from gg_desktop.voice import PAGE_LANGUAGE
 
 
 class ReferenceHero(SceneHeader):
@@ -22,8 +23,8 @@ class ReferenceHero(SceneHeader):
         super().__init__(kind, title, subtitle, note="CRIMSON COMMAND")
         self.setObjectName("referenceHero")
         self._has_metrics = bool(metrics)
-        self.setMinimumHeight(248 if self._has_metrics else 192)
-        self.setMaximumHeight(248 if self._has_metrics else 192)
+        self.setMinimumHeight(278 if self._has_metrics else 214)
+        self.setMaximumHeight(278 if self._has_metrics else 214)
         self.setAccessibleName(title + ". " + subtitle)
         for child in self.findChildren(QLabel):
             child.hide()
@@ -52,54 +53,54 @@ class ReferenceHero(SceneHeader):
         self.title_overlay.setObjectName("referenceHeroTitle")
         self.title_overlay.setStyleSheet(
             "background:transparent; color:#FFFFFF;"
-            "font-family:'Georgia','Cambria','Segoe UI'; font-size:35px;"
-            "font-weight:800; letter-spacing:1px;")
-        self.eyebrow_overlay = QLabel(
-            {"mods":"MOD ARCHIVES / COMBAT READY",
-             "oldfiles":"THE ARCHIVE / STORAGE AUDIT",
-             "storage":"STORAGE MAP / DISK INTELLIGENCE",
-             "captures":"THE SCREENING ROOM / GAME CAPTURES",
-             "graveyard":"THE GRAVEYARD / REVIEW QUEUE",
-             "dna":"THE GENOME LAB / FILE RELATIONSHIPS",
-             "undo":"THE RECOVERY DESK / REVERSE LOG",
-             "games":"THE GAME LIBRARY / DISCOVERY"}.get(self.kind, "CRIMSON COMMAND"), self)
+            "font-family:'Georgia','Cambria','Segoe UI'; font-size:47px;"
+            "font-weight:800; letter-spacing:-.2px;")
+        route_for_kind = {
+            "mods": "Mods", "oldfiles": "Old Files",
+            "storage": "Other Storage", "captures": "Captures",
+            "graveyard": "Graveyard", "dna": "Game DNA",
+            "undo": "Undo Center", "games": "Games",
+        }.get(self.kind)
+        editorial = PAGE_LANGUAGE.get(route_for_kind, ("GAME GRAVE", ""))[0]
+        self.eyebrow_overlay = QLabel(editorial, self)
         self.eyebrow_overlay.setObjectName("featureHeroKicker")
         self.eyebrow_overlay.setStyleSheet(
             "background:transparent;color:"+self.theme_tone+
-            ";font-size:10px;font-weight:850;letter-spacing:2px;")
+            ";font-size:11px;font-weight:800;letter-spacing:1.5px;")
         self.subtitle_overlay = QLabel(subtitle, self)
         self.subtitle_overlay.setObjectName("referenceHeroSubtitle")
         self.subtitle_overlay.setWordWrap(True)
         self.subtitle_overlay.setStyleSheet(
-            "background:transparent;color:#E2DDE6;font-size:13px;")
+            "background:transparent;color:#DFDCE3;"
+            "font-size:15px;line-height:1.3;")
 
         self.metrics = QWidget(self)
         self.metrics.setObjectName("referenceHeroMetrics")
         self.metrics.setVisible(self._has_metrics)
         row = QHBoxLayout(self.metrics)
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(10)
+        row.setSpacing(0)
         for i, (name, value, note) in enumerate(list(metrics)[:6]):
             tile = QFrame(self.metrics)
             tile.setObjectName("referenceHeroTile")
             tile.setStyleSheet(
                 "QFrame#referenceHeroTile{"
-                "background:rgba(7,10,19,218);"
-                "border:1px solid #BB354D;border-radius:11px;}")
+                "background:rgba(8,10,16,226);"
+                "border:0;border-left:1px solid #5D3D4B;border-radius:0;}")
             col = QVBoxLayout(tile)
-            col.setContentsMargins(14, 6, 11, 6)
-            col.setSpacing(1)
+            col.setContentsMargins(17, 11, 9, 8)
+            col.setSpacing(3)
             top = QLabel(str(name).upper())
             top.setStyleSheet(
-                "background:transparent;color:#EBB8C1;"
-                "font-size:10px;font-weight:800;")
+                "background:transparent;color:#D6BEC8;"
+                "font-size:10px;font-weight:700;letter-spacing:1px;")
             count = QLabel(str(value))
             count.setStyleSheet(
                 "background:transparent;color:#FFFFFF;"
-                "font-size:22px;font-weight:900;")
+                "font-family:'Georgia','Segoe UI';font-size:27px;font-weight:800;")
             foot = QLabel(str(note))
             foot.setStyleSheet(
-                "background:transparent;color:#A9C2D1;font-size:10px;")
+                "background:transparent;color:#92A3B0;font-size:10px;")
             foot.setWordWrap(True)
             for widget in (top, count, foot):
                 col.addWidget(widget)
@@ -108,10 +109,10 @@ class ReferenceHero(SceneHeader):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.width()
-        self.eyebrow_overlay.setGeometry(89, 17, max(150, w - 115), 18)
-        self.title_overlay.setGeometry(86, 36, max(150, w - 119), 52)
-        self.subtitle_overlay.setGeometry(90, 94, max(150, w - 125), 48)
-        self.metrics.setGeometry(17, 158, max(250, w - 34), 79)
+        self.eyebrow_overlay.setGeometry(37, 34, max(150, w - 76), 25)
+        self.title_overlay.setGeometry(32, 64, max(150, w - 71), 62)
+        self.subtitle_overlay.setGeometry(36, 131, max(150, w - 73), 52)
+        self.metrics.setGeometry(17, 190, max(250, w - 34), 73)
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -128,10 +129,10 @@ class ReferenceHero(SceneHeader):
             self.background_art.render(p, QRectF(0, -65, w, h + 122))
         # Preserve artwork on the right; fade only the functional text field.
         shade = QLinearGradient(0, 0, w, 0)
-        shade.setColorAt(0.0, QColor(5, 7, 14, 235))
-        shade.setColorAt(.28, QColor(8, 8, 16, 174))
-        shade.setColorAt(.52, QColor(10, 7, 16, 54))
-        shade.setColorAt(1, QColor(12, 6, 13, 8))
+        shade.setColorAt(0.0, QColor(5, 7, 14, 251))
+        shade.setColorAt(.29, QColor(8, 8, 16, 192))
+        shade.setColorAt(.55, QColor(10, 7, 16, 33))
+        shade.setColorAt(1, QColor(12, 6, 13, 0))
         p.fillRect(full, shade)
         # Darken only the bottom where translucent tiles sit.
         bottom = QLinearGradient(0, h * .49, 0, h)
@@ -147,13 +148,15 @@ class ReferenceHero(SceneHeader):
         p.drawLine(15, h - 2, min(w - 20, w*.42), h - 2)
         p.drawLine(w-132, 0, w-35, 0)
         p.drawLine(w-35, 0, w-10, 21)
-        p.drawLine(14, 19, 14, 142)
+        p.drawLine(18, 39, 18, 164)
         # A consistent crest with per-room glyph, not a font-emoji ornament.
         p.setPen(QPen(QColor(self.theme_tone), 2))
         p.setBrush(QColor(11, 17, 26, 185))
-        p.drawEllipse(QRectF(24, 50, 51, 51))
-        p.drawEllipse(QRectF(30, 56, 39, 39))
-        cx, cy = 49.5, 75.5
+        p.drawEllipse(QRectF(24, 173, 40, 40))
+        p.drawEllipse(QRectF(28, 177, 32, 32))
+        # Editorial title takes precedence over unnecessary ornamentation.
+        # The small crest is deliberately quiet and never covers any text.
+        cx, cy = 44.0, 194.0
         if self.kind == "dna":
             p.drawArc(QRectF(39, 60, 22, 31), 85*16, 185*16)
             p.drawArc(QRectF(39, 60, 22, 31), 265*16, 185*16)
