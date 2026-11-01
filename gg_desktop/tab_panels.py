@@ -66,7 +66,7 @@ class GameCover(QPushButton):
         self.game = game
         self.setMinimumWidth(170)
         self.setMaximumWidth(185)
-        self.setMinimumHeight(188)
+        self.setFixedHeight(188)
         self.setObjectName("gameCover")
         self.setToolTip(f"{game.name}\n{game.launcher}\n{game.install_path}")
         self.setAccessibleName("Select game: " + game.name)
@@ -131,12 +131,16 @@ def game_gallery(games, selected_callback, *, limit=7):
     scroller.setWidgetResizable(True)
     scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
     scroller.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-    scroller.setMinimumHeight(218)
-    scroller.setMaximumHeight(228)
+    scroller.setFixedHeight(212)
+    scroller.setAlignment(Qt.AlignLeft | Qt.AlignTop)
     area = QWidget()
+    area.setFixedHeight(199)
     row = _layout(area, vertical=False, pad=(1, 3, 1, 3), gap=11)
+    row.setAlignment(Qt.AlignTop)
     for game in games[:limit]:
-        row.addWidget(GameCover(game, lambda _=False, g=game: selected_callback(g)))
+        row.addWidget(
+            GameCover(game, lambda _=False, g=game: selected_callback(g)),
+            0, Qt.AlignTop)
     row.addStretch(1)
     scroller.setWidget(area)
     layout.addWidget(scroller)
