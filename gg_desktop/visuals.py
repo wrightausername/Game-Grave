@@ -335,6 +335,12 @@ class RelationshipMap(QWidget):
         self.game_name = "Choose a game"
         self.states = {}
         self.active = "Install"
+        self._cover = QPixmap()
+
+    def set_cover(self, pixmap: QPixmap | None):
+        """Display only decoded artwork from a verified game record."""
+        self._cover = pixmap if pixmap is not None else QPixmap()
+        self.update()
 
     def set_game(self, name: str, states: dict[str, str]):
         self.game_name = str(name)[:120]
@@ -358,11 +364,25 @@ class RelationshipMap(QWidget):
         p.drawEllipse(center, 80, 56)
         p.setPen(_pen(CYAN, 3))
         p.drawEllipse(center, 86, 61)
-        p.setPen(WHITE)
-        title_font = QFont("Segoe UI", 11, QFont.DemiBold)
-        p.setFont(title_font)
-        p.drawText(QRectF(center.x()-72, center.y()-28, 144, 56),
-                   Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
+        if not self._cover.isNull():
+            p.save()
+            artwork_clip = QPainterPath()
+            artwork_clip.addEllipse(QRectF(center.x() - 77, center.y() - 53, 154, 106))
+            p.setClipPath(artwork_clip)
+            p.setOpacity(.90)
+            p.drawPixmap(
+                QRectF(center.x() - 78, center.y() - 54, 156, 108),
+                self._cover,
+                QRectF(0, 0, self._cover.width(), self._cover.height()))
+            p.restore()
+            p.setPen(_pen("#F84359", 2))
+            p.setBrush(Qt.NoBrush)
+            p.drawEllipse(center, 80, 56)
+        else:
+            p.setPen(WHITE)
+            p.setFont(QFont("Segoe UI", 11, QFont.DemiBold))
+            p.drawText(QRectF(center.x()-72, center.y()-28, 144, 56),
+                       Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
         self.positions = {}
         for i, name in enumerate(self.NODE_TYPES):
             angle = -math.pi / 2 + i * math.pi * 2 / len(self.NODE_TYPES)
