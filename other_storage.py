@@ -45,6 +45,8 @@ class OtherStorageReport:
     complete: bool
     limitation: str
     elapsed_seconds: float
+    category_totals: tuple[tuple[str, int], ...] = ()
+    root_entries_count: int = 0
 
 
 def category_for_folder(name: str) -> str:
@@ -210,6 +212,9 @@ def analyze_other_storage(
                    f"Examined {examined:,} file/folder entries"
                    + (" (Full Scan, no fixed limit)" if max_entries is None else ""))
 
+    category_bytes: dict[str, int] = defaultdict(int)
+    for name, amount in folder_bytes.items():
+        category_bytes[category_for_folder(name)] += amount
     grouped = []
     for name, path in top_folder_paths.items():
         if len(grouped) >= MAX_FOLDER_ROWS and name not in folder_bytes:
@@ -244,4 +249,7 @@ def analyze_other_storage(
         complete=not bool(incomplete),
         limitation=incomplete or "Completed allowed metadata walk. Disk accounting can still differ.",
         elapsed_seconds=max(0, time.monotonic() - start),
+        category_totals=tuple(
+            sorted(category_bytes.items(), key=lambda row: -row[1])),
+        root_entries_count=len(top_folder_paths),
     )
