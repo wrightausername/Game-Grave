@@ -177,6 +177,7 @@ class ScreenMethods:
         game_left = QWidget()
         game_left_col = column(spacing=12)
         game_left.setLayout(game_left_col)
+        self.game_left_col = game_left_col
         game_workspace_row.addWidget(game_left, 1)
         self.game_inspector = GameInspector(
             self._inspect_game_record,
@@ -184,9 +185,11 @@ class ScreenMethods:
             lambda: self.navigate("Mods"),
             lambda: self.navigate("Captures"))
         game_workspace_row.addWidget(self.game_inspector, 0, Qt.AlignTop)
+        # Start empty and populate once from the same filtered/sorted rows as
+        # the table. No mismatch between search results and visible covers.
         self.game_gallery_frame = game_gallery(
-            self.inventory.games,
-            lambda game: self._focus_game_from_gallery(game), limit=9)
+            [], lambda game: self._focus_game_from_gallery(game), limit=9)
+        self._gallery_keys = None
         game_left_col.addWidget(self.game_gallery_frame)
         page.content.addWidget(game_workspace)
         p, pcol = panel()
@@ -225,6 +228,24 @@ class ScreenMethods:
         self.game_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.game_table.customContextMenuRequested.connect(self._games_context_menu)
         self._fill_games()
+
+    def _refresh_games_gallery(self, rows):
+        keys = tuple(g.key for g in rows[:9])
+        if keys == getattr(self, "_gallery_keys", None):
+            return
+        old = self.game_gallery_frame
+        index = self.game_left_col.indexOf(old)
+        self.game_left_col.removeWidget(old)
+        old.hide()
+        old.setParent(None)
+        old.deleteLater()
+        self.game_gallery_frame = game_gallery(
+            rows, lambda game: self._focus_game_from_gallery(game), limit=9,
+            empty_message=("No installed games match the selected filters."
+                           if self.inventory.games else
+                           "No verified games yet. Run Scan PC to check your library."))
+        self.game_left_col.insertWidget(max(0, index), self.game_gallery_frame)
+        self._gallery_keys = keys
 
     def _toggle_games_inventory(self):
         shown = not self.game_inventory_panel.isVisible()
@@ -274,6 +295,7 @@ class ScreenMethods:
         else:
             rows.sort(key=lambda g: (g.size_bytes is None,
                                      (g.size_bytes or 0) * (-1 if sort == "Largest known size" else 1)))
+        self._refresh_games_gallery(rows)
         self._shown_games = rows[:500]  # bounded presentation, full inventory retained
         self.game_table.setRowCount(len(self._shown_games))
         for i, g in enumerate(self._shown_games):
