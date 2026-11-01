@@ -31,6 +31,7 @@ ROUTES = (
     ("Graveyard", "♱"),
     ("Game DNA", "⌁"),
     ("Undo Center", "↶"),
+    ("AI Assistant", "✧"),
     ("Settings", "⚙"),
     ("More Tools", "⋯"),
 )
@@ -106,6 +107,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.workers = {}
         self.pool = QThreadPool.globalInstance()
         self.current_route = "Overview"
+        self._ai_companion = None
         self.setWindowTitle("Game Grave  |  Crimson Command preview")
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg")))
         self.setMinimumSize(960, 650)
@@ -223,7 +225,16 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             control.style().polish(control)
         return self.page
 
+    def open_ai_companion(self):
+        """Non-modal local assistant: persists when navigating any other tab."""
+        from gg_desktop.ai_companion import open_companion
+        open_companion(self)
+
     def navigate(self, route: str):
+        # Assistant is a dockable/pop-out companion, NEVER a page replacement.
+        if route == "AI Assistant":
+            self.open_ai_companion()
+            return
         # Legacy links to the recording viewer open Captures on its Video tab.
         self._show_capture_videos = route in ("Videos", "Recordings", "Game Recordings")
         route = ROUTE_ALIASES.get(route, route)
