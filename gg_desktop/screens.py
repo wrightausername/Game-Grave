@@ -169,14 +169,6 @@ class ScreenMethods:
         filters.addWidget(self.game_sort, 2)
         page.content.addWidget(ctrl)
 
-        known, unknown = reported_game_bytes(self.inventory.games)
-        stats = QWidget()
-        statrow = row()
-        stats.setLayout(statrow)
-        statrow.addWidget(MetricCard("Detected installations", str(len(self.inventory.games)), "Evidence-backed records"))
-        statrow.addWidget(MetricCard("Known reported sizes", human_size(known), "Not equal to disk space reclaimed"))
-        statrow.addWidget(MetricCard("Size unknown", str(unknown), "Never assumed to be zero", tone="amber"))
-        page.content.addWidget(stats)
         # The artwork-led library and the selection inspector share one
         # workspace. All detail actions still call the existing safe APIs.
         game_workspace = QWidget()
@@ -192,9 +184,10 @@ class ScreenMethods:
             lambda: self.navigate("Mods"),
             lambda: self.navigate("Captures"))
         game_workspace_row.addWidget(self.game_inspector, 0, Qt.AlignTop)
-        game_left_col.addWidget(game_gallery(
+        self.game_gallery_frame = game_gallery(
             self.inventory.games,
-            lambda game: self._focus_game_from_gallery(game), limit=8))
+            lambda game: self._focus_game_from_gallery(game), limit=9)
+        game_left_col.addWidget(self.game_gallery_frame)
         page.content.addWidget(game_workspace)
         p, pcol = panel()
         self.game_table = data_table(["GAME", "LAUNCHER", "SIZE", "LAST PLAYED", "EVIDENCE"])
@@ -204,9 +197,19 @@ class ScreenMethods:
         self.game_table.setColumnWidth(3, 145)
         self.game_table.setMinimumHeight(370)
         pcol.addWidget(self.game_table)
+        # Advanced inventory stays available on demand, instead of displacing
+        # the visual game library at the top of the screen.
+        self.game_detail_toggle = button(
+            "▤  Show advanced inventory list",
+            lambda: self._toggle_games_inventory())
+        self.game_detail_toggle.setObjectName("referenceSecondary")
+        game_left_col.addWidget(self.game_detail_toggle)
+        self.game_inventory_panel = p
+        p.setVisible(False)
         game_left_col.addWidget(p)
         self.game_details = panel()[0]
         self.game_details_col = self.game_details.layout()
+        self.game_details.setVisible(False)
         game_left_col.addWidget(self.game_details)
         self.game_search.textChanged.connect(self._fill_games)
         self.game_filter.currentTextChanged.connect(self._fill_games)
@@ -219,6 +222,14 @@ class ScreenMethods:
         self.game_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.game_table.customContextMenuRequested.connect(self._games_context_menu)
         self._fill_games()
+
+    def _toggle_games_inventory(self):
+        shown = not self.game_inventory_panel.isVisible()
+        self.game_inventory_panel.setVisible(shown)
+        self.game_details.setVisible(shown)
+        self.game_detail_toggle.setText(
+            "▤  Hide advanced inventory list" if shown
+            else "▤  Show advanced inventory list")
 
     def _focus_game_from_gallery(self, game):
         """Select the exact verified game row, preserving its existing actions."""
@@ -1214,13 +1225,6 @@ class ScreenMethods:
         page = self._new("Mods", "Trace detected mod managers, addons and game storage without changing a single file.")
         if self._not_scanned(page):
             return
-        page.content.addWidget(mod_radar_panel(self.inventory.mods))
-        page.content.addWidget(FeatureStrip([
-            ("DETECT", "Source-aware locations"),
-            ("INSPECT", "Evidence and owner"),
-            ("PROTECT", "Profiles stay safe"),
-            ("REVIEW", "Manual Graveyard action"),
-        ]))
         mod_workspace = QWidget()
         mod_workspace_row = row(spacing=14)
         mod_workspace.setLayout(mod_workspace_row)
@@ -1323,7 +1327,21 @@ class ScreenMethods:
                                self._launch_classic_tools))
         tools.addStretch()
         contents.addWidget(controls)
+        # Put the engineering inventory below the artwork-led mod workspace.
+        # Nothing is guessed or exposed as a one-click cleanup action.
+        more_mods = button("▤  Show detailed mod storage findings",
+                           lambda: toggle_mod_inventory())
+        more_mods.setObjectName("referenceSecondary")
+        page.content.addWidget(more_mods)
+        p.setVisible(False)
+        def toggle_mod_inventory():
+            visible = not p.isVisible()
+            p.setVisible(visible)
+            more_mods.setText(
+                "▤  Hide detailed mod storage findings" if visible
+                else "▤  Show detailed mod storage findings")
         page.content.addWidget(p)
+        page.content.addWidget(mod_radar_panel(self.inventory.mods))
         page.content.addWidget(label(
             "All managed mod locations remain protected. Read-only inventory "
             "cannot establish whether a mod is unused.", "warning", wrap=True))
