@@ -487,7 +487,13 @@ class ScreenMethods:
         self.settings = updated
         refresh_graveyard(self.inventory, self.settings)
         self._pending_grave_key = "mod:" + str(Path(path)).casefold()
-        self.navigate("Graveyard")
+        # Never steal focus or destroy the current page after queuing.
+        # Only a deliberate "Open Graveyard" action changes tabs.
+        self.status.setText(
+            "Added to Graveyard review queue. You can continue working here; "
+            "nothing was deleted or moved.")
+        if hasattr(self, "mod_inspector"):
+            self.mod_inspector.review_btn.setText("Queued for Graveyard review")
 
     def _graveyard_context_menu(self, point):
         row_idx = self._right_clicked_row(self.grave_table, point)
