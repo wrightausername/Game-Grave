@@ -1589,10 +1589,23 @@ class ScreenMethods:
             disk_choices.setCurrentIndex(ix)
         disk_choices.setAccessibleName("Choose a local fixed disk to examine")
         rowline.addWidget(disk_choices)
+        scan_mode = QComboBox()
+        scan_mode.addItems(["Quick Scan", "Full Scan"])
+        scan_mode.setAccessibleName("Other Storage scan depth")
+        scan_mode.setToolTip("Quick: 220,000 entries / 25 seconds. Full: no entry/time cap.")
+        rowline.addWidget(scan_mode)
         run_scan = button("Analyze Other storage…", kind="primary")
         rowline.addWidget(run_scan)
+        stop_scan = button("Cancel scan")
+        stop_scan.setEnabled(False)
+        rowline.addWidget(stop_scan)
         rowline.addStretch()
         sc.addWidget(selectors)
+        sc.addWidget(label(
+            "Quick Scan: up to 220,000 entries or 25 seconds. "
+            "Full Scan: no artificial entry/time limit, until completed or canceled. "
+            "Both pause during gameplay, skip inaccessible and linked locations, "
+            "and never modify files.", "subtle", wrap=True))
 
         overview = label("", "subtle", wrap=True)
         sc.addWidget(overview)
@@ -1638,7 +1651,21 @@ class ScreenMethods:
         summary_col.addWidget(buttonbar)
         page.content.addWidget(summary)
 
+        import threading
+        from performance_guard import GameActivityDetector, CooperativeGameplayPause
         current = {"report": None, "root": None}
+        active_scan = getattr(self, "_other_storage_cancel_event", None)
+        if active_scan is None:
+            active_scan = threading.Event()
+            self._other_storage_cancel_event = active_scan
+        stop_scan.clicked.connect(active_scan.set)
+        if getattr(self, "_other_storage_running", False):
+            scan_state.setText("An Other Storage scan is still running. Cancel remains available.")
+            run_scan.setEnabled(False)
+            stop_scan.setEnabled(True)
+            scan_mode.setEnabled(False)
+            progress.setRange(0, 0)
+            progress.show()
         def get_drive():
             return disk_choices.currentData()
         def refresh_drive(_=None):
@@ -1702,9 +1729,12 @@ class ScreenMethods:
                 f"{report.skipped_entries:,} entries inaccessible/skipped  •  "
                 f"{report.excluded_games:,} recognized game directories excluded.\n"
                 f"Coverage: {report.limitation}")
-            scan_state.setText("Read-only analysis finished. No files were modified.")
+            scan_state.setText(
+                ("Read-only storage analysis completed. " if report.complete
+                 else "Partial coverage: " + report.limitation + " ")
+                + "No files modified.")
             progress.hide()
-            run_scan.setEnabled(True)
+            run_scan.setEnabled(not getattr(self, "_other_storage_running", False))
             inspect.setEnabled(bool(shown))
             open_folder.setEnabled(bool(shown))
             back.setEnabled(report.root != get_drive())
@@ -1717,50 +1747,82 @@ class ScreenMethods:
             return data.folders[idx[0]]
 
         def analyze(scope=None):
+            if getattr(self, "_other_storage_running", False):
+                scan_state.setText("Already analyzing Other Storage. Cancel the current scan first.")
+                return
             drive = get_drive()
             if not drive:
                 self.error("No drive found", "Select a connected local fixed drive.")
                 return
+            full_scan = scan_mode.currentText() == "Full Scan"
+            mode_name = "Full Scan" if full_scan else "Quick Scan"
             proposed = str(scope or drive)
+            terms = ("No entry or time limit. Can run a long time; Cancel is always available."
+                     if full_scan else "Stops after 220,000 entries or 25 seconds.")
             if not self.confirm(
-                "Run read-only storage analysis?",
-                "Game Grave will examine file/folder names and sizes under:\n"
-                + proposed + "\n\nThe scan stops after 220,000 entries or 25 seconds. "
-                "It may be incomplete where Windows restricts access. "
-                "No contents are opened, sent to a server, modified, or deleted."):
+                "Start " + mode_name + "?",
+                "Read-only file/folder metadata under:\n" + proposed
+                + "\n\n" + terms
+                + "\n\nPauses while games run. Inaccessible/linked locations remain excluded."
+                + "\nNothing is opened, uploaded, modified, or deleted."):
                 return
             from other_storage import analyze_other_storage
             selected_games = tuple(
                 g.install_path for g in self.inventory.games
                 if getattr(g, "install_path", None))
-            scan_state.setText("Analyzing local file metadata…")
+            active_scan.clear()
+            self._other_storage_running = True
+            scan_state.setText(mode_name + ": examining local metadata…")
+            progress.setRange(0, 0 if full_scan else 100)
+            if not full_scan:
+                progress.setValue(0)
             progress.show()
-            progress.setValue(0)
             run_scan.setEnabled(False)
+            stop_scan.setEnabled(True)
+            scan_mode.setEnabled(False)
             drive_at_start = drive
 
             def job(emitter):
                 try:
+                    detector = GameActivityDetector()
+                    # Suspend the walk while a game is detected. A user's
+                    # Cancel input immediately terminates a paused scan.
+                    gate = CooperativeGameplayPause(
+                        active_scan.is_set, detector=detector,
+                        on_pause=lambda paused: emitter(
+                            0, "Paused for gameplay. Cancel remains available."
+                            if paused else "Resuming low-priority scan"))
                     return True, analyze_other_storage(
                         drive_at_start, selected_games, scope=scope,
-                        notify=emitter)
+                        max_entries=None if full_scan else 220_000,
+                        max_seconds=None if full_scan else 25,
+                        cancel=gate.checkpoint, notify=emitter)
                 except Exception as exc:
-                    # A failed read-only scan is not allowed to leave the
-                    # action permanently disabled in Settings/Other Storage.
                     return False, type(exc).__name__ + ": " + str(exc)[:250]
+
             def progress_cb(percent, message):
-                if isValid(progress):
-                    progress.setValue(percent)
+                if isValid(scan_state):
+                    if full_scan:
+                        progress.setRange(0, 0)
+                    elif "Paused for gameplay" not in message:
+                        progress.setRange(0, 100)
+                        progress.setValue(percent)
                     scan_state.setText(message)
+
             def done(outcome):
+                self._other_storage_running = False
+                if isValid(run_scan):
+                    run_scan.setEnabled(True)
+                    stop_scan.setEnabled(False)
+                    scan_mode.setEnabled(True)
+                    progress.hide()
                 success, response = outcome
                 if not success:
-                    if isValid(table):
-                        progress.hide()
-                        run_scan.setEnabled(True)
-                        scan_state.setText("Read-only scan could not finish. Retry or choose another drive.")
+                    if isValid(scan_state):
+                        scan_state.setText("Analysis failed. Choose Retry or another drive.")
                     self.error("Other Storage analysis incomplete", response)
                     return
+                # Retain partial results, including deliberate cancellation.
                 report = response
                 self._other_storage_report = report
                 self._other_storage_report_drive = drive_at_start
@@ -1768,7 +1830,7 @@ class ScreenMethods:
                     show_report(report)
                 else:
                     self.status.setText(
-                        "Other Storage analysis complete. Open Other Storage to review.")
+                        "Other Storage analysis ended; open that tab to inspect the results.")
             self.job(job, done, progress=progress_cb,
                      error_title="Other Storage analysis could not finish")
 
@@ -1795,6 +1857,14 @@ class ScreenMethods:
         back.clicked.connect(lambda _=False: analyze())
         disk_choices.currentIndexChanged.connect(refresh_drive)
         refresh_drive()
+        # refresh_drive may have cleared the disabled state of an ongoing job.
+        if getattr(self, "_other_storage_running", False):
+            run_scan.setEnabled(False)
+            stop_scan.setEnabled(True)
+            scan_mode.setEnabled(False)
+            progress.setRange(0, 0)
+            progress.show()
+            scan_state.setText("Other Storage scan running. Cancel remains available.")
 
     def captures_page(self):
         """One Captures destination with distinct Screenshots and Videos panels.
