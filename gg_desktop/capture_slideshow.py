@@ -37,7 +37,7 @@ class CaptureSlideshow(QFrame):
         layout.setSpacing(10)
 
         heading = QHBoxLayout()
-        title = QLabel("SCREENSHOT GALLERY")
+        title = QLabel("Moments worth keeping")
         title.setObjectName("captureSlideshowHeading")
         heading.addWidget(title)
         heading.addStretch()
@@ -66,7 +66,7 @@ class CaptureSlideshow(QFrame):
         for control in (self.previous_button, self.play_button, self.next_button):
             actions.addWidget(control)
         actions.addStretch(1)
-        note = QLabel("5 sec / image  •  loops all detected screenshots")
+        note = QLabel("Changes every 5 seconds  ·  Pauses when you leave")
         note.setObjectName("captureSlideshowNote")
         actions.addWidget(note)
         layout.addLayout(actions)
@@ -78,7 +78,7 @@ class CaptureSlideshow(QFrame):
         self.host.installEventFilter(self)
         if not self.records:
             self.playing = False
-            self.preview.set_status("No game screenshots detected. Scan PC to build your gallery.")
+            self.preview.set_status("No screenshots in sight. Try scanning your game capture folders.")
         self._display()
 
     def _display(self):
@@ -88,7 +88,7 @@ class CaptureSlideshow(QFrame):
         self.play_button.setText("❚❚  Pause" if self.playing else "▶  Play")
         self.position.setText(f"{self.index + 1:,} / {total:,}" if total else "0 / 0")
         if not total:
-            self.description.setText("Your own game captures will appear here after a scan.")
+            self.description.setText("Your screenshots will show up here when we find them.")
             self.timer.stop()
             return
 
@@ -165,5 +165,5 @@ class CaptureSlideshow(QFrame):
             (i for i, rec in enumerate(self.records) if rec.path == previous), 0)
         self.playing = bool(self.records) and self.playing
         if not self.records:
-            self.preview.set_status("No screenshots remain in this review list.")
+            self.preview.set_status("Nothing left in this selection.")
         self._display()
