@@ -87,7 +87,13 @@ def merge_games(steam: Iterable, others: Iterable) -> list[GameRecord]:
         # the original manifest, instead of creating false "ambiguous" status.
         supplemental = {"Custom library", "Local game files",
                         "Windows installed games"}
-        primary = [r for r in rows if r.launcher not in supplemental]
+        # Steam/Epic/GOG/EAs are storefront records; Rockstar may merely
+        # provide its runtime registration for the same Steam/Epic game.
+        storefronts = {"Steam", "Epic Games", "GOG", "EA",
+                       "Ubisoft Connect", "Battle.net", "Riot Games"}
+        primary = [r for r in rows if r.launcher in storefronts]
+        if not primary:
+            primary = [r for r in rows if r.launcher == "Rockstar Games"]
         if len(primary) == 1 and all(
                 r is primary[0] or r.launcher in supplemental
                 or (r.launcher == "Rockstar Games"
