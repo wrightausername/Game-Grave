@@ -228,16 +228,16 @@ class ModLocationCard(QFrame):
     def __init__(self, game, locations, on_selected, source=None):
         super().__init__()
         self.setObjectName("modLocationCard")
-        self.setMinimumWidth(200)
-        self.setFixedHeight(208)
+        self.setMinimumWidth(140)
+        self.setFixedHeight(240)
         self.setCursor(Qt.PointingHandCursor)
         self._choose = on_selected
         layout = _col(self, spacing=4, margins=(7, 7, 7, 8))
         art = QLabel()
-        _image(art, game, w=248, h=135)
+        _image(art, game, w=140, h=166)
         if game is None:
             from gg_desktop.poster_art import generated_game_poster
-            art.setPixmap(generated_game_poster(str(source or "MOD SOURCE"), 248, 135))
+            art.setPixmap(generated_game_poster(str(source or "MOD SOURCE"), 140, 166))
         layout.addWidget(art)
         title = game.name if game else str(source or "Other locations")
         layout.addWidget(_label(title[:45], "findingTitle"))
@@ -252,7 +252,7 @@ class ModLocationCard(QFrame):
         super().mouseReleaseEvent(event)
 
 
-def mod_gallery(games, mods, on_selected, *, limit=9):
+def mod_gallery(games, mods, on_selected, *, limit=10, columns=5):
     """Gallery of actual mod locations, grouped by known game or detected source."""
     pairs, unknown = group_mod_locations(games, mods)
     box = QFrame()
@@ -293,12 +293,13 @@ def mod_gallery(games, mods, on_selected, *, limit=9):
     grid = QGridLayout(grid_holder)
     grid.setContentsMargins(0, 3, 0, 3)
     grid.setSpacing(10)
+    columns = max(1, min(5, int(columns)))
     for i, (game, found, source) in enumerate(targets[:limit]):
         grid.addWidget(ModLocationCard(
             game, found,
             lambda g=game, m=found, src=source: on_selected(g, m, src),
-            source=source), i // 3, i % 3)
-    for col in range(3):
+            source=source), i // columns, i % columns)
+    for col in range(columns):
         grid.setColumnStretch(col, 1)
     column.addWidget(grid_holder)
     if len(targets) > limit:
@@ -314,8 +315,8 @@ class ModInspector(QFrame):
     def __init__(self, on_open, on_review, on_scan):
         super().__init__()
         self.setObjectName("premiumInspector")
-        self.setMinimumWidth(335)
-        self.setMaximumWidth(390)
+        self.setMinimumWidth(310)
+        self.setMaximumWidth(345)
         self._on_open = on_open
         self._on_review = on_review
         self._on_scan = on_scan
