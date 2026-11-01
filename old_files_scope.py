@@ -112,9 +112,11 @@ def scan_old_files_scope(
     *,
     cancel: Callable[[], bool] | None = None,
     known_game_roots: Iterable[str] = (),
-    max_entries: int = MAX_ENTRIES,
-    max_matches: int = MAX_MATCHES,
-    max_seconds: float = MAX_SECONDS,
+    max_entries: int | None = MAX_ENTRIES,
+    max_matches: int | None = MAX_MATCHES,
+    max_seconds: float | None = MAX_SECONDS,
+    max_depth: int | None = MAX_DEPTH,
+    notify: Callable[[int, str], None] | None = None,
 ) -> OldFilesScopeResult:
     """Choose normal folder scan or separately bounded local fixed-drive scan.
 
@@ -125,21 +127,32 @@ def scan_old_files_scope(
     if not is_fixed_drive_root(root):
         if not safe_scan_root(root):
             raise ValueError("Select an ordinary folder or a local fixed drive.")
-        files = scan_old_files(root, days, cancel=cancel)
+        folder_limit = 50_000 if max_matches is not None else None
+        files = scan_old_files(root, days, cancel=cancel,
+                               max_matches=folder_limit, notify=notify)
+        capped = folder_limit is not None and len(files) >= folder_limit
         return OldFilesScopeResult(
             files=tuple(files),
-            status="partial" if len(files) >= 50_000 else "complete",
-            message=("Ordinary folder scan reached the 50,000-file display limit."
-                     if len(files) >= 50_000 else "Folder scan completed."),
+            status="partial" if capped else "complete",
+            message=("Ordinary folder scan reached the 50,000-file limit."
+                     if capped else "Folder scan completed."),
             inspected=0,
         )
 
     if not 1 <= int(days) <= 10_000:
         raise ValueError("Old Files age filter must be at least 1 day.")
-    if not 1 <= max_entries <= MAX_ENTRIES or not 1 <= max_matches <= MAX_MATCHES:
-        raise ValueError("Drive scan limits are invalid.")
-    if max_seconds <= 0 or max_seconds > 120:
+    if max_entries is not None and (type(max_entries) is not int or
+                                     not 1 <= max_entries <= MAX_ENTRIES):
+        raise ValueError("Drive scan entry limit is invalid.")
+    if max_matches is not None and (type(max_matches) is not int or
+                                     not 1 <= max_matches <= MAX_MATCHES):
+        raise ValueError("Drive scan result limit is invalid.")
+    if max_seconds is not None and (type(max_seconds) not in (int, float) or
+                                    not 0 < max_seconds <= 120):
         raise ValueError("Drive scan time limit is invalid.")
+    if max_depth is not None and (type(max_depth) is not int or
+                                  not 1 <= max_depth <= MAX_DEPTH):
+        raise ValueError("Drive scan depth limit is invalid.")
     games = tuple(
         Path(path) for path in known_game_roots
         if isinstance(path, str) and path.strip() and _inside(root, Path(path))
@@ -163,7 +176,7 @@ def scan_old_files_scope(
                                        onerror=on_error):
         if cancel and cancel():
             raise InterruptedError("Old Files drive scan canceled.")
-        if time.monotonic() - started >= max_seconds:
+        if max_seconds is not None and time.monotonic() - started >= max_seconds:
             status, reason = "partial", "Time limit reached; results are incomplete."
             break
         parent_path = Path(parent)
@@ -172,7 +185,7 @@ def scan_old_files_scope(
             dirs[:] = []
             continue
         depth = len(parent_path.relative_to(root).parts)
-        if depth >= MAX_DEPTH:
+        if max_depth is not None and depth >= max_depth:
             skipped += len(dirs)
             dirs[:] = []
         else:
@@ -191,7 +204,12 @@ def scan_old_files_scope(
 
         for name in names:
             visited += 1
-            if visited >= max_entries:
+            if notify and visited % 3000 == 0:
+                percent = (min(99, int(100 * visited / max_entries))
+                           if max_entries is not None else 0)
+                notify(percent, f"Examined {visited:,} file entries; "
+                       f"{len(result):,} age-matched (read-only)")
+            if max_entries is not None and visited >= max_entries:
                 status, reason = "partial", "Item limit reached; results are incomplete."
                 break
             if cancel and cancel():
@@ -220,7 +238,7 @@ def scan_old_files_scope(
                     state.st_dev, state.st_ino,
                     state.st_mtime_ns, state.st_nlink,
                 ))
-                if len(result) >= max_matches:
+                if max_matches is not None and len(result) >= max_matches:
                     status, reason = "partial", "Result limit reached; scan is incomplete."
                     break
         if status != "complete":
