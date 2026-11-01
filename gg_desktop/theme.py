@@ -594,3 +594,43 @@ QFrame#undoRecoveryStatusPanel {
     border-radius:6px;
 }
 """
+
+
+# Screen-specific geometry, sourced from the approved Crimson mockups.
+STYLE += r"""
+QFrame#captureTheaterPanel {
+    background:#080E17; border:1px solid #71324A;
+    border-top:2px solid #E14460; border-radius:6px;
+}
+QLabel#captureTheaterNote {
+    color:#7DAFC0; font-weight:800;
+    font-size:10px; letter-spacing:1.7px;
+    padding:3px 12px;
+}
+QWidget#captureFilmstrip {background:#090F17;border:0;}
+QPushButton#captureFilmstripTile {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #222C38,stop:1 #0A111A);
+    color:#E0EBF3;border:1px solid #365266;
+    border-bottom:2px solid #7B344A;
+    border-radius:3px; font-size:11px;
+    text-align:center; padding:5px 7px;
+}
+QPushButton#captureFilmstripTile:hover {
+    border:1px solid #E14662; border-bottom:2px solid #E14662;
+    background:#34212E;
+}
+QTabWidget#captureTabs::pane {
+    border:1px solid #314454;background:#08101B;
+    border-radius:4px;
+}
+QTabWidget#captureTabs QTabBar::tab {
+    padding:10px 22px;background:#101926;
+    border:1px solid #314353;color:#ABC3D2;
+    font-size:12px;font-weight:800;
+}
+QTabWidget#captureTabs QTabBar::tab:selected {
+    background:#542038;border-bottom:2px solid #E94B68;
+    color:#FFFFFF;
+}
+"""
