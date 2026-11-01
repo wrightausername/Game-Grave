@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 280">
+<defs>
+  <linearGradient id="bg" x1="0" x2="1" y1="0" y2="0"><stop stop-color="#060A12"/><stop offset=".48" stop-color="#130D18"/><stop offset="1" stop-color="#3C1427"/></linearGradient>
+  <radialGradient id="glow"><stop stop-color="#F94A67" stop-opacity=".36"/><stop offset=".7" stop-color="#CA2B47" stop-opacity=".12"/><stop offset="1" stop-color="#CA2B47" stop-opacity="0"/></radialGradient>
+  <pattern id="mesh" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0H0V36" fill="none" stroke="#81364E" stroke-width=".6" opacity=".20"/></pattern>
+  <linearGradient id="dna" x1="0" x2="1"><stop stop-color="#DA1D3C"/><stop offset=".5" stop-color="#FA637B"/><stop offset="1" stop-color="#6FE0ED"/></linearGradient>
+</defs>
+<rect width="1320" height="280" fill="url(#bg)"/>
+<rect width="1320" height="280" fill="url(#mesh)"/>
+<ellipse cx="1030" cy="135" rx="350" ry="205" fill="url(#glow)"/>
+<g fill="none" stroke="#EE4560" opacity=".48"><path d="M755 30L823 30L842 50M790 240L825 212L862 212M1127 20H1215L1260 66M1191 236L1235 200H1300" stroke-width="2"/><path d="M856 48H975M1102 208H1210" stroke-dasharray="5 6"/></g>
+<g fill="none" stroke="#E83D57" opacity=".5" stroke-width="1.2">
+<polygon points="1025,18 1122,75 1122,190 1025,244 928,190 928,75"/>
+<polygon points="1025,38 1102,86 1102,178 1025,222 948,178 948,86"/>
+</g>
+<g stroke="url(#dna)" stroke-linecap="round" fill="none">
+<path d="M991 39C1094 81 956 124 1058 164S1091 239 991 245" stroke-width="7" opacity=".86"/>
+<path d="M1058 39C955 81 1091 124 991 164S958 239 1058 245" stroke-width="7" opacity=".86"/>
+</g>
+<g stroke="#99CEDC" stroke-width="2" opacity=".6">
+<path d="M998 50L1052 50M985 77L1063 77M992 103L1058 103M1002 131L1048 131M986 157L1065 157M991 185L1058 185M997 213L1052 213M990 239L1058 239"/>
+</g>
+<g font-family="Segoe UI, sans-serif" font-size="11" letter-spacing="1.6" font-weight="600" fill="#EBA5B1" opacity=".85">
+<text x="796" y="88">INSTALL</text><text x="1163" y="106">MODS</text><text x="796" y="214">SAVES</text><text x="1160" y="196">LINKS</text>
+</g>
+<g fill="#FA586E"><circle cx="841" cy="98" r="3"/><circle cx="1150" cy="111" r="3"/><circle cx="846" cy="216" r="3"/><circle cx="1150" cy="192" r="3"/></g>
+</svg>
