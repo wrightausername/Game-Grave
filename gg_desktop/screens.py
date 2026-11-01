@@ -2993,118 +2993,236 @@ class ScreenMethods:
         return self.captures_page()
 
     def undo_page(self):
-        page = self._new("Undo Center",
-                         "Check whether Windows still holds recycled files, then approve restoration.")
-        entries = list(reversed(get_records()))[:300]
-        page.content.addWidget(FeatureStrip([
-            ("RECORDED", "Game Grave action log"),
-            ("VERIFIED", "Check Windows match"),
-            ("RESTORE", "Approve exact path"),
-            ("CONFIRM", "No silent overwrite"),
-        ]))
-        recovery_visual, recovery_col = panel(padding=12)
-        recovery_col.addWidget(section_title("RECOVERY ROUTE", "Select a row to examine"))
-        recovery_path = RecoveryRoute()
-        recovery_col.addWidget(recovery_path)
-        page.content.addWidget(recovery_visual)
-        p, contents = panel()
-        contents.addWidget(section_title("Local recovery records",
-                                         str(len(entries)) + " recent"))
-        table = data_table(["ORIGINAL LOCATION", "SIZE", "RECORDED", "STATE"])
-        table.setColumnWidth(0, 360)
-        table.setColumnWidth(1, 110)
-        table.setColumnWidth(2, 165)
-        table.setRowCount(len(entries))
-        for i, e in enumerate(entries):
-            values = (e.get("path", "Unknown"), readable_bytes(e.get("size")),
-                      e.get("time", "Unknown"), e.get("state", "Not checked"))
-            for j, val in enumerate(values):
-                _table_text(table, i, j, val)
-        contents.addWidget(table)
-        buttons = QWidget()
-        line = row()
-        buttons.setLayout(line)
+        """Recovery-first workspace: action bar, searchable history and inspector.
+
+        Only a unique Windows Recycle Bin match may be restored. The dial
+        counts recorded verification states, never promises future retention.
+        """
+        from shiboken6 import isValid
+        from gg_desktop.undo_visuals import UndoStatusDial
+
+        page = self._new(
+            "Undo Center",
+            "Recover and restore content you've removed with Game Grave. "
+            "Nothing is overwritten automatically.")
+
+        actions, actions_col = panel(padding=12)
+        tiles = QWidget()
+        tiles_row = row(spacing=10)
+        tiles.setLayout(tiles_row)
+        restore_tile = button("↶  Restore Items\nVerify and recover", kind="primary")
+        recycle_tile = button("▤  Browse Recycle Bin\nView deleted items")
+        history_tile = button("☷  Deletion History\nSearch local records")
+        settings_tile = button("⚙  Undo Settings\nSafety and protection")
+        for action_button in (restore_tile, recycle_tile, history_tile, settings_tile):
+            action_button.setMinimumHeight(68)
+            action_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            tiles_row.addWidget(action_button, 1)
+        actions_col.addWidget(tiles)
+        page.content.addWidget(actions)
+
+        workspace = QWidget()
+        layout = row(spacing=12)
+        workspace.setLayout(layout)
+
+        history_panel, history_col = panel(padding=13)
+        history_header = QWidget()
+        title_row = row(spacing=9)
+        history_header.setLayout(title_row)
+        history_title = label("RECENTLY DELETED", "sectionTitle")
+        title_row.addWidget(history_title, 1)
+        history_search = QLineEdit()
+        history_search.setPlaceholderText("Search deleted items…")
+        history_search.setAccessibleName("Search local recovery history")
+        history_search.setMaximumWidth(225)
+        title_row.addWidget(history_search)
+        history_sort = QComboBox()
+        history_sort.setAccessibleName("Sort recovery history")
+        history_sort.addItems(["Newest first", "Oldest first", "Largest first", "Item A to Z"])
+        history_sort.setMaximumWidth(147)
+        title_row.addWidget(history_sort)
+        history_col.addWidget(history_header)
+
+        table = data_table(["ITEM", "ACTION", "ORIGINAL LOCATION", "SIZE", "RECORDED", "STATE"])
+        table.setObjectName("undoHistoryTable")
+        table.setSelectionMode(QAbstractItemView.SingleSelection)
+        table.setMinimumHeight(410)
+        table.setColumnWidth(0, 200)
+        table.setColumnWidth(1, 115)
+        table.setColumnWidth(2, 230)
+        table.setColumnWidth(3, 85)
+        table.setColumnWidth(4, 126)
+        table.setColumnWidth(5, 120)
+        history_col.addWidget(table)
+        history_caption = label(
+            "Logged recycling is not the same as verified recoverability. "
+            "Check Windows before restoring. All records remain local.",
+            "caption", wrap=True)
+        history_col.addWidget(history_caption)
+        history_col.addStretch(1)
+        layout.addWidget(history_panel, 7)
+
+        status_panel, status_col = panel(padding=14)
+        status_panel.setObjectName("undoRecoveryStatusPanel")
+        status_col.addWidget(section_title("RECOVERY STATUS", "Actual recorded evidence"))
+        dial = UndoStatusDial()
+        status_col.addWidget(dial)
+        selected_name = label("Select an item", "sectionTitle", wrap=True)
+        selected_path = label("Choose a deleted item to inspect its original path.",
+                              "subtle", wrap=True)
+        selected_state = label("Availability not checked", "warning", wrap=True)
+        status_col.addWidget(selected_name)
+        status_col.addWidget(selected_path)
+        status_col.addWidget(selected_state)
+        verify_btn = button("Verify Windows Recycle Bin", kind="primary")
+        restore_btn = button("↶  Restore selected item…")
+        restore_btn.setObjectName("undoRestoreSelected")
+        verify_btn.setMinimumHeight(40)
+        restore_btn.setMinimumHeight(44)
+        status_col.addWidget(verify_btn)
+        status_col.addWidget(restore_btn)
+        status_col.addWidget(label(
+            "No overwrite. No automatic recovery. No guaranteed retention "
+            "period. Restoration requires your confirmation and an exact "
+            "matching Windows Recycle Bin entry.",
+            "caption", wrap=True))
+        status_col.addStretch(1)
+        layout.addWidget(status_panel, 3)
+        page.content.addWidget(workspace)
+
+        page.content.addWidget(label(
+            "Your Windows Recycle Bin is controlled by Windows. Emptying it, "
+            "storage cleanup, or restoring another copy can make recovery "
+            "unavailable even when a historical action is logged.",
+            "warning", wrap=True))
+
+        state = {"entries": [], "visible": []}
         def selected_record():
-            idx = _selected_indices(table)
-            return entries[idx[0]] if idx else None
-        def update_route():
-            rec = selected_record()
-            recovery_path.set_record(
-                str(rec.get("path", "Select a recovery record")) if rec else
-                "Select a recovery record",
-                ("Last logged state: " + str(rec.get("state", "Not checked")))
-                if rec else "Not checked")
-        table.itemSelectionChanged.connect(update_route)
-        if entries:
-            table.selectRow(0)
-        else:
-            contents.addWidget(clear_empty_panel(
-                "No recovery records",
-                "Game Grave has not recorded a Recycle Bin cleanup yet. "
-                "Nothing to restore from this list."))
-        def refresh_recovery_row(event_id: str):
-            # Update the existing table without throwing the user to the top
-            # of the Undo Center or discarding their selected record.
-            recent = {str(r.get("id", "")): r for r in get_records()}
-            updated = recent.get(str(event_id))
-            if updated is None:
+            idxs = _selected_indices(table)
+            return (state["visible"][idxs[0]]
+                    if idxs and 0 <= idxs[0] < len(state["visible"]) else None)
+
+        def update_inspector():
+            current = selected_record()
+            dial.set_records(state["entries"])
+            if current is None:
+                selected_name.setText("No item selected")
+                selected_path.setText("Select a history record, then verify it.")
+                selected_state.setText("Not checked")
+                verify_btn.setEnabled(False)
+                restore_btn.setEnabled(False)
                 return
-            from shiboken6 import isValid
-            if not isValid(table):
+            selected_name.setText(Path(str(current.get("path", ""))).name or "Unknown item")
+            selected_path.setText("Original location: " + str(current.get("path", "Unknown")) +
+                                  "\nLogged size: " + readable_bytes(current.get("size")))
+            status = str(current.get("state", "Not checked"))
+            selected_state.setText(
+                "Recorded status: " + status + "\n" +
+                str(current.get("note", "A new Windows check is required.")))
+            verify_btn.setEnabled(status != "Restored")
+            # A recent previous availability check is a prerequisite but not
+            # a guarantee. The backend checks the exact match again on restore.
+            restore_btn.setEnabled(status == "Available")
+
+        def rebuild(preferred_id=None):
+            state["entries"] = list(reversed(get_records()))[:500]
+            query = history_search.text().strip().casefold()
+            rows = [e for e in state["entries"] if not query or
+                    query in (" ".join(str(e.get(k, "")) for k in
+                             ("path", "action", "time", "state"))).casefold()]
+            choice = history_sort.currentText()
+            if choice == "Oldest first":
+                rows.sort(key=lambda e: str(e.get("time", "")))
+            elif choice == "Largest first":
+                rows.sort(key=lambda e: -int(e.get("size", 0) or 0))
+            elif choice == "Item A to Z":
+                rows.sort(key=lambda e: Path(str(e.get("path", ""))).name.casefold())
+            else:
+                rows.sort(key=lambda e: str(e.get("time", "")), reverse=True)
+            state["visible"] = rows
+            history_title.setText(f"RECENTLY DELETED  ({len(rows)} shown)")
+            table.setRowCount(len(rows))
+            for i, rec in enumerate(rows):
+                filename = Path(str(rec.get("path", ""))).name or "Unknown"
+                for j, value in enumerate((
+                    filename, rec.get("action", "Manual"),
+                    str(rec.get("path", "")), readable_bytes(rec.get("size")),
+                    rec.get("time", "Unknown"), rec.get("state", "Not checked"),
+                )):
+                    _table_text(table, i, j, value)
+                table.setRowHeight(i, 39)
+            target = next((i for i,e in enumerate(rows)
+                           if str(e.get("id")) == str(preferred_id)), None)
+            if target is None and rows:
+                target = 0
+            if target is not None:
+                table.selectRow(target)
+            update_inspector()
+
+        def browse_bin():
+            if os.name != "nt":
+                self.error("Windows only", "Windows Recycle Bin is not available here.")
                 return
-            for index, previous in enumerate(entries):
-                if str(previous.get("id", "")) == str(event_id):
-                    entries[index] = updated
-                    _table_text(table, index, 3,
-                                updated.get("state", "Not checked"))
-                    if index in _selected_indices(table):
-                        update_route()
-                    break
+            try:
+                subprocess.Popen(["explorer.exe", "shell:RecycleBinFolder"])
+            except OSError as exc:
+                self.error("Windows Recycle Bin unavailable", str(exc))
 
         def check():
-            record = selected_record()
-            if not record:
-                self.info("Choose a record", "Select an Undo Center entry first.")
-                return
-            key = str(record.get("id", ""))
-            def verified(outcome):
-                refresh_recovery_row(key)
-                self.status.setText(
-                    "Windows recovery check: " + str(outcome) +
-                    ". Verify an exact Recycle Bin match before restoring.")
-            self.job(lambda _emitter: check_restore(key), verified,
-                     error_title="Cannot check recovery")
-        def undo():
-            if self.cleaning or self.scanning:
-                self.info("Busy", "Finish the current operation first.")
-                return
             rec = selected_record()
             if not rec:
-                self.info("Choose a record", "Select a recovery record.")
                 return
-            if not self.confirm("Restore from Windows Recycle Bin?",
-                "Attempt to restore the exact matching recycled item to:\n" +
-                str(rec.get("path", "Unknown")) +
-                "\n\nWindows will refuse uncertain or conflicting entries. "
-                "Game Grave will not overwrite a current file."):
+            key = str(rec.get("id", ""))
+            verify_btn.setEnabled(False)
+            self.status.setText("Checking exact Windows Recycle Bin match…")
+            def finished(outcome):
+                if not isValid(table):
+                    return
+                rebuild(preferred_id=key)
+                self.status.setText(
+                    "Windows check: " + str(outcome) + ". No files were moved.")
+            self.job(lambda _p: check_restore(key), finished,
+                     error_title="Cannot check Windows recovery")
+
+        def restore_one():
+            rec = selected_record()
+            if not rec or rec.get("state") != "Available" or self.cleaning or self.scanning:
+                self.info("Verify before restoring",
+                          "Select a record marked Available by Windows and finish any scan first.")
+                return
+            key = str(rec.get("id", ""))
+            path = str(rec.get("path", ""))
+            if not self.confirm(
+                "Restore this exact item?",
+                "Restore from Windows Recycle Bin to:\n\n" + path +
+                "\n\nThe original must still be absent and Windows must have "
+                "one matching item. An existing file will never be overwritten."):
                 return
             self.cleaning = True
-            key = str(rec.get("id", ""))
+            restore_btn.setEnabled(False)
             def finished(value):
                 self.cleaning = False
-                refresh_recovery_row(key)
-                self.status.setText("Windows restore result: " + str(value))
-                self.info("Restore result", str(value))
-            self.job(lambda _progress: restore_recycled(key), finished,
+                if isValid(table):
+                    rebuild(preferred_id=key)
+                self.status.setText("Restore result: " + str(value))
+                self.info("Recovery result", str(value))
+            self.job(lambda _p: restore_recycled(key), finished,
                      error_title="Restore could not be verified")
-        line.addWidget(button("Verify exact Windows match", check))
-        line.addWidget(button("Restore selected…", undo, kind="primary"))
-        line.addWidget(button("Refresh records", lambda: self.navigate("Undo Center")))
-        contents.addWidget(buttons)
-        page.content.addWidget(p)
-        _box_notice(page, "Undo depends on a unique matching Windows Recycle Bin item. "
-                    "Emptying the Recycle Bin or source path conflicts may prevent recovery.",
-                    warning=True)
+
+        table.itemSelectionChanged.connect(update_inspector)
+        history_search.textChanged.connect(lambda _: rebuild())
+        history_sort.currentTextChanged.connect(lambda _: rebuild())
+        restore_tile.clicked.connect(restore_one)
+        recycle_tile.clicked.connect(browse_bin)
+        history_tile.clicked.connect(lambda: (table.setFocus(), table.scrollToTop()))
+        settings_tile.clicked.connect(lambda: self.navigate("Settings"))
+        verify_btn.clicked.connect(check)
+        restore_btn.clicked.connect(restore_one)
+        rebuild()
+        if not state["entries"]:
+            history_caption.setText(
+                "No Game Grave cleanup history yet. Your future approved "
+                "Recycle Bin operations will appear here. Nothing is simulated.")
 
     def _choose_old_files_c_drive(self):
         """Deliberately opt in to a read-only bounded C-drive scan."""
