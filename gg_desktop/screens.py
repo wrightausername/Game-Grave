@@ -3268,17 +3268,8 @@ class ScreenMethods:
                        key=lambda x: (-x.modified, x.path.casefold()))
         recordings = sorted(self.inventory.recordings,
                             key=lambda x: (-x.modified, x.path.casefold()))
-        counts = QWidget()
-        statrow = row(spacing=10)
-        counts.setLayout(statrow)
-        statrow.addWidget(MetricCard(
-            "SCREENSHOTS", str(len(shots)),
-            "Recognized game captures • metadata only", tone="cyan"))
-        statrow.addWidget(MetricCard(
-            "VIDEOS / RECORDINGS", str(len(recordings)),
-            "Known capture sources • metadata only", tone="text"))
-        page.content.addWidget(counts)
-
+        # The approved Screening Room is photo-first, not two KPI cards and
+        # a wall of explanatory copy before the actual screenshot.
         tabs = QTabWidget()
         tabs.setObjectName("captureTabs")
         tabs.setDocumentMode(True)
@@ -3299,14 +3290,13 @@ class ScreenMethods:
             return stack, body
 
         # ---------- SCREENSHOT PANEL ----------
-        screenshot_stack, photo_col = build_panel(
-            f"▧  Screenshots  ({len(shots)})",
-            "Game Grave automatically finds game screenshots in supported Steam, "
-            "launcher, capture and game-named screenshot folders. "
-            "The dashboard shows your newest actual image. "
-            "No personal Pictures-folder crawl; photos are decoded locally only "
-            "for previews. In fullscreen review, one safety acknowledgement "
-            "per session permits deliberate per-image Keep/Recycle actions.")
+        screenshot_tab = QWidget()
+        screenshot_stack = column(spacing=9, margins=(10, 12, 10, 10))
+        screenshot_tab.setLayout(screenshot_stack)
+        gallery_frame, photo_col = panel(padding=12)
+        gallery_frame.setObjectName("captureTheaterPanel")
+        screenshot_stack.addWidget(gallery_frame)
+        tabs.addTab(screenshot_tab, f"▧  Screenshots  ({len(shots)})")
         actions = QWidget()
         controls = row(spacing=9)
         actions.setLayout(controls)
@@ -3332,8 +3322,31 @@ class ScreenMethods:
                 _table_text(photo_table, i, colno, value)
             photo_table.setRowHeight(i, 37)
         from gg_desktop.capture_slideshow import CaptureSlideshow
-        slideshow = CaptureSlideshow(self, shots, page)
-        photo_col.insertWidget(2, slideshow)
+        slideshow = CaptureSlideshow(self, shots, screenshot_tab)
+        slideshow.preview.setMinimumHeight(430)
+        slideshow.preview.setMaximumHeight(540)
+        photo_col.insertWidget(0, slideshow)
+        gallery_note = label(
+            "YOUR ACTUAL CAPTURES  ·  AUTO-ADVANCE EVERY 5 SECONDS  ·  "
+            "LOCAL-ONLY PREVIEWS", "captureTheaterNote")
+        photo_col.insertWidget(1, gallery_note)
+        # A small authored filmstrip navigates the real photo list, without
+        # pre-decoding hundreds of user files or fabricating thumbnails.
+        if shots:
+            strip = QWidget()
+            strip.setObjectName("captureFilmstrip")
+            strip_row = row(spacing=7)
+            strip.setLayout(strip_row)
+            for index, shot in enumerate(shots[:5]):
+                caption = Path(shot.path).stem
+                tile = button(
+                    f"{index + 1:02d}  {caption[:20]}",
+                    lambda _checked=False, number=index: slideshow.jump_to(number),
+                    kind="captureFilmstripTile",
+                    tip=str(shot.path))
+                tile.setMinimumHeight(37)
+                strip_row.addWidget(tile, 1)
+            photo_col.insertWidget(2, strip)
         # The image gallery is the primary Captures view. Detailed rows are
         # optional, not a wall of table data covering the actual pictures.
         inventory_toggle = button("▤  Show screenshot inventory", kind="referenceSecondary")
@@ -3343,8 +3356,12 @@ class ScreenMethods:
             inventory_toggle.setText(
                 "▤  Hide screenshot inventory" if visible
                 else "▤  Show screenshot inventory")
-        photo_col.addWidget(inventory_toggle)
-        photo_col.addWidget(photo_table)
+        advanced_section = QWidget()
+        advanced_col = column(spacing=5)
+        advanced_section.setLayout(advanced_col)
+        advanced_col.addWidget(inventory_toggle)
+        advanced_col.addWidget(photo_table)
+        screenshot_stack.addWidget(advanced_section)
         photo_table.hide()
         if not shots:
             photo_col.addWidget(label(
@@ -3396,7 +3413,9 @@ class ScreenMethods:
                 photo_table.selectRow(min(idx, len(photos) - 1))
 
         def folder_photo():
-            record = current_photo()
+            # In theater mode, the image on screen is the selected capture,
+            # even when the optional inventory table remains hidden.
+            record = slideshow.records[slideshow.index] if slideshow.records else None
             if record is not None:
                 self._open_folder(str(Path(record.path).parent))
 
@@ -3407,7 +3426,7 @@ class ScreenMethods:
             "Review screenshots fullscreen…", review_photo, kind="primary"))
         photo_buttons_row.addWidget(button("Open folder", folder_photo))
         photo_buttons_row.addStretch()
-        photo_col.addWidget(photo_buttons)
+        screenshot_stack.insertWidget(1, photo_buttons)
         photo_table.cellDoubleClicked.connect(
             lambda index, _column: review_photo(index)
             if 0 <= index < len(photos) else None)
