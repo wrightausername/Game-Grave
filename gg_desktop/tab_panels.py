@@ -269,3 +269,85 @@ def clear_empty_panel(title: str, message: str):
     col.addWidget(_small(title, "sceneTitle"))
     col.addWidget(_small(message))
     return panel
+
+
+def _evidence_bar(parent, name, value, maximum, *, color="#F84359",
+                  detail=""):
+    """Truthful relative count visualization, with an explicit denominator."""
+    row = QWidget()
+    line = _layout(row, vertical=False, pad=(0, 0, 0, 0), gap=11)
+    title = _small(name, "findingTitle")
+    title.setMinimumWidth(135)
+    line.addWidget(title, 2)
+    bar = QProgressBar()
+    bar.setMinimum(0)
+    bar.setMaximum(max(1, int(maximum)))
+    bar.setValue(max(0, min(int(value), max(1, int(maximum)))))
+    bar.setTextVisible(False)
+    bar.setFixedHeight(12)
+    bar.setStyleSheet(
+        "QProgressBar{background:#0B1721;border:1px solid #334757;"
+        "border-radius:5px;}"
+        f"QProgressBar::chunk{{background:{color};border-radius:4px;}}")
+    bar.setAccessibleName(f"{name}: {value} of {maximum} inspected findings")
+    line.addWidget(bar, 4)
+    line.addWidget(_small(f"{value:,} / {maximum:,}" + detail, "caption"), 2)
+    parent.addWidget(row)
+
+
+def graveyard_mix_panel(entries):
+    """What kinds of findings were discovered, not a deletion forecast."""
+    total = len(entries)
+    counts = Counter(str(getattr(e, "category", "Other")) for e in entries)
+    panel = QFrame()
+    panel.setObjectName("dashboardPanel")
+    col = _layout(panel, gap=11)
+    col.addWidget(_small("GRAVEYARD DISCOVERY MIX", "sectionTitle"))
+    col.addWidget(_small(
+        "Counts of currently scanned findings. Protection and apparent size "
+        "are separate from what can actually be reclaimed.", "caption"))
+    if not entries:
+        col.addWidget(_small("No findings to chart after this scan.", "caption"))
+        return panel
+    colors = ("#F84359", "#41C7E8", "#A482EE", "#F8AF67", "#77D7AA")
+    for idx, (category, count) in enumerate(counts.most_common(5)):
+        _evidence_bar(col, category, count, total,
+                      color=colors[idx % len(colors)])
+    if len(counts) > 5:
+        extra = sum(n for _, n in counts.most_common()[5:])
+        _evidence_bar(col, "Other categories", extra, total, color="#91A7B9")
+    return panel
+
+
+def old_file_age_chart(files, *, now=None):
+    """Age histogram from metadata, never proof that removal is safe."""
+    import time
+    clock = time.time() if now is None else now
+    groups = [
+        ("0–90 days", 0), ("91–180 days", 0), ("181–365 days", 0),
+        ("1–2 years", 0), ("2+ years", 0),
+    ]
+    counts = [0] * len(groups)
+    for file in files:
+        try:
+            age = max(0, (clock - float(file.modified)) / 86400)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        idx = (0 if age <= 90 else 1 if age <= 180 else
+               2 if age <= 365 else 3 if age <= 730 else 4)
+        counts[idx] += 1
+    panel = QFrame()
+    panel.setObjectName("dashboardPanel")
+    col = _layout(panel, gap=9)
+    col.addWidget(_small("DISCOVERED FILE AGE", "sectionTitle"))
+    col.addWidget(_small(
+        "Last-modified date is not last-used date. These relative counts "
+        "do not establish that any file can be safely recycled.", "caption"))
+    measured = sum(counts)
+    if measured == 0:
+        col.addWidget(_small("No timestamped findings to chart.", "caption"))
+        return panel
+    for i, ((name, _), amount) in enumerate(zip(groups, counts)):
+        _evidence_bar(col, name, amount, measured,
+                      color="#43D6F2" if i <= 2 else "#F84359")
+    return panel
