@@ -110,12 +110,12 @@ class ScreenMethods:
             metrics = (
                 ("Games with mods", len(groups), "Verified install links"),
                 ("Mod locations", len(self.inventory.mods), "Discovered locations"),
-                ("Apparent mod storage",
+                ("Mod storage",
                  (human_size(known) if measured and known else "Unknown"),
                  "Sizes may overlap"),
                 ("Conflicts", "—", "Not assessed"),
                 ("Updates", "—", "Not verified"),
-                ("Orphaned mods", "—", "Not proven by age"),
+                ("Orphans", "—", "Not proven by age"),
             )
             page.content.addWidget(ReferenceHero(
                 "mods", "Mods", subtitle, metrics))
