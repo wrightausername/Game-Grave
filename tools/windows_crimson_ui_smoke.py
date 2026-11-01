@@ -128,6 +128,17 @@ def main():
             assert len(filters) == 1 and filters[0].count() >= 9
             assert filters[0].findText("Steam") >= 0
             assert window.page.findChildren(QCheckBox), "Missing Graveyard queue checkboxes"
+            scan_control = window.findChild(QPushButton, "mainScanControl")
+            cancel_control = window.findChild(QPushButton, "mainCancelScan")
+            assert scan_control is window.scan_button and cancel_control is window.cancel_button
+            assert scan_control.isVisible() and scan_control.isEnabled(), (
+                "Main Scan PC action must be visible and usable on the current page")
+            assert scan_control.minimumHeight() >= 50 and scan_control.minimumWidth() >= 155
+            assert scan_control.mapTo(window, QPoint(0, 0)).x() < window.width() * .50, (
+                "Main Scan PC action must not be hidden in the far top-right corner")
+            assert cancel_control.isVisible() and not cancel_control.isEnabled(), (
+                "Persistent Cancel control remains visible but disabled until a scan starts")
+            assert window.progress.objectName() == "mainScanProgress"
             for name in ("crimson_hero.svg", "crimson_sunset.svg",
                          "crimson_fog.svg", "crimson_footer.svg",
                          "crimson_dna_scene.svg", "crimson_undo_scene.svg"):
