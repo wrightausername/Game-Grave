@@ -2339,8 +2339,9 @@ class ScreenMethods:
                     "AI not installed. Normal Game Grave features are unchanged.")
             if not ok:
                 self.error("AI setup could not finish", detail)
-            elif not still_visible():
-                self.status.setText("AI installed and ready. Open Settings to use it.")
+            else:
+                self.status.setText("Local AI installed. Companion is available across tabs.")
+                self.open_ai_companion()
         def set_ai_enabled(checked):
             if not checked:
                 try:
@@ -2366,6 +2367,7 @@ class ScreenMethods:
                     return
                 ai_open.setEnabled(True)
                 ai_status.setText("AI ready. All processing stays on this PC.")
+                self.open_ai_companion()
                 return
             if not self.confirm("Install AI Assistant?", INSTALL_MESSAGE):
                 restore_toggle(False)
