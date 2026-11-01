@@ -3754,13 +3754,13 @@ class ScreenMethods:
         tiles_row = row(spacing=10)
         tiles.setLayout(tiles_row)
         restore_tile = RecoveryActionTile(
-            "RESTORE ITEMS", "Verify first, recover only if available", "restore")
+            "Restore Items", "Verify first, recover only if available", "restore")
         recycle_tile = RecoveryActionTile(
-            "RECYCLE BIN", "Browse Windows' local Recycle Bin", "bin")
+            "Browse Recycle Bin", "Browse Windows' local Recycle Bin", "bin")
         history_tile = RecoveryActionTile(
-            "DELETION HISTORY", "Search the local action ledger", "history")
+            "Deletion History", "Search the local action ledger", "history")
         settings_tile = RecoveryActionTile(
-            "UNDO SETTINGS", "Protection and safety rules", "settings")
+            "Undo Settings", "Protection and safety rules", "settings")
         for action_button in (restore_tile, recycle_tile, history_tile, settings_tile):
             action_button.setMinimumHeight(84)
             action_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
