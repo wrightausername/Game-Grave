@@ -95,18 +95,15 @@ def generated_game_poster(title: str, width: int, height: int) -> QPixmap:
     shade.setColorAt(1, QColor("#010509"))
     p.fillRect(QRectF(0, h * .35, w, h * .65), shade)
 
+    # Decorative fallback must not impersonate licensed store art. Its
+    # accessible tooltip carries this disclosure rather than repeating
+    # engineering labels on every beautiful game card.
     p.setPen(QColor("#D5EBF2"))
-    p.setFont(QFont("Segoe UI", max(7, min(9, int(w / 27))), QFont.DemiBold))
-    p.drawText(QRectF(9, 7, w - 18, 16),
-               Qt.AlignLeft | Qt.AlignVCenter, "GAME GRAVE  /  ORIGINAL ART")
     p.setFont(QFont("Segoe UI", max(10, min(16, int(w / 13))), QFont.Bold))
     p.setPen(QColor("#FFFFFF"))
     p.drawText(QRectF(8, h * .58, w - 16, h * .28),
                Qt.AlignCenter | Qt.TextWordWrap, title.upper())
     p.setPen(QColor(edge))
-    p.setFont(QFont("Segoe UI", max(7, min(9, int(w / 25))), QFont.DemiBold))
-    p.drawText(QRectF(8, h * .87, w - 16, h * .10),
-               Qt.AlignCenter | Qt.AlignVCenter, "LOCAL COVER NOT FOUND")
     p.end()
     out.setDevicePixelRatio(scale)
     return out
