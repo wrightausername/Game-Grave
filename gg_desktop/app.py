@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 from core import load_settings
 from gg_desktop.backend import Inventory, scan_inventory, ScanCanceled
+from performance_guard import background_worker_priority
 from gg_desktop.theme import STYLE
 from gg_desktop.widgets import label, button, row, column, ScrollPage, LandscapeArt
 from gg_desktop.visuals import nav_icon
@@ -64,7 +65,8 @@ class Job(QRunnable):
 
     def run(self):
         try:
-            result = self.fn(self.signals.progress.emit)
+            with background_worker_priority():
+                result = self.fn(self.signals.progress.emit)
             self.signals.done.emit(result)
         except Exception as exc:
             self.signals.failed.emit(type(exc).__name__ + ": " + str(exc)[:300])
@@ -106,7 +108,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.cleaning = False
         self.cancel = threading.Event()
         self.workers = {}
-        self.pool = QThreadPool.globalInstance()
+        self.pool = QThreadPool(self)
+        self.pool.setMaxThreadCount(2)
         self.current_route = "Overview"
         self._ai_companion = None
         self.setWindowTitle("Game Grave  |  Crimson Command preview")
