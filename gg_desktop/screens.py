@@ -2347,6 +2347,9 @@ class ScreenMethods:
                     return
                 from ai_bundle import stop_ai
                 stop_ai()
+                companion = getattr(self, "_ai_companion", None)
+                if companion is not None:
+                    companion.hide()
                 ai_open.setEnabled(False)
                 ai_status.setText("AI disabled. You can enable it any time.")
                 return
