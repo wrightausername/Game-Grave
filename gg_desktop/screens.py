@@ -430,6 +430,38 @@ class ScreenMethods:
                      finished, error_title="Steam news unavailable")
         refresh.clicked.connect(lambda _=False: update_news(force=True))
         update_news()
+        # A single low-cost OS drive-capacity check on Ready Room visits can
+        # reveal real storage changes without continuous monitoring or file scans.
+        storage_panel, storage_col = panel(padding=14)
+        storage_col.addWidget(section_title(
+            "STORAGE WATCH", "Changes since your previous visit"))
+        storage_col.addWidget(label(
+            "Free-space history for detected local game drives. Samples are "
+            "limited to one per drive every six hours, never during detected "
+            "gameplay. Changes may be caused by games, Windows or unrelated files; "
+            "this is not a prediction of when your SSD will be full.",
+            "subtle", wrap=True))
+        storage_text = label("No previous storage observations.", "findingTitle", wrap=True)
+        storage_col.addWidget(storage_text)
+        from gg_desktop.storage_watch import (
+            load_history, sample_on_ready_room_open, describe_storage_history,
+        )
+        def display_storage(history):
+            if self.current_route != "Ready Room" or not isValid(storage_text):
+                return
+            lines = describe_storage_history(history)
+            storage_text.setText("\n".join(lines) if lines
+                else "No accessible local game drives or saved samples yet.")
+        display_storage(load_history())
+        def sample_storage():
+            self.job(
+                lambda _emit: sample_on_ready_room_open(tuple(self.inventory.games)),
+                display_storage, error_title="Storage Watch unavailable")
+        storage_col.addWidget(button(
+            "Refresh storage trend", sample_storage))
+        page.content.addWidget(storage_panel)
+        sample_storage()
+
         health_panel, health_col = panel(padding=16)
         health_col.addWidget(section_title(
             "MOD HEALTH  /  CHANGE DETECTIVE",
