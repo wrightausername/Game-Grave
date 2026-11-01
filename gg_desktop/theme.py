@@ -634,3 +634,167 @@ QTabWidget#captureTabs QTabBar::tab:selected {
     color:#FFFFFF;
 }
 """
+
+
+# The Archivist's Workbench. Less neon-on-every-box; more editorial hierarchy,
+# texture, and clear interaction. These are live Qt widget styles, not mockups.
+STYLE += r"""
+QFrame#referenceHero {
+    background:#090C15;
+    border:0;
+    border-bottom:2px solid #A9324C;
+    border-radius:4px;
+}
+QFrame#referenceLibrary {
+    background:#0C1018;
+    border:0;
+    border-radius:4px;
+}
+QFrame#modCommandFilters {
+    background:#0F131C;
+    border:0;
+    border-bottom:1px solid #49313F;
+    border-radius:0;
+}
+QFrame#modShelfEmpty {
+    background:#090F17;
+    border:1px solid #44303A;
+    border-left:3px solid #C5405B;
+    border-radius:4px;
+}
+QWidget#modShelfCopy {
+    background:transparent;border:0;
+}
+QLabel#modShelfKicker {
+    color:#D96378;
+    font-family:"Segoe UI",sans-serif;
+    font-size:10px;font-weight:800;letter-spacing:2px;
+    background:transparent;
+}
+QLabel#modShelfHeadline, QLabel#editorialEmptyTitle {
+    color:#F6F0EB;
+    font-family:"Georgia","Cambria","Segoe UI",serif;
+    font-size:29px;font-weight:700;
+    background:transparent;
+}
+QLabel#modShelfDescription, QLabel#editorialBody {
+    color:#C9D0D8;font-size:13px;line-height:1.4;
+    background:transparent;
+}
+QLabel#modShelfSectionTitle {
+    color:#F0EAE8;
+    font-family:"Georgia","Cambria","Segoe UI",serif;
+    font-size:23px;font-weight:700;
+    background:transparent;
+}
+QLabel#modShelfSectionNote {
+    color:#AAB7C3;font-size:12px;
+    background:transparent;
+}
+QLabel#editorialFootnote {
+    color:#95A5B4;font-size:11px;
+    background:transparent;
+}
+QFrame#premiumInspector {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #17131D,stop:1 #0B121B);
+    border:0;
+    border-left:2px solid #994155;
+    border-radius:4px;
+}
+QFrame#premiumInspector QLabel#premiumTitle {
+    color:#F6F0EB;
+    font-family:"Georgia","Cambria","Segoe UI",serif;
+    font-size:23px;font-weight:700;
+}
+QFrame#modLocationCard {
+    background:#101820;
+    border:1px solid #363F48;
+    border-bottom:2px solid #5F3442;
+    border-radius:4px;
+}
+QFrame#modLocationCard:hover {
+    background:#1B1720;
+    border:1px solid #D74C65;
+    border-bottom:2px solid #D74C65;
+}
+QFrame#modLocationCard QLabel#findingTitle {
+    color:#EDE7E7;
+    font-size:13px;font-weight:700;
+}
+QLabel#modSourcePlaceholder {
+    color:#92BBC9;
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+       stop:0 #112532,stop:1 #201622);
+    border:1px solid #355267;
+    font-family:"Georgia","Segoe UI",serif;
+    font-size:16px;
+    padding:12px;
+}
+QFrame#beforeFirstScan {
+    border:1px solid #544451;
+    border-left:3px solid #C5465E;
+    background:#121923;border-radius:5px;
+}
+QFrame#graveyardEmptyPanel {
+    background:#0B151D;
+    border:1px solid #35536B;
+    border-left:3px solid #5E98B2;
+    border-radius:4px;
+}
+QFrame#graveyardScanInspector {
+    background:#101923;
+    border:0;border-left:1px solid #415462;
+    border-radius:0;
+}
+QFrame#routeNavigationBar {
+    background:#0C1018;
+    border:0;border-bottom:1px solid #332C37;
+    min-height:38px;
+}
+QLabel#routeBreadcrumb {
+    color:#C5C4C9;
+    font-family:"Segoe UI",sans-serif;
+    font-size:11px;font-weight:600;
+    background:transparent;
+}
+QPushButton#routeBackButton, QPushButton#routeHomeButton {
+    background:transparent;
+    color:#CBD5DF;
+    border:1px solid #413342;
+    border-radius:3px;
+    min-height:25px;
+    padding:5px 13px;font-size:11px;font-weight:700;
+}
+QPushButton#routeBackButton:hover,QPushButton#routeHomeButton:hover {
+    color:#FFFFFF;background:#29212F;border-color:#D74C65;
+}
+QPushButton#navButton {
+    background:transparent;
+    border:0;border-radius:3px;
+    color:#D5D5DB;
+    font-size:13px;font-weight:600;
+    padding:9px 12px;
+}
+QPushButton#navButton[active="true"] {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #532235,stop:1 #17131D);
+    color:#FFFFFF;
+    border:0;border-left:3px solid #E04964;
+    border-radius:2px;
+    font-weight:800;
+}
+QLabel#sectionTitle {
+    color:#F2E9EB;font-size:16px;font-weight:750;
+}
+QPushButton#referenceSecondary {
+    background:#151A24;
+    border:1px solid #584453;border-radius:3px;
+    color:#E7DDE1;
+    font-size:12px;font-weight:700;
+    min-height:31px;text-align:left;padding:8px 14px;
+}
+QPushButton#referenceSecondary:hover {
+    border-color:#C94B65;background:#24202A;
+}
+"""
