@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
@@ -206,6 +207,13 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.progress.setValue(0)
         self.progress.hide()
         base.addWidget(self.progress)
+        self.scan_timing = label("", "caption")
+        self.scan_timing.setContentsMargins(18, 0, 18, 5)
+        self.scan_timing.hide()
+        base.addWidget(self.scan_timing)
+        self._scan_clock = QTimer(self)
+        self._scan_clock.setInterval(1000)
+        self._scan_clock.timeout.connect(self._refresh_scan_timing)
         self.stack_holder = QWidget()
         self.stack_layout = column(spacing=0)
         self.stack_holder.setLayout(self.stack_layout)
@@ -270,6 +278,9 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             on_success(data)
         def fail(message):
             self.workers.pop(key, None)
+            if self.scanning and hasattr(self, "_scan_clock"):
+                self._scan_clock.stop()
+                self._refresh_scan_timing_completed()
             if message.startswith("ScanCanceled:"):
                 self.status.setText("Scan canceled. Previous inventory retained.")
             else:
@@ -288,10 +299,46 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             job.signals.progress.connect(progress)
         self.pool.start(job)
 
-    def start_scan(self):
+    @staticmethod
+    def _seconds_human(seconds):
+        value = max(0, int(seconds))
+        return (f"{value // 3600}h {(value % 3600) // 60}m"
+                if value >= 3600 else
+                f"{value // 60}m {value % 60}s" if value >= 60
+                else f"{value}s")
+
+    def _refresh_scan_timing(self):
+        if not self.scanning:
+            return
+        elapsed = max(0, time.monotonic() - self._scan_started_at)
+        percent = getattr(self, "_scan_last_percent", 0)
+        paused = getattr(self, "_scan_paused_for_game", False)
+        full_scope = getattr(self, "_scan_full_old_files", False)
+        if paused:
+            remaining = "Paused for gameplay"
+        elif full_scope and getattr(self, "_scan_stage_is_old_files", False):
+            remaining = "Full Scan: total work unknown"
+        elif percent >= 8 and elapsed >= 5:
+            # This is intentionally only an estimate. Each scan stage can take
+            # very different amounts of time, especially on HDDs.
+            remaining = "Rough ETA " + self._seconds_human(elapsed * (100 - percent) / percent)
+        else:
+            remaining = "Estimating remaining time…"
+        self.scan_timing.setText(
+            "Elapsed " + self._seconds_human(elapsed) + "  •  " + remaining)
+
+    def start_scan(self, *, old_files_full: bool | None = None):
         if self.scanning or self.cleaning:
             return
         self.scanning = True
+        self._scan_started_at = time.monotonic()
+        self._scan_last_percent = 0
+        self._scan_paused_for_game = False
+        self._scan_stage_is_old_files = False
+        self._scan_full_old_files = bool(old_files_full)
+        self.scan_timing.show()
+        self._refresh_scan_timing()
+        self._scan_clock.start()
         self.cancel.clear()
         self.scan_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
@@ -299,14 +346,28 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.progress.setValue(0)
         self.status.setText("Scanning local gaming records. No files are being changed.")
         settings = dict(self.settings)
+        settings["old_files_full_scan"] = self._scan_full_old_files
         rules = tuple(settings.get("never_touch", []))
         settings["never_touch"] = list(rules)
 
         def progress(percent, stage):
-            self.progress.setValue(percent)
+            self._scan_paused_for_game = str(stage).startswith("Paused:")
+            self._scan_stage_is_old_files = (
+                str(stage).startswith("Examined") and
+                self._scan_full_old_files)
+            self._scan_last_percent = max(0, int(percent))
+            if self._scan_stage_is_old_files:
+                self.progress.setRange(0, 0)  # Unknown denominator, honest spinner.
+            else:
+                self.progress.setRange(0, 100)
+                self.progress.setValue(percent)
             self.status.setText("Scanning: " + stage + " (" + str(percent) + "%)")
+            self._refresh_scan_timing()
         def finish(inventory):
             self.scanning = False
+            self._scan_clock.stop()
+            self._scan_last_percent = 100
+            self._refresh_scan_timing_completed()
             self.scan_button.setEnabled(True)
             self.cancel_button.setEnabled(False)
             self.progress.setValue(100)
@@ -326,6 +387,11 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             self.navigate(self.current_route)
         self.job(lambda emitter: scan_inventory(settings, self.cancel.is_set, emitter),
                  finish, error_title="Local scan incomplete", progress=progress)
+
+    def _refresh_scan_timing_completed(self):
+        elapsed = time.monotonic() - getattr(self, "_scan_started_at", time.monotonic())
+        if hasattr(self, "scan_timing"):
+            self.scan_timing.setText("Scan ended after " + self._seconds_human(elapsed))
 
     def cancel_scan(self):
         if self.scanning:
