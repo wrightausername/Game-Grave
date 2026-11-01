@@ -449,6 +449,49 @@ def main():
             window.settings["never_touch"] = []
             refresh_graveyard(window.inventory, window.settings)
 
+            # Visual-regression fixture for the APPROVED second Mod Shelf
+            # mockup. All games, covers and mod folders are synthetic and live
+            # only in the disposable CI directory. No fake data is bundled.
+            from core import ModFolder
+            from gg_desktop.premium_panels import ModLocationCard
+            from gg_desktop.typography import display_family
+            from gg_desktop.reference_hero import ReferenceHero
+            synthetic_mods = []
+            for index, game in enumerate(window.inventory.games):
+                fake_folder = Path(game.install_path) / "Mods"
+                fake_folder.mkdir(parents=True, exist_ok=True)
+                synthetic_mods.append(ModFolder(
+                    game.name + " - mods", str(fake_folder), str(synthetic),
+                    "Scanned mod location", ("QA synthetic fixture",),
+                    (index + 1) * 3_500_000, 6 + index,
+                    False, source=("Vortex", "Mod Organizer 2", "BepInEx")[index % 3]))
+            window.inventory.mods = synthetic_mods
+            window.navigate("Mods")
+            window.resize(1440, 900)
+            app.processEvents()
+            heroes = window.page.findChildren(ReferenceHero)
+            assert len(heroes) == 1 and heroes[0].title_overlay.text() == "MOD SHELF"
+            assert heroes[0].title_overlay.font().family() == display_family()
+            cards = window.page.findChildren(ModLocationCard)
+            assert len(cards) >= 3, "Artwork-led Mod Shelf must show actual modded game tiles"
+            cards[1].activate()
+            app.processEvents()
+            assert cards[1].property("selected") is True
+            assert cards[0].property("selected") is False
+            assert window.mod_inspector.title.text() == cards[1].game_name
+            window.mod_list_btn.click()
+            app.processEvents()
+            assert window.mod_list_btn.property("active") is True
+            assert not cards[1].isVisible(), "List view must hide gallery tiles"
+            window.mod_grid_btn.click()
+            app.processEvents()
+            assert window.mod_grid_btn.property("active") is True
+            assert cards[1].isVisible(), "Grid view must bring back game cover tiles"
+            mockup_screen = root / "_ci_temp" / "crimson-mods-populated-SYNTHETIC-1440.png"
+            assert window.grab().save(str(mockup_screen)), (
+                "Failed to render approved Mod Shelf interaction state")
+            assert mockup_screen.stat().st_size > 12000
+
             for route, filename in (
                 ("Overview", "crimson-desktop-1440.png"),
                 ("Games", "crimson-games-1440.png"),
