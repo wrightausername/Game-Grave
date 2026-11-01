@@ -84,6 +84,42 @@ def _checked_host(response, allowed: set[str]) -> bool:
         return False
 
 
+def lookup_steam_game_name(app_id: str, *, opener=None) -> str:
+    """Verify the Steam-listed title before attaching art to a non-Steam game.
+
+    This is an explicit user-requested ID lookup and does not scan installed
+    titles or send installation paths. Failure means there is no trusted match.
+    """
+    if not _APP_ID.fullmatch(str(app_id)):
+        return ""
+    query = json.dumps({
+        "ids": [{"appid": int(app_id)}],
+        "context": {"country_code": "US", "language": "english"},
+        "data_request": {"include_assets": True},
+    }, separators=(",", ":"))
+    url = ("https://api.steampowered.com/IStoreBrowseService/GetItems/v1/"
+           "?input_json=" + urllib.parse.quote(query, safe=""))
+    fetcher = opener or urllib.request.urlopen
+    try:
+        with fetcher(urllib.request.Request(
+            url, headers={"User-Agent": "GameGrave/1.0 (official Steam title)"}),
+                timeout=_TIMEOUT) as response:
+            if not _checked_host(response, {_API_HOST}):
+                return ""
+            raw = response.read(_MAX_METADATA + 1)
+        if len(raw) > _MAX_METADATA:
+            return ""
+        rows = json.loads(raw).get("response", {}).get("store_items", [])
+        for item in rows:
+            if isinstance(item, dict) and str(item.get("appid", "")) == app_id:
+                title = item.get("name")
+                if isinstance(title, str) and title.strip():
+                    return title.strip()[:180]
+    except (OSError, ValueError, KeyError, TypeError, UnicodeError, TimeoutError):
+        pass
+    return ""
+
+
 def _read_store_assets(app_id: str, opener=None) -> tuple[str, ...]:
     """Discover hashed portrait asset names from Steam's public store metadata.
 
