@@ -2538,14 +2538,26 @@ class ScreenMethods:
         scan_clock.timeout.connect(update_scan_timing)
 
         summary, summary_col = panel(padding=14)
-        summary_col.addWidget(section_title("Folder and category breakdown"))
+        summary_col.addWidget(section_title(
+            "VISUAL STORAGE BREAKDOWN", "Measured categories + detailed results"))
         summary_col.addWidget(label(
-            "These are possible contributors to the 'Other' estimate, not "
-            "confirmed portions of it. Known installed-game folders are excluded "
-            "where detected. Protected/system locations or incomplete scans "
-            "may leave substantial unclassified space.",
+            "The graphic shows only bytes actually categorized during your "
+            "read-only scan. Its percentages do NOT describe the whole drive or "
+            "the estimated 'Other' capacity. Excluded games, inaccessible "
+            "folders, junctions and any unscanned data are not charted.",
             "subtle", wrap=True))
-        categories = label("Choose Analyze to see folder category totals.", "subtle", wrap=True)
+        from gg_desktop.storage_breakdown import OtherStorageBreakdown
+        breakdown_chart = OtherStorageBreakdown()
+        breakdown_chart.hide()
+        summary_col.addWidget(breakdown_chart)
+        coverage_note = label(
+            "Run Quick Scan or Full Scan to generate a measured breakdown.",
+            "caption", wrap=True)
+        coverage_note.setObjectName("otherStorageBreakdownCoverage")
+        summary_col.addWidget(coverage_note)
+        summary_col.addWidget(section_title(
+            "FILE / FOLDER RESULTS", "Browsable list below the graphic"))
+        categories = label("No scanned categories yet.", "subtle", wrap=True)
         summary_col.addWidget(categories)
         report_stats = label("", "caption", wrap=True)
         summary_col.addWidget(report_stats)
@@ -2623,7 +2635,10 @@ class ScreenMethods:
             else:
                 current["report"] = None
                 table.setRowCount(0)
-                categories.setText("Not scanned. Choose Analyze.")
+                breakdown_chart.hide()
+                coverage_note.setText(
+                    "Run Quick Scan or Full Scan to generate a measured breakdown.")
+                categories.setText("Not scanned. Choose Quick Scan or Full Scan.")
                 report_stats.setText("Scan only starts after explicit approval.")
                 scan_state.setText("Read-only, on-device category analysis.")
                 inspect.setEnabled(False)
@@ -2635,6 +2650,15 @@ class ScreenMethods:
                 return
             current["report"] = report
             current["root"] = report.root
+            breakdown_chart.set_report(report)
+            breakdown_chart.setVisible(True)
+            coverage_note.setText(
+                f"{'Completed allowed scope' if report.complete else 'PARTIAL COVERAGE'}"
+                f"  •  {report.entries_seen:,} entries examined"
+                f"  •  {report.skipped_entries:,} entries skipped"
+                f"  •  {report.excluded_games:,} detected game folders excluded."
+                " Donut percentages are relative only to measured categories."
+                + ("  " + report.limitation if not report.complete else ""))
             lines = defaultdict(int)
             if getattr(report, "category_totals", ()):
                 for name, total in report.category_totals:
