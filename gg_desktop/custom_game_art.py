@@ -36,12 +36,14 @@ def override_path(game) -> str:
     ident = _cover_id(game)
     if not ident:
         return ""
-    result = override_dir() / (ident + ".cover")
-    try:
-        if result.is_file() and not result.is_symlink() and 1024 <= result.stat().st_size <= _MAX_BYTES:
-            return str(result)
-    except OSError:
-        pass
+    for extension in (".jpg", ".png", ".webp"):
+        result = override_dir() / (ident + extension)
+        try:
+            if (result.is_file() and not result.is_symlink()
+                    and 1024 <= result.stat().st_size <= _MAX_BYTES):
+                return str(result)
+        except OSError:
+            continue
     return ""
 
 
@@ -71,7 +73,8 @@ def choose_custom_cover(game, source: str) -> str:
         raise ValueError("Selected cover is not readable.") from exc
     dest = override_dir()
     dest.mkdir(parents=True, exist_ok=True)
-    output = dest / (ident + ".cover")
+    extension = ".jpg" if path.suffix.lower() in (".jpg", ".jpeg") else path.suffix.lower()
+    output = dest / (ident + extension)
     fd, tmp = tempfile.mkstemp(prefix=ident[:10], suffix=".tmp", dir=dest)
     try:
         with os.fdopen(fd, "wb") as target, path.open("rb") as reader:
@@ -79,6 +82,13 @@ def choose_custom_cover(game, source: str) -> str:
         if not 1024 <= os.stat(tmp).st_size <= _MAX_BYTES:
             raise ValueError("Cover exceeded the size limit.")
         os.replace(tmp, output)
+        for extension in (".jpg", ".png", ".webp"):
+            other = dest / (ident + extension)
+            if other != output:
+                try:
+                    other.unlink(missing_ok=True)
+                except OSError:
+                    pass
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
