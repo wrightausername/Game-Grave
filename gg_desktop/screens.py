@@ -83,6 +83,7 @@ class ScreenMethods:
             "Games": ("games", "YOUR GAME LIBRARY"),
             "Mods": ("mods", "MOD RADAR"),
             "Old Files": ("oldfiles", "ARCHIVE CLEANUP"),
+            "Other Storage": ("storage", "YOUR DRIVES • DECODED"),
             "Graveyard": ("graveyard", "REVIEW • PROTECT • RECOVER"),
             "Game DNA": ("dna", "DIGITAL FORENSICS"),
             "Undo Center": ("undo", "RESTORE • VERIFY • RECOVER"),
