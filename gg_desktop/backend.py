@@ -98,9 +98,16 @@ def _scan_inventory(settings: dict, canceled: Callable[[], bool],
         roots = [g.install_path for g in staged.games
                  if getattr(g, "install_path", None)]
         roots.extend(str(m.path) for m in staged.mods if getattr(m, "path", None))
+        full = bool(settings.get("old_files_full_scan", False))
         old_results = scan_old_files_scope(
             old_scope, int(settings.get("files_stale_days", 180)),
-            cancel=canceled, known_game_roots=roots)
+            cancel=canceled, known_game_roots=roots,
+            max_entries=None if full else 160_000,
+            max_matches=None if full else 15_000,
+            max_seconds=None if full else 25.0,
+            max_depth=None if full else 14,
+            notify=(lambda percent, message: progress(40 + min(19, percent // 6), message))
+                   if progress else None)
         staged.files = list(old_results.files)
         staged.old_files_scan_status = old_results.status
         staged.old_files_scan_message = old_results.message
