@@ -18,6 +18,7 @@ from screenshots import find_old_screenshots
 from graveyard import build_graveyard
 from graveyard_protection import set_item_protection
 from gg_desktop.models import merge_games
+from performance_guard import GameActivityDetector, CooperativeGameplayPause, background_worker_priority
 
 
 @dataclass
@@ -44,7 +45,32 @@ class ScanCanceled(InterruptedError):
 
 def scan_inventory(settings: dict, canceled: Callable[[], bool],
                    progress: Callable[[int, str], None] | None = None) -> Inventory:
-    """Read-only scan, built off-thread; partial noncritical failures are explicit."""
+    """Read-only scan that yields to gameplay and uses background I/O priority."""
+    detector = GameActivityDetector()
+    progress_percent = 0
+
+    def safe_progress(percent: int, label: str) -> None:
+        nonlocal progress_percent
+        progress_percent = percent
+        if progress:
+            progress(percent, label)
+
+    def pause_changed(paused: bool) -> None:
+        if progress:
+            status = ("Paused: game or fullscreen application is running"
+                      if paused else "Resuming low-priority scan")
+            progress(progress_percent, status)
+
+    gate = CooperativeGameplayPause(canceled, detector=detector,
+                                    on_pause=pause_changed)
+    with background_worker_priority():
+        return _scan_inventory(settings, gate.checkpoint, safe_progress, detector)
+
+
+def _scan_inventory(settings: dict, canceled: Callable[[], bool],
+                    progress: Callable[[int, str], None] | None,
+                    detector: GameActivityDetector) -> Inventory:
+    """Create a staged inventory only after cooperative scan checkpoints."""
     def stage(i, name):
         if canceled():
             raise ScanCanceled("Scan canceled. The earlier accepted inventory is unchanged.")
@@ -55,6 +81,7 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
     staged.steam = find_games(list(settings.get("steam_extra_roots", [])), cancel=canceled)
     staged.other = find_launcher_games(list(settings.get("other_library_roots", [])), cancel=canceled)
     staged.games = merge_games(staged.steam, staged.other)
+    detector.set_game_roots(str(g.install_path) for g in staged.games)
     stage(1, STAGES[1])
     staged.mods = find_all_mod_storage(
         list(settings.get("steam_extra_roots", [])),

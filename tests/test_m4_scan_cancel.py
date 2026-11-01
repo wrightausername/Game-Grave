@@ -70,7 +70,9 @@ class ScanCancelTests(unittest.TestCase):
         self.assertNotIn("complete", fake.scan_progress_text.get().lower())
         event_log.assert_called_once()
         self.assertEqual(event_log.call_args.args[0], "Scan canceled")
-        self.assertEqual(fake.after_calls, [180])
+        # After cancellation, idle polling slows down to avoid needless
+        # periodic wakeups while a game is running.
+        self.assertEqual(fake.after_calls, [1200])
 
     def test_cancelled_error_does_not_show_failure_popup(self):
         fake = FakeCancelApp()
