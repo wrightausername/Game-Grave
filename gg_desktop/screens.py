@@ -1998,7 +1998,8 @@ class ScreenMethods:
             "launcher, capture and game-named screenshot folders. "
             "The dashboard shows your newest actual image. "
             "No personal Pictures-folder crawl; photos are decoded locally only "
-            "for previews. Every Recycle Bin move requires separate approval.")
+            "for previews. In fullscreen review, one safety acknowledgement "
+            "per session permits deliberate per-image Keep/Recycle actions.")
         actions = QWidget()
         controls = row(spacing=9)
         actions.setLayout(controls)
@@ -2050,12 +2051,35 @@ class ScreenMethods:
         if photos:
             photo_table.selectRow(0)
 
-        def preview_photo():
-            record = current_photo()
-            if record is None:
-                self.info("Choose one screenshot", "Select a screenshot before previewing it.")
+        def review_photo(start_index=None):
+            if not photos:
+                self.info("No screenshots found", "Run Scan PC to find gaming screenshots.")
+                return
+            idx = start_index
+            if idx is None:
+                selected = _selected_indices(photo_table)
+                idx = selected[0] if selected else 0
+            from gg_desktop.capture_review import CaptureReviewDialog
+            review = CaptureReviewDialog(self, photos, idx)
+            review.start_fullscreen()
+            # Update this table *in place*. Do not navigate to Graveyard, lose
+            # the scroll position, or reset screenshot selection after review.
+            valid = {x.path for x in self.inventory.screenshots}
+            photos[:] = [x for x in photos if x.path in valid]
+            photo_table.setRowCount(len(photos))
+            for i, shot in enumerate(photos):
+                for colno, value in enumerate((
+                    Path(shot.path).name, human_size(shot.size),
+                    datetime.fromtimestamp(shot.modified).strftime("%Y-%m-%d %H:%M"),
+                    str(Path(shot.path).parent),
+                )):
+                    _table_text(photo_table, i, colno, value)
+                photo_table.setRowHeight(i, 37)
+            tabs.setTabText(0, f"▧  Screenshots  ({len(photos)})")
+            if photos:
+                photo_table.selectRow(min(idx, len(photos) - 1))
             else:
-                self._preview_capture(record)
+                selected_photo_image.set_status("No screenshots remain in this review list.")
 
         def folder_photo():
             record = current_photo()
@@ -2066,12 +2090,12 @@ class ScreenMethods:
         photo_buttons_row = row(spacing=8)
         photo_buttons.setLayout(photo_buttons_row)
         photo_buttons_row.addWidget(button(
-            "Preview selected screenshot…", preview_photo, kind="primary"))
+            "Review screenshots fullscreen…", review_photo, kind="primary"))
         photo_buttons_row.addWidget(button("Open folder", folder_photo))
         photo_buttons_row.addStretch()
         photo_col.addWidget(photo_buttons)
         photo_table.cellDoubleClicked.connect(
-            lambda index, _column: self._preview_capture(photos[index])
+            lambda index, _column: review_photo(index)
             if 0 <= index < len(photos) else None)
 
         def photo_menu(point):
@@ -2080,8 +2104,8 @@ class ScreenMethods:
                 return
             item = photos[index]
             menu = QMenu(photo_table)
-            menu.addAction("Preview screenshot and review Recycle Bin move…",
-                           lambda: self._preview_capture(item))
+            menu.addAction("Review screenshots fullscreen…",
+                           lambda: review_photo(index))
             menu.addAction("Open containing folder",
                            lambda: self._open_folder(str(Path(item.path).parent)))
             action, reason = protection_action(
