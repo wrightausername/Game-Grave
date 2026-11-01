@@ -2457,6 +2457,30 @@ class ScreenMethods:
         page = self._new("Mods", "Trace detected mod managers, addons and game storage without changing a single file.")
         if self._not_scanned(page):
             return
+        # Approved Mod Command Center: search/sort strip above an artwork-first
+        # linked game grid, with radar evidence on the right.
+        search_strip, strip_layout = panel(padding=10)
+        search_strip.setObjectName("modCommandFilters")
+        filter_row = QWidget()
+        fl = row(spacing=9)
+        filter_row.setLayout(fl)
+        self.mod_query = QLineEdit()
+        self.mod_query.setPlaceholderText("Search modded games, manager sources or locations…")
+        self.mod_query.setAccessibleName("Search discovered mods by game, manager or path")
+        fl.addWidget(self.mod_query, 4)
+        self.mod_source_filter = QComboBox()
+        self.mod_source_filter.setAccessibleName("Filter discovered mods by source")
+        self.mod_source_filter.addItems(
+            ["All sources", "Linked game", "External / unattributed"])
+        fl.addWidget(self.mod_source_filter, 2)
+        self.mod_sort_filter = QComboBox()
+        self.mod_sort_filter.setAccessibleName("Sort discovered modded games")
+        self.mod_sort_filter.addItems(
+            ["Most locations", "Game A to Z", "Game Z to A"])
+        fl.addWidget(self.mod_sort_filter, 2)
+        fl.addWidget(button("↻  SCAN MODS", self.start_scan, kind="primary"))
+        strip_layout.addWidget(filter_row)
+        page.content.addWidget(search_strip)
         mod_workspace = QWidget()
         mod_workspace_row = row(spacing=14)
         mod_workspace.setLayout(mod_workspace_row)
@@ -2479,6 +2503,48 @@ class ScreenMethods:
             self.mod_inspector.set_group(
                 None, external, "External / unattributed sources")
         page.content.addWidget(mod_workspace)
+        # Filter and reflow only existing real tiles; never synthesize games,
+        # hide Mod Radar's attribution limits or re-run a scan on every key.
+        from gg_desktop.premium_panels import ModLocationCard
+        from shiboken6 import isValid
+        tile_grid = gallery.findChild(QWidget, "modCardGrid")
+        all_tiles = (tile_grid.findChildren(ModLocationCard)
+                     if tile_grid is not None else [])
+        tile_layout = tile_grid.layout() if tile_grid is not None else None
+        def update_mod_cards(*_):
+            if tile_layout is None or not isValid(tile_grid):
+                return
+            query = self.mod_query.text().strip().casefold()
+            source = self.mod_source_filter.currentText()
+            visible = [
+                tile for tile in all_tiles
+                if query in tile.search_tokens and (
+                    source == "All sources" or
+                    (source == "Linked game" and tile.source_name == "Linked game") or
+                    (source == "External / unattributed" and
+                     tile.source_name != "Linked game"))
+            ]
+            mode = self.mod_sort_filter.currentText()
+            if mode == "Game A to Z":
+                visible.sort(key=lambda tile: tile.game_name.casefold())
+            elif mode == "Game Z to A":
+                visible.sort(key=lambda tile: tile.game_name.casefold(),
+                             reverse=True)
+            else:
+                visible.sort(key=lambda tile: (-tile.location_count,
+                              tile.game_name.casefold()))
+            for tile in all_tiles:
+                tile_layout.removeWidget(tile)
+                tile.hide()
+            width = max(1, columns)
+            for index, tile in enumerate(visible):
+                tile_layout.addWidget(tile, index // width, index % width)
+                tile.show()
+            self.mod_query.setToolTip(
+                f"{len(visible)} visible genuine game/source groups")
+        self.mod_query.textChanged.connect(update_mod_cards)
+        self.mod_source_filter.currentTextChanged.connect(update_mod_cards)
+        self.mod_sort_filter.currentTextChanged.connect(update_mod_cards)
         p, contents = panel()
         contents.addWidget(section_title("Detected mod and manager storage",
                                          str(len(self.inventory.mods)) + " findings"))
