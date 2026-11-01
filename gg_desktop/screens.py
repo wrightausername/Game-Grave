@@ -3762,7 +3762,9 @@ class ScreenMethods:
         settings_tile = RecoveryActionTile(
             "Undo Settings", "Protection and safety rules", "settings")
         for action_button in (restore_tile, recycle_tile, history_tile, settings_tile):
-            action_button.setMinimumHeight(84)
+            # The two-line labels must actually fit. SizeHint alone was
+            # producing 40px tiles on Windows at some DPI settings.
+            action_button.setFixedHeight(116)
             action_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             tiles_row.addWidget(action_button, 1)
         actions_col.addWidget(tiles)
