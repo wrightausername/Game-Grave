@@ -2342,14 +2342,14 @@ class ScreenMethods:
             disk_choices.setCurrentIndex(ix)
         disk_choices.setAccessibleName("Choose a local fixed disk to examine")
         rowline.addWidget(disk_choices)
-        scan_mode = QComboBox()
-        scan_mode.addItems(["Quick Scan", "Full Scan"])
-        scan_mode.setCurrentText(getattr(self, "_other_storage_scan_mode", "Quick Scan"))
-        scan_mode.setAccessibleName("Other Storage scan depth")
-        scan_mode.setToolTip("Quick: 220,000 entries / 25 seconds. Full: no entry/time cap.")
-        rowline.addWidget(scan_mode)
-        run_scan = button("Analyze Other storage…", kind="primary")
+        run_scan = button("Quick Scan", kind="primary",
+                          tip="Up to 220,000 entries / 25 seconds")
+        run_scan.setObjectName("otherStorageQuickScan")
         rowline.addWidget(run_scan)
+        full_scan_btn = button("Full Scan",
+            tip="Every accessible entry; no arbitrary entry or time cap")
+        full_scan_btn.setObjectName("otherStorageFullScan")
+        rowline.addWidget(full_scan_btn)
         stop_scan = button("Cancel scan")
         stop_scan.setEnabled(False)
         rowline.addWidget(stop_scan)
@@ -2372,7 +2372,8 @@ class ScreenMethods:
         sc.addWidget(scan_state)
         scan_timing = label("Elapsed 0s  •  Remaining: waiting to scan", "caption", wrap=True)
         sc.addWidget(scan_timing)
-        page.content.addWidget(selection)
+        # Scan choices should be visible without scrolling past the explanation.
+        page.content.insertWidget(1, selection)
         scan_started = {"at": None, "mode": "Quick Scan", "progress": 0}
         scan_clock = QTimer(selection)
         scan_clock.setInterval(1000)
@@ -2450,8 +2451,8 @@ class ScreenMethods:
         if getattr(self, "_other_storage_running", False):
             scan_state.setText("An Other Storage scan is still running. Cancel remains available.")
             run_scan.setEnabled(False)
+            full_scan_btn.setEnabled(False)
             stop_scan.setEnabled(True)
-            scan_mode.setEnabled(False)
             progress.setRange(0, 0)
             progress.show()
         def get_drive():
@@ -2552,7 +2553,7 @@ class ScreenMethods:
                 return None
             return rows[idx[0]]
 
-        def analyze(scope=None):
+        def analyze(scope=None, *, full_scan=None):
             if getattr(self, "_other_storage_running", False):
                 scan_state.setText("Already analyzing Other Storage. Cancel the current scan first.")
                 return
@@ -2560,9 +2561,12 @@ class ScreenMethods:
             if not drive:
                 self.error("No drive found", "Select a connected local fixed drive.")
                 return
-            full_scan = scan_mode.currentText() == "Full Scan"
-            self._other_storage_scan_mode = scan_mode.currentText()
-            mode_name = "Full Scan" if full_scan else "Quick Scan"
+            if full_scan is None:
+                full_scan = (getattr(self, "_other_storage_scan_mode", "Quick Scan")
+                             == "Full Scan")
+            full_scan = bool(full_scan)
+            self._other_storage_scan_mode = "Full Scan" if full_scan else "Quick Scan"
+            mode_name = self._other_storage_scan_mode
             proposed = str(scope or drive)
             terms = ("No entry or time limit. Can run a long time; Cancel is always available."
                      if full_scan else "Stops after 220,000 entries or 25 seconds.")
@@ -2588,8 +2592,8 @@ class ScreenMethods:
                 progress.setValue(0)
             progress.show()
             run_scan.setEnabled(False)
+            full_scan_btn.setEnabled(False)
             stop_scan.setEnabled(True)
-            scan_mode.setEnabled(False)
             drive_at_start = drive
 
             def job(emitter):
@@ -2631,7 +2635,7 @@ class ScreenMethods:
                 if isValid(run_scan):
                     run_scan.setEnabled(True)
                     stop_scan.setEnabled(False)
-                    scan_mode.setEnabled(True)
+                    full_scan_btn.setEnabled(True)
                     progress.hide()
                 success, response = outcome
                 if not success:
@@ -2668,7 +2672,8 @@ class ScreenMethods:
                 path = Path(entry.path)
                 self._open_folder(str(path if path.is_dir() else path.parent))
 
-        run_scan.clicked.connect(lambda _=False: analyze())
+        run_scan.clicked.connect(lambda _=False: analyze(full_scan=False))
+        full_scan_btn.clicked.connect(lambda _=False: analyze(full_scan=True))
         inspect.clicked.connect(analyze_selected)
         open_folder.clicked.connect(open_selected)
         back.clicked.connect(lambda _=False: analyze())
@@ -2680,8 +2685,8 @@ class ScreenMethods:
         # refresh_drive may have cleared the disabled state of an ongoing job.
         if getattr(self, "_other_storage_running", False):
             run_scan.setEnabled(False)
+            full_scan_btn.setEnabled(False)
             stop_scan.setEnabled(True)
-            scan_mode.setEnabled(False)
             progress.setRange(0, 0)
             progress.show()
             scan_state.setText("Other Storage scan running. Cancel remains available.")
