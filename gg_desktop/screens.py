@@ -105,17 +105,24 @@ class ScreenMethods:
                 "games", "Games", subtitle, metrics))
         elif title == "Mods":
             from gg_desktop.premium_panels import group_mod_locations
-            groups, _unmatched = group_mod_locations(
+            groups, unmatched = group_mod_locations(
                 self.inventory.games, self.inventory.mods)
             measured = [int(getattr(m, "apparent_bytes", 0) or 0)
                         for m in self.inventory.mods]
             known = sum(max(0, v) for v in measured)
+            managers = {
+                str(getattr(m, "source", "")).strip()
+                for m in self.inventory.mods
+                if str(getattr(m, "source", "")).strip()
+            }
             metrics = (
-                ("Games linked", len(groups), "Direct folder matches"),
-                ("Mod folders", len(self.inventory.mods), "Places we found"),
-                ("Size reported",
+                ("GAMES LINKED", len(groups), "Matched install"),
+                ("MOD FOLDERS", len(self.inventory.mods), "Found on disk"),
+                ("KNOWN SIZE",
                  (human_size(known) if measured and known else "—"),
-                 "May include overlap"),
+                 "May overlap"),
+                ("SOURCES", len(managers), "Managers / locations"),
+                ("UNLINKED", len(unmatched), "Not proof of junk"),
             )
             page.content.addWidget(ReferenceHero(
                 "mods", "Mods", subtitle, metrics))
@@ -2516,7 +2523,16 @@ class ScreenMethods:
         self.mod_sort_filter.addItems(
             ["Most locations", "Game A to Z", "Game Z to A"])
         fl.addWidget(self.mod_sort_filter, 2)
-        fl.addWidget(button("Scan again", self.start_scan, kind="primary"))
+        fl.addWidget(button("Scan mods", self.start_scan, kind="primary"))
+        self.mod_grid_btn = button("▦ Grid")
+        self.mod_grid_btn.setObjectName("modViewMode")
+        self.mod_grid_btn.setAccessibleName("Show mod artwork gallery")
+        self.mod_list_btn = button("☷ List")
+        self.mod_list_btn.setObjectName("modViewMode")
+        self.mod_list_btn.setAccessibleName("Show detailed mod folder list")
+        self.mod_grid_btn.setProperty("active", True)
+        fl.addWidget(self.mod_grid_btn)
+        fl.addWidget(self.mod_list_btn)
         strip_layout.addWidget(filter_row)
         page.content.addWidget(search_strip)
         mod_workspace = QWidget()
@@ -2687,6 +2703,22 @@ class ScreenMethods:
                 "Hide the folder list" if visible
                 else "View the folder list")
         page.content.addWidget(p)
+        def change_mod_view(list_view: bool):
+            # An actual gallery/list switch, not the mockup's decorative icons.
+            mod_workspace.setVisible(not list_view)
+            p.setVisible(list_view)
+            more_mods.setVisible(not list_view)
+            for control, active in (
+                (self.mod_grid_btn, not list_view),
+                (self.mod_list_btn, list_view),
+            ):
+                control.setProperty("active", active)
+                control.style().unpolish(control)
+                control.style().polish(control)
+            if list_view:
+                page.ensureWidgetVisible(p)
+        self.mod_grid_btn.clicked.connect(lambda: change_mod_view(False))
+        self.mod_list_btn.clicked.connect(lambda: change_mod_view(True))
         if self.inventory.mods:
             page.content.addWidget(mod_radar_panel(self.inventory.mods))
         page.content.addWidget(label(
