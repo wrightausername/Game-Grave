@@ -116,7 +116,7 @@ class HeroBanner(QFrame):
         self.subtitle = subtitle
         self.detail = detail
         from PySide6.QtSvg import QSvgRenderer
-        self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "crimson_hero.svg"))
+        self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
         # Vector original, rendered at display resolution to stay crisp on
         # 1440p, 4K and high-DPI monitors. Avoid the low-resolution JPG atlas.
 
@@ -159,7 +159,7 @@ class LandscapeArt(QFrame):
         "sunset": "crimson_sunset.svg",
         "fog": "crimson_fog.svg",
         "footer": "crimson_footer.svg",
-        "hero": "crimson_hero.svg",
+        "hero": "gg_cinematic_hero.svg",
     }
 
     def __init__(self, height=154, *, scene="sunset", note=""):
