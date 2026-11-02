@@ -96,35 +96,31 @@ def main():
             # exist and be wired to the real app, never static screenshot overlays.
             from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox, QLabel
             from PySide6.QtSvg import QSvgRenderer
-            from gg_desktop.widgets import ActionCard
+            from gg_desktop.approved_overview import RecycledRing
             window.navigate("Overview")
             app.processEvents()
-            # The November 2 locked top shell has notification/help actions.
-            # Scan PC must be invoked from a page, never a persistent toolbar.
+            # The owner-approved dashboard has five evidence-backed metrics
+            # and functional actions, not an embedded static mockup image.
             assert window.notification_button.isVisible()
             assert window.help_button.isVisible()
             assert not window.scan_button.isVisible()
-            assert window.notification_button.icon().isNull() is False
-            buttons = {b.text() for b in window.page.findChildren(QPushButton)}
-            labels = {b.text() for b in window.page.findChildren(QLabel)}
-            cards = window.page.findChildren(ActionCard)
-            assert len(cards) == 4, "Four clickable top-level action cards are required"
-            assert all(callable(card._action) for card in cards)
-            for expected in ("Scan for Old Files", "Review Graveyard",
-                             "Open Undo Center", "Quick Settings"):
-                assert any(expected in t for t in labels), (
-                    f"Missing text label inside actionable reference card: {expected}")
-            for expected in ("Delete Selected", "Restore", "Add to Graveyard",
-                             "Review Files", "Preview actual image"):
+            assert not window.notification_button.icon().isNull()
+            assert len(window.page.findChildren(QPushButton, "approvedMetric")) == 5
+            assert len(window.page.findChildren(RecycledRing)) == 1
+            buttons = {b.accessibleName() for b in
+                       window.page.findChildren(QPushButton)}
+            for expected in ("Scan Library", "Find Unused Mods",
+                             "Review Old Files", "Open Graveyard",
+                             "Manage Captures", "Undo Center",
+                             "View all games"):
                 assert any(expected in t for t in buttons), (
-                    f"Missing or unconnected reference dashboard button: {expected}")
-            combos = window.page.findChildren(QComboBox)
-            drives = [c for c in combos if "local drive" in c.accessibleName().lower()]
-            filters = [c for c in combos if "filter launchers" in c.accessibleName().lower()]
-            assert len(drives) == 1 and drives[0].count() >= 1
-            assert len(filters) == 1 and filters[0].count() >= 9
-            assert filters[0].findText("Steam") >= 0
-            assert window.page.findChildren(QCheckBox), "Missing Graveyard queue checkboxes"
+                    "Locked Overview action missing: " + expected)
+            assert len(window.page.findChildren(QPushButton, "approvedCover")) == 3, (
+                "Library strip must be backed by all three verified test game records")
+            labels = {b.text() for b in window.page.findChildren(QLabel)}
+            assert any("RECENT ACTIVITY" in t for t in labels)
+            assert any("RECYCLE BIN ACTIVITY" in t for t in labels)
+            assert any("QUICK ACTIONS" in t for t in labels)
             for name in ("gg_cinematic_hero.svg", "crimson_sunset.svg",
                          "crimson_fog.svg", "crimson_footer.svg"):
                 asset = root / "gg_desktop" / "assets" / name
@@ -158,6 +154,16 @@ def main():
                         rows[0].last_played_source != "Unknown")
                 if route == "Graveyard":
                     assert len(window._shown_graves) == 1
+                    assert window.grave_table.rowCount() == 1
+                    assert window.grave_table.columnCount() == 6
+                    assert window.grave_drive.count() >= 1
+                    assert window.grave_age.count() == 4
+                    window.grave_age.setCurrentText("3+ years")
+                    app.processEvents()
+                    assert window.grave_table.rowCount() == 0, (
+                        "Age filter must use verified last-modified evidence")
+                    window.grave_age.setCurrentText("All ages")
+                    app.processEvents()
                     assert window.grave_table.rowCount() == 1
                 if route in ("Ready Room", "Games", "Mods", "Old Files", "Graveyard",
                              "Game DNA", "Undo Center", "Captures", "Settings",
@@ -266,7 +272,7 @@ def main():
             from PySide6.QtWidgets import QPushButton
             window.grave_table.selectRow(0)
             app.processEvents()
-            unlock = window.grave_table.cellWidget(0, 3)
+            unlock = window.grave_table.cellWidget(0, 5)
             assert isinstance(unlock, QPushButton) and "Unprotect" in unlock.text(), (
                 "Missing the user's requested direct in-row Unprotect control")
             protected_image = root / "_ci_temp" / "crimson-unprotect-1440.png"
