@@ -303,6 +303,25 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
+            # Locked owner references are 1672 x 941. Capture the same native
+            # Qt window size for direct review against each approved image.
+            for route, slug in (
+                ("Overview", "overview"),
+                ("Graveyard", "graveyard"),
+                ("Game DNA", "dna"),
+                ("Undo Center", "undo"),
+                ("AI Assistant", "ai"),
+                ("Settings", "settings"),
+                ("More Tools", "more-tools"),
+            ):
+                window.navigate(route)
+                window.resize(1672, 941)
+                app.processEvents()
+                shot = root / "_ci_temp" / ("crimson-" + slug + "-1672.png")
+                assert window.grab().save(str(shot)), (
+                    "Cannot render exact-resolution owner reference: " + route)
+                assert shot.stat().st_size > 9000, (
+                    "Blank exact-resolution screenshot: " + route)
             # Full-height capture preserves all three bands of the reference
             # dashboard. The 900px legacy capture deliberately tests scrolling.
             window.navigate("Overview")
