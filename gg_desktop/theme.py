@@ -472,3 +472,66 @@ QHeaderView::section {
     padding: 10px; font-weight: 700;
 }
 """
+
+# Owner-locked November 2 visual override. Keep these scoped to the desktop
+# shell and structural surfaces; do not alter native dark safety prompts.
+# Separating fidelity overrides from older preview styling makes future
+# screenshot differences auditable without silently changing the theme.
+STYLE += r"""
+QMainWindow, QWidget#appRoot, QWidget#scrollBody { background: #090B0F; }
+QFrame#navRail, QWidget#navBody, QScrollArea#navScroll {
+    background: #0A0D12; border-color: #191E25;
+}
+QPushButton#navButton {
+    background: transparent; border: none; border-radius: 5px;
+    color: #BAC5D0; font-weight: 550; font-size: 12px;
+    min-height: 20px; padding: 8px 14px;
+}
+QPushButton#navButton:hover { background: #1C1C25; color: #FFFFFF; }
+QPushButton#navButton[active="true"] {
+    background: #4B1826; color: #FFFFFF;
+    border-left: 2px solid #F34B65; font-weight: 750;
+}
+QLineEdit#globalSearch {
+    background: #10141A; color: #F5F6FA;
+    border: 1px solid #292F37; border-radius: 6px;
+    min-height: 26px; padding: 4px 13px; font-size: 12px;
+}
+QLineEdit#globalSearch:focus { border: 1px solid #B53449; }
+QPushButton#chromeButton {
+    background: transparent; color: #C6CED9;
+    border: 0; border-radius: 5px;
+    min-width: 29px; max-width: 29px; min-height: 29px;
+    padding: 3px; font-size: 17px;
+}
+QPushButton#chromeButton:hover { background: #24202A; color: white; }
+QLabel#scanStatus {
+    background: #12151C; color: #BEC8D2;
+    border-bottom: 1px solid #272C34; padding: 4px 16px;
+}
+QFrame#referenceHero, QFrame#sceneHeader {
+    border-radius: 7px; border: 1px solid #20242C;
+}
+QWidget#graveyardSummary { background: transparent; }
+QFrame#dashboardPanel, QFrame#panel, QFrame#metricCard,
+QFrame#actionCard, QFrame#infoCard {
+    background: #10141B; border: 1px solid #242B34;
+    border-radius: 7px;
+}
+QFrame#premiumInspector { border: 1px solid #743045; border-radius: 8px; }
+QFrame#graphicCard {
+    background: #11161D; border: 1px solid #2C343E;
+    border-radius: 7px;
+}
+QTableWidget {
+    background: #0C1117; border: 1px solid #28313B;
+    gridline-color: #1B2530;
+}
+QTableWidget::item { padding: 5px 7px; border-bottom: 1px solid #202831; }
+QTableWidget::item:selected { background: #532235; color: #FFFFFF; }
+QHeaderView::section {
+    background: #161A22; color: #BCC8D4;
+    padding: 7px 8px; border-bottom: 1px solid #303640;
+}
+QFrame#landscapeArt { border: 0; border-radius: 0; }
+"""
