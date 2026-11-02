@@ -115,7 +115,7 @@ class HeroBanner(QFrame):
         self.subtitle = subtitle
         self.detail = detail
         from PySide6.QtSvg import QSvgRenderer
-        self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "crimson_ruins.svg"))
+        self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -162,7 +162,7 @@ class LandscapeArt(QFrame):
         self.setAccessibleName("Original decorative Game Grave landscape artwork. Screenshot not loaded.")
         from PySide6.QtSvg import QSvgRenderer
         self.renderer = QSvgRenderer(
-            str(Path(__file__).parent / "assets" / "crimson_ruins.svg"))
+            str(Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
 
     def paintEvent(self, event):
         painter = QPainter(self)
