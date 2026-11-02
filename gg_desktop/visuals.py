@@ -569,7 +569,14 @@ def nav_icon(route: str) -> QIcon:
     p.setPen(_pen("#C4D5E4", 2))
     p.setBrush(Qt.NoBrush)
     shape = route.casefold()
-    if "ready room" in shape:
+    if "notifications" in shape:
+        # Quiet monochrome bell, matching the approved shell icons.
+        p.drawArc(QRectF(7,5,12,16), 0, 180*16)
+        p.drawLine(7,13,7,19)
+        p.drawLine(19,13,19,19)
+        p.drawLine(5,19,21,19)
+        p.drawArc(QRectF(10,19,6,5), 180*16, 180*16)
+    elif "ready room" in shape:
         p.drawEllipse(QPointF(13,13),2.4,2.4)
         p.drawArc(QRectF(6,5,14,18), 35*16, 110*16)
         p.drawArc(QRectF(1,2,24,24), 35*16, 110*16)
