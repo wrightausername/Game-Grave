@@ -242,6 +242,30 @@ def main():
                         "Game DNA must display the verified Steam cached cover")
                     assert not dna_art[0]._cover.isNull(), (
                         "Game DNA relationship map must share the selected Steam cover")
+                    from gg_desktop.dna_exploded import ExplodedGameMap
+                    from PySide6.QtTest import QTest
+                    from PySide6.QtCore import Qt
+                    tower = window.page.findChildren(ExplodedGameMap)
+                    assert len(tower) == 1, (
+                        "Game DNA must show one interactive 2.5D exploded file map")
+                    assert tower[0] is dna_art[0]
+                    assert tower[0]._sizes.get("Install") is not None, (
+                        "The install layer should report its real Steam size")
+                    assert tower[0]._counts.get("Mods") is None, (
+                        "A scan with no mods must not show fictional linked folders")
+                    tower[0].repaint()
+                    app.processEvents()
+                    assert "Mods" in tower[0].positions, (
+                        "The exploded map's six evidence layers must be selectable")
+                    hit = tower[0].positions["Mods"].center()
+                    QTest.mouseClick(tower[0], Qt.LeftButton,
+                                     pos=QPoint(round(hit.x()), round(hit.y())))
+                    app.processEvents()
+                    assert tower[0].active == "Mods", (
+                        "Clicking a mod layer must open its actual evidence")
+                    assert window.page.findChild(QWidget, "dnaGameRibbon")
+                    assert window.page.findChild(QFrame, "dnaSelectedGame")
+                    assert window.page.findChild(QLabel, "dnaInstallSize") is not None
                 if route == "Undo Center":
                     dials = window.page.findChildren(UndoStatusDial)
                     assert len(dials) == 1, "Undo Center needs real recovery status."
