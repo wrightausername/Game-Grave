@@ -83,6 +83,7 @@ def main():
                     assert window.grave_table.rowCount() == 1
             # Global search must use actual inventory, not invented items.
             from PySide6.QtWidgets import QDialog
+            from unittest.mock import patch
             window.global_search.setText("Sample Steam")
             with patch("gg_desktop.app.QDialog.exec", return_value=QDialog.Rejected):
                 window.open_global_search()
