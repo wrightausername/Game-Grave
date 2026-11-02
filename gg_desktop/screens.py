@@ -2287,6 +2287,42 @@ class ScreenMethods(LockedPagesMixin):
             "Captures", "AI Assistant", "Appearance & Privacy",
             "Backup & Restore", "About",
         ])
+        # Approved Settings overview: every section either reports real
+        # application state or opens its already-existing working controls.
+        overview_grid = QWidget()
+        overview_cells = QGridLayout(overview_grid)
+        overview_cells.setContentsMargins(0, 0, 0, 0)
+        overview_cells.setSpacing(11)
+        settings_overview = [
+            ("LIBRARIES & DETECTION",
+             str(len(self.settings.get("steam_extra_roots", [])) +
+                 len(self.settings.get("other_library_roots", []))) +
+             " extra game paths",
+             "Review local scan roots and installed launchers", 1),
+            ("PROTECTION & CLEANUP",
+             str(len(self.settings.get("never_touch", []))) + " personal rules",
+             "Recycle Bin only; built-in protection always active", 2),
+            ("GAMING PERFORMANCE GUARD", "ON",
+             "Low-priority workers; pause nonessential scans during gaming", 1),
+            ("LOCAL AI ASSISTANT",
+             "Enabled" if self.settings.get("ai_assistant_enabled") else "Off",
+             "Optional, disabled by default, never required", 4),
+            ("NOTIFICATIONS & READY ROOM", "On demand",
+             "No fictional patches or always-on polling", 0),
+            ("PRIVACY & DATA", "Local first",
+             "No file paths, save contents or game lists uploaded", 5),
+        ]
+        for idx, (heading, state, description, category) in enumerate(settings_overview):
+            card, card_col = panel(padding=12)
+            card_col.addWidget(label(heading, "eyebrow"))
+            card_col.addWidget(label(state, "sectionTitle", wrap=True))
+            card_col.addWidget(label(description, "caption", wrap=True))
+            card_col.addWidget(button(
+                "Manage settings  ›",
+                lambda category=category: category_nav.setCurrentRow(category)))
+            overview_cells.addWidget(card, idx // 3, idx % 3)
+        page.content.addWidget(overview_grid)
+
         settings_pages = QStackedWidget()
         settings_pages.setObjectName("settingsPanels")
         settings_row.addWidget(category_nav, 1)
