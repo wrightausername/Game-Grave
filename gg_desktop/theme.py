@@ -535,3 +535,52 @@ QHeaderView::section {
 }
 QFrame#landscapeArt { border: 0; border-radius: 0; }
 """
+
+
+# Owner-locked functional workspaces, applied after all older preview rules.
+STYLE += r"""
+QFrame#approvedOverviewPanel {
+    background:#10141B; border:1px solid #222A33; border-radius:6px;
+}
+QPushButton#approvedMetric {
+    background:#10151D; border:0;
+    border-bottom:2px solid #282F3B; border-radius:4px;
+    text-align:left; padding:5px;
+}
+QPushButton#approvedMetric:hover {
+    background:#19202B; border-bottom:2px solid #D53C57;
+}
+QPushButton#approvedAction {
+    background:transparent; border:0; border-bottom:1px solid #262E38;
+    text-align:left; border-radius:0; font-size:12px;
+    color:#DCE5F0; padding:5px 8px; min-height:20px;
+}
+QPushButton#approvedAction:hover {
+    background:#231824; color:white; border-bottom-color:#C33750;
+}
+QPushButton#approvedCover {
+    background:#131721; border:1px solid #2E2D39;
+    border-radius:5px; text-align:center; padding:1px;
+}
+QPushButton#approvedCover:hover {border:1px solid #F0475E;background:#211A27;}
+QScrollArea#approvedLibraryScroll {background:transparent; border:none;}
+QFrame#approvedGraveStat, QFrame#approvedUndoStat, QFrame#approvedDNAMetric {
+    background:#10151D; border:1px solid #292B34; border-radius:5px;
+}
+QFrame#approvedSettingsTabs {
+    background:#10151B; border:1px solid #282C34; border-radius:6px;
+}
+QPushButton#approvedSettingsTab {
+    color:#BBC6D2; background:#171B23; border:1px solid #31313C;
+    border-radius:5px; padding:6px 7px; font-size:11px;
+    min-height:26px; font-weight:650;
+}
+QPushButton#approvedSettingsTab:hover {
+    color:white; background:#32202C; border-color:#974057;
+}
+QPushButton#approvedSettingsTab[active="true"] {
+    color:white; background:#5B1D30; border:1px solid #D8415B;
+    font-weight:850;
+}
+QFrame#approvedDNABand { background:transparent; }
+"""
