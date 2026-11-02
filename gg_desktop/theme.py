@@ -399,3 +399,76 @@ QComboBox, QLineEdit {
 }
 QComboBox:focus,QLineEdit:focus {border:1px solid #F5425D;}
 """
+
+# Final owner-approved cinematic design overlay; changes presentation only.
+# It deliberately does not restyle confirmation/error dialogs into low contrast.
+STYLE += r"""
+QMainWindow, QWidget#appRoot, QWidget#scrollBody {
+    background: #070E16; color: #F5F7FB;
+}
+QWidget { font-family: "Segoe UI Variable", "Segoe UI", Arial; font-size: 13px; }
+QFrame#navRail, QWidget#navBody, QScrollArea#navScroll {
+    background: #080F18; border: none;
+}
+QScrollArea#navScroll QWidget#qt_scrollarea_viewport {
+    background: #080F18; border: none;
+}
+QLineEdit#globalSearch {
+    min-height: 26px; padding: 9px 15px;
+    border: 1px solid #384651; border-radius: 11px;
+    color: #F5F7FB; background: #0C141D; font-size: 14px;
+}
+QLineEdit#globalSearch:focus { border-color: #F3435B; }
+QPushButton#navButton {
+    min-height: 29px; padding: 8px 15px;
+    border: none; background: transparent; border-radius: 3px;
+    color: #E3E8EE; text-align: left; font-size: 14px;
+}
+QPushButton#navButton:hover { background: #1B2430; color: white; }
+QPushButton#navButton[active="true"] {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #71172A, stop:.58 #391722, stop:1 #111822);
+    border: none; border-left: 3px solid #FF3D54;
+    border-radius: 3px; color: #FFFFFF; font-weight: 800;
+}
+QFrame#referenceHero, QFrame#hero {
+    background: #09151F; border: none; border-radius: 10px;
+}
+QFrame#panel, QFrame#dashboardPanel {
+    background: #0C1721;
+    border: 1px solid #273846; border-radius: 10px;
+}
+QFrame#metricCard, QFrame#heroMetric {
+    background: #0B1720; border: 1px solid #253844; border-radius: 9px;
+}
+QFrame#actionCard {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #131D27, stop:1 #0B141E);
+    border: 1px solid #2E404C; border-radius: 10px;
+}
+QFrame#actionCard:hover {
+    background: #19252E; border: 1px solid #AD4354;
+}
+QFrame#actionCardPrimary {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #2D1420, stop:1 #121A24);
+    border: 1px solid #9E354A; border-radius: 11px;
+}
+QPushButton#primary {
+    background: #A71C34; color: #FFFFFF; border: 1px solid #FF4057;
+    border-radius: 9px; min-height: 30px; font-weight: 750;
+}
+QPushButton#primary:hover { background: #C52B43; }
+QPushButton#danger { background: #8A1F30; border: 1px solid #E73A4B; }
+QLabel#sectionTitle { color: #F7F9FD; font-size: 16px; font-weight: 800; }
+QLabel#caption { color: #A5B7C8; font-size: 11px; }
+QLabel#eyebrow { color: #F26275; font-size: 11px; font-weight: 750; }
+QTableWidget { background: #0A151F; border: 1px solid #273846; }
+QTableWidget::item { padding: 8px; border-bottom: 1px solid #182A37; }
+QTableWidget::item:selected { color: white; background: #58192B; }
+QHeaderView::section {
+    background: #14222C; color: #D0E0EC;
+    border: none; border-bottom: 1px solid #2E4453;
+    padding: 10px; font-weight: 700;
+}
+"""
