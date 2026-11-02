@@ -35,7 +35,7 @@ from gg_desktop.models import (
     graveyard_protection_decision, graveyard_totals, graveyard_detail_text, game_detail_text,
 )
 from gg_desktop.widgets import (
-    ActionCard, HeroBanner, LandscapeArt, MetricCard, ScrollPage, StorageRing,
+    ActionCard, HeroBanner, LandscapeArt, MetricCard, ScrollPage, StorageRing, ResponsiveColumns,
     button, column, data_table, label, page_heading, panel, row, section_title,
 )
 from gg_desktop.visuals import SceneHeader, FeatureStrip, RelationshipMap, RecoveryRoute
@@ -828,7 +828,8 @@ class ScreenMethods:
             source_row.addWidget(badge)
         source_row.addStretch(1)
         page.content.addWidget(sources)
-        ctrl = QWidget()
+        ctrl = ResponsiveColumns()
+        ctrl.setObjectName("gamesResponsiveFilters")
         filters = row()
         ctrl.setLayout(filters)
         self.game_search = QLineEdit()
@@ -855,7 +856,9 @@ class ScreenMethods:
                                  self._add_game_library_root,
                                  kind="referenceSecondary"))
         page.content.addWidget(ctrl)
-        art_tools = QWidget()
+        ctrl.watch_window(self)
+        art_tools = ResponsiveColumns()
+        art_tools.setObjectName("gamesResponsiveArtActions")
         art_row = row(spacing=9)
         art_tools.setLayout(art_row)
         art_row.addWidget(label("OFFICIAL GAME COVER GALLERY", "sectionTitle"))
@@ -874,10 +877,12 @@ class ScreenMethods:
         art_row.addWidget(self.art_next)
         art_row.addWidget(self.art_refresh)
         page.content.addWidget(art_tools)
+        art_tools.watch_window(self)
 
         # The artwork-led library and the selection inspector share one
         # workspace. All detail actions still call the existing safe APIs.
-        game_workspace = QWidget()
+        game_workspace = ResponsiveColumns()
+        game_workspace.setObjectName("gamesResponsiveWorkspace")
         game_workspace_row = row(spacing=14)
         game_workspace.setLayout(game_workspace_row)
         game_left = QWidget()
@@ -901,6 +906,15 @@ class ScreenMethods:
         self._gallery_keys = None
         game_left_col.addWidget(self.game_gallery_frame)
         page.content.addWidget(game_workspace)
+        def adapt_inspector(narrow):
+            # A vertical inspector must not retain its desktop-only width cap.
+            if narrow:
+                self.game_inspector.setMinimumWidth(0)
+                self.game_inspector.setMaximumWidth(16777215)
+            else:
+                self.game_inspector.setMaximumWidth(390)
+                self.game_inspector.setMinimumWidth(335)
+        game_workspace.watch_window(self, adapt_inspector)
         p, pcol = panel()
         self.game_table = data_table(["GAME", "LAUNCHER", "SIZE", "LAST PLAYED", "EVIDENCE"])
         self.game_table.setColumnWidth(0, 245)
@@ -1541,7 +1555,8 @@ class ScreenMethods:
             return
         if not self.inventory.graveyard:
             from gg_desktop.graveyard_empty_art import GraveyardEmptyArt
-            empty_workspace = QWidget()
+            empty_workspace = ResponsiveColumns()
+            empty_workspace.setObjectName("graveyardResponsiveEmpty")
             empty_row = row(spacing=12)
             empty_workspace.setLayout(empty_row)
             main, main_col = panel(padding=16)
@@ -1582,11 +1597,13 @@ class ScreenMethods:
             side_col.addStretch(1)
             empty_row.addWidget(sidebar, 3)
             page.content.addWidget(empty_workspace)
+            empty_workspace.watch_window(self)
             return
         # The reference leads with review controls and the burial ledger.
         # Diagnostic metrics and category charts remain available beneath it,
         # rather than hiding the useful list below three generic card strips.
-        filters = QWidget()
+        filters = ResponsiveColumns()
+        filters.setObjectName("graveyardResponsiveFilters")
         controls = row()
         filters.setLayout(controls)
         self.grave_search = QLineEdit()
@@ -1600,8 +1617,10 @@ class ScreenMethods:
         controls.addWidget(self.grave_state, 2)
         controls.addWidget(button("↻  SCAN", self.start_scan, kind="primary"))
         page.content.addWidget(filters)
+        filters.watch_window(self)
 
-        content = QWidget()
+        content = ResponsiveColumns()
+        content.setObjectName("graveyardResponsiveWorkspace")
         cr = row(spacing=12)
         content.setLayout(cr)
         table_box, table_col = panel(padding=8)
@@ -1629,6 +1648,7 @@ class ScreenMethods:
         self.grave_detail = detail_col
         cr.addWidget(detail, 3)
         page.content.addWidget(content)
+        content.watch_window(self)
         # The scan intelligence is secondary to the review action, as in the
         # approved Graveyard composition.
         insights_toggle = button("▤  Show discovery breakdown",
