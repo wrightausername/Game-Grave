@@ -461,7 +461,13 @@ def nav_icon(route: str) -> QIcon:
     p.setPen(_pen("#C4D5E4", 2))
     p.setBrush(Qt.NoBrush)
     shape = route.casefold()
-    if "game dna" in shape:
+    if "ready room" in shape:
+        p.drawEllipse(QPointF(13,13),2.4,2.4)
+        p.drawArc(QRectF(6,5,14,18), 35*16, 110*16)
+        p.drawArc(QRectF(1,2,24,24), 35*16, 110*16)
+        p.drawArc(QRectF(6,5,14,18), 215*16, 110*16)
+        p.drawArc(QRectF(1,2,24,24), 215*16, 110*16)
+    elif "game dna" in shape:
         for i in range(9):
             y = 3 + i * 2.5
             x = 13 + 6 * math.sin(i * .70)
