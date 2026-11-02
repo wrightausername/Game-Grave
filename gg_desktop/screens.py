@@ -1148,6 +1148,16 @@ class ScreenMethods(LockedPagesMixin):
         overview_col.addWidget(section_title(
             "GAME DNA  /  RELATIONSHIP MAP", "Tap any file group to inspect"))
         relationship = RelationshipMap()
+        map_tools = QWidget()
+        map_tools_row = row(spacing=6)
+        map_tools.setLayout(map_tools_row)
+        map_tools_row.addWidget(label(
+            "Click nodes for evidence • Drag to pan • Wheel to zoom",
+            "caption", wrap=True), 1)
+        map_tools_row.addWidget(button("+", relationship.zoom_in, tip="Zoom in"))
+        map_tools_row.addWidget(button("−", relationship.zoom_out, tip="Zoom out"))
+        map_tools_row.addWidget(button("Fit", relationship.reset_view))
+        overview_col.addWidget(map_tools)
         overview_col.addWidget(relationship)
         board_row.addWidget(overview, 7)
 
@@ -1181,12 +1191,37 @@ class ScreenMethods(LockedPagesMixin):
         linked_text = label("", "subtle", wrap=True)
         a_col.addWidget(linked_text)
         page.content.addWidget(associations)
+        from gg_desktop.game_dna_tools import run_ghost_watch
+        insights, insights_col = panel(padding=12)
+        insights_col.addWidget(section_title(
+            "INVESTIGATION WORKSPACE", "Manual observations, not automatic monitoring"))
+        tasks = QWidget()
+        buttons = row(spacing=10)
+        tasks.setLayout(buttons)
+        buttons.addWidget(button(
+            "Ghost Watch • Compare mod changes",
+            lambda: run_ghost_watch(self), kind="primary"))
+        buttons.addWidget(button(
+            "Patch Fallout • Review changed files",
+            lambda: run_ghost_watch(self, patch_only=True)))
+        buttons.addWidget(button(
+            "Save Vault & Resurrection Kit", lambda: self.navigate("More Tools")))
+        insights_col.addWidget(tasks)
+        insights_col.addWidget(label(
+            "Ghost Watch uses limited, user-triggered observations. Patch Fallout "
+            "does not certify mod compatibility or diagnose game crashes.",
+            "caption", wrap=True))
+        page.content.addWidget(insights)
 
         explanations = {
             "Install": "Existing launcher installation. It is protected by default. "
                        "Files within it are not automatically considered unused.",
             "Mods": "Associated mod storage uses game install path or trusted Steam "
                     "Workshop identifiers. A relationship does not prove the mod is inactive.",
+            "Profiles": "A mod-manager profile is linked only when its manager-reported "
+                        "installation path exactly matches the recorded installed game.",
+            "Caches": "GPU and launcher caches may be shared by multiple games; "
+                      "Game DNA cannot assign or delete them based on folder age alone.",
             "Saves": "Save/profile ownership has not been verified. "
                      "Discovered saves stay protected even when their names match a game.",
             "Captures": "Screenshots and recordings are scanned independently. "
@@ -1208,6 +1243,10 @@ class ScreenMethods(LockedPagesMixin):
                 evidence.setText(
                     f"{len(game['assets'])} directly associated mod/storage location(s). "
                     "Nothing here is marked safe to delete.")
+            elif name == "Profiles":
+                evidence.setText(
+                    f"{len(game['manager_profiles'])} matching manager profile(s) with "
+                    "verified game installation roots; protected from cleanup.")
             elif name == "Install":
                 evidence.setText(
                     "Install: " + str(game["install_path"]) +
@@ -1232,9 +1271,11 @@ class ScreenMethods(LockedPagesMixin):
             relationship.set_game(game["game"], {
                 "Install": "Verified record",
                 "Mods": f"{associated} linked",
+                "Profiles": f"{len(game['manager_profiles'])} matched",
                 "Saves": "Unverified",
                 "Captures": "Independent",
                 "Configs": "Protected",
+                "Caches": "Unknown",
                 "Leftovers": "Unknown",
             })
             linked_text.setText(
