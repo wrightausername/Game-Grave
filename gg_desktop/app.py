@@ -296,6 +296,16 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         route = ROUTE_ALIASES.get(route, route)
         if route not in self.nav_buttons:
             route = "More Tools"
+        # The owner's locked Overview and Graveyard have dedicated Qt views.
+        # Both preserve the existing scan and reversible cleanup backends.
+        if route == "Overview":
+            from gg_desktop.approved_overview import render_approved_overview
+            render_approved_overview(self)
+            return
+        if route == "Graveyard":
+            from gg_desktop.approved_graveyard import render_approved_graveyard
+            render_approved_graveyard(self)
+            return
         methods = {
             "Overview": self.overview_page,
             "Ready Room": self.ready_room_page,
