@@ -119,15 +119,25 @@ def main():
             assert len(filters) == 1 and filters[0].count() >= 9
             assert filters[0].findText("Steam") >= 0
             assert window.page.findChildren(QCheckBox), "Missing Graveyard queue checkboxes"
-            for name in ("crimson_hero.svg", "crimson_sunset.svg",
+            for name in ("gg_cinematic_hero.svg", "crimson_sunset.svg",
                          "crimson_fog.svg", "crimson_footer.svg"):
                 asset = root / "gg_desktop" / "assets" / name
                 assert QSvgRenderer(str(asset)).isValid(), (
                     "Invalid cinematic local visual: " + name)
             assert oldzip.read_bytes() == b"not an actual mod or game"
-            for route in ("Overview", "Games", "Graveyard", "Game DNA",
-                          "Mods", "Old Files", "Captures", "Other Storage",
-                          "Undo Center", "Settings", "More Tools"):
+            # Read-only Ctrl+K inventory search must not fabricate results
+            # or touch scanned files. Reject dialog rather than blocking smoke.
+            from unittest.mock import patch
+            from PySide6.QtWidgets import QDialog
+            window.global_search.setText("Sample Steam")
+            with patch("gg_desktop.app.QDialog.exec", return_value=QDialog.Rejected):
+                window.open_global_search()
+            assert window.global_search.text() == "Sample Steam"
+            window.global_search.clear()
+            for route in ("Overview", "Ready Room", "Games", "Graveyard",
+                          "Game DNA", "Mods", "Old Files", "Captures",
+                          "Other Storage", "Undo Center", "AI Assistant",
+                          "Settings", "More Tools"):
                 window.navigate(route)
                 window.resize(1366, 768)
                 app.processEvents()
@@ -143,8 +153,9 @@ def main():
                 if route == "Graveyard":
                     assert len(window._shown_graves) == 1
                     assert window.grave_table.rowCount() == 1
-                if route in ("Games", "Mods", "Old Files", "Graveyard",
-                             "Game DNA", "Undo Center", "Captures", "Settings"):
+                if route in ("Ready Room", "Games", "Mods", "Old Files", "Graveyard",
+                             "Game DNA", "Undo Center", "Captures", "Settings",
+                             "AI Assistant", "More Tools"):
                     art = window.page.findChildren(SceneHeader)
                     assert len(art) == 1 and art[0].kind, (
                         "Missing high-DPI, tab-specific scene for " + route)
@@ -180,17 +191,17 @@ def main():
                     categories = window.page.findChildren(QStackedWidget)
                     assert len(categories) == 1 and categories[0].count() == 8, (
                         "Settings must show real controls in eight organized sections")
-            # The optional assistant stays visible while the user navigates.
-            # This test never invokes the model or installs anything.
+            # Locked design provides an AI hub page AND the existing optional
+            # dockable companion. Never invoke inference or install a model.
             window.settings["ai_assistant_enabled"] = True
-            window.navigate("Games")
-            before = window.current_route
             window.navigate("AI Assistant")
             app.processEvents()
+            assert window.current_route == "AI Assistant"
+            assert window.page.isVisible()
+            window.open_ai_companion()
+            app.processEvents()
             docks = window.findChildren(QDockWidget)
-            assert len(docks) == 1 and docks[0].isVisible(), (
-                "AI must open as a companion, not replace the current tab")
-            assert window.current_route == before
+            assert len(docks) == 1 and docks[0].isVisible()
             docks[0].setFloating(True)
             app.processEvents()
             assert docks[0].isFloating()
@@ -267,6 +278,7 @@ def main():
 
             for route, filename in (
                 ("Overview", "crimson-desktop-1440.png"),
+                ("Ready Room", "crimson-ready-room-1440.png"),
                 ("Games", "crimson-games-1440.png"),
                 ("Mods", "crimson-mods-1440.png"),
                 ("Old Files", "crimson-old-files-1440.png"),
@@ -274,7 +286,10 @@ def main():
                 ("Game DNA", "crimson-dna-1440.png"),
                 ("Undo Center", "crimson-undo-1440.png"),
                 ("Captures", "crimson-captures-1440.png"),
+                ("Other Storage", "crimson-other-storage-1440.png"),
+                ("AI Assistant", "crimson-ai-1440.png"),
                 ("Settings", "crimson-settings-1440.png"),
+                ("More Tools", "crimson-more-tools-1440.png"),
             ):
                 window.navigate(route)
                 window.resize(1440, 900)
