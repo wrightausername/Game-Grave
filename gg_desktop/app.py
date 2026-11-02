@@ -314,6 +314,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             from gg_desktop.approved_dna import render_approved_dna
             render_approved_dna(self)
             return
+        if route == "Settings":
+            from gg_desktop.approved_settings import render_approved_settings
+            render_approved_settings(self)
+            return
         methods = {
             "Overview": self.overview_page,
             "Ready Room": self.ready_room_page,
