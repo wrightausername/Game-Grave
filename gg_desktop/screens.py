@@ -29,6 +29,7 @@ from cleanup_actions import recycle_reviewed_entries, recycle_old_files
 from recovery import get_records, restore as restore_recycled, check_restore
 from screenshot_preview import decode_screenshot_preview
 from gg_desktop.backend import refresh_graveyard, unprotect_exact_personal_item, add_never_touch_path
+from gg_desktop.extra_pages import ExtraPages
 from gg_desktop.models import (
     readable_bytes, reported_game_bytes, unique_launcher_counts,
     graveyard_protection_decision, graveyard_totals,
@@ -65,12 +66,13 @@ def _box_notice(parent, message: str, *, warning=False):
     return frame
 
 
-class ScreenMethods:
+class ScreenMethods(ExtraPages):
     """These methods are deliberately UI-only; the existing backend is authoritative."""
 
     def _new(self, title: str, subtitle: str) -> ScrollPage:
         page = self.page_for(title)
-        page_heading(page, title, subtitle)
+        page.content.addWidget(HeroBanner(
+            title=title, subtitle=subtitle, detail="GAME GRAVE  •  LOCAL FIRST"))
         if self.inventory.warnings:
             _box_notice(page, "Partial scan: " + " ".join(self.inventory.warnings), warning=True)
         return page
@@ -89,8 +91,8 @@ class ScreenMethods:
     def overview_page(self):
         page = self.page_for("Overview")
         page.content.addWidget(HeroBanner(
-            title="YOUR GAMES.", subtitle="A CLEANER TOMORROW.",
-            detail="Find what your games leave behind across launchers. Review everything; keep what matters."))
+            title="Overview", subtitle="Your games. All their baggage. Under control.",
+            detail="Discover local storage, understand relationships, and keep what matters."))
         strip = QWidget()
         grid = QGridLayout(strip)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -257,6 +259,8 @@ class ScreenMethods:
         self.game_search = QLineEdit()
         self.game_search.setPlaceholderText("Search any game, launcher, or install path…")
         self.game_search.setAccessibleName("Search installed games")
+        self.game_search.setText(getattr(self, "_pending_game_query", ""))
+        self._pending_game_query = ""
         filters.addWidget(self.game_search, 3)
         self.game_filter = QComboBox()
         self.game_filter.addItems(["All launchers"] + sorted({
@@ -414,6 +418,8 @@ class ScreenMethods:
         filters.setLayout(controls)
         self.grave_search = QLineEdit()
         self.grave_search.setPlaceholderText("Search findings and paths…")
+        self.grave_search.setText(getattr(self, "_pending_grave_query", ""))
+        self._pending_grave_query = ""
         controls.addWidget(self.grave_search, 3)
         self.grave_type = QComboBox()
         self.grave_type.addItems(["All types"] + sorted({e.category for e in self.inventory.graveyard}))
