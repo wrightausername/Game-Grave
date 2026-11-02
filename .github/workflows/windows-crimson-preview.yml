@@ -54,13 +54,21 @@ jobs:
         run: |
           python -m unittest tests.test_gg_desktop_models -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
+          python -m unittest tests.test_crimson_premium_panels -v
+          if ($LASTEXITCODE -ne 0) { throw 'Crimson premium panels regression tests failed.' }
+          python -m unittest tests.test_capture_slideshow -v
+          if ($LASTEXITCODE -ne 0) { throw 'Capture slideshow regression tests failed.' }
+          python -m unittest tests.test_launcher_discovery -v
+          if ($LASTEXITCODE -ne 0) { throw 'Cross-launcher RDR2 discovery tests failed.' }
+          python -m unittest tests.test_crimson_navigation -v
+          if ($LASTEXITCODE -ne 0) { throw 'Back/breadcrumb navigation tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
       - name: Upload actual Qt screen captures for design review
         uses: actions/upload-artifact@v4
         with:
           name: GameGrave-Crimson-Rendered-UI-Screenshots
-          path: _ci_temp/crimson-*-1440.png
+          path: _ci_temp/crimson-*.png
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -139,7 +147,7 @@ jobs:
           name: GameGrave-Crimson-Qt-Preview-Unsigned
           path: |
             dist/GameGrave-Crimson-Preview.exe
-            _ci_temp/crimson-*-1440.png
+            _ci_temp/crimson-*.png
             release/GameGrave-Crimson-Preview-Setup.exe
             release/GameGrave-Crimson-Preview-Setup.sha256
           if-no-files-found: error

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 400">
+<defs>
+<linearGradient id="back" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#060911"/><stop offset=".52" stop-color="#132035"/><stop offset="1" stop-color="#251233"/></linearGradient>
+<radialGradient id="blue"><stop stop-color="#1DE5FF" stop-opacity=".62"/><stop offset="1" stop-color="#1DE5FF" stop-opacity="0"/></radialGradient>
+<radialGradient id="violet"><stop stop-color="#C342FF" stop-opacity=".36"/><stop offset="1" stop-color="#C342FF" stop-opacity="0"/></radialGradient>
+<linearGradient id="tube"><stop stop-color="#091624"/><stop offset=".25" stop-color="#1F4760" stop-opacity=".85"/><stop offset=".57" stop-color="#060D1C" stop-opacity=".74"/><stop offset=".86" stop-color="#162D44" stop-opacity=".83"/><stop offset="1" stop-color="#040A16"/></linearGradient>
+<linearGradient id="rack" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3B3A55"/><stop offset=".4" stop-color="#161E34"/><stop offset="1" stop-color="#070C16"/></linearGradient>
+<linearGradient id="dna" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#5AE7F7"/><stop offset=".5" stop-color="#A96AFF"/><stop offset="1" stop-color="#5AE7F7"/></linearGradient>
+<pattern id="grid" width="38" height="38" patternUnits="userSpaceOnUse"><path d="M38 0H0V38" stroke="#5C3B7B" stroke-width="1" opacity=".28" fill="none"/></pattern>
+</defs>
+<rect width="1600" height="400" fill="url(#back)"/><rect width="1600" height="400" fill="url(#grid)"/>
+<path d="M0 110H660l60-42h250M0 260h720l20-20h240M0 345H530l40-34h250" stroke="#27506E" stroke-width="4" fill="none" opacity=".45"/>
+<ellipse cx="1070" cy="183" rx="386" ry="228" fill="url(#blue)"/>
+<ellipse cx="1216" cy="135" rx="315" ry="190" fill="url(#violet)"/>
+<!-- Scientific containment equipment -->
+<g transform="translate(891,-32)">
+<ellipse cx="196" cy="65" rx="179" ry="30" fill="#101B31" stroke="#B149EB" stroke-width="8"/>
+<path d="M31 58L30 304Q180 352 363 304L362 58" fill="url(#tube)" stroke="#4389A8" stroke-width="7"/>
+<path d="M43 68V299M349 68V299" stroke="#7EDCF1" opacity=".46" stroke-width="6"/>
+<ellipse cx="197" cy="69" rx="153" ry="19" fill="#04101B" stroke="#36C3E5" stroke-width="4"/>
+<ellipse cx="197" cy="301" rx="157" ry="26" fill="#101729" stroke="#BD3FFD" stroke-width="7"/>
+<rect x="16" y="307" width="362" height="48" rx="11" fill="url(#rack)" stroke="#7E4DB5" stroke-width="6"/>
+<rect x="72" y="319" width="248" height="19" rx="5" fill="#080D19" stroke="#D14AFF" stroke-width="3"/>
+<path d="M154 319h82m-75 9h63" stroke="#55EBF2" stroke-width="4"/>
+<!-- Actual DNA strand, no false relationships or file metrics -->
+<path d="M158 79C277 126 143 164 266 213C307 240 200 277 159 291" fill="none" stroke="url(#dna)" stroke-width="8" stroke-linecap="round"/>
+<path d="M266 79C147 126 281 164 158 213C117 240 224 277 266 291" fill="none" stroke="url(#dna)" stroke-width="8" stroke-linecap="round"/>
+<g stroke="#96EEFA" stroke-width="3" opacity=".88"><path d="M166 92h93M193 123h38M174 152h78M174 183h76M183 214h59M185 243h54M173 274h78"/></g>
+<!-- game controller suspended in vessel -->
+<g fill="none" stroke="#73E7F8" stroke-width="5" opacity=".95" transform="translate(145 117)">
+<path d="M3 35q-8-30 22-32h34q30-3 25 32-2 19-20 9L53 32H32l-16 13Q6 50 3 35Z"/>
+<path d="M19 17h17M27 8v18"/><circle cx="66" cy="14" r="4"/><circle cx="75" cy="24" r="4"/>
+</g>
+</g>
+<!-- Forensic pinboard on the far right -->
+<g transform="translate(1261,18)" stroke="#7D607F" fill="#141E30" stroke-width="4">
+<path d="M14 13l238-27 36 331-249 20Z" fill="url(#rack)" stroke="#453E53" stroke-width="8"/>
+<g stroke="#9C779E" stroke-width="3"><path d="M38 57l90-6 7 102-91 6Z"/><path d="M151 48l89-8 3 92-88 6Z"/><path d="M62 182l105-10 2 112-97 8Z"/></g>
+<g fill="#26384B"><path d="M49 74h65v60H49Z"/><path d="M166 64h61v51h-61Z"/><path d="M78 201h72v69H78Z"/></g>
+<g stroke="#E94B72" stroke-width="2" fill="none"><path d="M84 78l93 7-53 130M196 112l-72 103M108 229l99-111"/></g>
+<g stroke="#54D8EF" stroke-width="3" fill="none"><circle cx="82" cy="105" r="14"/><path d="M75 105h14m-7-7v14"/><path d="M180 86h28m-14-14v28"/><path d="M102 230l19-14 17 22"/></g>
+</g>
+<!-- Warm red scan edge treatment and foreground consoles -->
+<path d="M640 367L718 307h118L907 365M1150 370l70-43h161l65 43" stroke="#AA38C7" stroke-width="4" opacity=".7" fill="none"/>
+<path d="M0 387Q250 361 590 376T1210 370T1600 379" stroke="#54D5EB" opacity=".34" stroke-width="3" fill="none"/>
+</svg>

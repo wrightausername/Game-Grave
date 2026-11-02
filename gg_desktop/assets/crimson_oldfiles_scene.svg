@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400" viewBox="0 0 1600 400">
+<defs>
+ <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#06101b"/><stop offset=".52" stop-color="#103249"/><stop offset="1" stop-color="#050b16"/></linearGradient>
+ <radialGradient id="moon"><stop stop-color="#c1f9ff"/><stop offset=".72" stop-color="#3e9fc2"/><stop offset="1" stop-color="#154660"/></radialGradient>
+ <radialGradient id="glow"><stop stop-color="#32d7ff" stop-opacity=".45"/><stop offset="1" stop-color="#32d7ff" stop-opacity="0"/></radialGradient>
+ <linearGradient id="drive" x2="1" y2="1"><stop stop-color="#2c4652"/><stop offset=".5" stop-color="#152937"/><stop offset="1" stop-color="#07131c"/></linearGradient>
+ <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#41dafa" stop-opacity=".5"/><stop offset="1" stop-color="#0e708d" stop-opacity=".1"/></linearGradient>
+</defs>
+<rect width="1600" height="400" fill="url(#sky)"/>
+<path d="M0 165Q260 10 530 110T1100 102T1600 67V0H0Z" fill="#0b1e30" opacity=".65"/>
+<circle cx="1135" cy="110" r="225" fill="url(#glow)"/><circle cx="1135" cy="95" r="123" fill="url(#moon)" opacity=".9"/>
+<path d="M0 280L110 196 205 267 313 174 450 290 558 190 680 270 790 171 917 273 1042 173 1189 277 1311 180 1480 265 1600 205V400H0Z" fill="#091929"/>
+<path d="M0 332L157 271 268 321 435 257 583 326 748 265 912 329 1070 257 1205 332 1394 272 1600 315V400H0Z" fill="#07111d"/>
+<g fill="#06121d" stroke="#1d536a" stroke-width="2" opacity=".9">
+<path d="M702 303V153l23-29 25 28v151Z"/><path d="M726 143V94"/><path d="M836 309V127l28-39 27 39v182Z"/><path d="M865 105V67"/><path d="M1457 333V115l23-37 25 37v218Z"/>
+</g>
+<g transform="translate(850 138) rotate(-7 225 155)">
+ <ellipse cx="270" cy="251" rx="335" ry="57" fill="#020b12" opacity=".8"/>
+ <path d="M18 81L469 44 544 198 72 265Z" fill="url(#drive)" stroke="#479ab2" stroke-width="5"/>
+ <path d="M34 73L450 35 503 150 78 206Z" fill="#101e2d" stroke="#2d586c" stroke-width="5"/>
+ <path d="M89 115L384 85" stroke="#5490a8" stroke-width="3" opacity=".7"/>
+ <ellipse cx="302" cy="132" rx="102" ry="49" fill="#081525" stroke="#43c9e2" stroke-width="5" transform="rotate(-5 302 132)"/>
+ <ellipse cx="302" cy="132" rx="58" ry="27" fill="#071524" stroke="#285c7a" stroke-width="3" transform="rotate(-5 302 132)"/>
+ <ellipse cx="302" cy="132" rx="14" ry="8" fill="#79ecfa"/>
+ <path d="M183 168l101-36" stroke="#e33459" stroke-width="7" stroke-linecap="round"/>
+ <path d="M388 214l30-4M438 210l15-1" stroke="#70e4ef" stroke-width="7"/>
+</g>
+<g transform="translate(1215 35)">
+ <path d="M8 96V54h68l19 22h56v124H8Z" fill="#17394a" stroke="#53d5f7" stroke-width="4"/>
+ <path d="M16 77h127v114H16Z" fill="url(#glass)" stroke="#7ae7f7" stroke-width="3"/>
+ <path d="M165 136V76h62l15 18h42v120H165Z" fill="#153a4b" stroke="#4bc4dc" stroke-width="4" opacity=".88"/>
+ <path d="M176 100h100v101H176Z" fill="#0d2c3d" stroke="#58d6ea" stroke-width="3"/>
+ <g font-family="Segoe UI,sans-serif" font-size="22" letter-spacing="3" font-weight="700" fill="#b7faff"><text x="32" y="145">LOGS</text><text x="180" y="163" font-size="16">CACHE</text></g>
+</g>
+<g fill="none" stroke="#63ebff" stroke-width="3" opacity=".85"><path d="M1270 280h140m-70-70v140"/><circle cx="1340" cy="280" r="42"/><path d="M1460 255l22 21 42-45"/></g>
+<path d="M0 344Q350 298 740 344T1600 327V400H0Z" fill="#06111b"/><path d="M0 373Q300 322 660 367T1260 361T1600 368" stroke="#0fb1df" stroke-opacity=".42" stroke-width="3" fill="none"/>
+</svg>

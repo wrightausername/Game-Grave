@@ -10,6 +10,7 @@ import os
 import stat
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from core import config_dir
 
@@ -186,7 +187,8 @@ def _special(path: Path) -> bool:
         return True
 
 
-def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
+def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES,
+                            cancel: Callable[[], bool] | None = None) -> dict:
     """Bounded, opt-in mod metadata snapshot with explicit coverage uncertainty.
 
     Unreadable, redirected, linked, deep or skipped entries make completeness
@@ -203,6 +205,8 @@ def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
     skipped_entries = 0
     scan_errors = 0
     for m in sources[:MAX_ROOTS]:
+        if cancel and cancel():
+            raise InterruptedError("Mod observation canceled or paused for gaming.")
         root = Path(str(getattr(m, "path", "")))
         if (not root.is_dir() or _special(root) or
                 _path(root) in (Path.home().resolve(), Path(_path(root).anchor))):
@@ -219,6 +223,8 @@ def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
 
         for current, dirs, filenames in os.walk(
                 root, topdown=True, followlinks=False, onerror=on_walk_error):
+            if cancel and cancel():
+                raise InterruptedError("Mod observation canceled or paused for gaming.")
             directory = Path(current)
             if _linked_ancestor(directory) or _special(directory):
                 skipped_entries += 1
@@ -237,6 +243,8 @@ def capture_mod_observation(mods, max_entries: int = MAX_ENTRIES) -> dict:
                         ordinary_dirs.append(name)
                 dirs[:] = ordinary_dirs
             for name in filenames:
+                if cancel and cancel():
+                    raise InterruptedError("Mod observation canceled or paused for gaming.")
                 item = directory / name
                 if len(entries) >= max_entries:
                     truncated = True

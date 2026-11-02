@@ -1,13 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Game Grave Crimson Command sword and grave emblem">
 <defs>
- <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff6274"/><stop offset="1" stop-color="#b71c35"/></linearGradient>
+ <linearGradient id="blade" x1="0" y1="0" x2="1" y2="1">
+  <stop stop-color="#ff8b8c"/><stop offset=".44" stop-color="#FF364E"/><stop offset="1" stop-color="#B61D35"/>
+ </linearGradient>
+ <radialGradient id="glow"><stop stop-color="#FF2B4B" stop-opacity=".44"/>
+  <stop offset="1" stop-color="#FF2B4B" stop-opacity="0"/></radialGradient>
 </defs>
-<rect width="256" height="256" rx="48" fill="#0b111b"/>
-<path d="M61 207V102 Q61 37 128 37 Q195 37 195 102 V207" fill="#151d26" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
-<path d="M83 181 H173" stroke="#FF5166" stroke-width="7" opacity=".65"/>
-<path d="M100 127 V155 M86 141 H114" stroke="#F2F6FA" stroke-linecap="round" stroke-width="11"/>
-<circle cx="150" cy="135" r="8" fill="#41d6f4"/>
-<circle cx="170" cy="153" r="8" fill="#FF6373"/>
-<path d="M44 215H212" stroke="#FF5166" stroke-width="10" stroke-linecap="round"/>
-<path d="M114 70H142" stroke="#FF5264" stroke-width="7" stroke-linecap="round"/>
+<circle cx="128" cy="131" r="108" fill="url(#glow)"/>
+<g stroke="url(#blade)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+ <path d="M128 21 120 76 126 101 125 195 128 244 132 195 130 101 137 76Z"
+       fill="#E52E47" stroke-width="3"/>
+ <path d="M127 23 127 234" stroke="#FF9FA5" stroke-width="3" opacity=".8"/>
+ <path d="M124 55 132 55 M122 77 134 77" stroke-width="5"/>
+ <path d="M65 151 Q62 105 91 95 L111 110 Q84 119 87 151" stroke-width="7"/>
+ <path d="M191 151 Q194 105 165 95 L145 110 Q172 119 169 151" stroke-width="7"/>
+ <path d="M52 147 Q63 121 84 118 M204 147 Q193 121 172 118" stroke-width="8"/>
+ <path d="M69 145 Q74 174 103 184 M187 145 Q182 174 153 184" stroke-width="7"/>
+ <path d="M89 114 99 122 89 133 M167 114 157 122 167 133" stroke-width="5"/>
+ <path d="M96 108 112 96 128 114 144 96 160 108" stroke-width="7"/>
+ <path d="M90 158 111 151 128 166 145 151 166 158" stroke-width="5"/>
+ <path d="M109 184 127 193 147 184" stroke-width="4"/>
+ <path d="M106 85 111 102 M150 85 145 102" stroke-width="4"/>
+</g>
 </svg>
