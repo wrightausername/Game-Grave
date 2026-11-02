@@ -44,6 +44,7 @@ from gg_desktop.tab_panels import (
 )
 from gg_desktop.premium_panels import GameInspector, ModInspector, mod_gallery
 from gg_desktop.reference_hero import ReferenceHero
+from gg_desktop.locked_pages import LockedPagesMixin
 
 
 def _table_text(table: QTableWidget, r: int, c: int, value) -> None:
@@ -72,12 +73,15 @@ def _box_notice(parent, message: str, *, warning=False):
     return frame
 
 
-class ScreenMethods:
+class ScreenMethods(LockedPagesMixin):
     """These methods are deliberately UI-only; the existing backend is authoritative."""
 
     def _new(self, title: str, subtitle: str) -> ScrollPage:
         page = self.page_for(title)
         themes = {
+            "Ready Room": ("readyroom", "PLAY • PREPARE • PROTECT"),
+            "AI Assistant": ("assistant", "PRIVATE • LOCAL • OPTIONAL"),
+            "More Tools": ("tools", "ADVANCED GAME UTILITIES"),
             "Games": ("games", "YOUR GAME LIBRARY"),
             "Mods": ("mods", "MOD RADAR"),
             "Old Files": ("oldfiles", "ARCHIVE CLEANUP"),
@@ -150,6 +154,8 @@ class ScreenMethods:
         self.game_search = QLineEdit()
         self.game_search.setPlaceholderText("Search any game, launcher, or install path…")
         self.game_search.setAccessibleName("Search installed games")
+        self.game_search.setText(getattr(self, "_pending_game_query", ""))
+        self._pending_game_query = ""
         filters.addWidget(self.game_search, 3)
         self.game_filter = QComboBox()
         self.game_filter.addItems(["All launchers"] + sorted({
@@ -594,6 +600,8 @@ class ScreenMethods:
         filters.setLayout(controls)
         self.grave_search = QLineEdit()
         self.grave_search.setPlaceholderText("Search findings and paths…")
+        self.grave_search.setText(getattr(self, "_pending_grave_query", ""))
+        self._pending_grave_query = ""
         controls.addWidget(self.grave_search, 3)
         self.grave_type = QComboBox()
         self.grave_type.addItems(["All types"] + sorted({e.category for e in self.inventory.graveyard}))
@@ -2520,7 +2528,7 @@ class ScreenMethods:
         p, stack = panel()
         stack.addWidget(section_title("Appearance and privacy"))
         stack.addWidget(label(
-            "Crimson Command is a local UI preview. No account, telemetry, "
+            "Game Grave cinematic interface is a local Qt preview. No account, telemetry, "
             "external images or automatic server polling. Older appearance themes "
             "remain available in the original Game Grave interface.",
             "subtle", wrap=True))
@@ -2544,7 +2552,7 @@ class ScreenMethods:
 
         about, about_col = panel(padding=16)
         about_col.setAlignment(Qt.AlignTop)
-        about_col.addWidget(section_title("GAME GRAVE  /  CRIMSON COMMAND"))
+        about_col.addWidget(section_title("GAME GRAVE  /  CINEMATIC PREVIEW"))
         about_col.addWidget(label(
             "Gaming-aware, safety-first Windows storage inventory. "
             "Local-only scans, optional local AI, user-approved Recycle Bin "
