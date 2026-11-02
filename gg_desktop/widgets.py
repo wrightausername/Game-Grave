@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from PySide6.QtCore import Qt, QSize, QRectF
+from PySide6.QtCore import Qt, QSize, QRectF, QEvent
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
-    QWidget, QFrame, QLabel, QHBoxLayout, QVBoxLayout, QPushButton,
+    QWidget, QFrame, QLabel, QHBoxLayout, QVBoxLayout, QBoxLayout, QPushButton,
     QScrollArea, QGridLayout, QProgressBar, QTableWidget, QHeaderView,
     QSizePolicy, QAbstractItemView,
 )
@@ -66,6 +66,49 @@ def section_title(title: str, trailing: str = "") -> QWidget:
     if trailing:
         layout.addWidget(label(trailing, "caption"))
     return box
+
+
+class ResponsiveColumns(QWidget):
+    """Reflow native panels vertically before narrow Windows windows clip them.
+
+    ScrollPage deliberately has no horizontal scrollbar: unresponsive side
+    inspectors would otherwise disappear beyond the viewport. This lightweight
+    event filter only responds to window resizes; no game or disk polling.
+    """
+
+    def __init__(self, *, break_at: int = 1320):
+        super().__init__()
+        self._break_at = break_at
+        self._watched_window = None
+        self._on_change = None
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+    def watch_window(self, window, on_change=None):
+        self._watched_window = window
+        self._on_change = on_change
+        window.installEventFilter(self)
+        self._reflow()
+
+    def eventFilter(self, watched, event):
+        if watched is self._watched_window and event.type() == QEvent.Resize:
+            self._reflow()
+        return super().eventFilter(watched, event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reflow()
+
+    def _reflow(self):
+        layout = self.layout()
+        if self._watched_window is None or not isinstance(layout, QBoxLayout):
+            return
+        narrow = self._watched_window.width() < self._break_at
+        desired = QBoxLayout.TopToBottom if narrow else QBoxLayout.LeftToRight
+        if layout.direction() != desired:
+            layout.setDirection(desired)
+            if self._on_change is not None:
+                self._on_change(narrow)
 
 
 class ScrollPage(QScrollArea):
