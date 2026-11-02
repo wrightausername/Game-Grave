@@ -196,16 +196,32 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             "⌕  Search games, mods, files, and more…           Ctrl + K")
         self.global_search.returnPressed.connect(self.open_global_search)
         topbox.addWidget(self.global_search, 1)
+        # The approved Nov 2 shell has quiet notification/help controls, not
+        # a persistent SCAN PC toolbar on every route. Scanning remains in
+        # Overview, Graveyard and other explicit user-invoked workflows.
         self.cancel_button = button("Cancel scan", self.cancel_scan)
+        self.cancel_button.setAccessibleName("Cancel active scan")
         self.cancel_button.setEnabled(False)
         self.cancel_button.hide()
         topbox.addWidget(self.cancel_button)
         self.scan_button = button("Scan PC", self.start_scan, kind="primary")
+        self.scan_button.setAccessibleName("Scan PC from a page action")
+        self.scan_button.hide()
         topbox.addWidget(self.scan_button)
+        self.notification_button = button("♧", self._show_notifications, kind="chromeButton")
+        self.notification_button.setToolTip("Notifications and scan status")
+        self.notification_button.setAccessibleName("Notifications and scan status")
+        topbox.addWidget(self.notification_button)
+        self.help_button = button("?", self._show_help, kind="chromeButton")
+        self.help_button.setToolTip("Help and safety information")
+        self.help_button.setAccessibleName("Help")
+        topbox.addWidget(self.help_button)
         base.addWidget(top)
         self.status = label(
             "Not scanned. Scan PC reads local records; no files are changed.",
             "caption", wrap=True)
+        self.status.setObjectName("scanStatus")
+        self.status.hide()
         base.addWidget(self.status)
         self.search_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
         self.search_shortcut.activated.connect(self.global_search.setFocus)
@@ -222,6 +238,31 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.page = None
         base.addWidget(self.stack_holder, 1)
         outer.addWidget(main, 1)
+
+    def _show_notifications(self):
+        """Show actual local status; do not fabricate notifications."""
+        if self.scanning:
+            message = self.status.text()
+        elif self.inventory.scanned_at:
+            message = "Last scan: " + str(self.inventory.scanned_at)
+        else:
+            message = "No scan has run yet. Open Overview to scan your PC."
+        warnings = list(getattr(self.inventory, "warnings", []) or [])
+        if warnings:
+            message += "\n\nScan coverage warnings:\n" + "\n".join(
+                str(w) for w in warnings[:8])
+        self.info("Game Grave status", message)
+
+    def _show_help(self):
+        """Help is an actual action, not an inert decoration."""
+        self.info(
+            "Game Grave help",
+            "Ctrl+K searches your scanned local inventory.\n\n"
+            "Start a read-only scan from Overview or the relevant tool. "
+            "Graveyard deletion requires explicit review and confirmation; "
+            "protected saves and Windows locations remain blocked. "
+            "Undo Center can restore only files still verified as recoverable.\n\n"
+            "The optional local AI is off by default in Settings.")
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -378,6 +419,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.progress.show()
         self.progress.setValue(0)
         self.status.setText("Scanning local gaming records. No files are being changed.")
+        self.status.show()
         settings = dict(self.settings)
         rules = tuple(settings.get("never_touch", []))
         settings["never_touch"] = list(rules)
