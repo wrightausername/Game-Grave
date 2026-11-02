@@ -332,6 +332,18 @@ def main():
                     app.processEvents()
                     assert window.current_route == route
                     assert window.scan_button.isVisible()
+                    # A green smoke test is not enough if the right inspector
+                    # lives offscreen behind a disabled horizontal scrollbar.
+                    from PySide6.QtWidgets import QBoxLayout
+                    responsive_id = {
+                        "Ready Room": "readyRoomResponsiveTop",
+                        "Games": "gamesResponsiveWorkspace",
+                        "Graveyard": "graveyardResponsiveWorkspace",
+                    }[route]
+                    responsive = window.page.findChild(QWidget, responsive_id)
+                    assert responsive is not None
+                    assert responsive.layout().direction() == QBoxLayout.TopToBottom, (
+                        route + " must stack its wide inspector at 1024px.")
                     screenshot = root / "_ci_temp" / filename
                     assert window.grab().save(str(screenshot))
                     assert screenshot.stat().st_size > 14000
