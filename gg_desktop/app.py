@@ -1,4 +1,4 @@
-"""Crimson Command application shell: premium presentation, existing safe backend.
+"""Game Grave cinematic application shell: approved design, safe real backend.
 
 Run only with: python -m gg_desktop --ui-preview
 The existing Tk app remains the normal launcher until human UI parity signoff.
@@ -10,10 +10,11 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
-from PySide6.QtGui import QColor, QIcon, QPalette
+from PySide6.QtGui import QColor, QIcon, QPalette, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
-    QProgressBar, QVBoxLayout, QWidget, QScrollArea,
+    QProgressBar, QVBoxLayout, QWidget, QScrollArea, QLineEdit,
+    QDialog, QTableWidget, QTableWidgetItem, QAbstractItemView,
 )
 from core import load_settings
 from gg_desktop.backend import Inventory, scan_inventory, ScanCanceled
@@ -24,6 +25,7 @@ from gg_desktop.screens import ScreenMethods
 
 ROUTES = (
     ("Overview", "⌂"),
+    ("Ready Room", "◉"),
     ("Games", "▣"),
     ("Mods", "♜"),
     ("Old Files", "▤"),
@@ -109,10 +111,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.pool = QThreadPool.globalInstance()
         self.current_route = "Overview"
         self._ai_companion = None
-        self.setWindowTitle("Game Grave  |  Crimson Command preview")
+        self.setWindowTitle("Game Grave  |  Cinematic UI preview")
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg")))
-        self.setMinimumSize(960, 650)
-        self.resize(1450, 1000)
+        self.setMinimumSize(1040, 690)
+        self.resize(1672, 941)
         self.setStyleSheet(STYLE)
         self._create_shell()
         self.navigate("Overview")
@@ -128,7 +130,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
         rail = QFrame()
         rail.setObjectName("navRail")
-        rail.setFixedWidth(220)
+        rail.setFixedWidth(252)
         r = column(spacing=5, margins=(10, 20, 10, 12))
         rail.setLayout(r)
         brand_holder = QWidget()
@@ -136,25 +138,24 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         brand_holder.setLayout(brand_layout)
         glyph = QLabel()
         glyph.setPixmap(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg"))
-                        .pixmap(54, 69))
-        glyph.setFixedSize(54, 69)
-        glyph.setAccessibleName("Game Grave crimson emblem")
+                        .pixmap(64, 56))
+        glyph.setFixedSize(64, 56)
+        glyph.setAccessibleName("Game Grave red GG monogram")
         brand_layout.addWidget(glyph)
-        brand_name = label("GAME\nGRAVE", "brand")
-        brand_name.setStyleSheet(
-            "color:#F5F7FB; font-size:21px; font-weight:900; line-height:1;")
-        brand_layout.addWidget(brand_name, 1)
+        name = label("GAME GRAVE", "brand")
+        name.setStyleSheet("color:#F5F7FB;font-size:17px;font-weight:900;")
+        brand_layout.addWidget(name, 1)
         r.addWidget(brand_holder)
-        kicker = label("CLEANER GAMES\nBRIGHTER WORLDS", "brandKicker")
-        kicker.setWordWrap(True)
-        kicker.setStyleSheet(
-            "color:#8CA0B3; font-size:9px; letter-spacing:1px;")
-        r.addWidget(kicker)
-        edition = label("CRIMSON COMMAND", "brandEdition")
-        edition.setStyleSheet("color:#FF4056;font-size:10px;font-weight:800;"
-                              "letter-spacing:1px;")
-        r.addWidget(edition)
-        r.addSpacing(13)
+        r.addSpacing(12)
+        rail_scroll = QScrollArea()
+        rail_scroll.setObjectName("navScroll")
+        rail_scroll.setFrameShape(QFrame.NoFrame)
+        rail_scroll.setWidgetResizable(True)
+        rail_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        nav_body = QWidget()
+        nav_body.setObjectName("navBody")
+        nav_stack = column(spacing=4)
+        nav_body.setLayout(nav_stack)
         self.nav_buttons = {}
         for route, _legacy_icon in ROUTES:
             control = button(route,
@@ -165,17 +166,18 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             control.setProperty("active", route == self.current_route)
             control.setAccessibleName(route + " page")
             control.setFocusPolicy(Qt.StrongFocus)
-            r.addWidget(control)
+            nav_stack.addWidget(control)
             self.nav_buttons[route] = control
-        r.addStretch()
+        nav_stack.addStretch()
+        rail_scroll.setWidget(nav_body)
+        r.addWidget(rail_scroll, 1)
         # Decorative local artwork remains separate from scan findings and
         # disappears on shorter screens so every navigation control stays usable.
         self.sidebar_art = LandscapeArt(224, scene="footer")
         footer_layout = column(margins=(14, 22, 12, 4))
         self.sidebar_art.setLayout(footer_layout)
-        motto = label('“SAME GAMES.\nA CLEANER\nTOMORROW.”', "subtle", wrap=True)
-        motto.setStyleSheet("color:#D7E1EC;font-size:12px;letter-spacing:2px;")
-        footer_layout.addWidget(motto)
+        footer_layout.addWidget(label(
+            "KEEP THE GAMES.\\nLOSE THE CLUTTER.", "caption", wrap=True))
         footer_layout.addStretch()
         self.sidebar_art.setVisible(self.height() >= 795)
         r.addWidget(self.sidebar_art)
@@ -187,15 +189,26 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         top = QWidget()
         topbox = row(spacing=8, margins=(18, 5, 18, 4))
         top.setLayout(topbox)
-        self.status = label("No scan yet. Choose Scan PC to begin.", "subtle", wrap=True)
-        topbox.addWidget(self.status, 1)
-        top.setMaximumHeight(39)
+        self.global_search = QLineEdit()
+        self.global_search.setObjectName("globalSearch")
+        self.global_search.setAccessibleName("Search scanned games, mods and paths")
+        self.global_search.setPlaceholderText(
+            "⌕  Search games, mods, files, and more…           Ctrl + K")
+        self.global_search.returnPressed.connect(self.open_global_search)
+        topbox.addWidget(self.global_search, 1)
         self.cancel_button = button("Cancel scan", self.cancel_scan)
         self.cancel_button.setEnabled(False)
+        self.cancel_button.hide()
         topbox.addWidget(self.cancel_button)
-        self.scan_button = button("⌕  Scan PC", self.start_scan, kind="primary")
+        self.scan_button = button("Scan PC", self.start_scan, kind="primary")
         topbox.addWidget(self.scan_button)
         base.addWidget(top)
+        self.status = label(
+            "Not scanned. Scan PC reads local records; no files are changed.",
+            "caption", wrap=True)
+        base.addWidget(self.status)
+        self.search_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
+        self.search_shortcut.activated.connect(self.global_search.setFocus)
         self.progress = QProgressBar()
         self.progress.setFixedHeight(5)
         self.progress.setTextVisible(False)
@@ -234,10 +247,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         open_companion(self)
 
     def navigate(self, route: str):
-        # Assistant is a dockable/pop-out companion, NEVER a page replacement.
-        if route == "AI Assistant":
-            self.open_ai_companion()
-            return
+        # Assistant has a dedicated approved page; the optional dock remains available.
         # Legacy links to the recording viewer open Captures on its Video tab.
         self._show_capture_videos = route in ("Videos", "Recordings", "Game Recordings")
         route = ROUTE_ALIASES.get(route, route)
@@ -245,6 +255,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             route = "More Tools"
         methods = {
             "Overview": self.overview_page,
+            "Ready Room": self.ready_room_page,
             "Games": self.games_page,
             "Mods": self.mods_page,
             "Old Files": self.old_files_page,
@@ -253,6 +264,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             "Graveyard": self.graveyard_page,
             "Game DNA": self.dna_page,
             "Undo Center": self.undo_page,
+            "AI Assistant": self.ai_assistant_page,
             "Settings": self.settings_page,
             "More Tools": self.tools_page,
         }
@@ -276,6 +288,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
                 self.scanning = False
                 self.scan_button.setEnabled(True)
                 self.cancel_button.setEnabled(False)
+                self.cancel_button.hide()
                 self.progress.hide()
             if self.cleaning:
                 self.cleaning = False
@@ -285,11 +298,81 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             job.signals.progress.connect(progress)
         self.pool.start(job)
 
+    def open_global_search(self):
+        """Find real scanned items; never invent search hits or edit any file."""
+        query = self.global_search.text().strip().casefold()
+        if not query:
+            return
+        if not self.inventory.scanned_at:
+            self.info("Scan first", "Run Scan PC to discover local content.")
+            return
+        records = []
+        for game in self.inventory.games:
+            records.append(("Games", game.name, game.install_path))
+        for entry in self.inventory.graveyard:
+            records.append(("Graveyard", entry.name, entry.path))
+        for mod in self.inventory.mods:
+            records.append(("Mods", str(getattr(mod, "source", "Mods")),
+                            str(getattr(mod, "path", ""))))
+        for entry in (*self.inventory.screenshots, *self.inventory.recordings):
+            p = str(getattr(entry, "path", ""))
+            records.append(("Captures", Path(p).name, p))
+        for entry in self.inventory.files:
+            p = str(getattr(entry, "path", ""))
+            records.append(("Old Files", Path(p).name, p))
+        for entry in self.inventory.saves:
+            p = str(getattr(entry, "path", ""))
+            records.append(("Other Storage", Path(p).name, p))
+        matching = [x for x in records if query in (" ".join(x)).casefold()][:250]
+        if not matching:
+            self.info("No matching scanned items", "No hits in the latest inventory.")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Game Grave — Local Search")
+        dialog.resize(950, 510)
+        body = column(spacing=10, margins=(15, 15, 15, 15))
+        dialog.setLayout(body)
+        body.addWidget(label(f"{len(matching)} results (up to 250). Select one to open its tab.",
+                             "subtle", wrap=True))
+        table = QTableWidget(len(matching), 3)
+        table.setHorizontalHeaderLabels(["SOURCE", "ITEM", "PATH"])
+        table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SingleSelection)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.setColumnWidth(0, 130)
+        table.setColumnWidth(1, 260)
+        table.horizontalHeader().setStretchLastSection(True)
+        for i, rowdata in enumerate(matching):
+            for j, value in enumerate(rowdata):
+                table.setItem(i, j, QTableWidgetItem(str(value)))
+        body.addWidget(table, 1)
+        controls = QWidget()
+        buttons = row()
+        controls.setLayout(buttons)
+        buttons.addStretch()
+        buttons.addWidget(button("Close", dialog.reject))
+        buttons.addWidget(button("Open selected", dialog.accept, kind="primary"))
+        body.addWidget(controls)
+        table.cellDoubleClicked.connect(lambda _r, _c: dialog.accept())
+        if dialog.exec() != QDialog.Accepted:
+            return
+        selected = table.selectionModel().selectedRows()
+        if not selected:
+            return
+        source, name, path = matching[selected[0].row()]
+        if source == "Games":
+            self._pending_game_query = name
+        elif source == "Graveyard":
+            self._pending_grave_query = path
+        self.navigate(source)
+
     def start_scan(self):
         if self.scanning or self.cleaning:
             return
         self.scanning = True
         self.cancel.clear()
+        self.cancel_button.show()
         self.scan_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self.progress.show()
@@ -306,6 +389,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             self.scanning = False
             self.scan_button.setEnabled(True)
             self.cancel_button.setEnabled(False)
+            self.cancel_button.hide()
             self.progress.setValue(100)
             self.progress.hide()
             if self.cancel.is_set():
