@@ -22,8 +22,8 @@ class ReferenceHero(SceneHeader):
         super().__init__(kind, title, subtitle, note="GAME GRAVE")
         self.setObjectName("referenceHero")
         self._has_metrics = bool(metrics)
-        self.setMinimumHeight(248 if self._has_metrics else 192)
-        self.setMaximumHeight(248 if self._has_metrics else 192)
+        self.setMinimumHeight(224 if self._has_metrics else 164)
+        self.setMaximumHeight(224 if self._has_metrics else 164)
         self.setAccessibleName(title + ". " + subtitle)
         for child in self.findChildren(QLabel):
             child.hide()
@@ -33,7 +33,7 @@ class ReferenceHero(SceneHeader):
         self.title_overlay = QLabel(title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
         self.title_overlay.setStyleSheet(
-            "background:transparent; color:#FFFFFF; font-size:32px;"
+            "background:transparent; color:#FFFFFF; font-size:34px;"
             "font-weight:900; letter-spacing:.3px;")
         self.subtitle_overlay = QLabel(subtitle, self)
         self.subtitle_overlay.setObjectName("referenceHeroSubtitle")
@@ -76,9 +76,9 @@ class ReferenceHero(SceneHeader):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.width()
-        self.title_overlay.setGeometry(23, 16, max(150, w - 52), 49)
-        self.subtitle_overlay.setGeometry(25, 65, max(150, w - 55), 46)
-        self.metrics.setGeometry(20, 153, max(250, w - 40), 81)
+        self.title_overlay.setGeometry(24, 17, max(150, w - 52), 48)
+        self.subtitle_overlay.setGeometry(26, 65, max(150, w - 55), 44)
+        self.metrics.setGeometry(18, 143, max(250, w - 36), 71)
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -92,12 +92,12 @@ class ReferenceHero(SceneHeader):
         p.save()
         p.setClipRect(full)
         if self.background_art.isValid():
-            self.background_art.render(p, QRectF(0, -65, w, h + 122))
+            self.background_art.render(p, QRectF(0, -62, w, h + 128))
         # Red moon atmosphere, while preserving white text contrast.
         shade = QLinearGradient(0, 0, w, 0)
         shade.setColorAt(0.0, QColor(5, 7, 14, 243))
-        shade.setColorAt(.31, QColor(8, 8, 16, 210))
-        shade.setColorAt(.58, QColor(14, 7, 17, 83))
+        shade.setColorAt(.31, QColor(8, 8, 16, 194))
+        shade.setColorAt(.58, QColor(14, 7, 17, 64))
         shade.setColorAt(1, QColor(22, 5, 12, 20))
         p.fillRect(full, shade)
         # Darken only the bottom where translucent tiles sit.
