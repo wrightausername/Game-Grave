@@ -44,6 +44,23 @@ class ScanCanceled(InterruptedError):
 
 def scan_inventory(settings: dict, canceled: Callable[[], bool],
                    progress: Callable[[int, str], None] | None = None) -> Inventory:
+    """Bounded read-only scan, game-aware and low-priority on Windows."""
+    from performance_guard import (
+        GameActivityDetector, CooperativeGameplayPause, background_worker_priority,
+    )
+    detector = GameActivityDetector(refresh_seconds=3)
+    def update_pause(paused: bool):
+        if progress:
+            progress(0, "Paused: an active game or fullscreen application was detected"
+                     if paused else "Resuming local scan")
+    guard = CooperativeGameplayPause(canceled, detector=detector, on_pause=update_pause)
+    with background_worker_priority():
+        return _scan_inventory_impl(settings, guard.checkpoint, progress, detector)
+
+
+def _scan_inventory_impl(settings: dict, canceled: Callable[[], bool],
+                         progress: Callable[[int, str], None] | None = None,
+                         detector=None) -> Inventory:
     """Read-only scan, built off-thread; partial noncritical failures are explicit."""
     def stage(i, name):
         if canceled():
@@ -55,6 +72,9 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
     staged.steam = find_games(list(settings.get("steam_extra_roots", [])), cancel=canceled)
     staged.other = find_launcher_games(list(settings.get("other_library_roots", [])), cancel=canceled)
     staged.games = merge_games(staged.steam, staged.other)
+    if detector is not None:
+        detector.set_game_roots([g.install_path for g in staged.games
+                                 if "open_folder" in g.capabilities])
     stage(1, STAGES[1])
     staged.mods = find_all_mod_storage(
         list(settings.get("steam_extra_roots", [])),

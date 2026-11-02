@@ -63,8 +63,9 @@ def main():
             window.inventory.files = [old]
             window.inventory.scanned_at = "Synthetic test date"
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
-            for route in ("Overview", "Games", "Graveyard", "Game DNA",
-                          "Mods", "Old Files", "Undo Center", "Settings", "More Tools"):
+            for route in ("Overview", "Ready Room", "Games", "Mods", "Old Files",
+                          "Other Storage", "Captures", "Graveyard", "Game DNA",
+                          "Undo Center", "AI Assistant", "Settings", "More Tools"):
                 window.navigate(route)
                 window.resize(1366, 768)
                 app.processEvents()
@@ -80,6 +81,18 @@ def main():
                 if route == "Graveyard":
                     assert len(window._shown_graves) == 1
                     assert window.grave_table.rowCount() == 1
+            # Global search must use actual inventory, not invented items.
+            from PySide6.QtWidgets import QDialog
+            from unittest.mock import patch
+            window.global_search.setText("Sample Steam")
+            with patch("gg_desktop.app.QDialog.exec", return_value=QDialog.Rejected):
+                window.open_global_search()
+            assert window.global_search.text() == "Sample Steam"
+            window.global_search.clear()
+            window.settings["ai_assistant_enabled"] = False
+            window.navigate("AI Assistant")
+            app.processEvents()
+            assert window.current_route == "AI Assistant"
             # Exact personal Never Touch rule can be removed from the Graveyard
             # with a separate confirmation and WITHOUT a recycle operation.
             from gg_desktop.backend import refresh_graveyard
@@ -109,9 +122,18 @@ def main():
 
             for route, filename in (
                 ("Overview", "crimson-desktop-1440.png"),
+                ("Ready Room", "crimson-ready-room-1440.png"),
                 ("Games", "crimson-games-1440.png"),
+                ("Mods", "crimson-mods-1440.png"),
+                ("Old Files", "crimson-old-files-1440.png"),
+                ("Other Storage", "crimson-other-storage-1440.png"),
+                ("Captures", "crimson-captures-1440.png"),
                 ("Graveyard", "crimson-graveyard-1440.png"),
                 ("Game DNA", "crimson-dna-1440.png"),
+                ("Undo Center", "crimson-undo-1440.png"),
+                ("AI Assistant", "crimson-ai-1440.png"),
+                ("Settings", "crimson-settings-1440.png"),
+                ("More Tools", "crimson-more-tools-1440.png"),
             ):
                 window.navigate(route)
                 window.resize(1440, 900)
@@ -119,9 +141,9 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
-            print("PASS: Qt Crimson Overview and 9 interactive pages, mixed-launcher "
-                  "Games, inline exact-rule Unprotect without deletion, "
-                  "four screenshots and original hero asset.")
+            print("PASS: Qt 13 route navigation, mixed-launcher Games, "
+                  "global local search, exact personal-rule Unprotect without deletion, "
+                  "13 real Qt screenshots and local original art.")
         finally:
             window.close()
             app.processEvents()

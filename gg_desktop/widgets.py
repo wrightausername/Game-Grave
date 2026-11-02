@@ -109,13 +109,13 @@ class HeroBanner(QFrame):
                  detail="A lighter PC. A safer way to manage gaming storage."):
         super().__init__()
         self.setObjectName("hero")
-        self.setMinimumHeight(157)
+        self.setMinimumHeight(166)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.title = title
         self.subtitle = subtitle
         self.detail = detail
         from PySide6.QtSvg import QSvgRenderer
-        self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "crimson_ruins.svg"))
+        self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -135,20 +135,22 @@ class HeroBanner(QFrame):
         grad.setColorAt(.46, QColor(5, 10, 17, 183))
         grad.setColorAt(1, QColor(10, 15, 22, 15))
         painter.fillRect(target, grad)
+        painter.setPen(QPen(QColor(COLORS["red"]), 5))
+        painter.drawLine(22, 42, 12, 106)
         painter.setPen(QColor("#F5F7FB"))
-        painter.setFont(QFont("Segoe UI", 20, QFont.Black))
-        painter.drawText(22, 46, self.title)
-        painter.setPen(QColor(COLORS["red"]))
-        painter.setFont(QFont("Segoe UI", 20, QFont.Black))
-        painter.drawText(22, 79, self.subtitle)
-        painter.setPen(QColor("#BBCAD7"))
-        painter.setFont(QFont("Segoe UI", 10))
-        painter.drawText(QRectF(23, 92, max(120, self.width() * .58), 52),
-                         Qt.AlignLeft | Qt.TextWordWrap, self.detail)
+        painter.setFont(QFont("Segoe UI", 31, QFont.Bold))
+        painter.drawText(QRectF(43, 36, max(180, self.width() * .54), 48),
+                         Qt.AlignLeft | Qt.AlignVCenter, self.title)
+        painter.setPen(QColor("#E6E8EE"))
+        painter.setFont(QFont("Segoe UI", 12))
+        painter.drawText(QRectF(44, 86, max(160, self.width() * .54), 48),
+                         Qt.AlignLeft | Qt.TextWordWrap, self.subtitle)
+        if self.detail:
+            painter.setPen(QColor("#90A5B7"))
+            painter.setFont(QFont("Segoe UI", 9))
+            painter.drawText(QRectF(44, 136, max(160, self.width() * .54), 20),
+                             Qt.AlignLeft, self.detail)
         painter.restore()
-        painter.setPen(QPen(QColor("#334552"), 1))
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRoundedRect(target.adjusted(.5, .5, -.5, -.5), 11, 11)
 
 
 class LandscapeArt(QFrame):
@@ -160,7 +162,7 @@ class LandscapeArt(QFrame):
         self.setAccessibleName("Original decorative Game Grave landscape artwork. Screenshot not loaded.")
         from PySide6.QtSvg import QSvgRenderer
         self.renderer = QSvgRenderer(
-            str(Path(__file__).parent / "assets" / "crimson_ruins.svg"))
+            str(Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
 
     def paintEvent(self, event):
         painter = QPainter(self)

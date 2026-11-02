@@ -29,6 +29,7 @@ from cleanup_actions import recycle_reviewed_entries, recycle_old_files
 from recovery import get_records, restore as restore_recycled, check_restore
 from screenshot_preview import decode_screenshot_preview
 from gg_desktop.backend import refresh_graveyard, unprotect_exact_personal_item, add_never_touch_path
+from gg_desktop.extra_pages import ExtraPages
 from gg_desktop.models import (
     readable_bytes, reported_game_bytes, unique_launcher_counts,
     graveyard_protection_decision, graveyard_totals,
@@ -65,12 +66,13 @@ def _box_notice(parent, message: str, *, warning=False):
     return frame
 
 
-class ScreenMethods:
+class ScreenMethods(ExtraPages):
     """These methods are deliberately UI-only; the existing backend is authoritative."""
 
     def _new(self, title: str, subtitle: str) -> ScrollPage:
         page = self.page_for(title)
-        page_heading(page, title, subtitle)
+        page.content.addWidget(HeroBanner(
+            title=title, subtitle=subtitle, detail="GAME GRAVE  •  LOCAL FIRST"))
         if self.inventory.warnings:
             _box_notice(page, "Partial scan: " + " ".join(self.inventory.warnings), warning=True)
         return page
@@ -89,8 +91,8 @@ class ScreenMethods:
     def overview_page(self):
         page = self.page_for("Overview")
         page.content.addWidget(HeroBanner(
-            title="YOUR GAMES.", subtitle="A CLEANER TOMORROW.",
-            detail="Find what your games leave behind across launchers. Review everything; keep what matters."))
+            title="Overview", subtitle="Your games. All their baggage. Under control.",
+            detail="Discover local storage, understand relationships, and keep what matters."))
         strip = QWidget()
         grid = QGridLayout(strip)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -257,6 +259,8 @@ class ScreenMethods:
         self.game_search = QLineEdit()
         self.game_search.setPlaceholderText("Search any game, launcher, or install path…")
         self.game_search.setAccessibleName("Search installed games")
+        self.game_search.setText(getattr(self, "_pending_game_query", ""))
+        self._pending_game_query = ""
         filters.addWidget(self.game_search, 3)
         self.game_filter = QComboBox()
         self.game_filter.addItems(["All launchers"] + sorted({
@@ -414,6 +418,8 @@ class ScreenMethods:
         filters.setLayout(controls)
         self.grave_search = QLineEdit()
         self.grave_search.setPlaceholderText("Search findings and paths…")
+        self.grave_search.setText(getattr(self, "_pending_grave_query", ""))
+        self._pending_grave_query = ""
         controls.addWidget(self.grave_search, 3)
         self.grave_type = QComboBox()
         self.grave_type.addItems(["All types"] + sorted({e.category for e in self.inventory.graveyard}))
@@ -727,81 +733,141 @@ class ScreenMethods:
                  ready, error_title="Could not safely preview image")
 
     def dna_page(self):
-        page = self._new("Game DNA", "See how verified game files relate to mods, saves, captures and unknown leftovers.")
+        page = self._new("Game DNA",
+                         "Explore detected connections between game installs, mods, profiles and protected content.")
         if self._not_scanned(page):
             return
         from game_intelligence import build_game_dna
+        from gg_desktop.dna_map import DNAMap
+        from gg_desktop.widgets import destroy_layout
+
         dna = build_game_dna(self.inventory.steam, self.inventory.other,
                              self.inventory.mods, self.inventory.saves)
-        rowtop = QWidget()
-        top = row()
-        rowtop.setLayout(top)
-        top.addWidget(label("Choose a game", "sectionTitle"))
-        choose = QComboBox()
         games = dna.get("games", [])
-        choose.addItems([f"{g['game']}  •  {g['launcher']}" for g in games])
-        choose.setAccessibleName("Choose game for visual relationship map")
+        controls = QWidget()
+        top = row()
+        controls.setLayout(top)
+        top.addWidget(label("CHOOSE A GAME", "sectionTitle"))
+        choose = QComboBox()
+        choose.addItems([g.get("game", "Unknown") + "  •  " +
+                         g.get("launcher", "Unknown") for g in games])
+        choose.setAccessibleName("Choose installed game for its relationship map")
         top.addWidget(choose, 1)
-        page.content.addWidget(rowtop)
-        visual, visuals = panel()
-        visuals.addWidget(section_title("WHERE YOUR GAME'S FILES LIVE",
-                                        "Known relationships only"))
-        chosen = label("Choose an installed game. No file will be modified.", "subtle", wrap=True)
-        visuals.addWidget(chosen)
-        diagram = QWidget()
-        diaggrid = QGridLayout(diagram)
-        diaggrid.setContentsMargins(2, 12, 2, 12)
-        diaggrid.setHorizontalSpacing(8)
-        diaggrid.setVerticalSpacing(8)
-        visuals.addWidget(diagram)
-        page.content.addWidget(visual)
-        detail, detail_col = panel()
-        detail_col.addWidget(section_title("What this means"))
-        description = label("", "subtle", wrap=True)
-        detail_col.addWidget(description)
-        assets_title = label("", "sectionTitle", wrap=True)
-        detail_col.addWidget(assets_title)
-        page.content.addWidget(detail)
+        top.addWidget(button("Scan PC", self.start_scan))
+        page.content.addWidget(controls)
+
+        workspace = QWidget()
+        columns = row(spacing=12)
+        workspace.setLayout(columns)
+        map_frame, map_layout = panel()
+        heading = QWidget()
+        tools = row()
+        heading.setLayout(tools)
+        tools.addWidget(section_title("INTERACTIVE DNA MAP", "Select a node to inspect evidence"), 1)
+        graph = DNAMap()
+        tools.addWidget(button("+", graph.zoom_in, tip="Zoom in on relationship map"))
+        tools.addWidget(button("−", graph.zoom_out, tip="Zoom out on relationship map"))
+        tools.addWidget(button("Fit", graph.reset_map))
+        map_layout.addWidget(heading)
+        map_layout.addWidget(graph, 1)
+        map_layout.addWidget(label(
+            "Solid lines indicate an attributed local relationship. Dashed lines mean "
+            "unverified or unknown ownership; they are never deletion authority.",
+            "caption", wrap=True))
+        columns.addWidget(map_frame, 7)
+        inspector, details = panel()
+        details.addWidget(section_title("NODE INSPECTOR"))
+        columns.addWidget(inspector, 3)
+        page.content.addWidget(workspace)
+        stats = QWidget()
+        cardrow = row()
+        stats.setLayout(cardrow)
+        link_card = MetricCard("Verified mod locations", "Unknown",
+                               "Linked only when evidence permits", tone="cyan")
+        profiles_card = MetricCard("Manager profiles", "Unknown",
+                                   "Requires verified install path", tone="amber")
+        unresolved_card = MetricCard("Unresolved locations", str(len(dna.get("unresolved", []))),
+                                     "Protected unless independently verified", tone="text")
+        cardrow.addWidget(link_card)
+        cardrow.addWidget(profiles_card)
+        cardrow.addWidget(unresolved_card)
+        page.content.addWidget(stats)
+
+        def selected_node(node):
+            destroy_layout(details)
+            details.addWidget(section_title(str(node.get("title", "Node"))))
+            details.addWidget(label(str(node.get("value", "Unknown")),
+                                    "sectionTitle", wrap=True))
+            for name, value in (
+                ("Relationship", node.get("relationship", "Unknown")),
+                ("Source", node.get("source", "Unknown")),
+                ("Confidence", node.get("confidence", "Unknown")),
+                ("Protection", "Protected / no direct cleanup" if
+                 node.get("protected", True) else "Review independently"),
+                ("Evidence", node.get("reason", "Not provided")),
+                ("Location", node.get("path", "Not attributed")),
+            ):
+                details.addWidget(label(name.upper(), "eyebrow"))
+                details.addWidget(label(str(value) or "Unknown", "subtle", wrap=True))
+            path = str(node.get("path", ""))
+            if path:
+                from pathlib import Path
+                folder = path if Path(path).is_dir() else str(Path(path).parent)
+                details.addWidget(button("Open location",
+                                         lambda path=folder: self._open_folder(path)))
+            details.addStretch()
+
+        graph.node_selected.connect(selected_node)
         def show(index):
-            from gg_desktop.widgets import destroy_layout
-            while diaggrid.count():
-                item = diaggrid.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-                elif item.layout():
-                    destroy_layout(item.layout())
             if index < 0 or index >= len(games):
-                chosen.setText("No verified installed game records.")
-                description.setText("Run Scan PC or check supported launcher metadata.")
-                assets_title.setText("")
+                graph.scene_graph.clear()
+                selected_node({"title": "No game selected",
+                               "reason": "Scan to discover verified install records."})
+                link_card.update_value("0", "No verified game selected")
+                profiles_card.update_value("0", "No verified game selected")
                 return
-            item = games[index]
-            chosen.setText(item["game"] + "  •  " + item["launcher"] +
-                           "\n" + item["install_evidence"])
-            buckets = [
-                ("▣  INSTALLED GAME", "Protected", "Existing game installation"),
-                ("♜  MODS", str(len(item["assets"])) + " associated", "Files may still be active"),
-                ("▣  SAVES", "Protected", "Ownership not guaranteed"),
-                ("▥  RECORDINGS", "Review", "Captured independently of install"),
-                ("▧  SCREENSHOTS", "Preview", "Actual images require consent"),
-                ("♱  LEFTOVERS", "Unverified", "Absence of launcher manifest proves nothing"),
-            ]
-            for i, (name, value, meaning) in enumerate(buckets):
-                metric = MetricCard(name, value, meaning,
-                                    tone="cyan" if i in (3, 4) else
-                                         "amber" if i in (1, 2, 5) else "text")
-                diaggrid.addWidget(metric, i // 3, i % 3)
-            description.setText(
-                "Game DNA matches files only with verified install directories or "
-                "source-specific IDs. Mods, screenshots and saves remain protected "
-                "until independently reviewed. A missing link is UNKNOWN, not permission to delete.")
-            assets_title.setText(
-                f"{len(item['assets'])} directly associated mod/storage locations. "
-                f"{len(dna.get('unresolved', []))} unresolved findings stay protected.")
+            game = games[index]
+            graph.populate(game, dna.get("unresolved", []))
+            selected_node({
+                "title": game.get("game", "Game core"),
+                "value": game.get("launcher", "Unknown launcher"),
+                "source": "Installed game inventory",
+                "relationship": "Game core",
+                "confidence": game.get("install_evidence", "Local game inventory"),
+                "reason": ("Install evidence: " + game.get("install_evidence", "Unknown") +
+                           ". Other paths require separate owner verification."),
+                "path": game.get("install_path", ""),
+                "protected": True,
+            })
+            link_card.update_value(str(len(game.get("assets", []))),
+                                   "Local path/ID association, not a cleanup decision")
+            profiles_card.update_value(str(len(game.get("manager_profiles", []))),
+                                       "Manager install path matched exactly")
         choose.currentIndexChanged.connect(show)
         show(choose.currentIndex())
+
+        extras, extra_col = panel()
+        extra_col.addWidget(section_title("RELATED INVESTIGATIONS"))
+        shortcuts = QWidget()
+        options = QGridLayout(shortcuts)
+        options.setSpacing(9)
+        for i, (title, desc, dest) in enumerate((
+            ("Mod Radar", "Inspect active and orphan candidates", "Mods"),
+            ("Save Vault", "Access save protection and backups", "More Tools"),
+            ("Graveyard", "Review cleanup evidence; no automatic removal", "Graveyard"),
+            ("Captures", "Inspect recorded videos and screenshots", "Captures"),
+        )):
+            options.addWidget(ActionCard("⌁", title, desc,
+                                         lambda dest=dest: self.navigate(dest)),
+                              i // 2, i % 2)
+        extra_col.addWidget(shortcuts)
+        extra_col.addWidget(label(
+            "Ghost Watch and Patch Fallout require two complete, user-triggered observations. "
+            "Absent or truncated data must not be interpreted as missing mods or a broken game.",
+            "caption", wrap=True))
+        page.content.addWidget(extras)
         if not games:
-            _box_notice(page, "No Game DNA relationships available. Unknown files stay protected.")
+            _box_notice(page, "No verified installed-game records. Unknown files remain protected.")
 
     def mods_page(self):
         page = self._new("Mods", "Mod Radar shows potential mod storage without touching profiles, saves or managed assets.")
