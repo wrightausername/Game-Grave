@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 320" width="1400" height="320">
+<title>Original Game Grave cinematic forest, crimson leaves and GG stone monument</title>
+<defs>
+ <linearGradient id="night" x1="0" y1="0" x2=".8" y2="1">
+  <stop stop-color="#080f19" offset="0"/><stop stop-color="#172734" offset=".64"/><stop stop-color="#07101a" offset="1"/>
+ </linearGradient>
+ <radialGradient id="moonlight" cx=".77" cy=".03" r=".5">
+  <stop stop-color="#b7d4de" stop-opacity=".75"/><stop offset=".36" stop-color="#577d91" stop-opacity=".28"/><stop offset="1" stop-color="#0b1c29" stop-opacity="0"/>
+ </radialGradient>
+ <linearGradient id="stone" x1="0" y1="0" x2="1" y2="1">
+  <stop stop-color="#455663"/><stop offset=".32" stop-color="#1d2d38"/><stop offset=".72" stop-color="#101923"/><stop offset="1" stop-color="#384652"/>
+ </linearGradient>
+ <linearGradient id="redGlow" x1="0" y1="0" x2="0" y2="1">
+  <stop stop-color="#fa5263" stop-opacity="0"/><stop offset=".75" stop-color="#ff3448" stop-opacity=".32"/><stop offset="1" stop-color="#fa344b" stop-opacity=".85"/>
+ </linearGradient>
+ <radialGradient id="floorGlow" cx=".78" cy=".7" r=".5">
+  <stop stop-color="#f94259" stop-opacity=".8"/><stop offset=".32" stop-color="#c8273e" stop-opacity=".19"/><stop offset="1" stop-color="#f12e45" stop-opacity="0"/>
+ </radialGradient>
+</defs>
+<rect width="1400" height="320" fill="url(#night)"/>
+<rect width="1400" height="320" fill="url(#moonlight)"/>
+<path d="M0 224 L155 143 202 177 349 117 483 174 606 102 735 163 866 113 981 149 1080 112 1198 163 1317 109 1400 159V320H0Z" fill="#172733" opacity=".47"/>
+<path d="M0 250 L115 171 207 220 321 153 429 213 541 147 681 234 765 173 923 218 1091 159 1198 218 1329 168 1400 219V320H0Z" fill="#0e1a25" opacity=".85"/>
+<!-- atmospheric red landscape -->
+<path d="M0 260 Q187 207 333 260T715 250T1400 253V320H0Z" fill="#0a1019"/>
+<ellipse cx="1120" cy="270" rx="280" ry="58" fill="url(#floorGlow)"/>
+<!-- distant tree trunks -->
+<g stroke="#0a141d" stroke-width="11" fill="none" opacity=".7">
+ <path d="M740 0L756 255M741 86L691 41M753 126L813 76M804 0L818 242M820 83L876 35M928 0L928 257M924 120L866 80M980 0L978 252M978 73L1023 14M1285 0L1269 276M1279 76L1341 27"/>
+</g>
+<!-- moonlight shaft silhouettes -->
+<g opacity=".1" fill="#bddde6"><path d="M1014 0L949 239L979 225L1091 0Z"/><path d="M1060 0L1013 253L1057 234L1139 0Z"/></g>
+<!-- prominent right-hand engraved GG gravestone -->
+<path d="M1114 266L1119 86Q1123 31 1186 25L1232 31Q1285 45 1288 96L1292 268Z" fill="#05070c" stroke="#060910" stroke-width="16"/>
+<path d="M1125 262L1130 94Q1133 42 1182 39L1226 42Q1274 53 1276 100L1278 263Z" fill="url(#stone)" stroke="#55616c" stroke-width="5"/>
+<path d="M1149 231L1148 99Q1156 66 1183 65L1221 69Q1250 76 1255 103L1255 226" fill="none" stroke="#0b141d" stroke-width="3" opacity=".7"/>
+<path d="M1145 126L1168 119 1158 134 1186 145 1172 165 1191 174 1209 149 1232 149 1245 122" fill="none" stroke="#111b24" stroke-width="6"/>
+<path d="M1144 116L1168 104M1200 169L1234 199" stroke="#ff4055" stroke-width="2" opacity=".58"/>
+<text x="1200" y="166" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="80" font-style="italic" font-weight="900" fill="#a6182f" stroke="#ff324a" stroke-width="1">GG</text>
+<path d="M1166 175L1174 219L1185 214L1178 244" stroke="#f83b50" stroke-width="3" opacity=".6"/>
+<!-- game controller at base -->
+<path d="M1030 230Q1032 214 1052 214H1127Q1145 214 1155 231L1171 263Q1177 284 1157 282L1124 260H1052L1018 283Q1000 289 1005 266Z" fill="#080a0f" stroke="#596571" stroke-width="4"/>
+<path d="M1041 239L1066 239M1053 227L1053 252" stroke="#8f9fa9" stroke-width="7" stroke-linecap="round"/>
+<circle cx="1115" cy="231" r="6" fill="#c62c3f"/><circle cx="1133" cy="245" r="6" fill="#a81e34"/><circle cx="1122" cy="257" r="5" fill="#8e2434"/>
+<ellipse cx="1104" cy="288" rx="138" ry="17" fill="#d53345" opacity=".15"/>
+<!-- moss / ivy -->
+<g stroke="#334b3f" stroke-width="4" fill="none"><path d="M1267 37Q1242 71 1271 99Q1234 124 1264 165"/><path d="M1254 52Q1279 64 1294 95"/></g>
+<g fill="#3d5c3e"><ellipse cx="1267" cy="58" rx="14" ry="6" transform="rotate(-26 1267 58)"/><ellipse cx="1250" cy="92" rx="13" ry="6" transform="rotate(27 1250 92)"/><ellipse cx="1264" cy="137" rx="12" ry="6" transform="rotate(-42 1264 137)"/><ellipse cx="1296" cy="97" rx="10" ry="6" transform="rotate(40 1296 97)"/></g>
+<!-- red foliage at canopy and along floor -->
+<g fill="#a91d32">
+ <path d="M840 0L857 18 884 7 880 30 910 41 881 53 889 77 855 61 826 76 835 53 807 34 836 27Z"/>
+ <path d="M905 0L922 21 957 14 939 41 971 55 933 59 922 84 908 57 877 49 908 36Z"/>
+ <path d="M988 0L1009 19 1033 9 1031 33 1054 52 1027 60 1022 80 1003 62 973 70 981 46 958 29 985 28Z"/>
+ <path d="M1068 0L1087 18 1117 5 1104 36 1128 48 1094 56 1082 81 1067 55 1038 63 1050 40 1030 17 1058 24Z"/>
+</g>
+<g fill="#d53a47" opacity=".86"><path d="M845 75L855 83 866 79 859 93 869 99 856 101 847 111 842 99 831 95 843 90Z"/><path d="M997 82L1008 90 1020 85 1017 99 1028 109 1015 111 1008 122 1001 110 988 106 1001 97Z"/><path d="M1142 6L1153 18 1166 12 1158 27 1169 36 1154 38 1144 53 1140 36 1128 32 1139 23Z"/></g>
+<g fill="#5e1425"><path d="M872 282L906 273 897 291 913 305 883 300Z"/><path d="M1010 291L1030 281 1027 302 1054 313 1021 310Z"/><path d="M1213 278L1251 277 1231 291 1255 309 1225 301Z"/><path d="M1353 286L1380 283 1366 296 1400 312 1365 311Z"/></g>
+<!-- side dark forest frame and floor glow -->
+<path d="M0 0L73 0Q34 67 46 127L30 200L0 230ZM1400 0L1354 0L1374 100L1350 182L1400 244Z" fill="#060d14" opacity=".67"/>
+<rect width="1400" height="320" fill="url(#redGlow)" opacity=".13"/>
+</svg>
