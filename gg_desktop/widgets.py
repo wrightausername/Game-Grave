@@ -137,16 +137,27 @@ class HeroBanner(QFrame):
         grad.setColorAt(.46, QColor(5, 10, 17, 122))
         grad.setColorAt(1, QColor(10, 15, 22, 15))
         painter.fillRect(target, grad)
-        painter.setPen(QColor("#F5F7FB"))
-        painter.setFont(QFont("Segoe UI", 23, QFont.Black))
-        painter.drawText(24, 55, self.title)
-        painter.setPen(QColor(COLORS["red"]))
-        painter.setFont(QFont("Segoe UI", 23, QFont.Black))
-        painter.drawText(24, 91, self.subtitle)
-        painter.setPen(QColor("#BBCAD7"))
-        painter.setFont(QFont("Segoe UI", 10))
-        painter.drawText(QRectF(25, 108, max(140, self.width() * .64), 65),
-                         Qt.AlignLeft | Qt.TextWordWrap, self.detail)
+        if self.title == "Overview":
+            # Owner's exact Overview headline hierarchy: one large white
+            # title, one restrained white subtitle, no secondary red slogan.
+            painter.setPen(QColor("#F7F8FA"))
+            painter.setFont(QFont("Segoe UI", 28, QFont.Bold))
+            painter.drawText(24, 63, self.title)
+            painter.setPen(QColor("#C8CFDA"))
+            painter.setFont(QFont("Segoe UI", 12, QFont.Normal))
+            painter.drawText(QRectF(26, 78, max(160, self.width() * .65), 70),
+                             Qt.AlignLeft | Qt.TextWordWrap, self.subtitle)
+        else:
+            painter.setPen(QColor("#F5F7FB"))
+            painter.setFont(QFont("Segoe UI", 23, QFont.Black))
+            painter.drawText(24, 55, self.title)
+            painter.setPen(QColor(COLORS["red"]))
+            painter.setFont(QFont("Segoe UI", 23, QFont.Black))
+            painter.drawText(24, 91, self.subtitle)
+            painter.setPen(QColor("#BBCAD7"))
+            painter.setFont(QFont("Segoe UI", 10))
+            painter.drawText(QRectF(25, 108, max(140, self.width() * .64), 65),
+                             Qt.AlignLeft | Qt.TextWordWrap, self.detail)
         painter.restore()
         painter.setPen(QPen(QColor("#334552"), 1))
         painter.setBrush(Qt.NoBrush)
