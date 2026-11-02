@@ -2573,52 +2573,144 @@ class ScreenMethods(LockedPagesMixin):
             settings_pages.count() - 1)))
 
     def tools_page(self):
-        page = self._new("More Tools", "All existing advanced Game Grave capabilities remain available.")
-        p, stack = panel()
-        stack.addWidget(label("YOUR SAVES AND RESURRECTION KITS REMAIN PROTECTED", "eyebrow"))
-        stack.addWidget(label(
-            "The classic Game Grave interface still contains Save Vault, "
-            "Resurrection Kits, Living Kits, Time Machine, PC transfer, "
-            "Make Room, Activity, schedules and advanced options. "
-            "This visual preview does not replace the trusted workflow yet.",
-            "subtle", wrap=True))
-        actions = QWidget()
-        buttons = QGridLayout(actions)
-        buttons.setContentsMargins(0, 5, 0, 4)
-        buttons.setSpacing(9)
-        links = [
-            ("Save Vault: back up a selected folder", self._create_save_backup),
-            ("Create verified Resurrection Kit", self._create_kit),
-            ("Inspect and restore Kit to NEW folder", self._restore_kit),
-            ("Rehearse Kit recovery in isolation", self._rehearse_kit),
-            ("Check Kit missing pieces", self._missing_pieces),
-            ("Compare two Kit snapshots", self._compare_kits),
-            ("Prepare portable PC-to-PC transfer", self._transfer_kit),
-            ("Browse Time Machine snapshots", self._kit_versions),
-        ]
-        for i, (caption, callback) in enumerate(links):
-            buttons.addWidget(button(caption, callback,
-                                     kind="primary" if i == 1 else ""),
-                              i // 2, i % 2)
-        stack.addWidget(actions)
-        stack.addWidget(button("Open classic Mod Organizer, advanced backup and update tools",
-                               self._launch_classic_tools))
-        page.content.addWidget(p)
-        p, stack = panel()
-        stack.addWidget(section_title("What is safe to do here?"))
-        for detail in (
-            "Read-only scans and evidence-backed game/mod discovery",
-            "Inspect and unprotect only your exact personal Never Touch items",
-            "Review individual screenshots locally before a separate approval",
-            "Move ordinary reviewed files to Windows Recycle Bin after verified safety check",
-            "View and request restoration from a unique Windows recovery entry",
+        """Owner-locked More Tools launcher with real actions only."""
+        page = self._new(
+            "More Tools",
+            "Advanced utilities, recovery tools, and specialized gaming workflows.")
+        from core import get_activity
+        from gg_desktop.widgets import ActionCard
+        from PySide6.QtWidgets import QGridLayout
+
+        # Quick Access: all buttons open an actual working screen or verified
+        # existing backend action. No unimplemented fake tool controls.
+        access, access_col = panel(padding=14)
+        access_bar = QWidget()
+        access_row = row(spacing=11)
+        access_bar.setLayout(access_row)
+        access_row.addWidget(label("QUICK ACCESS", "sectionTitle"))
+        access_row.addWidget(label("Your recovery and maintenance shortcuts", "caption"))
+        access_row.addStretch(1)
+        for name, callback in (
+            ("Resurrection Kit", self._create_kit),
+            ("Save Vault", self._create_save_backup),
+            ("Make Room", lambda: self.navigate("Other Storage")),
+            ("Ghost Watch", lambda: self.navigate("Game DNA")),
         ):
-            stack.addWidget(label("✓  " + detail, "subtle", wrap=True))
-        page.content.addWidget(p)
-        _box_notice(page, "This Qt presentation is a preview, not Game Grave 1.0. "
-                    "Native Windows acceptance, full advanced UI parity and "
-                    "third-party Qt commercial redistribution review are pending.",
-                    warning=True)
+            access_row.addWidget(button(name + "  ›", callback))
+        access_col.addWidget(access_bar)
+        page.content.addWidget(access)
+
+        content = QWidget()
+        columns = row(spacing=13)
+        content.setLayout(columns)
+
+        main = QWidget()
+        main_col = column(spacing=13)
+        main.setLayout(main_col)
+        headline = QWidget()
+        feats = row(spacing=13)
+        headline.setLayout(feats)
+        rescue, rescue_col = panel(kind="actionCardPrimary", padding=17)
+        rescue_col.addWidget(label("♻  RESURRECTION KIT", "eyebrow"))
+        rescue_col.addWidget(label("Bring your games back.", "sectionTitle"))
+        rescue_col.addWidget(label(
+            "Build an evidence-based, verified backup before risky game changes. "
+            "Restoration always requires your approval and a safe target.",
+            "subtle", wrap=True))
+        rescue_col.addWidget(button("Create a verified kit  ›", self._create_kit, kind="primary"))
+        rescue_col.addWidget(button("Restore Kit into a new folder", self._restore_kit))
+        rescue_col.addStretch()
+        feats.addWidget(rescue, 1)
+
+        vault, vault_col = panel(kind="actionCard", padding=17)
+        vault_col.addWidget(label("▣  SAVE VAULT", "eyebrow"))
+        vault_col.addWidget(label("Protect your progress.", "sectionTitle"))
+        vault_col.addWidget(label(
+            "Create and review locally stored save backups. Unknown save folders "
+            "are protected until explicitly verified.",
+            "subtle", wrap=True))
+        vault_col.addWidget(button("Create selected-folder backup  ›",
+                                   self._create_save_backup, kind="primary"))
+        vault_col.addWidget(button("View backup & restore options",
+                                   lambda: self.navigate("Settings")))
+        vault_col.addStretch()
+        feats.addWidget(vault, 1)
+        main_col.addWidget(headline)
+
+        matrix = QWidget()
+        grid = QGridLayout(matrix)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(12)
+        tiles = (
+            ("Make Room", "Review game-related storage; no automatic removal",
+             lambda: self.navigate("Other Storage")),
+            ("Storage Explorer", "Inspect disk-level ownership and locations",
+             lambda: self.navigate("Other Storage")),
+            ("Ghost Watch", "Compare user-triggered mod observations in Game DNA",
+             lambda: self.navigate("Game DNA")),
+            ("Capture Studio", "Inspect screenshots and recordings on demand",
+             lambda: self.navigate("Captures")),
+            ("Game Exodus", "Prepare a cautious transfer or reinstall",
+             self._transfer_kit),
+            ("Diagnostics", "Investigate game/mod links and warnings",
+             lambda: self.navigate("Game DNA")),
+        )
+        for i, (name, description, callback) in enumerate(tiles):
+            grid.addWidget(ActionCard("⌁", name, description, callback),
+                           i // 3, i % 3)
+        main_col.addWidget(matrix)
+        main_col.addStretch()
+        columns.addWidget(main, 7)
+
+        sidebar = QWidget()
+        sidebar_col = column(spacing=13)
+        sidebar.setLayout(sidebar_col)
+
+        recent, recent_col = panel()
+        recent_col.addWidget(section_title("RECENTLY USED", "Local operations"))
+        activities = get_activity(limit=6)
+        if not activities:
+            recent_col.addWidget(label(
+                "No recorded Game Grave actions yet. This list reflects local logs only.",
+                "subtle", wrap=True))
+        else:
+            for event in activities[:5]:
+                name = str(event.get("kind", "Local action"))[:60]
+                stamp = str(event.get("date", ""))[:16]
+                recent_col.addWidget(label(name, "sectionTitle", wrap=True))
+                recent_col.addWidget(label(stamp or "Time unavailable", "caption"))
+        sidebar_col.addWidget(recent)
+
+        recommended, rec_col = panel()
+        rec_col.addWidget(section_title("RECOVERY & DIAGNOSTICS"))
+        for name, action in (
+            ("Rehearse recovery safely", self._rehearse_kit),
+            ("Check missing Kit pieces", self._missing_pieces),
+            ("Compare Kit snapshots", self._compare_kits),
+            ("Review Undo Center", lambda: self.navigate("Undo Center")),
+        ):
+            rec_col.addWidget(button(name + "  ›", action))
+        sidebar_col.addWidget(recommended)
+        columns.addWidget(sidebar, 3)
+
+        page.content.addWidget(content)
+        footer, footer_col = panel(padding=12)
+        footer_col.addWidget(section_title("ADVANCED RECOVERY", "Protected by default"))
+        rowtools = QWidget()
+        footer_tools = row(spacing=8)
+        rowtools.setLayout(footer_tools)
+        footer_tools.addWidget(button("Browse Kit versions", self._kit_versions))
+        footer_tools.addWidget(button("Open classic advanced tools",
+                                      self._launch_classic_tools))
+        footer_tools.addStretch()
+        footer_tools.addWidget(button("Undo Center", lambda: self.navigate("Undo Center")))
+        footer_col.addWidget(rowtools)
+        footer_col.addWidget(label(
+            "All file modification and restoration still runs through the existing "
+            "identity, ownership, explicit confirmation and recovery checks. "
+            "No animated mockup numbers represent real storage savings.",
+            "caption", wrap=True))
+        page.content.addWidget(footer)
 
     def _launch_classic_tools(self):
         entry = Path(__file__).resolve().parent.parent / "launcher.py"
