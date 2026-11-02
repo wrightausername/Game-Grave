@@ -318,83 +318,191 @@ class FeatureStrip(QWidget):
 
 
 class RelationshipMap(QWidget):
-    """Visual relationship map for *actual* evidenced game DNA categories.
+    """Cinematic interactive evidence map; unverified links are visibly dashed.
 
-    Selecting a node emits a grounded name. Unknown links stay explicitly
-    unknown rather than being presented as safe-to-delete.
+    This is a read-only navigator, not an ownership or deletion authority.
+    Supports selection, wheel zoom, drag pan and keyboard zoom/reset.
     """
     selected = Signal(str)
-    NODE_TYPES = ("Install", "Mods", "Saves", "Captures", "Configs", "Leftovers")
-    NODE_COLORS = ("#43D6F2", "#82A9C5", "#5F91B4",
-                   "#46BEDA", "#E6A1A9", "#F84359")
+    NODE_TYPES = ("Install", "Mods", "Profiles", "Saves",
+                  "Captures", "Configs", "Caches", "Leftovers")
+    NODE_COLORS = ("#FF4055", "#CB82F0", "#49CBED", "#62DBA7",
+                   "#539FEA", "#FFBF60", "#ECA567", "#F85B73")
 
     def __init__(self):
         super().__init__()
-        self.setMinimumHeight(350)
-        self.setAccessibleName("Visual relationship map connecting installed game, mods, saves, captures, configuration and unknown leftovers")
+        self.setMinimumHeight(410)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setMouseTracking(True)
+        self.setAccessibleName(
+            "Game DNA interactive relationship map. Select a node for evidence; "
+            "drag to pan, scroll to zoom, 0 to fit.")
+        self.setToolTip("Click a node to inspect evidence. Wheel zoom; drag empty space to pan.")
         self.game_name = "Choose a game"
         self.states = {}
         self.active = "Install"
+        self.positions = {}
+        self.zoom = 1.0
+        self.pan_x = 0.0
+        self.pan_y = 0.0
+        self._drag = None
 
     def set_game(self, name: str, states: dict[str, str]):
         self.game_name = str(name)[:120]
         self.states = {str(k): str(v)[:100] for k, v in states.items()}
         self.active = "Install"
+        self.reset_view()
+
+    def reset_view(self):
+        self.zoom = 1.0
+        self.pan_x = self.pan_y = 0.0
         self.update()
+
+    def zoom_in(self):
+        self.zoom = min(1.65, self.zoom * 1.14)
+        self.update()
+
+    def zoom_out(self):
+        self.zoom = max(0.6, self.zoom / 1.14)
+        self.update()
+
+    def wheelEvent(self, event):
+        self.zoom_in() if event.angleDelta().y() > 0 else self.zoom_out()
+        event.accept()
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Plus, Qt.Key_Equal):
+            self.zoom_in()
+            event.accept()
+        elif event.key() == Qt.Key_Minus:
+            self.zoom_out()
+            event.accept()
+        elif event.key() == Qt.Key_0:
+            self.reset_view()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
+    def _center(self):
+        return QPointF(self.width()*.50 + self.pan_x,
+                       self.height()*.51 + self.pan_y)
 
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
+        p.setRenderHint(QPainter.TextAntialiasing)
         w, h = self.width(), self.height()
-        p.fillRect(self.rect(), QColor("#0A1420"))
-        center = QPointF(w * .50, h * .51)
-        radius_x = max(165, min(310, w * .32))
-        radius_y = max(110, h * .32)
-        p.setPen(_pen("#173243", 1))
-        for r in (0.72, 1.0, 1.18):
-            p.drawEllipse(center, radius_x * r, radius_y * r)
-        p.setPen(_pen("#4B8AA1", 2))
-        p.setBrush(QColor("#0D2835"))
-        p.drawEllipse(center, 80, 56)
-        p.setPen(_pen(CYAN, 3))
-        p.drawEllipse(center, 86, 61)
+        p.fillRect(self.rect(), QColor("#080F1A"))
+        center = self._center()
+        rx = max(100, min(270, w * .30)) * self.zoom
+        ry = max(84, min(156, h * .37)) * self.zoom
+
+        # Sparse radar chart background is useful orientation, not fake metrics.
+        p.setPen(_pen("#112735", 1))
+        for step in range(45, int(w), 45):
+            p.drawLine(step, 0, step, h)
+        for step in range(40, int(h), 40):
+            p.drawLine(0, step, w, step)
+        p.setPen(_pen("#1F3B49", 1))
+        for fraction in (0.6, 0.9, 1.13):
+            p.drawEllipse(center, rx*fraction, ry*fraction)
+        p.setPen(_pen("#4D2839", 2))
+        p.drawEllipse(center, 99, 87)
+        p.setPen(_pen("#76263B", 2))
+        p.drawEllipse(center, 94, 82)
+        p.setPen(_pen("#FF4055", 3))
+        p.setBrush(QColor("#23121E"))
+        p.drawRoundedRect(QRectF(center.x()-82, center.y()-61, 164, 120), 16, 16)
+        p.setPen(QColor("#FF4055"))
+        p.setFont(QFont("Segoe UI", 10, QFont.Black))
+        p.drawText(QRectF(center.x()-75, center.y()-51, 150, 22),
+                   Qt.AlignCenter, "GAME CORE")
         p.setPen(WHITE)
-        title_font = QFont("Segoe UI", 11, QFont.DemiBold)
-        p.setFont(title_font)
-        p.drawText(QRectF(center.x()-72, center.y()-28, 144, 56),
+        p.setFont(QFont("Segoe UI", 10, QFont.DemiBold))
+        p.drawText(QRectF(center.x()-73, center.y()-25, 146, 66),
                    Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
+
         self.positions = {}
+        node_radius_x, node_radius_y = rx, ry
         for i, name in enumerate(self.NODE_TYPES):
-            angle = -math.pi / 2 + i * math.pi * 2 / len(self.NODE_TYPES)
-            x = center.x() + math.cos(angle) * radius_x
-            y = center.y() + math.sin(angle) * radius_y
-            rect = QRectF(x-74, y-31, 148, 62)
-            self.positions[name] = rect
+            angle = (-math.pi/2) + (i * math.pi*2 / len(self.NODE_TYPES))
+            x = center.x() + math.cos(angle)*node_radius_x
+            y = center.y() + math.sin(angle)*node_radius_y
             color = QColor(self.NODE_COLORS[i])
-            p.setPen(_pen(color, 2 if name == self.active else 1))
-            p.drawLine(center, QPointF(x, y))
-            p.setPen(_pen(color if name == self.active else "#345D70", 2))
-            p.setBrush(QColor("#183540" if name == self.active else "#102330"))
-            p.drawRoundedRect(rect, 9, 9)
+            unknown = any(token in self.states.get(name, "Unverified").casefold()
+                          for token in ("unknown", "unverified", "protected", "independent"))
+            path = QPainterPath()
+            path.moveTo(center)
+            bend = QPointF((center.x() + x)*.5 + math.sin(angle)*27,
+                            (center.y() + y)*.5 - math.cos(angle)*12)
+            path.quadTo(bend, QPointF(x,y))
+            pen = _pen(color if not unknown else "#425867", 2)
+            if unknown:
+                pen.setStyle(Qt.DashLine)
+            p.setPen(pen)
+            p.setBrush(Qt.NoBrush)
+            p.drawPath(path)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(color))
+            p.drawEllipse(QPointF(x, y), 3.5, 3.5)
+
+            box = QRectF(x-72, y-30, 144, 60)
+            self.positions[name] = box
+            active = name == self.active
+            p.setBrush(QColor("#371522" if active else "#14232F"))
+            p.setPen(_pen(color if active else "#405868", 2 if active else 1.2))
+            p.drawRoundedRect(box, 10, 10)
             p.setPen(WHITE)
-            p.setFont(QFont("Segoe UI", 11, QFont.DemiBold))
-            p.drawText(QRectF(rect.x()+5, rect.y()+4, rect.width()-10, 22),
+            p.setFont(QFont("Segoe UI", 10, QFont.DemiBold))
+            p.drawText(QRectF(box.x()+7, box.y()+6, box.width()-14, 22),
                        Qt.AlignCenter, name)
-            p.setPen(MUTED)
-            p.setFont(QFont("Segoe UI", 9))
-            status = self.states.get(name, "Not verified")
-            p.drawText(QRectF(rect.x()+7, rect.y()+27, rect.width()-14, 30),
-                       Qt.AlignCenter | Qt.TextWordWrap, status)
+            p.setPen(color if active else MUTED)
+            p.setFont(QFont("Segoe UI", 8))
+            p.drawText(QRectF(box.x()+6, box.y()+29, box.width()-12, 26),
+                       Qt.AlignCenter | Qt.TextWordWrap,
+                       self.states.get(name, "Not verified"))
+        # Small graph legend with truth-based link meanings
+        p.setFont(QFont("Segoe UI", 8))
+        p.setPen(QColor("#86A3B6"))
+        p.drawText(QRectF(10, h-27, w-20, 22), Qt.AlignLeft,
+                   "Solid: linked to this game     - -  Dashed: unresolved / independent")
         p.end()
 
     def mousePressEvent(self, event):
-        for name, rect in getattr(self, "positions", {}).items():
-            if rect.contains(event.position()):
-                self.active = name
-                self.update()
-                self.selected.emit(name)
-                break
+        if event.button() == Qt.LeftButton:
+            for name, box in self.positions.items():
+                if box.contains(event.position()):
+                    self.active = name
+                    self.update()
+                    self.selected.emit(name)
+                    event.accept()
+                    return
+            self._drag = event.position()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag is not None:
+            delta = event.position() - self._drag
+            self.pan_x = max(-self.width()*.5, min(self.width()*.5,
+                                                  self.pan_x+delta.x()))
+            self.pan_y = max(-self.height()*.5, min(self.height()*.5,
+                                                   self.pan_y+delta.y()))
+            self._drag = event.position()
+            self.update()
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._drag is not None:
+            self._drag = None
+            self.unsetCursor()
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
 
 
 class RecoveryRoute(QWidget):
