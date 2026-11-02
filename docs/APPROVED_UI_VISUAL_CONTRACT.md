@@ -54,3 +54,15 @@ The definitive supplied overview has:
 - 2026-10-31: earlier `UI_REDESIGN_BLUEPRINT.md` documented an initial Crimson Command direction and safety/architecture constraints.
 - **2026-11-02: OWNER VISUAL REFERENCE LOCK**: owner re-supplied the premium *Game Grave Cinematic Cleanup Dashboard* screenshot and explicitly clarified it, **not** the old toolbar-based or neon/green/purple mockups, defines the intended Game Grave Theme. Graveyard must be brought into visual parity with this reference.
 - Status of this file: **locked visual contract proposed for inclusion in main**. Until PR merge, its branch is a durable review copy; do not pretend it is already in main.
+
+## 6. Graveyard tab — owner APPROVED on 2026-11-02
+
+- **Approved exact image**: `Game_Grave_Graveyard_APPROVED_2026-11-02.png`, 1672×941, SHA-256 `e41b67713983e1c8cc822ad0a2f1659db493145b7753f2c0ec1380692d72eb79`.
+- **Persistent reference**: user's Library folder `/Game Grave/Approved UI/2026-11-02 - LOCKED - Graveyard Overhaul.png`. It is the **same PNG bytes** as the owner-approved image, not a regenerated approximation.
+- **Approval language**: owner explicitly said `i like... lock it in... next ... tab` after seeing this exact mockup. **Status: APPROVED AND LOCKED**.
+- **Visual layout**: identical original red geometric GG logo, sidebar and top global search bar as the cinematic Overview; forest, stone GG marker with red leaves and controller; `Graveyard` heading; inline candidate summary/stat row, scan call-to-action, search and filters; dense two-column table + contextual item details, in-row protected/unprotected states; action strip; storage-impact footer.
+- **Feature needs**: age-based discovery, per-item evidence and reason, drive/source/type filters, selectable entries, Protect/Unprotect, safe Delete via confirmation/Recycle Bin/Undo, Open Path and Keep List; do not assume content is safe to delete based only on age. 
+- **Illustrative aspects of mockup, not production claims**: counts, sizes, space reclaimed, game associations, risk levels, path contents and any `safe to remove` copy. In the real app, replace misleading mockup risk/safety language with evidence-based action states, and distinguish potential space from reclaimed space. Preserve the owner-approved visual composition while correcting copy/data and enforcing non-overridable protections.
+- **Locked design is not yet coded as the final production UI**. This GitHub PR holds the contract; Library holds the reference PNG. To change its visual design, require explicit owner approval and update this log.
+
+**Next page:** Game DNA is next in navigation. Its new mockup must continue this identical visual language, not the prior fantasy/neon or old toolbar-heavy design.
