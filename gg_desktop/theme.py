@@ -983,3 +983,85 @@ QLabel#captureSlideshowCount, QLabel#scanControlHeading {
     font-family:"Bahnschrift","Segoe UI",sans-serif;
 }
 """
+
+
+# Game DNA 2.5D Workbench. These selectors style actual widgets, not a
+# screenshot-overlay. Other pages keep their previously approved UI.
+STYLE += r"""
+QFrame#dnaRelationshipStudio {
+    background:#090E16;
+    border:1px solid #442737;
+    border-top:2px solid #CA3C59;
+    border-radius:6px;
+}
+QWidget#dnaExplodedGameMap {
+    background:#080C14;
+    border:0;
+}
+QFrame#dnaEvidenceInspector {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #19111E,stop:.32 #0D121B,stop:1 #090E16);
+    border:1px solid #522D41;
+    border-radius:6px;
+}
+QWidget#dnaGameRibbon {
+    background:#0A1019;border:0;
+}
+QPushButton#dnaGameChip {
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+       stop:0 #22252D,stop:1 #0A111B);
+    color:#E2E3EC;
+    border:1px solid #35404C;
+    border-radius:5px;
+    min-height:35px;
+    padding:7px 14px;
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-weight:800;
+    font-size:12px;
+}
+QPushButton#dnaGameChip:hover {
+    border:1px solid #BB3856;
+    background:#281723;
+}
+QPushButton#dnaGameChip[active="true"] {
+    color:#FFFFFF;
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+       stop:0 #7D1737,stop:1 #29101F);
+    border:2px solid #FF4966;
+}
+QFrame#dnaSelectedGame {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+       stop:0 #1A1420,stop:.4 #10141E,stop:1 #080E16);
+    border:1px solid #542B3D;
+    border-left:3px solid #ED405C;
+    border-radius:5px;
+}
+QLabel#dnaSelectedName {
+    background:transparent;color:#F7F3F7;
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:25px;font-weight:900;letter-spacing:.4px;
+}
+QLabel#dnaSelectedPath {
+    background:transparent;color:#ACB8C4;
+    font-family:"Segoe UI Variable","Segoe UI",sans-serif;
+    font-size:11px;
+}
+QLabel#dnaInstallSize {
+    background:transparent;color:#F6F3F6;
+    font-family:"Bahnschrift","Segoe UI",sans-serif;
+    font-size:38px;font-weight:900;letter-spacing:.3px;
+}
+QFrame#dnaForensicControls {
+    background:#10151F;border:1px solid #303B48;
+    border-radius:4px;
+}
+QFrame#dnaForensicControls QComboBox {
+    color:#F1F0F4;background:#101824;
+    border:1px solid #4B364A;
+    border-radius:4px;
+    min-height:28px;padding:6px 10px;
+}
+QLabel#dnaSelectedName,QLabel#dnaInstallSize {
+    selection-background-color:#802944;
+}
+"""
