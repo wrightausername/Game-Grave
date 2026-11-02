@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from core import human_size
-from gg_desktop.widgets import button, column, label, panel, row, section_title
+from gg_desktop.widgets import button, column, label, panel, row, section_title, ResponsiveColumns
 from gg_desktop.premium_panels import _load_local_art
 from gg_desktop.ready_room_data import (
     game_news_batch, launch_guard_summary, official_patch_source_for,
@@ -112,7 +112,8 @@ def render_ready_room(window):
             "sources may be missing.", "warning", wrap=True)
         page.content.addWidget(warning)
 
-    top = QWidget()
+    top = ResponsiveColumns()
+    top.setObjectName("readyRoomResponsiveTop")
     top_row = row(spacing=12)
     top.setLayout(top_row)
     left = QWidget()
@@ -125,6 +126,7 @@ def render_ready_room(window):
     right.setLayout(right_col)
     top_row.addWidget(right, 3)
     page.content.addWidget(top)
+    top.watch_window(window)
 
     lineup, lineup_col = _card(
         "★  YOUR LINEUP",
