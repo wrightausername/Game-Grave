@@ -140,22 +140,33 @@ def finish_session(*, at: int | None = None, discard=False) -> dict | None:
     return row
 
 
+def _calendar_date(timestamp: int, *, now: datetime | None) -> datetime:
+    """Use the user's local calendar, not UTC, for recap month boundaries.
+
+    When a zone-aware clock is passed by tests, respect its zone and DST.
+    Without one, Python's local timestamp conversion respects the system's
+    historical timezone rules for the session's own date.
+    """
+    if now is not None:
+        return datetime.fromtimestamp(timestamp, now.tzinfo)
+    return datetime.fromtimestamp(timestamp)
+
+
 def time_window(records: list[dict], kind: str,
                 *, now: datetime | None = None) -> list[dict]:
-    current = now or datetime.now(timezone.utc)
+    current = now if now is not None else datetime.now().astimezone()
     if current.tzinfo is None:
         raise ValueError("An aware date is required.")
-    current = current.astimezone(timezone.utc)
     if kind == "This Session":
         return records[:1]
     year = current.year
     if kind == "This Month":
         return [s for s in records
-                if (t := datetime.fromtimestamp(s["start"], timezone.utc)).year == year
+                if (t := _calendar_date(s["start"], now=now)).year == year
                 and t.month == current.month]
     if kind == "This Year":
         return [s for s in records
-                if datetime.fromtimestamp(s["start"], timezone.utc).year == year]
+                if _calendar_date(s["start"], now=now).year == year]
     raise ValueError("Unsupported recap period.")
 
 
@@ -171,7 +182,7 @@ def recap(records: list[dict], kind: str, *, now=None) -> dict:
     most = max(play_by_game.values(), key=lambda item: item[1], default=None)
     monthly = [0] * 12
     for item in scoped:
-        month = datetime.fromtimestamp(item["start"], timezone.utc).month
+        month = _calendar_date(item["start"], now=now).month
         monthly[month - 1] += item["end"] - item["start"]
     return {
         "kind": kind,
