@@ -746,6 +746,8 @@ def scan_old_files(folder: Path, min_days: int = 180, cancel: Callable[[], bool]
         dirs[:] = [d for d in dirs if d.lower() not in SCAN_EXCLUDED and not
                    _has_reparse_component(Path(parent) / d)]
         for name in names:
+            if cancel and cancel():
+                raise InterruptedError("Scan canceled")
             path = Path(parent) / name
             if allowed_extensions is not None and path.suffix.lower() not in allowed_extensions:
                 continue
@@ -976,6 +978,14 @@ def recycle_file(path: Path) -> None:
 
 
 def run_auto_cleanup() -> tuple[int, int, str]:
+    # Guard before reading settings or touching disk. Defer if detection fails.
+    try:
+        from performance_guard import GameActivityDetector
+        game_guard = GameActivityDetector(refresh_seconds=1.5)
+        if game_guard.active():
+            return 0, 0, "Automatic cleanup deferred while gaming."
+    except (ImportError, OSError, RuntimeError):
+        return 0, 0, "Automatic cleanup deferred: gameplay safety check unavailable."
     cfg = load_settings()
     if not cfg["auto_enabled"]:
         return 0, 0, "Automatic cleanup is disabled."
@@ -991,6 +1001,12 @@ def run_auto_cleanup() -> tuple[int, int, str]:
     log_event("Cleanup started", f"Automatic cleanup: {len(items)} candidates reviewed", session_id=session_id)
     done, total_bytes, failed = 0, 0, 0
     for item in items:
+        # A game might start during an automatic run. Never begin the next
+        # Recycle Bin move while detection reports active gameplay.
+        if game_guard.active():
+            summary = f"Automatic cleanup deferred while gaming after {done} item(s)."
+            log_event("Automatic cleanup deferred", summary, session_id=session_id)
+            return done, total_bytes, summary
         try:
             if is_protected_path(Path(item.path), cfg.get("never_touch", [])):
                 raise ValueError("Protected by Never Touch list")
