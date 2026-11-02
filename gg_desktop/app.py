@@ -98,7 +98,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
         rail = QFrame()
         rail.setObjectName("navRail")
-        rail.setFixedWidth(219)
+        rail.setFixedWidth(254)
         r = column(spacing=7, margins=(12, 23, 12, 18))
         rail.setLayout(r)
         identity = QWidget()
@@ -115,6 +115,15 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         identity_row.addStretch()
         r.addWidget(identity)
         r.addSpacing(17)
+        navigation_scroll = QScrollArea()
+        navigation_scroll.setObjectName("navScroll")
+        navigation_scroll.setFrameShape(QFrame.NoFrame)
+        navigation_scroll.setWidgetResizable(True)
+        navigation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        nav_body = QWidget()
+        nav_body.setObjectName("navBody")
+        nav_column = column(spacing=4, margins=(0, 0, 0, 0))
+        nav_body.setLayout(nav_column)
         self.nav_buttons = {}
         for route, icon in ROUTES:
             control = button(icon + "    " + route,
@@ -123,9 +132,11 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             control.setProperty("active", route == self.current_route)
             control.setAccessibleName(route + " page")
             control.setFocusPolicy(Qt.StrongFocus)
-            r.addWidget(control)
+            nav_column.addWidget(control)
             self.nav_buttons[route] = control
-        r.addStretch()
+        nav_column.addStretch()
+        navigation_scroll.setWidget(nav_body)
+        r.addWidget(navigation_scroll, 1)
         policy = label("LOCAL FIRST  •  RECYCLE BIN ONLY", "caption", wrap=True)
         r.addWidget(policy)
         outer.addWidget(rail)
