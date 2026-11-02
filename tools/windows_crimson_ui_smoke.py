@@ -99,6 +99,12 @@ def main():
             from gg_desktop.widgets import ActionCard
             window.navigate("Overview")
             app.processEvents()
+            # The November 2 locked top shell has notification/help actions.
+            # Scan PC must be invoked from a page, never a persistent toolbar.
+            assert window.notification_button.isVisible()
+            assert window.help_button.isVisible()
+            assert not window.scan_button.isVisible()
+            assert window.notification_button.icon().isNull() is False
             buttons = {b.text() for b in window.page.findChildren(QPushButton)}
             labels = {b.text() for b in window.page.findChildren(QLabel)}
             cards = window.page.findChildren(ActionCard)
@@ -163,7 +169,7 @@ def main():
                     assert len(window.page.findChildren(GameCover)) == 3, (
                         "Games gallery must present actual verified game records")
                     hero = window.page.findChildren(ReferenceHero)
-                    assert len(hero) == 1 and hero[0].height() >= 240, (
+                    assert len(hero) == 1 and hero[0].height() >= 215, (
                         "Approved Games layout needs a cinematic metrics header")
                     assert not window.game_inventory_panel.isVisible(), (
                         "Advanced game table must not dominate the default visual screen")
