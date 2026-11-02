@@ -2143,6 +2143,7 @@ class ScreenMethods:
         from gg_desktop.premium_panels import _load_local_art
         from gg_desktop.steam_artwork import prime_visible_covers, verified_steam_id
         from game_intelligence import build_game_dna
+        from gg_desktop.dna_exploded import ExplodedGameMap
 
         page = self._new(
             "Game DNA",
@@ -2165,8 +2166,7 @@ class ScreenMethods:
         toolbar, controls = panel(padding=12)
         toolbar.setObjectName("dnaForensicControls")
         controls.addWidget(section_title(
-            "GAME DNA LAB  /  SELECT AN INSTALLED GAME",
-            f"{len(records)} inventory record(s)"))
+            "Choose a game", f"{len(records)} installed-game record(s)"))
         bar = QWidget()
         bar_row = row(spacing=9)
         bar.setLayout(bar_row)
@@ -2186,11 +2186,39 @@ class ScreenMethods:
             "↻  Run DNA Scan", self.start_scan, kind="primary"))
         controls.addWidget(bar)
         controls.addWidget(label(
-            "Read-only metadata. A link is shown only when its source or "
-            "path supports it; unverified saves, caches and leftovers stay "
-            "unattributed and protected.",
+            "Every colored link has a source. Unverified saves and other files "
+            "stay separate and protected.",
             "caption", wrap=True))
         page.content.addWidget(toolbar)
+
+        # Real installed-game picker, not art or titles hard-coded from a mockup.
+        game_ribbon = QWidget()
+        game_ribbon.setObjectName("dnaGameRibbon")
+        ribbon_row = row(spacing=7)
+        game_ribbon.setLayout(ribbon_row)
+        ribbon_controls = []
+        for index, game in enumerate(records[:12]):
+            tab = button(game["game"][:28], kind="dnaGameChip")
+            tab.setToolTip(game["game"] + "  •  " + game["launcher"])
+            tab.setAccessibleName("Inspect Game DNA for " + game["game"])
+            tab.setProperty("active", False)
+            tab.clicked.connect(
+                lambda _checked=False, i=index: choose.setCurrentIndex(
+                    next((at for at in range(choose.count())
+                          if choose.itemData(at) == i), -1)))
+            ribbon_row.addWidget(tab)
+            ribbon_controls.append((index, tab))
+        ribbon_row.addStretch(1)
+        page.content.addWidget(game_ribbon)
+        game_overview, game_overview_row = panel(padding=10)
+        game_overview.setObjectName("dnaSelectedGame")
+        overview_title = label("Choose a game", "dnaSelectedName")
+        overview_title.setWordWrap(True)
+        game_overview_row.addWidget(overview_title)
+        overview_meta = label("Choose an installed game to inspect its file trail.",
+                              "dnaSelectedPath", wrap=True)
+        game_overview_row.addWidget(overview_meta)
+        page.content.addWidget(game_overview)
 
         workspace = QWidget()
         work_row = row(spacing=12)
@@ -2198,16 +2226,17 @@ class ScreenMethods:
         map_panel, map_col = panel(padding=12)
         map_panel.setObjectName("dnaRelationshipStudio")
         map_col.addWidget(section_title(
-            "GAME FOOTPRINT MAP", "Select a glowing node to inspect its evidence"))
-        relationship = RelationshipMap()
+            "THE GAME, LAYER BY LAYER",
+            "Select a layer to see what links it to this install"))
+        relationship = ExplodedGameMap()
         relationship.setObjectName("dnaFullscreenRelationshipMap")
         relationship.setMinimumHeight(510)
         relationship.setMaximumHeight(510)
         relationship.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         map_col.addWidget(relationship)
         map_caption = label(
-            "Cyan: source evidence. Red: review or unknown. "
-            "File relationships are not proof that something is unused.",
+            "Bright = verified relationship  •  Faded = not attributed. "
+            "A file's age does not prove it is disposable.",
             "caption", wrap=True)
         map_col.addWidget(map_caption)
         map_col.addStretch(1)
@@ -2216,15 +2245,26 @@ class ScreenMethods:
         inspector, inspector_col = panel(padding=12)
         inspector.setObjectName("dnaEvidenceInspector")
         inspector_col.addWidget(section_title(
-            "FILE MAP / SOURCE LAYERS", "Verified links are illuminated"))
+            "THIS GAME'S FOOTPRINT", "Only measured or launcher-reported data"))
+        known_install = label("—", "dnaInstallSize")
+        inspector_col.addWidget(known_install)
+        footprint_note = label(
+            "Launcher-reported installation size. Linked mod sizes can "
+            "overlap; we don't add unknown files into a fictional total.",
+            "caption", wrap=True)
+        inspector_col.addWidget(footprint_note)
+        inspector_col.addWidget(section_title(
+            "WHAT THE LAYERS MEAN", "Click the sculpture to inspect"))
         from gg_desktop.dna_layers import GenomeLayerMap
         genome_layers = GenomeLayerMap()
         genome_layers.setObjectName("dnaGenomeLayers")
+        genome_layers.setMaximumHeight(125)
+        genome_layers.setMinimumHeight(125)
         inspector_col.addWidget(genome_layers)
-        inspector_col.addWidget(section_title("What we know", "Choose a game to inspect"))
+        inspector_col.addWidget(section_title("Selected game", "Real cached cover art"))
         dna_art = QLabel()
         dna_art.setObjectName("dnaOfficialCover")
-        dna_art.setFixedHeight(166)
+        dna_art.setFixedHeight(112)
         dna_art.setAlignment(Qt.AlignCenter)
         dna_art.setStyleSheet(
             "background:#0B1420;border:1px solid #743047;border-radius:10px;"
@@ -2242,6 +2282,9 @@ class ScreenMethods:
             "Open verified install", lambda: self._open_folder(
                 records[choose.currentData()]["install_path"])
             if choose.currentData() is not None else None))
+        inspector_col.addWidget(button(
+            "Review in Graveyard", lambda: self.navigate("Graveyard"),
+            kind="primary"))
         inspector_col.addWidget(button(
             "Review Mods", lambda: self.navigate("Mods")))
         inspector_col.addStretch(1)
@@ -2378,6 +2421,10 @@ class ScreenMethods:
                 relationship.set_game("NO GAME", {})
                 relationship.set_cover(None)
                 game_title.setText("No game selected")
+                overview_title.setText("Choose a game")
+                overview_meta.setText("No verified installation selected.")
+                known_install.setText("—")
+                relationship.set_evidence()
                 dna_art.setText("NO COVER")
                 footprint_summary.setText("No verified game record.")
                 linked_text.setText("Run Scan PC to discover gaming installations.")
@@ -2386,6 +2433,13 @@ class ScreenMethods:
             game_title.setText(item["game"])
             record = record_for(item)
             mod_assets = item.get("assets", [])
+            overview_title.setText(item["game"])
+            overview_meta.setText(
+                item["launcher"] + "   •   " + str(item["install_path"]))
+            for record_index, chip in ribbon_controls:
+                chip.setProperty("active", records[record_index] is item)
+                chip.style().unpolish(chip)
+                chip.style().polish(chip)
             evidence_states = {
                 "Install": ("Recorded" if record else "Unknown"),
                 "Mods": f"{len(mod_assets)} linked",
@@ -2399,6 +2453,14 @@ class ScreenMethods:
                 install=bool(record), linked_mods=bool(mod_assets))
             load_game_cover(item)
             size = readable_bytes(record.size_bytes) if record else "Unknown"
+            known_install.setText(
+                size if record is not None and record.size_bytes is not None
+                else "Size unknown")
+            relationship.set_evidence(
+                sizes={"Install": size if record is not None and
+                       record.size_bytes is not None else None},
+                counts={"Mods": f"{len(mod_assets)} linked folder(s)"
+                        if mod_assets else None})
             footprint_summary.setText(
                 "INSTALL: " + size + " (launcher-reported)     "
                 f"MODS: {len(mod_assets)} verified association(s)     "
