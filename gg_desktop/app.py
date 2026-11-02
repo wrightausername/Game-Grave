@@ -306,6 +306,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             from gg_desktop.approved_graveyard import render_approved_graveyard
             render_approved_graveyard(self)
             return
+        if route == "Undo Center":
+            from gg_desktop.approved_undo import render_approved_undo
+            render_approved_undo(self)
+            return
         methods = {
             "Overview": self.overview_page,
             "Ready Room": self.ready_room_page,
