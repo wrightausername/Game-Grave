@@ -81,10 +81,6 @@ class ExtraPages:
             "Ready Room",
             "Your installed games, local warnings and official update links in one place.",
         )
-        page.content.addWidget(HeroBanner(
-            title="READY ROOM", subtitle="STAY IN THE GAME.",
-            detail="A local snapshot of your library. Official Patch Watch feeds are not yet connected.",
-        ))
         if self._not_scanned(page):
             return
         metrics = QWidget()
@@ -176,6 +172,8 @@ class ExtraPages:
         ))
         search = QLineEdit()
         search.setPlaceholderText("Search scanned paths and sources…")
+        search.setText(getattr(self, "_pending_other_query", ""))
+        self._pending_other_query = ""
         stack.addWidget(search)
         table = data_table(["CATEGORY", "LOCATION", "APPARENT SIZE", "PROTECTION"])
         table.setMinimumHeight(420)
@@ -231,6 +229,8 @@ class ExtraPages:
         filter_by.addItems(["All captures", "Screenshots", "Recordings"])
         search = QLineEdit()
         search.setPlaceholderText("Search filename or path…")
+        search.setText(getattr(self, "_pending_capture_query", ""))
+        self._pending_capture_query = ""
         tools.addWidget(filter_by)
         tools.addWidget(search, 1)
         stack.addWidget(controls)
@@ -321,10 +321,6 @@ class ExtraPages:
             "AI Assistant",
             "Optional private local advice. It cannot inspect your file contents or approve cleanup.",
         )
-        page.content.addWidget(HeroBanner(
-            title="AI ASSISTANT", subtitle="LOCAL. OPTIONAL. YOUR CALL.",
-            detail="Ask for explanations and help. Core Game Grave features never need AI.",
-        ))
         enabled = self.settings.get("ai_assistant_enabled") is True
         p, stack = panel()
         toggle = QCheckBox("Enable optional AI Assistant (local Ollama only)")
