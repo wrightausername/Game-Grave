@@ -66,3 +66,20 @@ The definitive supplied overview has:
 - **Locked design is not yet coded as the final production UI**. This GitHub PR holds the contract; Library holds the reference PNG. To change its visual design, require explicit owner approval and update this log.
 
 **Next page:** Game DNA is next in navigation. Its new mockup must continue this identical visual language, not the prior fantasy/neon or old toolbar-heavy design.
+
+## 7. Game DNA tab — owner APPROVED on 2026-11-02
+
+- **Exact approved reference:** `cyberpunk_2077_game_dna_map.png`, 1672×941, SHA-256 `2021461dbbdb3a6d2605a912298c12758dbecab7b58e9e0d3991521e5fb27c07`. Persistent user Library location: `/Game Grave/Approved UI/2026-11-02 - LOCKED - Game DNA.png`.
+- **Owner decision:** explicitly requested a richer, non-basic **interactive relationship map**, then approved the resulting map mockup: `good lock it in... next tab`. **Status: APPROVED AND LOCKED**.
+- **Visual contract:** the exact Overview/Graveyard shell and palette with immersive node graph centered on the selected game, distinct connected storage/launcher/mod/workshop/save/cache/media/profile/unknown nodes, vivid but restrained relationship lines, selected node glow, map zoom/filter tools and an adjacent evidence-led node inspector. Contextual metrics, Ghost Watch, Patch Fallout, storage split and concise action strip support the map without replacing it.
+- **Behavior contract:** actual interactive navigation, selection and zoom, drive paths and owner relationships backed by detected evidence, uncertainty when no reliable match, built-in save/active game protections, low-impact opt-in scan comparisons, links to Save Vault/Mod Radar; no claim of 97% verified confidence, actual size, compatibility or automatic repair without supporting evidence. Illustrated numbers/text are placeholders only.
+- Never replace this map with a simple static pie chart or basic wireframe without owner approval.
+
+## 8. Undo Center tab — owner APPROVED on 2026-11-02
+
+- **Exact approved reference:** `game_grave_undo_center_dashboard.png`, 1672×941, SHA-256 `ce483d2ec16486e562a5870bc68dbab086c9fbfb52150df5307d32d8ba5f0034`. Persistent user Library location: `/Game Grave/Approved UI/2026-11-02 - LOCKED - Undo Center.png`.
+- **Owner decision:** immediately after viewing the Undo Center UI mockup, said `good lock it in. next tab`. **Status: APPROVED AND LOCKED**.
+- **Visual contract:** consistent original Game Grave cinematic Overview shell, matching top search and left nav, a distinct red glowing stone Undo motif within forest hero, a prominent five-stat horizontal summary, operation filters, a dense readable history table, right-hand restore details with path/evidence and action status, lower Recovery Safety and Undo Insights modules, and clear bottom restore/review actions.
+- **Behavior contract:** log and review real actions, distinguish recoverable vs completed vs no longer restorable, deep inspect affected paths and provenance, restore through verified/explicitly confirmed backend recovery flow, never imply Recycle Bin retention has a fixed countdown, never promise restore when the item is gone or partial, never misstate moved bytes as reclaimed bytes, and do not offer forced restoration past validated protections. All mockup counts and retention days are illustration-only.
+
+**Next tab to design after Undo Center:** AI Assistant. It must be **optional, OFF by default**, use opt-in local Ollama, explain it is not required for cleanup, and visually match the same Game Grave theme.
