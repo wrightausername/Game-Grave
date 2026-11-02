@@ -318,6 +318,26 @@ def main():
                 assert window.page.body.grab().save(str(full_ready_room)), (
                     "Could not render complete approved Ready Room for visual review.")
                 assert full_ready_room.stat().st_size > 14000
+                # Explicit small-screen acceptance captures. These are native
+                # Windows renders with disposable fixtures, not resized mockups.
+                # Review clipping and horizontal scrolling before owner signoff.
+                for route, filename in (
+                    ("Ready Room", "crimson-ready-room-1024.png"),
+                    ("Games", "crimson-games-1024.png"),
+                    ("Graveyard", "crimson-graveyard-1024.png"),
+                ):
+                    window.resize(1024, 768)
+                    window.navigate(route)
+                    window.pool.waitForDone(3000)
+                    app.processEvents()
+                    assert window.current_route == route
+                    assert window.scan_button.isVisible()
+                    screenshot = root / "_ci_temp" / filename
+                    assert window.grab().save(str(screenshot))
+                    assert screenshot.stat().st_size > 14000
+                window.resize(1440, 1050)
+                window.navigate("Ready Room")
+                app.processEvents()
                 window.ready_room_diagnostics_page()
                 window.pool.waitForDone(3000)
                 app.processEvents()
