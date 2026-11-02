@@ -310,6 +310,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             from gg_desktop.approved_undo import render_approved_undo
             render_approved_undo(self)
             return
+        if route == "Game DNA":
+            from gg_desktop.approved_dna import render_approved_dna
+            render_approved_dna(self)
+            return
         methods = {
             "Overview": self.overview_page,
             "Ready Room": self.ready_room_page,
