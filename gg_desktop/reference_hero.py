@@ -19,7 +19,7 @@ class ReferenceHero(SceneHeader):
     """Cinematic header with scan-grounded metric tiles embedded in the art."""
 
     def __init__(self, kind, title, subtitle, metrics=()):
-        super().__init__(kind, title, subtitle, note="CRIMSON COMMAND")
+        super().__init__(kind, title, subtitle, note="GAME GRAVE")
         self.setObjectName("referenceHero")
         self._has_metrics = bool(metrics)
         self.setMinimumHeight(248 if self._has_metrics else 192)
@@ -28,7 +28,7 @@ class ReferenceHero(SceneHeader):
         for child in self.findChildren(QLabel):
             child.hide()
         self.background_art = QSvgRenderer(str(
-            Path(__file__).parent / "assets" / "crimson_reference_scene.svg"))
+            Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
 
         self.title_overlay = QLabel(title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
@@ -52,8 +52,8 @@ class ReferenceHero(SceneHeader):
             tile.setObjectName("referenceHeroTile")
             tile.setStyleSheet(
                 "QFrame#referenceHeroTile{"
-                "background:rgba(7,10,19,218);"
-                "border:1px solid #BB354D;border-radius:11px;}")
+                "background:rgba(7,13,22,195);"
+                "border:1px solid #324150;border-radius:10px;}")
             col = QVBoxLayout(tile)
             col.setContentsMargins(14, 6, 11, 6)
             col.setSpacing(1)
