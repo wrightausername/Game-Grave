@@ -1,6 +1,6 @@
 """Game Grave private Ready Room features: measured, not invented, sessions."""
 from __future__ import annotations
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -53,6 +53,44 @@ class ReadyRoomContinuityTests(unittest.TestCase):
                                        now=now)["sessions"], 0)
         self.assertEqual(session.recap(session.read_sessions(), "This Session",
                                        now=now)["sessions"], 1)
+
+    def test_local_month_boundary_never_flips_to_utc_early(self):
+        # November 30 23:30 EST is already December 1 in UTC. The
+        # user's November recap must still include the session.
+        eastern = timezone(timedelta(hours=-5))
+        local_start = datetime(2026, 11, 30, 23, 30, tzinfo=eastern)
+        tick = int(local_start.timestamp())
+        session.start_session(self.game, at=tick)
+        session.finish_session(at=tick + 1200)
+        entries = session.read_sessions()
+        november = session.recap(
+            entries, "This Month",
+            now=datetime(2026, 11, 30, 23, 59, tzinfo=eastern))
+        self.assertEqual(november["sessions"], 1)
+        self.assertEqual(november["seconds"], 1200)
+        yearly = session.recap(
+            entries, "This Year",
+            now=datetime(2026, 11, 30, 23, 59, tzinfo=eastern))
+        self.assertEqual(yearly["monthly_seconds"][10], 1200)
+        self.assertEqual(yearly["monthly_seconds"][11], 0)
+        december = session.recap(
+            entries, "This Month",
+            now=datetime(2026, 12, 1, 0, 1, tzinfo=eastern))
+        self.assertEqual(december["sessions"], 0)
+
+    def test_local_new_year_boundary_preserves_previous_year(self):
+        eastern = timezone(timedelta(hours=-5))
+        start = datetime(2026, 12, 31, 23, 45, tzinfo=eastern)
+        tick = int(start.timestamp())
+        session.start_session(self.game, at=tick)
+        session.finish_session(at=tick + 600)
+        entries = session.read_sessions()
+        self.assertEqual(session.recap(
+            entries, "This Year",
+            now=datetime(2026, 12, 31, 23, 58, tzinfo=eastern))["sessions"], 1)
+        self.assertEqual(session.recap(
+            entries, "This Year",
+            now=datetime(2027, 1, 1, 0, 3, tzinfo=eastern))["sessions"], 0)
 
     def test_cannot_double_start_and_stale_not_saved(self):
         session.start_session(self.game, at=1000)
