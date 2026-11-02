@@ -2197,7 +2197,7 @@ class ScreenMethods:
         ribbon_row = row(spacing=7)
         game_ribbon.setLayout(ribbon_row)
         ribbon_controls = []
-        for index, game in enumerate(records[:12]):
+        for index, game in enumerate(records[:6]):
             tab = button(game["game"][:28], kind="dnaGameChip")
             tab.setToolTip(game["game"] + "  •  " + game["launcher"])
             tab.setAccessibleName("Inspect Game DNA for " + game["game"])
