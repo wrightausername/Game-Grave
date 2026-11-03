@@ -240,7 +240,10 @@ def render_approved_overview(window):
     page.content.addWidget(metrics)
 
     recycled, move_count, recent = _monthly_moves()
-    center = QWidget(    activity_panel, activity = _panel("RECENT ACTIVITY",
+    center = QWidget()
+    c = _line(center, gap=10)
+
+    activity_panel, activity = _panel("RECENT ACTIVITY",
         subtitle="Verified local events only. No simulated gaming history.")
     # Scans count as real activity even when no files were removed. Existing
     # audit entries are presented before the separate Recycle Bin ledger.
