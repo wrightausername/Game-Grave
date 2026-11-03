@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QFrame,
-    QHBoxLayout, QLineEdit, QTableWidgetItem, QVBoxLayout, QWidget,
+    QHBoxLayout, QLineEdit, QScrollArea, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from core import human_size
@@ -150,7 +150,20 @@ def render_approved_graveyard(window):
 
     inspector, icol = panel(padding=12, spacing=6)
     icol.addWidget(_label("ITEM DETAILS", "#F6F3F7", 14, True))
-    window.grave_detail = icol
+    # Paths and evidence can be arbitrarily long. Without a separate
+    # inspector scroll area, Qt compresses the labels until they overlap.
+    details_scroll = QScrollArea()
+    details_scroll.setObjectName("approvedGraveInspectorScroll")
+    details_scroll.setWidgetResizable(True)
+    details_scroll.setFrameShape(QFrame.NoFrame)
+    details_body = QWidget()
+    details_body.setObjectName("approvedGraveInspectorBody")
+    details_col = QVBoxLayout(details_body)
+    details_col.setContentsMargins(2, 2, 2, 2)
+    details_col.setSpacing(7)
+    details_scroll.setWidget(details_body)
+    icol.addWidget(details_scroll, 1)
+    window.grave_detail = details_col
     main_row.addWidget(inspector, 3)
     page.content.addWidget(main)
 
