@@ -179,17 +179,16 @@ def _cover(game, open_game):
     """Verified local artwork or clearly identified generated placeholder."""
     holder = QPushButton()
     holder.setObjectName("approvedCover")
-    holder.setMinimumWidth(132)
-    holder.setMaximumWidth(165)
-    holder.setFixedHeight(184)
+    holder.setMinimumWidth(182)
+    holder.setMaximumWidth(190)
+    holder.setFixedHeight(182)
     holder.setToolTip(game.name + "\n" + game.launcher
                       + "\nCover from local cache if available")
     holder.setAccessibleName("Inspect " + game.name)
     outer = _stack(holder, margin=(5, 5, 5, 6), gap=4)
     art = QLabel()
     art.setAlignment(Qt.AlignCenter)
-    art.setFixedHeight(129)
-    art.setMinimumWidth(118)
+    art.setFixedSize(172, 134)
     from gg_desktop.local_art import game_cover_path
     source = game_cover_path(game)
     pixmap = None
@@ -208,7 +207,7 @@ def _cover(game, open_game):
                     Qt.SmoothTransformation)
     if pixmap is None:
         from gg_desktop.poster_art import generated_game_poster
-        pixmap = generated_game_poster(game.name, 148, 129)
+        pixmap = generated_game_poster(game.name, 172, 134)
         art.setToolTip("Original Game Grave placeholder, not official box art")
     else:
         art.setToolTip("Locally verified artwork for " + game.name)
@@ -385,9 +384,9 @@ def render_approved_overview(window):
         discover.setObjectName("approvedDiscoveryTile")
         discover.setAccessibleName("Configure another game library")
         discover.setToolTip("Open local scan and library Settings")
-        discover.setMinimumWidth(150)
-        discover.setMaximumWidth(165)
-        discover.setFixedHeight(184)
+        discover.setMinimumWidth(172)
+        discover.setMaximumWidth(190)
+        discover.setFixedHeight(182)
         discover.clicked.connect(lambda: window.navigate("Settings"))
         row.addWidget(discover)
         row.addStretch()
