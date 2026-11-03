@@ -71,9 +71,12 @@ def render_approved_undo(window):
     page = window.page_for("Undo Center")
     page.content.setContentsMargins(11, 7, 11, 17)
     page.content.setSpacing(9)
-    page.content.addWidget(ReferenceHero(
+    hero = ReferenceHero(
         "undo", "Undo Center",
-        "Review previous cleanup actions and restore items safely."))
+        "Review previous cleanup actions and restore items safely.")
+    hero.setMinimumHeight(146)
+    hero.setMaximumHeight(146)
+    page.content.addWidget(hero)
 
     records = list(reversed(get_records()))[:500]
     moved = sum(_bytes(r) for r in records)
@@ -128,7 +131,7 @@ def render_approved_undo(window):
     for idx, width in enumerate((255, 125, 95, 152, 115)):
         table.setColumnWidth(idx, width)
     table.horizontalHeader().setStretchLastSection(True)
-    table.setMinimumHeight(310)
+    table.setMinimumHeight(257)
     hcol.addWidget(table, 1)
     summary = _text("Select a record to check recoverability.", "#A7B7C4")
     hcol.addWidget(summary)
@@ -149,6 +152,7 @@ def render_approved_undo(window):
     route.setMinimumHeight(150)
     dcol.addWidget(route)
     wrow.addWidget(details, 3)
+    workspace.setFixedHeight(347)
     page.content.addWidget(workspace)
 
     def chosen():
@@ -322,6 +326,7 @@ def render_approved_undo(window):
     assurance.setLayout(assurance_row)
     assurance_row.addWidget(safety, 1)
     assurance_row.addWidget(insight, 1)
+    assurance.setFixedHeight(141)
     page.content.addWidget(assurance)
 
     actions.setObjectName("ggActionStrip")
