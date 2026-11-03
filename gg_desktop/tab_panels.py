@@ -91,7 +91,7 @@ class GameCover(QFrame):
                 image = reader.read()
                 if not image.isNull():
                     art.setPixmap(QPixmap.fromImage(image).scaled(
-                        164, 202, Qt.KeepAspectRatioByExpanding,
+                        164, 202, Qt.KeepAspectRatio,
                         Qt.SmoothTransformation))
                     art.setToolTip("Real local game cover: " + source)
                     loaded = True
