@@ -149,3 +149,141 @@ def download_official_steam_covers(
             if official_steam_urls(g) and
             not (target_dir / (str(g.app_id) + ".jpg")).exists()),
     }
+
+
+def _strict_title(name: str) -> str:
+    """Exact-title normalization only; never silently swap game editions."""
+    import re
+    import unicodedata
+    normalized = unicodedata.normalize("NFKC", str(name)).casefold()
+    return re.sub(r"[^a-z0-9]+", "", normalized)
+
+
+def search_exact_steam_catalog(name: str, *, fetch_json=None) -> str:
+    """Match another launcher's game to Steam's *identical* public title.
+
+    The user must explicitly opt in before this is called: a game name is
+    transmitted to Steam's Store Search endpoint. No install path or game
+    inventory is shared. Ambiguous exact-title matches are refused.
+    """
+    import json
+    from urllib.parse import urlencode
+    name = str(name).strip()
+    if not 2 <= len(name) <= 120:
+        return ""
+    term = _strict_title(name)
+    if not term:
+        return ""
+    url = ("https://store.steampowered.com/api/storesearch/?" +
+           urlencode({"term": name, "l": "english", "cc": "us"}))
+    if fetch_json is None:
+        req = Request(url, headers={
+            "User-Agent": "GameGrave-Artwork/1.0", "Accept": "application/json"})
+        with urlopen(req, timeout=3.5) as response:
+            if not str(response.headers.get("Content-Type", "")).lower().startswith(
+                    ("application/json", "text/javascript")):
+                return ""
+            raw = response.read(100_001)
+            if len(raw) > 100_000:
+                return ""
+            entries = json.loads(raw.decode("utf-8"))
+    else:
+        entries = fetch_json(url)
+    if not isinstance(entries, dict):
+        return ""
+    matches = {
+        str(item.get("id")) for item in entries.get("items", [])[:20]
+        if isinstance(item, dict) and item.get("type") == "app"
+        and _strict_title(item.get("name", "")) == term
+        and type(item.get("id")) is int
+        and 0 < item["id"] < 10**12
+    }
+    return next(iter(matches)) if len(matches) == 1 else ""
+
+
+def download_matched_catalog_covers(
+        games, *, limit=8, game_active=None, search=None, fetch=None,
+        clock=time.monotonic):
+    """User-initiated exact-title store cover lookup for other launchers.
+
+    A game name is sent to Steam only after the user consents in the UI.
+    Reuses the same strict image validation and gameplay guard as Steam-ID
+    downloads. Never changes any file in the actual game installation.
+    """
+    import hashlib
+    from gg_desktop.local_art import game_cover_path, _game_key
+    from performance_guard import GameActivityDetector
+    detector = GameActivityDetector(refresh_seconds=2.)
+    detector.set_game_roots([
+        str(getattr(g, "install_path", "")) for g in games])
+    active = game_active or detector.active
+    lookup = search or search_exact_steam_catalog
+    fetch_image = fetch or _read_public_image
+    max_games = max(1, min(8, int(limit)))
+    deadline = clock() + 60
+    seen = set()
+    checked = downloaded = unmatched = 0
+    paused = False
+    target_dir = artwork_cache_dir() / "catalog-match"
+    for game in games:
+        if str(getattr(game, "launcher", "")).casefold() == "steam":
+            continue
+        key = _game_key(game)
+        if key in seen:
+            continue
+        seen.add(key)
+        if game_cover_path(game):
+            continue
+        if checked >= max_games or clock() > deadline:
+            break
+        if active():
+            paused = True
+            break
+        checked += 1
+        try:
+            app_id = lookup(str(game.name))
+        except (ValueError, OSError, TimeoutError):
+            app_id = ""
+        if not app_id or not str(app_id).isascii() or not str(app_id).isdecimal():
+            unmatched += 1
+            continue
+        # Only public portrait URLs from a uniquely verified exact title;
+        # no similarity-score best guess or publisher-specific fake cover.
+        base = ("https://shared.fastly.steamstatic.com/"
+                "store_item_assets/steam/apps/" + str(app_id) + "/")
+        urls = (base + "library_600x900_2x.jpg",
+                base + "library_600x900.jpg",
+                "https://cdn.akamai.steamstatic.com/steam/apps/" +
+                str(app_id) + "/library_600x900_2x.jpg")
+        found = False
+        for url in urls:
+            if active() or clock() > deadline:
+                paused = True
+                break
+            try:
+                payload = _validated_jpeg(fetch_image(url))
+            except (ValueError, OSError, TimeoutError):
+                continue
+            if not payload:
+                continue
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target = target_dir / (key + ".jpg")
+            tmp = target.with_suffix(".partial")
+            try:
+                tmp.write_bytes(payload)
+                tmp.replace(target)
+                downloaded += 1
+                found = True
+            finally:
+                tmp.unlink(missing_ok=True)
+            break
+        if not found:
+            unmatched += 1
+        if paused:
+            break
+    if downloaded:
+        invalidate_cover_cache()
+    return {
+        "checked": checked, "downloaded": downloaded,
+        "unmatched": unmatched, "paused_for_game": paused,
+    }
