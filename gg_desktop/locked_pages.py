@@ -115,7 +115,7 @@ class LockedPagesMixin:
         table.horizontalHeader().setStretchLastSection(True)
         table.horizontalHeader().setSectionsClickable(True)
         table.horizontalHeader().setSortIndicatorShown(True)
-        table.setMinimumHeight(295)
+        table.setMinimumHeight(220)
         shown = []
 
         count_line = label("", "caption", wrap=True)
@@ -221,6 +221,9 @@ class LockedPagesMixin:
             [], inspect_game, limit=8)
         gallery.setObjectName("readyRoomCoverStrip")
         col.addWidget(gallery)
+        # Covers are the primary visual entry point. Keep the sortable table
+        # accessible below rather than hiding all real artwork off-screen.
+        col.insertWidget(col.indexOf(table), gallery)
         body.addWidget(left, 7)
 
         patch, patch_col = panel(padding=12, spacing=9)
