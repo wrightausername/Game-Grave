@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from core import age_text
 from gg_desktop.models import readable_bytes
+from gg_desktop.cinematic_art import CinematicToolArtwork
 from gg_desktop.widgets import (
     ActionCard, MetricCard, button, label, panel, row, section_title,
 )
@@ -64,11 +65,12 @@ class LockedPagesMixin:
         table.setSelectionMode(QAbstractItemView.SingleSelection)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.verticalHeader().setVisible(False)
+        table.verticalHeader().setDefaultSectionSize(37)
         table.setColumnWidth(0, 255)
         table.setColumnWidth(1, 140)
         table.setColumnWidth(2, 140)
         table.horizontalHeader().setStretchLastSection(True)
-        table.setMinimumHeight(360)
+        table.setMinimumHeight(334)
         for i, g in enumerate(games):
             for j, value in enumerate((
                 g.name, g.launcher,
@@ -94,7 +96,17 @@ class LockedPagesMixin:
         body.addWidget(left, 7)
 
         right, right_col = panel()
-        right_col.addWidget(section_title("PATCH WATCH", "Source status"))
+        right.setObjectName("ggAccentPanel")
+        right.setProperty("accent", "cyan")
+        right_col.addWidget(section_title("PATCH WATCH", "Official source status"))
+        signal = CinematicToolArtwork("scanner")
+        signal.setMinimumHeight(95)
+        signal.setMaximumHeight(95)
+        right_col.addWidget(signal)
+        status = label("OFFICIAL FEEDS: NOT CONNECTED", "eyebrow")
+        status.setStyleSheet(
+            "color:#F1C083;background:transparent;font-size:12px;font-weight:800;")
+        right_col.addWidget(status)
         right_col.addWidget(label(
             "Official patch feeds have not been connected to this engineering preview. "
             "Game Grave will never invent game versions, developer notes, "
