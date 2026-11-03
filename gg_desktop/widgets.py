@@ -36,7 +36,9 @@ def column(*, spacing: int = 10, margins=(0, 0, 0, 0)) -> QVBoxLayout:
 
 
 def button(text: str, action=None, *, kind: str = "", tip: str = "") -> QPushButton:
-    control = QPushButton(text)
+    # Qt interprets a bare '&' as a mnemonic underline, causing labels like
+    # 'Chat & Explain' to visibly lose their ampersand. Escape it in captions.
+    control = QPushButton(text.replace("&", "&&"))
     if kind:
         control.setObjectName(kind)
     if tip:
