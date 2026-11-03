@@ -146,6 +146,10 @@ def game_gallery(games, selected_callback, *, limit=12, empty_message=None):
     shelf_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
     shelf_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     shelf_area.setWidgetResizable(False)
+    # Prevent the offscreen portrait strip from forcing a 1500px-wide page.
+    # Scrolling covers is intentional; clipping the main Games UI is not.
+    shelf_area.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+    shelf_area.setMinimumWidth(0)
     shelf_area.setFixedHeight(318)
     shelf = QWidget()
     count = min(len(games), limit)
