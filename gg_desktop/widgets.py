@@ -304,7 +304,9 @@ class MetricCard(QFrame):
     def __init__(self, caption: str, value: str, hint: str = "", *, tone="text"):
         super().__init__()
         self.setObjectName("metricCard")
-        contents = column(spacing=5, margins=(16, 14, 16, 14))
+        self.setProperty("tone", tone)
+        self.setMinimumHeight(99)
+        contents = column(spacing=5, margins=(15, 10, 15, 10))
         self.setLayout(contents)
         self.caption = label(caption.upper(), "caption")
         self.value = label(value, "metricValue")
