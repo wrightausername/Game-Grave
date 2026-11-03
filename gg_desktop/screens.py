@@ -90,6 +90,7 @@ class ScreenMethods(LockedPagesMixin):
             "Undo Center": ("undo", "RESTORE • VERIFY • RECOVER"),
             "Settings": ("settings", "CUSTOMIZE GAME GRAVE"),
             "Captures": ("captures", "YOUR GAMING CAPTURES"),
+            "Other Storage": ("otherstorage", "EXPLAIN YOUR DISK USAGE"),
         }
         if title == "Games":
             actual_size, unknown = reported_game_bytes(self.inventory.games)
