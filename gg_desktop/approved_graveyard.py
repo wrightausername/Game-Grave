@@ -19,6 +19,7 @@ from core import human_size
 from graveyard_protection import protection_action
 from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.widgets import button, data_table, label, panel, row
+from gg_desktop.cinematic_art import CinematicImpactTrack
 
 
 def _label(text, color="#BDCAD7", size=11, bold=False):
@@ -131,21 +132,13 @@ def render_approved_graveyard(window):
         "SIZE", "AGE", "REVIEW STATUS"])
     window.grave_table.setSelectionBehavior(QAbstractItemView.SelectRows)
     window.grave_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-    for idx, width in enumerate((170, 132, 155, 95, 85, 140)):
+    for idx, width in enumerate((178, 112, 150, 80, 75, 132)):
         window.grave_table.setColumnWidth(idx, width)
     window.grave_table.horizontalHeader().setStretchLastSection(True)
-    window.grave_table.setMinimumHeight(337)
+    window.grave_table.setMinimumHeight(292)
     window.grave_table.setAccessibleName("Graveyard discovered candidates table")
     bcol.addWidget(window.grave_table, 1)
 
-    row_actions = QWidget()
-    action_layout = row(spacing=6)
-    row_actions.setLayout(action_layout)
-    action_layout.addWidget(button("Select reviewable", window._select_eligible))
-    action_layout.addWidget(button("Clear", window.grave_table.clearSelection))
-    action_layout.addWidget(button(
-        "Delete selected…", window._delete_grave_selected, kind="danger"))
-    bcol.addWidget(row_actions)
     main_row.addWidget(browser, 7)
 
     inspector, icol = panel(padding=12, spacing=6)
@@ -165,18 +158,8 @@ def render_approved_graveyard(window):
     icol.addWidget(details_scroll, 1)
     window.grave_detail = details_col
     main_row.addWidget(inspector, 3)
+    main.setMinimumHeight(363)
     page.content.addWidget(main)
-
-    footer = QWidget()
-    footrow = row(spacing=8)
-    footer.setLayout(footrow)
-    window.grave_counter = _label("No findings selected.", "#A9BCCB")
-    footrow.addWidget(window.grave_counter, 1)
-    footrow.addWidget(button(
-        "Test Recycle Bin recovery", window._test_recycle_bin_safely))
-    footrow.addWidget(button(
-        "Review in Old Files", lambda: window.navigate("Old Files")))
-    page.content.addWidget(footer)
 
     def selected():
         rows = window.grave_table.selectionModel().selectedRows()
@@ -222,17 +205,74 @@ def render_approved_graveyard(window):
         else:
             window.info("Choose one item", "Select a file or folder first.")
 
-    affordances = QWidget()
-    affordance_row = row(spacing=8)
-    affordances.setLayout(affordance_row)
-    affordance_row.addWidget(button("Protect", protect))
-    affordance_row.addWidget(button("Unprotect", unprotect))
-    affordance_row.addWidget(button("Open Path", open_path))
-    affordance_row.addStretch()
-    affordance_row.addWidget(_label(
-        "No automatic deletion  •  Windows Recycle Bin + Undo only",
-        "#A0C7BB", 11))
-    page.content.addWidget(affordances)
+    # The locked action strip belongs immediately under the review table.
+    # All three mutations still delegate to the existing confirmation/safety
+    # code. A protection override never implicitly deletes anything.
+    actions = QFrame()
+    actions.setObjectName("ggActionStrip")
+    action_layout = row(spacing=8, margins=(12, 9, 12, 9))
+    actions.setLayout(action_layout)
+    window.grave_counter = _label("No items selected.", "#DBE4ED", 12, True)
+    action_layout.addWidget(window.grave_counter, 2)
+    action_layout.addWidget(button("Select reviewable", window._select_eligible))
+    action_layout.addWidget(button("Protect", protect))
+    action_layout.addWidget(button("Unprotect", unprotect))
+    action_layout.addWidget(button("Open Path", open_path))
+    action_layout.addWidget(button(
+        "Delete selected…", window._delete_grave_selected, kind="danger"), 1)
+    page.content.addWidget(actions)
+
+    total_apparent = sum(_size(item) for item in entries)
+    can_review = sum(_size(item) for item in entries if item.can_recycle)
+    protected = total_apparent - can_review
+    impact = QFrame()
+    impact.setObjectName("ggAccentPanel")
+    impact.setProperty("accent", "red")
+    impact_row = row(spacing=15, margins=(15, 11, 15, 10))
+    impact.setLayout(impact_row)
+    impact_left = QWidget()
+    left_col = QVBoxLayout(impact_left)
+    left_col.setContentsMargins(0, 0, 0, 0)
+    left_col.setSpacing(4)
+    left_col.addWidget(_label("STORAGE IMPACT  /  CANDIDATE SIZES",
+                              "#F4F7FB", 14, True))
+    left_col.addWidget(CinematicImpactTrack(can_review, protected))
+    left_col.addWidget(_label(
+        human_size(can_review) + " reviewable   •   " +
+        human_size(protected) + " protected   •   " +
+        "not confirmed reclaimed space", "#A8C0CE", 11))
+    impact_row.addWidget(impact_left, 5)
+    def impact_stat(title, value, color):
+        col = QWidget()
+        body = QVBoxLayout(col)
+        body.setContentsMargins(4, 1, 4, 1)
+        body.setSpacing(4)
+        body.addWidget(_label(title.upper(), "#ACBDCA", 10, True))
+        body.addWidget(_label(value, color, 17, True))
+        return col
+    impact_row.addWidget(impact_stat(
+        "Games", str(len(window.inventory.games)), "#64D5EC"), 1)
+    impact_row.addWidget(impact_stat(
+        "Mod locations", str(len(window.inventory.mods)), "#CC9BF3"), 1)
+    impact_row.addWidget(impact_stat(
+        "Captures", str(len(window.inventory.screenshots) +
+                        len(window.inventory.recordings)), "#D0A4EA"), 1)
+    impact_row.addWidget(impact_stat(
+        "Potential", human_size(total_apparent), "#EFBB7A"), 1)
+    page.content.addWidget(impact)
+
+    recovery_row = QWidget()
+    recovery = row(spacing=8)
+    recovery_row.setLayout(recovery)
+    recovery.addWidget(_label(
+        "Manual review only  •  Recycle Bin + Undo  •  Saved games protected",
+        "#A2CDBE", 11))
+    recovery.addStretch()
+    recovery.addWidget(button(
+        "Test Recycle Bin recovery", window._test_recycle_bin_safely))
+    recovery.addWidget(button(
+        "Open Old Files", lambda: window.navigate("Old Files")))
+    page.content.addWidget(recovery_row)
 
     def refresh():
         query = window.grave_search.text().strip().casefold()
