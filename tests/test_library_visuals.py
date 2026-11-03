@@ -113,6 +113,13 @@ class RealCoverArtTests(unittest.TestCase):
         self.assertEqual(game_banner_path(self.game), str(banner))
         self.assertEqual(game_cover_path(self.game), str(target))
 
+    def test_user_account_steam_grid_art_is_detected(self):
+        grid = (self.steam_root / "userdata" / "123456789" /
+                "config" / "grid" / "455p.jpg")
+        grid.parent.mkdir(parents=True)
+        grid.write_bytes(self.poster.read_bytes())
+        self.assertEqual(game_cover_path(self.game), str(grid))
+
     def test_override_for_non_steam_game(self):
         epic = game("Not on Steam", "Epic Games", "epic01",
                     path=str(self.root / "Epic"))
