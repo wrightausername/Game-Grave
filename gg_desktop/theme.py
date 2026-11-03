@@ -718,3 +718,78 @@ QFrame#metricCard[tone="red"] {border-bottom:2px solid #F0455F;}
 QLabel#metricValue {font-size:25px;font-weight:850;color:#F5F8FF;}
 QFrame#metricCard QLabel#caption {font-size:11px;color:#B7C5D2;}
 """
+
+# Artwork-first Games and functional Ready Room: derived from locked mockups.
+STYLE += r"""
+QFrame#referenceLibrary {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #151725,stop:.55 #101923,stop:1 #0C1420);
+    border:1px solid #394254; border-radius:10px;
+}
+QFrame#gameCover {
+    background:#10121D;
+    border:1px solid #454458;
+    border-bottom:2px solid #A43149;
+    border-radius:9px;
+}
+QFrame#gameCover:hover {
+    border:2px solid #F04460; background:#271729;
+}
+QLabel#gameCoverArt {
+    background:#0B111B; border:1px solid #455367;
+    border-radius:5px;
+}
+QLabel#gameCoverTitle {
+    background:transparent; color:#F5F4F7;
+    font-size:13px; font-weight:800;
+}
+QLabel#gameCoverLauncher {
+    background:transparent; color:#80CBDD;
+    font-size:11px; font-weight:750;
+}
+QScrollArea#gameCoverShelf,
+QScrollArea#gameCoverShelf QWidget {
+    background:transparent; border:0;
+}
+QScrollBar:horizontal {
+    height:10px; background:#101723; border:0; border-radius:5px;
+}
+QScrollBar::handle:horizontal {
+    background:#8E314B; min-width:30px; border-radius:5px;
+}
+QScrollBar::handle:horizontal:hover {background:#E0435B;}
+QFrame#launcherMixGraphic {
+    background:#111827;border:1px solid #354352;border-radius:9px;
+}
+QFrame#readyRoomLineup {
+    background:#101622;border:1px solid #334150;border-radius:9px;
+}
+QTableWidget#readyRoomTable {font-size:13px; alternate-background-color:#172131;}
+QTableWidget#readyRoomTable::item {
+    padding:7px 8px; border-bottom:1px solid #263644;
+}
+QTableWidget#readyRoomTable::item:selected {
+    background:#7F263E; color:#FFFFFF;
+}
+QTableWidget#readyRoomTable QHeaderView::section {
+    background:#1B2635; color:#EAF0F6; font-size:12px;
+    font-weight:800; padding:10px;
+    border-right:1px solid #394457;
+    border-bottom:2px solid #AA324D;
+}
+QTableWidget#readyRoomTable QHeaderView::section:hover {
+    background:#4C2637; color:#FFFFFF;
+}
+QLineEdit#readyRoomSearch {
+    background:#0C1320;border:1px solid #405066;border-radius:7px;
+    color:white;padding:8px 10px;min-height:28px;
+}
+QComboBox#readyRoomSort,QComboBox#readyRoomLauncherFilter {
+    background:#172235;border:1px solid #4A5265;
+    padding:7px 8px;border-radius:7px;min-height:29px;
+    color:#F5F7FB;
+}
+QPushButton#gameCoverOverride {border:1px solid #7B5871;background:#262031;}
+QPushButton#gameCoverOverride:hover {border-color:#F14C66;background:#482034;}
+QLabel#readyRoomSortStatus {color:#9DCCD3; font-size:12px;}
+"""
