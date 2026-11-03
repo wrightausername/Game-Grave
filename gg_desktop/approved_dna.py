@@ -13,20 +13,41 @@ from gg_desktop.models import readable_bytes
 
 
 def _metric(title, value, hint, color):
+    from gg_desktop.visuals import nav_icon
     card = QFrame()
     card.setObjectName("approvedDNAMetric")
     column = QVBoxLayout(card)
-    column.setContentsMargins(9, 6, 9, 6)
-    column.setSpacing(1)
+    column.setContentsMargins(8, 5, 8, 6)
+    column.setSpacing(2)
+    top = QWidget()
+    heading = QHBoxLayout(top)
+    heading.setContentsMargins(0,0,0,0)
+    heading.setSpacing(6)
+    routes = {
+        "Installed games": "Games",
+        "Linked locations": "Mods",
+        "Manager profiles": "Mods",
+        "Unresolved": "Graveyard",
+        "Save locations": "More Tools",
+        "Capture files": "Captures",
+    }
+    glyph = QLabel()
+    glyph.setPixmap(nav_icon(routes.get(title, "Games")).pixmap(25,25))
+    glyph.setFixedSize(26,26)
+    heading.addWidget(glyph)
     a = label(title.upper(), "caption")
-    a.setStyleSheet("background:transparent;color:#B7C5D2;font-size:10px;font-weight:750;")
+    a.setStyleSheet(
+        "background:transparent;color:#B7C5D2;font-size:11px;font-weight:750;")
+    heading.addWidget(a,1)
+    column.addWidget(top)
     b = label(str(value), "sectionTitle")
-    b.setStyleSheet("background:transparent;color:" + color
-                    + ";font-size:18px;font-weight:850;")
+    b.setStyleSheet(
+        "background:transparent;color:" + color +
+        ";font-size:20px;font-weight:850;")
     c = label(hint, "caption", wrap=True)
-    c.setStyleSheet("background:transparent;color:#9EAEBE;font-size:10px;")
-    for w in (a, b, c):
-        column.addWidget(w)
+    c.setStyleSheet("background:transparent;color:#9EAEBC;font-size:10px;")
+    column.addWidget(b)
+    column.addWidget(c)
     return card, b
 
 
