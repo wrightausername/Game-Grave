@@ -148,10 +148,13 @@ class HeroBanner(QFrame):
             # title, one restrained white subtitle, no secondary red slogan.
             painter.setPen(QColor("#F7F8FA"))
             painter.setFont(QFont("Segoe UI", 28, QFont.Bold))
-            painter.drawText(24, 63, self.title)
+            painter.setPen(QPen(QColor("#F0445A"), 5, Qt.SolidLine, Qt.RoundCap))
+            painter.drawLine(26, 34, 17, 109)
+            painter.setPen(QColor("#F7F8FA"))
+            painter.drawText(44, 63, self.title)
             painter.setPen(QColor("#C8CFDA"))
             painter.setFont(QFont("Segoe UI", 12, QFont.Normal))
-            painter.drawText(QRectF(26, 78, max(160, self.width() * .65), 70),
+            painter.drawText(QRectF(46, 78, max(160, self.width() * .62), 70),
                              Qt.AlignLeft | Qt.TextWordWrap, self.subtitle)
         else:
             painter.setPen(QColor("#F5F7FB"))
@@ -165,9 +168,11 @@ class HeroBanner(QFrame):
             painter.drawText(QRectF(25, 108, max(140, self.width() * .64), 65),
                              Qt.AlignLeft | Qt.TextWordWrap, self.detail)
         painter.restore()
-        painter.setPen(QPen(QColor("#334552"), 1))
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRoundedRect(target.adjusted(.5, .5, -.5, -.5), 11, 11)
+        # The approved Overview is edge-to-edge: no floating outlined card.
+        if self.title != "Overview":
+            painter.setPen(QPen(QColor("#334552"), 1))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(target.adjusted(.5, .5, -.5, -.5), 11, 11)
 
 
 class LandscapeArt(QFrame):
@@ -231,9 +236,11 @@ class LandscapeArt(QFrame):
             painter.drawText(QRectF(10, self.height() - 34, self.width() - 20, 30),
                              Qt.AlignLeft | Qt.TextWordWrap, self.note)
         painter.restore()
-        painter.setPen(QPen(QColor("#29465A"), 1))
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRoundedRect(area.adjusted(.5, .5, -.5, -.5), 9, 9)
+        # The locked sidebar forest is atmospheric artwork, not a boxed card.
+        if self.scene != "footer":
+            painter.setPen(QPen(QColor("#29465A"), 1))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(area.adjusted(.5, .5, -.5, -.5), 9, 9)
 
 
 class StorageRing(QWidget):
