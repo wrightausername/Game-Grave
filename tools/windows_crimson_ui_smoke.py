@@ -193,6 +193,14 @@ def main():
                     assert room.findChildren(
                         QFrame, "readyRoomCoverStrip"), (
                         "Ready Room requires the real portrait-art shelf")
+                    # Artwork must follow the SAME sort order as the table.
+                    shelf = room.findChildren(QFrame, "readyRoomCoverStrip")[0]
+                    covers = shelf.findChildren(GameCover)
+                    names = [card.game.name for card in covers]
+                    expected = [lineup.item(i, 0).text()
+                                for i in range(min(8, lineup.rowCount()))]
+                    assert names == expected, (
+                        "Ready Room cover shelf and table disagree on sort order")
                 if route == "Games":
                     rows = window._shown_games
                     assert len(rows) == 3
