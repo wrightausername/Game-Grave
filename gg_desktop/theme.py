@@ -584,3 +584,29 @@ QPushButton#approvedSettingsTab[active="true"] {
 }
 QFrame#approvedDNABand { background:transparent; }
 """
+
+# November 2 locked composition pass: remove the heavy box outlines left over
+# from the engineering preview. Only passive surfaces are affected; danger
+# prompts, selection contrast, and actionable buttons keep visible borders.
+STYLE += r"""
+QFrame#approvedOverviewPanel {
+    background: transparent; border: 0; border-radius: 0;
+    border-right: 1px solid #29303B;
+}
+QFrame#approvedGraveStat, QFrame#approvedUndoStat, QFrame#approvedDNAMetric {
+    background: transparent; border: 0; border-radius: 0;
+    border-right: 1px solid #30303C;
+}
+QPushButton#approvedMetric {
+    background: transparent; border: 0; border-radius: 0;
+    border-bottom: 2px solid #34313E;
+    padding: 8px 10px; text-align: left;
+}
+QPushButton#approvedMetric:hover {
+    background: #191922; border-bottom: 2px solid #D84259;
+}
+QFrame#referenceHero, QFrame#hero {
+    background: transparent; border: 0; border-radius: 0;
+}
+QFrame#landscapeArt {background:transparent;border:0;border-radius:0;}
+"""
