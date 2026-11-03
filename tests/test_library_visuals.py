@@ -17,8 +17,8 @@ from gg_desktop.models import GameRecord
 from gg_desktop.library_sort import (
     sort_game_records, filter_game_records, next_header_sort)
 from gg_desktop.local_art import (
-    game_cover_path, save_custom_cover, invalidate_cover_cache,
-    steam_art_hashes)
+    game_cover_path, game_banner_path, save_custom_cover,
+    invalidate_cover_cache, steam_art_hashes)
 from gg_desktop.artwork_download import (
     official_steam_urls, download_official_steam_covers,
     search_exact_steam_catalog, download_matched_catalog_covers)
@@ -107,6 +107,11 @@ class RealCoverArtTests(unittest.TestCase):
         self.assertIn("d" * 40, steam_art_hashes(self.game))
         self.assertTrue(any(("d" * 40) in url for url in
                             official_steam_urls(self.game)))
+        banner = target.parent / "library_header.jpg"
+        Image.new("RGB", (460, 215), (112, 54, 68)).save(
+            banner, quality=95)
+        self.assertEqual(game_banner_path(self.game), str(banner))
+        self.assertEqual(game_cover_path(self.game), str(target))
 
     def test_override_for_non_steam_game(self):
         epic = game("Not on Steam", "Epic Games", "epic01",
