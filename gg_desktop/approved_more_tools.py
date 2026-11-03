@@ -55,8 +55,10 @@ def render_approved_more_tools(window):
                 tile.setProperty("toolAccent", name.replace(" ", ""))
                 tile.setStyleSheet(
                     "QFrame#actionCard{background:#121720;"
-                    f"border:1px solid {accent}44;border-radius:7px;}}"
+                    "border:1px solid #2A2D37;"
+                    f"border-left:2px solid {accent};border-radius:7px;}}"
                     "QFrame#actionCard:hover{"
-                    f"border:1px solid {accent};background:#1A1D2A;}}")
+                    "border:1px solid #794154;"
+                    f"border-left:2px solid {accent};background:#1A1D2A;}}")
                 break
     return page
