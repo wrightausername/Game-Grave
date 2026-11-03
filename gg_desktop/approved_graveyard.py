@@ -20,6 +20,9 @@ from graveyard_protection import protection_action
 from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.widgets import button, data_table, label, panel, row
 from gg_desktop.cinematic_art import CinematicImpactTrack
+from gg_desktop.graveyard_filters import (
+    SORT_OPTIONS, AGE_OPTIONS, available_drives, select_graveyard_entries,
+)
 
 
 def _label(text, color="#BDCAD7", size=11, bold=False):
@@ -122,19 +125,17 @@ def render_approved_graveyard(window):
 
     window.grave_drive = QComboBox()
     window.grave_drive.addItems(
-        ["All drives"] + sorted({Path(e.path).anchor.upper()
-                                 for e in entries if Path(e.path).anchor}))
+        ["All drives"] + available_drives(entries))
     window.grave_drive.setAccessibleName("Filter by drive")
     controls.addWidget(window.grave_drive, 1)
 
     window.grave_age = QComboBox()
-    window.grave_age.addItems(["All ages", "1+ year", "2+ years", "3+ years"])
+    window.grave_age.addItems(list(AGE_OPTIONS))
     window.grave_age.setAccessibleName("Filter by last modified age")
     controls.addWidget(window.grave_age, 1)
 
     window.grave_sort = QComboBox()
-    window.grave_sort.addItems([
-        "Largest first", "Oldest first", "Newest first", "Name A–Z"])
+    window.grave_sort.addItems(list(SORT_OPTIONS))
     window.grave_sort.setAccessibleName("Sort Graveyard candidates")
     controls.addWidget(window.grave_sort, 1)
     page.content.addWidget(filters)
