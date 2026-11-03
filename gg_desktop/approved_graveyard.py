@@ -293,43 +293,25 @@ def render_approved_graveyard(window):
     page.content.addWidget(recovery_row)
 
     def refresh():
-        query = window.grave_search.text().strip().casefold()
-        chosen_type = window.grave_type.currentText()
-        chosen_state = window.grave_state.currentText()
-        chosen_drive = window.grave_drive.currentText()
-        threshold = {"All ages": 0, "1+ year": 365,
-                     "2+ years": 730, "3+ years": 1095}[
-                         window.grave_age.currentText()]
-        result = [
-            e for e in window.inventory.graveyard
-            if (chosen_type == "All types" or e.category == chosen_type)
-            and (chosen_state == "All findings"
-                 or chosen_state == "Ready for review" and e.can_recycle
-                 or chosen_state == "Protected / preview only" and not e.can_recycle)
-            and (chosen_drive == "All drives"
-                 or Path(e.path).anchor.upper() == chosen_drive)
-            and (not threshold or
-                 e.age_days is not None and e.age_days >= threshold)
-            and (not query or query in (
-                e.name + " " + e.path + " " + e.relationship + " " +
-                e.finding + " " + e.category).casefold())
-        ]
-        order = window.grave_sort.currentText()
-        if order == "Oldest first":
-            result.sort(key=lambda e: (
-                e.age_days is None, -(e.age_days or 0), e.name.casefold()))
-        elif order == "Newest first":
-            result.sort(key=lambda e: (
-                e.age_days is None, e.age_days or 0, e.name.casefold()))
-        elif order == "Name A–Z":
-            result.sort(key=lambda e: e.name.casefold())
-        else:
-            result.sort(key=lambda e: (-_size(e), e.name.casefold()))
+        selected_rows = window.grave_table.selectionModel().selectedRows()
+        previous_key = None
+        if len(selected_rows) == 1 and hasattr(window, "_shown_graves"):
+            index = selected_rows[0].row()
+            if index < len(window._shown_graves):
+                previous_key = window._shown_graves[index].key
+        result = select_graveyard_entries(
+            window.inventory.graveyard,
+            query=window.grave_search.text(),
+            category=window.grave_type.currentText(),
+            state=window.grave_state.currentText(),
+            drive=window.grave_drive.currentText(),
+            min_age_days=AGE_OPTIONS[window.grave_age.currentText()],
+            sort_by=window.grave_sort.currentText())
 
         window._shown_graves = result[:500]
         table = window.grave_table
         table.blockSignals(True)
-        table.clearContents()
+        table.setRowCount(0)
         table.setRowCount(len(window._shown_graves))
         for idx, entry in enumerate(window._shown_graves):
             rule, _reason = protection_action(
@@ -358,7 +340,7 @@ def render_approved_graveyard(window):
                 table.setRowHeight(idx, 42)
             else:
                 table.setRowHeight(idx, 32)
-        pending = getattr(window, "_pending_grave_key", None)
+        pending = getattr(window, "_pending_grave_key", None) or previous_key
         if pending:
             for i, e in enumerate(window._shown_graves):
                 if e.key == pending:
