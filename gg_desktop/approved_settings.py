@@ -1,123 +1,256 @@
-"""Locked Settings control-center shell over real local preferences.
+"""Owner-locked cinematic Settings control center with real local actions.
 
-The seven owner-approved categories are visible. Original preference controls
-remain reachable, including Captures, Privacy and About from Advanced.
-Performance and Notifications are honest read-only status views until a real
-user-configurable setting or publisher feed exists.
+This dashboard is not a decorative settings screenshot. Navigation opens the
+existing on-disk preference controls. Unimplemented publisher services, FPS
+measurements, subscriptions and launcher connections are never faked.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFrame, QListWidget, QStackedWidget, QVBoxLayout,
+    QFrame, QGridLayout, QHBoxLayout, QLabel, QListWidget,
+    QStackedWidget, QVBoxLayout, QWidget,
 )
-from gg_desktop.widgets import button, row, label
+from gg_desktop.widgets import button, label, row
+from gg_desktop.visuals import nav_icon
 
 
 def _status_page(heading, explanation, actions):
     frame = QFrame()
     frame.setObjectName("approvedSettingsStatusPage")
-    contents = QVBoxLayout(frame)
-    contents.setContentsMargins(15, 16, 15, 16)
-    contents.setSpacing(12)
-    contents.addWidget(label(heading, "sectionTitle"))
-    contents.addWidget(label(explanation, "subtle", wrap=True))
+    col = QVBoxLayout(frame)
+    col.setContentsMargins(15, 16, 15, 16)
+    col.setSpacing(12)
+    col.addWidget(label(heading, "sectionTitle"))
+    col.addWidget(label(explanation, "subtle", wrap=True))
     for text, callback in actions:
-        contents.addWidget(button(text, callback))
-    contents.addStretch()
+        col.addWidget(button(text, callback))
+    col.addStretch()
     return frame
+
+
+def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
+    """A native, data-backed settings tile with real navigation/actions."""
+    shell = QFrame()
+    shell.setObjectName("ggAccentPanel")
+    shell.setProperty("accent", tone)
+    shell.setMinimumHeight(190 if compact else 244)
+    col = QVBoxLayout(shell)
+    col.setContentsMargins(14, 12, 14, 12)
+    col.setSpacing(7)
+    title_bar = QWidget()
+    headings = QHBoxLayout(title_bar)
+    headings.setContentsMargins(0, 0, 0, 0)
+    headings.setSpacing(8)
+    icon = QLabel()
+    icon.setPixmap(nav_icon(route_icon).pixmap(27, 27))
+    icon.setFixedSize(28, 28)
+    headings.addWidget(icon)
+    text_title = label(heading, "sectionTitle", wrap=True)
+    headings.addWidget(text_title, 1)
+    col.addWidget(title_bar)
+    description = label(info, "caption", wrap=True)
+    col.addWidget(description)
+    for name, value, color in facts:
+        line = QWidget()
+        line_layout = QHBoxLayout(line)
+        line_layout.setContentsMargins(0, 0, 0, 0)
+        line_layout.setSpacing(5)
+        left = QLabel(str(name))
+        left.setStyleSheet("background:transparent;color:#C9D4DF;font-size:12px;")
+        left.setWordWrap(True)
+        right = QLabel(str(value))
+        right.setStyleSheet(
+            "background:transparent;color:" + color +
+            ";font-size:12px;font-weight:750;")
+        right.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        right.setWordWrap(True)
+        line_layout.addWidget(left, 2)
+        line_layout.addWidget(right, 1)
+        col.addWidget(line)
+    col.addStretch(1)
+    for title, callback in actions:
+        col.addWidget(button(title, callback))
+    return shell
 
 
 def render_approved_settings(window):
     window.settings_page()
     page = window.page
     page.content.setContentsMargins(11, 7, 11, 16)
-    page.content.setSpacing(9)
+    page.content.setSpacing(8)
     navs = page.findChildren(QListWidget, "settingsCategories")
     stacks = page.findChildren(QStackedWidget, "settingsPanels")
     if not navs or not stacks:
         raise RuntimeError("Settings category controls unavailable")
     nav, stack = navs[0], stacks[0]
     if stack.count() != 8:
-        raise RuntimeError("Original Settings controls changed unexpectedly")
+        raise RuntimeError("Original Settings control count changed")
     nav.hide()
 
-    # Use working controls rather than fake screenshot toggles. These two
-    # status tabs are informational and never weaken the FPS or safety guard.
-    performance_index = stack.addWidget(_status_page(
+    perf_idx = stack.addWidget(_status_page(
         "GAMING PERFORMANCE GUARD",
-        "The guard is always active in this preview: low CPU and disk priority "
-        "during scans, cooperative pause while a game is detected, and no "
-        "game injection or overlay. Real game FPS and 1%-low benchmarks "
-        "are still required before a stable release.",
-        (
-            ("Open scanning preferences",
-             lambda: _select(1)),
-            ("Open Games", lambda: window.navigate("Games")),
-        )))
-    notifications_index = stack.addWidget(_status_page(
+        "Game-aware suspension and low CPU/disk priority are safety "
+        "requirements, not optional high-impact background features. "
+        "Actual FPS and 1%-low results are not measured here.",
+        (("Configure scans", lambda: select(1)),
+         ("Open Games", lambda: window.navigate("Games")))))
+    notices_idx = stack.addWidget(_status_page(
         "NOTIFICATIONS & READY ROOM",
-        "Game Grave shows verified local scan warnings on demand. Official "
-        "publisher Patch Watch feeds have not been connected; no patch "
-        "warnings or game compatibility verdicts are invented.",
-        (
-            ("Open Ready Room", lambda: window.navigate("Ready Room")),
-            ("View scan status", window._show_notifications),
-        )))
+        "Only local scan warnings are available in this engineering preview. "
+        "Official Patch Watch publisher feeds have not been connected.",
+        (("Open Ready Room", lambda: window.navigate("Ready Room")),
+         ("Review scan warnings", window._show_notifications))))
+
+    settings_root = stack.parentWidget()
+    overview = None
+    # The original six summary cards are duplicated by the faithful, fuller
+    # control-center workspace below; keep their real preference widgets.
+    for i in range(page.content.count()):
+        item = page.content.itemAt(i)
+        widget = item.widget() if item else None
+        if widget is None:
+            continue
+        if widget is not settings_root and widget is not page.content.itemAt(0).widget():
+            if widget.findChildren(QGridLayout) and not widget.findChildren(QStackedWidget):
+                overview = widget
+                break
+    if overview is not None:
+        overview.hide()
 
     tabs = QFrame()
     tabs.setObjectName("approvedSettingsTabs")
-    line = row(spacing=5, margins=(5, 5, 5, 5))
-    tabs.setLayout(line)
+    controls = row(spacing=6, margins=(3, 2, 3, 2))
+    tabs.setLayout(controls)
     names = (
         ("General", 0), ("Libraries", 1), ("Safety", 2),
-        ("Performance", performance_index), ("AI Assistant", 4),
-        ("Notifications", notifications_index), ("Advanced", 6),
+        ("Performance", perf_idx), ("AI Assistant", 4),
+        ("Notifications", notices_idx), ("Advanced", 6),
     )
 
-    def _select(index):
+    def select(index):
         if index < 8:
             nav.setCurrentRow(index)
         stack.setCurrentIndex(index)
         window._settings_category_index = index
 
-    buttons = []
-    for title, index in names:
-        tab = button(title, lambda _=False, i=index: _select(i),
-                     kind="approvedSettingsTab")
-        tab.setAccessibleName("Settings category " + title)
-        tab.setProperty("categoryIndex", index)
-        tab.setMinimumHeight(27)
-        line.addWidget(tab, 1)
-        buttons.append(tab)
+    choices = []
+    for name, index in names:
+        action = button(name, lambda _=False, target=index: select(target),
+                        kind="approvedSettingsTab")
+        action.setAccessibleName("Settings category " + name)
+        action.setMinimumHeight(33)
+        action.setProperty("categoryIndex", index)
+        controls.addWidget(action, 1)
+        choices.append(action)
     page.content.insertWidget(1, tabs)
 
     advanced = stack.widget(6)
     if advanced is not None and advanced.layout() is not None:
-        for title, destination in (
-            ("Captures settings", 3),
+        for name, index in (
+            ("Capture folders", 3),
             ("Appearance & Privacy", 5),
             ("About / App Version", 7),
         ):
             advanced.layout().addWidget(
-                button(title, lambda _=False, i=destination: _select(i)))
+                button(name, lambda _=False, target=index: select(target)))
+
+    dashboard = QWidget()
+    grid = QGridLayout(dashboard)
+    grid.setSpacing(10)
+    grid.setContentsMargins(1, 2, 1, 2)
+    data = dict(window.settings)
+    ai_on = data.get("ai_assistant_enabled") is True
+    from ai_bundle import is_ai_installed
+    ai_installed = is_ai_installed()
+    library_roots = len(data.get("steam_extra_roots", [])) + len(
+        data.get("other_library_roots", []))
+    never_touch = len(data.get("never_touch", []))
+    captures = len(data.get("screenshot_roots", []))
+    scan_folder = str(data.get("scan_folder", "")).strip()
+    scan_label = Path(scan_folder).name if scan_folder else "Not set"
+
+    cards = [
+        _card("Libraries & Detection",
+              "Verified launcher records and owner-selected scan roots.",
+              (("Extra game roots", str(library_roots), "#74D9E9"),
+               ("Capture locations", str(captures), "#BFA7E9"),
+               ("Old Files scope", scan_label, "#D9E2EC")),
+              "cyan", "Games",
+              (("Manage libraries", lambda: select(1)),)),
+        _card("Protection & Cleanup",
+              "Built-in protection cannot be bypassed.",
+              (("Recycle Bin", "Required", "#55D9AA"),
+               ("Delete confirmation", "Required", "#55D9AA"),
+               ("Never Touch rules", str(never_touch), "#EAC090")),
+              "amber", "Graveyard",
+              (("Manage protection", lambda: select(2)),)),
+        _card("Gaming Performance",
+              "No intrusive game overlays or continuous heavy scans.",
+              (("Pause heavy work", "On", "#55D9AA"),
+               ("Background priority", "Low", "#55D9AA"),
+               ("FPS measured here", "Not available", "#EBC18B")),
+              "red", "Game DNA",
+              (("Performance details", lambda: select(perf_idx)),)),
+        _card("System Status",
+              "Health indicators from this preview, not invented telemetry.",
+              (("CPU / memory", "Not sampled", "#D0B9DE"),
+               ("Disk activity", "Not sampled", "#D0B9DE"),
+               ("Edition", "Engineering preview", "#EEB97C")),
+              "green", "Other Storage",
+              (("View local scans", window._show_notifications),), compact=True),
+        _card("AI Assistant",
+              "Optional local help. Off until explicitly enabled.",
+              (("AI", "On" if ai_on else "Off",
+                "#58DCB1" if ai_on else "#F2BE87"),
+               ("Local engine", "Installed" if ai_installed else "Not installed",
+                "#58DCB1" if ai_installed else "#F2BE87")),
+              "purple", "AI Assistant",
+              (("Configure local AI", lambda: select(4)),)),
+        _card("Ready Room & Notices",
+              "Local warnings are real; official patch feeds are pending.",
+              (("Scan notifications", "On demand", "#6ED2ED"),
+               ("Official Patch Watch", "Not connected", "#F0BD80")),
+              "amber", "Ready Room",
+              (("Notification details", lambda: select(notices_idx)),)),
+        _card("Privacy & Data",
+              "Your game list, file paths and saves stay local.",
+              (("File uploads", "None", "#55D9AA"),
+               ("Optional AI", "Local only", "#72D5EA"),
+               ("Delete authority", "User only", "#D5B2EA")),
+              "green", "Settings",
+              (("Open privacy controls", lambda: select(5)),)),
+        _card("Paths & Quick Actions",
+              "Open the existing tools; no fake switches.",
+              (("Scan locations", str(library_roots + (1 if scan_folder else 0)),
+                "#78D6E9"),),
+              "cyan", "Old Files",
+              (("Scan now", window.start_scan),
+               ("Backup & restore", lambda: select(6))), compact=True),
+    ]
+    for i, card in enumerate(cards):
+        grid.addWidget(card, i // 4, i % 4)
+    for col in range(4):
+        grid.setColumnStretch(col, 1)
+    page.content.insertWidget(2, dashboard)
 
     def active(_index=None):
         selected = stack.currentIndex()
-        # Captures / Privacy / About live behind the Advanced category.
-        if selected in (3, 5, 7):
-            selected = 6
-        for tab in buttons:
-            tab.setProperty("active", tab.property("categoryIndex") == selected)
+        highlight = 6 if selected in (3, 5, 7) else selected
+        for tab in choices:
+            tab.setProperty("active", tab.property("categoryIndex") == highlight)
             tab.style().unpolish(tab)
             tab.style().polish(tab)
+        dashboard.setVisible(selected == 0)
+        # Original General preference remains below the overview in General.
     stack.currentChanged.connect(active)
-    desired = getattr(window, "_settings_category_index", 0)
-    if 0 <= desired < stack.count():
-        _select(desired)
+    target = getattr(window, "_settings_category_index", 0)
+    select(target if 0 <= target < stack.count() else 0)
     active()
     page.content.addWidget(label(
-        "Settings changes save when selected. Built-in game, system and "
-        "save protections cannot be disabled. Performance and notifications "
-        "report actual capabilities, not mockup values.",
+        "Changes to actual preferences save when selected. Game Grave never "
+        "reports simulated connected services, FPS measurements, or Pro licenses.",
         "caption", wrap=True))
     return page
