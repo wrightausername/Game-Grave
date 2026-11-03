@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from core import human_size, age_text
-from gg_desktop.local_art import game_cover_path
+from gg_desktop.local_art import game_cover_path, game_banner_path
 
 
 def _label(text, role="", wrap=True):
@@ -40,7 +40,7 @@ def _load_local_art(game, width=330, height=205):
     """Limit decoding before painting, including format/pixel limits."""
     if game is None:
         return QPixmap()
-    path = game_cover_path(game)
+    path = game_banner_path(game)
     if not path:
         return QPixmap()
     reader = QImageReader(path)
