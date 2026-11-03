@@ -352,6 +352,13 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
+            # The seven owner-locked references have real cropped artwork
+            # shipped with the package. A fabricated fallback is not parity.
+            from gg_desktop.owner_art import load_approved_hero
+            for route_kind in ("overview", "graveyard", "dna", "undo",
+                               "assistant", "settings", "tools"):
+                assert not load_approved_hero(route_kind).isNull(), (
+                    "Missing approved source artwork for " + route_kind)
             # Locked owner references are 1672 x 941. Capture the same native
             # Qt window size for direct review against each approved image.
             for route, slug in (
@@ -387,6 +394,13 @@ def main():
                 app.processEvents()
                 assert window.global_search.isVisible(), (
                     "Global search hidden at 1366x768: " + route)
+                if route in ("Graveyard", "Game DNA", "Undo Center",
+                             "AI Assistant", "Settings", "More Tools"):
+                    content_width = window.page.body.width()
+                    available_width = window.page.viewport().width()
+                    assert content_width <= available_width + 6, (
+                        f"{route} has horizontally clipped content at 1366: "
+                        f"body {content_width}px > viewport {available_width}px")
                 path = root / "_ci_temp" / ("crimson-" + slug + "-1366.png")
                 assert window.grab().save(str(path)), (
                     "Cannot render smaller-screen reference: " + route)
