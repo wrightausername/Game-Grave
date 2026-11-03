@@ -466,7 +466,7 @@ class RelationshipMap(QWidget):
             p.setPen(QPen(ring, 3.5))
             p.setBrush(Qt.NoBrush)
             p.drawEllipse(center, radius, radius*.81)
-        middle = QRectF(center.x()-97, center.y()-73, 194, 146)
+        middle = QRectF(center.x()-97, center.y()-44, 194, 88)
         middle_bg = QLinearGradient(middle.topLeft(), middle.bottomRight())
         middle_bg.setColorAt(0, QColor("#4C172C"))
         middle_bg.setColorAt(.56, QColor("#201522"))
@@ -475,25 +475,25 @@ class RelationshipMap(QWidget):
         p.setBrush(middle_bg)
         p.drawRoundedRect(middle, 17, 17)
         p.setPen(QPen(QColor("#E62E4F"), 1.3))
-        p.drawLine(QPointF(center.x()-63,center.y()-40),
-                   QPointF(center.x()+63,center.y()-40))
+        p.drawLine(QPointF(center.x()-63,center.y()-22),
+                   QPointF(center.x()+63,center.y()-22))
         p.setPen(QColor("#F34A64"))
         p.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        p.drawText(QRectF(center.x()-87, center.y()-67, 174, 25),
+        p.drawText(QRectF(center.x()-87, center.y()-43, 174, 18),
                    Qt.AlignCenter, "GAME DNA")
         p.setPen(WHITE)
         p.setFont(QFont("Segoe UI", 13, QFont.DemiBold))
-        p.drawText(QRectF(center.x()-84,center.y()-31,168,76),
+        p.drawText(QRectF(center.x()-84,center.y()-20,168,43),
                    Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
         p.setPen(QColor("#B8D7E4"))
         p.setFont(QFont("Segoe UI", 9))
-        p.drawText(QRectF(center.x()-87,center.y()+45,174,20),
+        p.drawText(QRectF(center.x()-87,center.y()+25,174,15),
                    Qt.AlignCenter, "SCANNED RELATIONSHIPS")
 
         # Large readable cards, bounded to the workspace at ordinary zoom.
         for name, x, y, color, uncertain, state, path in entries:
             active = name == self.active
-            box_w, box_h = (145, 66)
+            box_w, box_h = (145, 54)
             box = QRectF(x-box_w/2, y-box_h/2, box_w, box_h)
             self.positions[name] = box
             if active:
@@ -514,12 +514,12 @@ class RelationshipMap(QWidget):
                        QPointF(box.x()+28,box.y()+11))
             p.setPen(WHITE)
             p.setFont(QFont("Segoe UI", 11, QFont.DemiBold))
-            p.drawText(QRectF(box.x()+8,box.y()+14,box.width()-16,22),
+            p.drawText(QRectF(box.x()+8,box.y()+9,box.width()-16,20),
                        Qt.AlignCenter,name)
             p.setPen(QColor("#7BDFBA") if not uncertain else QColor("#B4AEBB"))
             p.setFont(QFont("Segoe UI", 9))
             short = p.fontMetrics().elidedText(str(state), Qt.ElideRight, 132)
-            p.drawText(QRectF(box.x()+7,box.y()+39,box.width()-14,20),
+            p.drawText(QRectF(box.x()+7,box.y()+30,box.width()-14,17),
                        Qt.AlignCenter,short)
 
         # Explicit evidence legend. Never promises that a link is removable.
