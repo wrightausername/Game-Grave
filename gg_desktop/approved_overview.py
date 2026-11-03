@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QVBoxLayout, QWidget,
 )
 
-from core import human_size
+from core import human_size, get_activity, friendly_activity
 from recovery import get_records
 from gg_desktop.widgets import HeroBanner, button, label
 
@@ -240,23 +240,37 @@ def render_approved_overview(window):
     page.content.addWidget(metrics)
 
     recycled, move_count, recent = _monthly_moves()
-    center = QWidget()
-    c = _line(center, gap=10)
-
-    activity_panel, activity = _panel("RECENT ACTIVITY",
-        subtitle="Real local cleanup records. No simulated history.")
-    if recent:
+    center = QWidget(    activity_panel, activity = _panel("RECENT ACTIVITY",
+        subtitle="Verified local events only. No simulated gaming history.")
+    # Scans count as real activity even when no files were removed. Existing
+    # audit entries are presented before the separate Recycle Bin ledger.
+    events = get_activity(limit=6)
+    if events:
+        for event in events[:5]:
+            item = friendly_activity(event)
+            kind = str(item.get("kind", "")).casefold()
+            route = ("Undo Center" if "recycl" in kind or "restor" in kind
+                     else "Mods" if "mod" in kind
+                     else "Graveyard" if "cleanup" in kind
+                     else "Games")
+            action = _compact_action(
+                str(item["title"]), lambda r=route: window.navigate(r),
+                secondary=str(item["date"]) + " | " + str(item["status"]))
+            action.setToolTip(str(item["explanation"]))
+            activity.addWidget(action)
+    elif recent:
         for record in recent[:5]:
             name = Path(str(record.get("path", ""))).name or "Recorded operation"
             value = human_size(record.get("size", 0))
             when = str(record.get("time", "Unknown"))[:16]
-            row = _compact_action(name, lambda: window.navigate("Undo Center"),
-                                  secondary=when + " | " + value)
-            activity.addWidget(row)
+            activity.addWidget(_compact_action(
+                name, lambda: window.navigate("Undo Center"),
+                secondary=when + " | " + value))
     else:
         activity.addWidget(_txt(
-            "No Game Grave cleanup history yet. A read-only scan does not "
-            "delete or recycle anything.", color="#AEB8C6", size=11, wrap=True))
+            "No recorded Game Grave activity yet. Scanning does not delete "
+            "or recycle anything.", color="#AEB8C6", size=11, wrap=True))
+="#AEB8C6", size=11, wrap=True))
     activity.addStretch()
     activity.addWidget(_compact_action("Review history",
                         lambda: window.navigate("Undo Center")))
