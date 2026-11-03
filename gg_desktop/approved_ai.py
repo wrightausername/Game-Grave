@@ -239,7 +239,11 @@ def render_approved_ai(window):
         control.setObjectName("approvedAIQuickTile")
         control.setMinimumHeight(56)
         control.setAccessibleName("Open " + title + " workflow")
-        grid.addWidget(control, 0, idx)
+        # Keep the approved six-across strip at normal scaling. At 125% or
+        # higher, two rows prevent Qt from expanding the entire page width.
+        high_dpi = window.devicePixelRatioF() >= 1.12
+        grid.addWidget(control, idx // 3 if high_dpi else 0,
+                       idx % 3 if high_dpi else idx)
     qcol.addWidget(cards)
     page.content.addWidget(quick)
     return page
