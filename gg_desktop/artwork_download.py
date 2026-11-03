@@ -19,6 +19,29 @@ from gg_desktop.local_art import (
 MAX_DOWNLOAD = 8 * 1024 * 1024
 
 
+def _foreign_fullscreen() -> bool:
+    """Do not mistake maximized Game Grave itself for a running game."""
+    import os
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        user32.GetForegroundWindow.restype = wintypes.HWND
+        hwnd = user32.GetForegroundWindow()
+        if hwnd:
+            pid = wintypes.DWORD(0)
+            user32.GetWindowThreadProcessId(
+                hwnd, ctypes.byref(pid))
+            if pid.value == os.getpid():
+                return False
+    except (OSError, ValueError, AttributeError):
+        pass
+    from performance_guard import _foreground_is_fullscreen
+    return _foreground_is_fullscreen()
+
+
 def official_steam_urls(game):
     app_id = str(getattr(game, "app_id", "") or "")
     if (str(getattr(game, "launcher", "")).casefold() != "steam"
@@ -84,7 +107,7 @@ def download_official_steam_covers(
     never blocks Qt painting. Avoids any new requests while a game is detected.
     """
     from performance_guard import GameActivityDetector
-    detector = GameActivityDetector(refresh_seconds=2.0)
+    detector = GameActivityDetector(refresh_seconds=2.0, fullscreen=_foreign_fullscreen)
     detector.set_game_roots([
         str(getattr(g, "install_path", "") or "") for g in games])
     active = game_active if game_active is not None else detector.active
@@ -213,7 +236,7 @@ def download_matched_catalog_covers(
     import hashlib
     from gg_desktop.local_art import game_cover_path, _game_key
     from performance_guard import GameActivityDetector
-    detector = GameActivityDetector(refresh_seconds=2.)
+    detector = GameActivityDetector(refresh_seconds=2., fullscreen=_foreign_fullscreen)
     detector.set_game_roots([
         str(getattr(g, "install_path", "")) for g in games])
     active = game_active or detector.active
