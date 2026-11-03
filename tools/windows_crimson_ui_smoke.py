@@ -68,8 +68,19 @@ def main():
         st = oldzip.stat()
         old = OldFile(str(oldzip), st.st_size, st.st_mtime,
                       st.st_dev, st.st_ino, st.st_mtime_ns, st.st_nlink)
+        # Exercise actual 2026 Steam portrait-cache topology rather than
+        # letting Game Grave's generated poster conceal broken discovery.
+        steam_install = synthetic / "Steam" / "steamapps" / "common" / "Sample"
+        steam_install.mkdir(parents=True, exist_ok=True)
+        official_cover = (synthetic / "Steam" / "appcache" /
+                          "librarycache" / "455" / ("a" * 40) /
+                          "library_600x900.jpg")
+        official_cover.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (300, 450), (44, 68, 103)).save(
+            official_cover, quality=96)
+        assert official_cover.stat().st_size > 1000
         steam = [SteamGame("455", "Sample Steam Game", str(synthetic),
-                           str(synthetic / "Steam" / "Sample"),
+                           str(steam_install),
                            1200000, None, "Unknown")]
         other = [
             LauncherGame("Sample Epic Game", "Epic Games",
@@ -97,6 +108,11 @@ def main():
             from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox, QLabel, QListWidget, QFrame
             from PySide6.QtSvg import QSvgRenderer
             from gg_desktop.approved_overview import RecycledRing
+            from gg_desktop.local_art import game_cover_path
+            real_steam = next(
+                g for g in window.inventory.games if g.launcher == "Steam")
+            assert game_cover_path(real_steam) == str(official_cover), (
+                "Modern Steam content-hash portrait must be discovered locally")
             window.navigate("Overview")
             app.processEvents()
             # The owner-approved dashboard has five evidence-backed metrics
@@ -146,6 +162,37 @@ def main():
                 assert window.page is not None and window.page.isVisible()
                 assert window.current_route == route
                 assert oldzip.read_bytes() == b"not an actual mod or game"
+                if route == "Ready Room":
+                    room = window.page
+                    lineups = room.findChildren(
+                        QTableWidget, "readyRoomTable")
+                    assert len(lineups) == 1
+                    lineup = lineups[0]
+                    sorts = room.findChildren(QComboBox, "readyRoomSort")
+                    assert len(sorts) == 1
+                    sort = sorts[0]
+                    assert lineup.rowCount() == 3
+                    sort.setCurrentText("Game A to Z")
+                    app.processEvents()
+                    assert lineup.item(0, 0).text() == "Sample EA Game"
+                    sort.setCurrentText("Game Z to A")
+                    app.processEvents()
+                    assert lineup.item(0, 0).text() == "Sample Steam Game"
+                    sort.setCurrentText("Size largest")
+                    app.processEvents()
+                    assert lineup.item(0, 0).text() == "Sample Steam Game"
+                    # The actual table header, not just the dropdown, sorts.
+                    lineup.horizontalHeader().sectionClicked.emit(1)
+                    app.processEvents()
+                    assert sort.currentText() == "Launcher A to Z"
+                    assert lineup.item(0, 1).text() == "EA"
+                    lineup.horizontalHeader().sectionClicked.emit(1)
+                    app.processEvents()
+                    assert sort.currentText() == "Launcher Z to A"
+                    assert lineup.item(0, 1).text() == "Steam"
+                    assert room.findChildren(
+                        QFrame, "readyRoomCoverStrip"), (
+                        "Ready Room requires the real portrait-art shelf")
                 if route == "Games":
                     rows = window._shown_games
                     assert len(rows) == 3
@@ -206,6 +253,17 @@ def main():
                         "Approved Games layout needs a cinematic metrics header")
                     assert not window.game_inventory_panel.isVisible(), (
                         "Advanced game table must not dominate the default visual screen")
+                    official_card = next(
+                        card for card in window.page.findChildren(GameCover)
+                        if card.game.launcher == "Steam")
+                    from PySide6.QtWidgets import QLabel as QtLabel
+                    art = official_card.findChildren(QtLabel, "gameCoverArt")[0]
+                    assert str(official_cover) in art.toolTip(), (
+                        "Real Steam artwork must be used in Games, "
+                        "not replaced with a generated placeholder")
+                    assert window.page.findChildren(
+                        QPushButton, "primary"), (
+                        "Games requires a visible on-demand artwork retrieval action")
                     first = window.page.findChildren(GameCover)[0]
                     gap = first.mapTo(window.game_gallery_frame, QPoint(0, 0)).y()
                     assert 0 <= gap < 145, (
