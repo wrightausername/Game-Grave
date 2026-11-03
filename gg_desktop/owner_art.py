@@ -17,6 +17,14 @@ IMAGE_BY_ROUTE = {
     "assistant": "owner_cinematic_assistant.jpg",
     "settings": "owner_cinematic_settings.jpg",
     "tools": "owner_cinematic_tools.jpg",
+    # Other sections share the definitive cinematic world until their own
+    # final owner reference can supersede it. No neon/fantasy theme drift.
+    "readyroom": "owner_cinematic_overview.jpg",
+    "games": "owner_cinematic_overview.jpg",
+    "mods": "owner_cinematic_overview.jpg",
+    "oldfiles": "owner_cinematic_overview.jpg",
+    "captures": "owner_cinematic_overview.jpg",
+    "otherstorage": "owner_cinematic_overview.jpg",
 }
 
 
