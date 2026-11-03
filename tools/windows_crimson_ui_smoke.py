@@ -370,6 +370,11 @@ def main():
                 ("Settings", "settings"),
                 ("More Tools", "more-tools"),
             ):
+                if route == "Settings":
+                    # Visual acceptance must capture the owner-approved
+                    # General dashboard, not an Advanced tab left selected by
+                    # earlier interaction tests.
+                    window._settings_category_index = 0
                 window.navigate(route)
                 window.resize(1672, 941)
                 app.processEvents()
