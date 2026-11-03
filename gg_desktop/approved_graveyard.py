@@ -149,7 +149,7 @@ def render_approved_graveyard(window):
         "SIZE", "AGE", "REVIEW STATUS"])
     window.grave_table.setSelectionBehavior(QAbstractItemView.SelectRows)
     window.grave_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-    for idx, width in enumerate((178, 112, 150, 80, 95, 143))
+    for idx, width in enumerate((178, 112, 150, 80, 95, 143)):
         window.grave_table.setColumnWidth(idx, width)
     window.grave_table.horizontalHeader().setStretchLastSection(True)
     window.grave_table.setMinimumHeight(292)
