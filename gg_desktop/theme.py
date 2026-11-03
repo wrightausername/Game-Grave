@@ -706,3 +706,15 @@ QPushButton#approvedAIQuickTile:hover {
 QFrame#ggAssistantWelcomeArt {border:0;background:transparent;}
 QFrame#approvedSettingsStatusPage {background:#101925;border:1px solid #314252;border-radius:8px;}
 """
+
+# Source-backed feature metric bands; hues are category accents, not alerts.
+STYLE += r"""
+QFrame#metricCard {background:#101824;border:1px solid #303B48;border-radius:8px;}
+QFrame#metricCard[tone="cyan"] {border-bottom:2px solid #4DCFE7;}
+QFrame#metricCard[tone="amber"] {border-bottom:2px solid #E6B06B;}
+QFrame#metricCard[tone="green"] {border-bottom:2px solid #4DD4A8;}
+QFrame#metricCard[tone="purple"] {border-bottom:2px solid #BB93E8;}
+QFrame#metricCard[tone="red"] {border-bottom:2px solid #F0455F;}
+QLabel#metricValue {font-size:25px;font-weight:850;color:#F5F8FF;}
+QFrame#metricCard QLabel#caption {font-size:11px;color:#B7C5D2;}
+"""
