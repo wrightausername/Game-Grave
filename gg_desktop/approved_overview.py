@@ -134,6 +134,10 @@ def _monthly_moves():
 
 def _metric(label_text, value, accent, route, handler, description):
     tile = QPushButton()
+    # Buttons do not automatically size to a nested widget layout on all
+    # Windows Qt styles. An explicit height prevents clipped metric values.
+    tile.setMinimumHeight(75)
+    tile.setMaximumHeight(80)
     tile.setObjectName("approvedMetric")
     tile.setAccessibleName(label_text + ": " + str(value) + ". " + description)
     tile.setToolTip(description)
@@ -214,6 +218,7 @@ def render_approved_overview(window):
     files = window.inventory.files
     captures = len(window.inventory.screenshots) + len(window.inventory.recordings)
     metrics = QWidget()
+    metrics.setMinimumHeight(80)
     metrics.setObjectName("approvedMetrics")
     mrow = _line(metrics, gap=8)
     values = (
