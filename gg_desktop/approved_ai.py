@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 from ai_bundle import is_ai_installed
 from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.widgets import button, label, panel, row
+from gg_desktop.cinematic_art import CinematicToolArtwork
 
 
 def _label(text, *, color="#B6C6D7", font=11, strong=False, wrap=True):
@@ -28,12 +29,12 @@ def _label(text, *, color="#B6C6D7", font=11, strong=False, wrap=True):
 
 def _small_status(title, data, color):
     section = QFrame()
-    section.setObjectName("approvedAIStatus")
+    section.setObjectName("ggStatusChip")
     col = QVBoxLayout(section)
-    col.setContentsMargins(9, 5, 9, 5)
+    col.setContentsMargins(12, 6, 12, 6)
     col.setSpacing(3)
     col.addWidget(_label(title.upper(), color="#AEBECC", font=10, strong=True))
-    col.addWidget(_label(data, color=color, font=16, strong=True))
+    col.addWidget(_label(data, color=color, font=19, strong=True))
     return section
 
 
@@ -82,13 +83,18 @@ def render_approved_ai(window):
          "Review captured game media"),
         ("Recovery", "Undo Center",
          "Verify actual Recycle Bin history"),
+        ("Custom Tools", "More Tools",
+         "Open available advanced Game Grave utilities"),
     )
     for name, route, tooltip in destinations:
         action = button(name + "   ›",
                         lambda _=False, route=route: (
                             entry.setFocus() if route == "AI Assistant"
                             else window.navigate(route)))
-        action.setObjectName("approvedAIWorkflow")
+        action.setObjectName(
+            "approvedAIModeActive" if route == "AI Assistant"
+            else "approvedAIWorkflow")
+        action.setMinimumHeight(39)
         action.setToolTip(tooltip)
         ml.addWidget(action)
     ml.addStretch()
@@ -97,11 +103,23 @@ def render_approved_ai(window):
     hub, chat = panel(padding=10, spacing=9)
     chat.addWidget(_label("GAME GRAVE AI", color="#FFFFFF", font=15, strong=True))
     chat.addWidget(_label(
-        "A local assistant for understanding scans. It cannot delete, "
-        "unprotect or repair files.", color="#ADBCC9", font=11))
+        "Your opt-in local gaming companion. Explanations remain read-only; "
+        "deletion, unprotecting and repairs are never delegated to AI.",
+        color="#B8C7D5", font=12))
+    welcome = CinematicToolArtwork("assistant")
+    welcome.setObjectName("ggAssistantWelcomeArt")
+    welcome.setMinimumHeight(124)
+    welcome.setMaximumHeight(124)
+    chat.addWidget(welcome)
+    if not (enabled and installed):
+        offline = _label(
+            "ENGINE OFFLINE  •  Enable local AI in Settings to ask questions. "
+            "All other Game Grave tools remain fully usable.",
+            color="#F0C188", font=12, strong=True)
+        chat.addWidget(offline)
     transcript = QPlainTextEdit()
     transcript.setReadOnly(True)
-    transcript.setMinimumHeight(260)
+    transcript.setMinimumHeight(178 if not enabled else 205)
     transcript.setAccessibleName("Local AI conversation history for this session")
     transcript.setPlaceholderText(
         "Ask Game Grave AI about your gaming storage, detected mods, "
@@ -171,7 +189,7 @@ def render_approved_ai(window):
     entry.returnPressed.connect(submit)
     wrow.addWidget(hub, 6)
 
-    side, scol = panel(padding=10, spacing=8)
+    side, scol = panel(padding=11, spacing=9)
     scol.addWidget(_label("ACTIVE CONTEXT", color="#FFFFFF", font=14, strong=True))
     if window.inventory.scanned_at:
         scol.addWidget(_label(
@@ -190,6 +208,7 @@ def render_approved_ai(window):
         "Only the local AI engine receives your question and aggregate "
         "inventory context. No filenames, game lists, screenshots or save "
         "contents are automatically shared."))
+    scol.addWidget(_label("INVESTIGATE", color="#F2C46F", font=12, strong=True))
     scol.addWidget(button(
         "Open Game DNA", lambda: window.navigate("Game DNA")))
     scol.addWidget(button(
@@ -217,8 +236,10 @@ def render_approved_ai(window):
     )):
         control = button(title + "   ›",
                          lambda _=False, route=route: window.navigate(route))
-        control.setObjectName("approvedAIWorkflow")
-        grid.addWidget(control, idx // 3, idx % 3)
+        control.setObjectName("approvedAIQuickTile")
+        control.setMinimumHeight(56)
+        control.setAccessibleName("Open " + title + " workflow")
+        grid.addWidget(control, 0, idx)
     qcol.addWidget(cards)
     page.content.addWidget(quick)
     return page
