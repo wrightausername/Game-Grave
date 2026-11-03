@@ -298,6 +298,21 @@ def render_approved_overview(window):
         activity.addWidget(_txt(
             "No recorded Game Grave activity yet. Scanning does not delete "
             "or recycle anything.", color="#AEB8C6", size=11, wrap=True))
+    # A recent audit can be genuinely short. Fill unused dashboard space
+    # with explicitly labeled, verifiable scan facts, never invented events.
+    if found and len(events) < 3:
+        activity.addWidget(_txt("LATEST SCAN SNAPSHOT",
+                                size=11, color="#F15A73", bold=True))
+        snapshots = (
+            ("Installed games", len(games), "Games"),
+            ("Detected mod locations", len(mods), "Mods"),
+            ("Graveyard candidates", len(window.inventory.graveyard), "Graveyard"),
+        )
+        for text, number, route in snapshots[:3-len(events)]:
+            activity.addWidget(_compact_action(
+                text + ": " + str(number),
+                lambda _checked=False, r=route: window.navigate(r),
+                secondary="From the latest scan  •  not a cleanup event"))
     activity.addStretch()
     activity.addWidget(_compact_action("Review history",
                         lambda: window.navigate("Undo Center")))
@@ -318,6 +333,12 @@ def render_approved_overview(window):
     dc.addStretch()
     rr.addWidget(details, 1)
     rc.addWidget(ring_row, 1)
+    if found:
+        rc.addWidget(_txt(
+            str(len(window.inventory.graveyard)) +
+            " Graveyard candidate(s) await separate manual review. "
+            "No unconfirmed freed space is counted.",
+            color="#A7D2D1", size=11, wrap=True))
     rc.addWidget(_compact_action("Open Undo Center",
                 lambda: window.navigate("Undo Center")))
     c.addWidget(recycled_panel, 4)
@@ -360,6 +381,16 @@ def render_approved_overview(window):
             window.navigate("Games")
         for game in games[:16]:
             row.addWidget(_cover(game, inspect))
+        # This is a real workflow tile, never an invented game cover.
+        discover = QPushButton("+\nADD A LIBRARY\n\nDetect games on another drive")
+        discover.setObjectName("approvedDiscoveryTile")
+        discover.setAccessibleName("Configure another game library")
+        discover.setToolTip("Open local scan and library Settings")
+        discover.setMinimumWidth(150)
+        discover.setMaximumWidth(165)
+        discover.setFixedHeight(184)
+        discover.clicked.connect(lambda: window.navigate("Settings"))
+        row.addWidget(discover)
         row.addStretch()
         shelf.setWidget(row_widget)
         libcol.addWidget(shelf)
