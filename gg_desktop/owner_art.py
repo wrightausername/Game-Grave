@@ -35,12 +35,16 @@ def draw_approved_hero(painter, art: QPixmap, width: int, height: int) -> bool:
     """
     if art.isNull() or width < 1 or height < 1:
         return False
-    dest = QRectF(width*.21, 0, width*.79, height)
+    # Fill the full header with the exact owner-cropped photographic asset.
+    # Host pages apply a broad, transparent left-to-right shade for titles.
+    # A partial-width image caused a hard rectangle / seam at 21% of the
+    # header, which did not exist in the locked owner reference.
+    dest = QRectF(0, 0, width, height)
     # Use the correct source aspect ratio and crop only the atmosphere at the
     # right edge. Stretching a gravestone/controller produces ugly proportions.
     crop_width = min(float(art.width()),
                      dest.width() * art.height() / max(1.0, dest.height()))
     available = max(0.0, art.width() - crop_width)
-    source = QRectF(available*.19, 0, crop_width, float(art.height()))
+    source = QRectF(available*.50, 0, crop_width, float(art.height()))
     painter.drawPixmap(dest, art, source)
     return True
