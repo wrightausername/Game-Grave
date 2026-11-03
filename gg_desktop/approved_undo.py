@@ -36,8 +36,8 @@ def _stat(title, value, tone):
     stack = QVBoxLayout(frame)
     stack.setContentsMargins(10, 5, 10, 6)
     stack.setSpacing(3)
-    stack.addWidget(_text(title.upper(), "#BEC7D3", size=10, bold=True))
-    stack.addWidget(_text(value, tone, size=19, bold=True))
+    stack.addWidget(_text(title.upper(), "#BEC7D3", size=12, bold=True))
+    stack.addWidget(_text(value, tone, size=23, bold=True))
     return frame
 
 
@@ -261,9 +261,9 @@ def render_approved_undo(window):
     ar.addWidget(button("Restore selected…", restore, kind="primary"))
     ar.addWidget(button("Open Cleanup History", lambda: window.navigate("Undo Center")))
     ar.addStretch()
-    page.content.addWidget(actions)
-
-    safety, sc = panel(padding=11, spacing=5)
+    # Restore controls appear below the recovery-safety/insights modules, as
+    # in the locked image, rather than interrupting the evidence inspector.
+    safety, sc = panel(padding=13, spacing=7)
     sc.addWidget(_text("RECOVERY SAFETY  •  CHECK BEFORE RESTORING",
                        "#97D4AF", size=12, bold=True))
     sc.addWidget(_text(
@@ -271,7 +271,45 @@ def render_approved_undo(window):
         "Recycle Bin match. Emptying the bin, system cleanup and duplicate "
         "paths can make restoration impossible. No countdown is guaranteed.",
         "#BDC9D7", wrap=True))
-    page.content.addWidget(safety)
+    safety.setObjectName("ggAccentPanel")
+    safety.setProperty("accent", "green")
+    sc.addWidget(_text(
+        "An exact Windows Recycle Bin match must still exist. A previous "
+        "successful check is not a promise that restoration remains possible.",
+        "#A1D8C1", size=11, wrap=True))
+
+    insight, ic = panel(padding=13, spacing=6)
+    insight.setObjectName("ggAccentPanel")
+    insight.setProperty("accent", "amber")
+    ic.addWidget(_text("UNDO INSIGHTS  /  RECORDED STATE",
+                       "#F1CA80", size=14, bold=True))
+    for heading, value, tone in (
+        ("Available at last verification", known_available, "#75DCB3"),
+        ("Not yet checked", unknown, "#EFB979"),
+        ("Already restored", restored, "#8BCCE8"),
+    ):
+        metric = QWidget()
+        line = row(spacing=8)
+        metric.setLayout(line)
+        line.addWidget(_text(heading, "#BFC9D5", size=12), 1)
+        line.addWidget(_text(str(value), tone, size=16, bold=True))
+        ic.addWidget(metric)
+    ic.addWidget(_text(
+        "Windows Recycle Bin items have no predictable expiration that "
+        "Game Grave can promise. Use Save Vault or Resurrection Kit when "
+        "you need independently verified backups.",
+        "#AFC0D0", size=11, wrap=True))
+
+    assurance = QWidget()
+    assurance_row = row(spacing=10)
+    assurance.setLayout(assurance_row)
+    assurance_row.addWidget(safety, 1)
+    assurance_row.addWidget(insight, 1)
+    page.content.addWidget(assurance)
+
+    actions.setObjectName("ggActionStrip")
+    actions.layout().setContentsMargins(11, 9, 11, 9)
+    page.content.addWidget(actions)
 
     if not records:
         path_detail.setText(
