@@ -162,10 +162,15 @@ def _cover_path(launcher: str, app_id: str, install_path: str,
             "cover.jpg", "cover.png", "cover.webp",
             "poster.jpg", "poster.png", "poster.webp",
             "boxart.jpg", "boxart.png", "library_600x900.jpg",
+            "Artwork/cover.jpg", "Artwork/cover.png",
+            "Images/cover.jpg", "Images/cover.png",
+            "Assets/StoreLogo.png", "Assets/Square150x150Logo.png",
+            "Assets/Square44x44Logo.png", "Assets/StoreLogo.scale-200.png",
         ))
         landscapes.extend(folder / filename for filename in (
             "folder.jpg", "folder.png", "banner.jpg", "banner.png",
             "header.jpg", "header.png",
+            "Assets/Wide310x150Logo.png", "Assets/SplashScreen.png",
         ))
     except (OSError, ValueError):
         pass
