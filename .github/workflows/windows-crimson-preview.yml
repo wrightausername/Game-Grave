@@ -9,6 +9,7 @@ on:
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
       - 'tools/windows_crimson_ui_smoke.py'
+      - 'tools/windows_crimson_dpi_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
   pull_request:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
       - 'tools/windows_crimson_ui_smoke.py'
+      - 'tools/windows_crimson_dpi_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
 
 concurrency:
@@ -58,6 +60,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Crimson premium panels regression tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
+      - name: Verify 125 percent and 150 percent Windows UI scaling
+        shell: pwsh
+        run: |
+          $env:QT_SCALE_FACTOR = '1.25'
+          python tools/windows_crimson_dpi_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw '125% Windows layout smoke failed.' }
+          $env:QT_SCALE_FACTOR = '1.5'
+          python tools/windows_crimson_dpi_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw '150% Windows layout smoke failed.' }
+          Remove-Item Env:QT_SCALE_FACTOR
       - name: Upload actual Qt screen captures for design review
         uses: actions/upload-artifact@v4
         with:
