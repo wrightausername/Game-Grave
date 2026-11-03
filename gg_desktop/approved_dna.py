@@ -118,7 +118,7 @@ def render_approved_dna(window):
     page.content.insertWidget(2, bar)
 
     for graph in page.findChildren(RelationshipMap):
-        graph.setMinimumHeight(389)
+        graph.setMinimumHeight(312)
         graph.setToolTip(
             "Interactive evidence map. Click a node for source information, "
             "drag background to pan, use wheel or +/- to zoom. "
@@ -211,6 +211,18 @@ def render_approved_dna(window):
             page.content.removeWidget(candidate)
             candidate.hide()
             candidate.deleteLater()
+    # The long raw linked-path evidence belongs after the main actions;
+    # it must not push the three approved diagnostic cards below the fold.
+    linked_evidence = None
+    for idx in range(page.content.count()):
+        item = page.content.itemAt(idx)
+        w = item.widget() if item is not None else None
+        if w is not None:
+            labels = [part.text() for part in w.findChildren(QLabel)]
+            if any("DIRECTLY LINKED FILE LOCATIONS" in text for text in labels):
+                linked_evidence = w
+                page.content.removeWidget(w)
+                break
     page.content.addWidget(lower)
 
     action_strip = QFrame()
@@ -222,6 +234,16 @@ def render_approved_dna(window):
     actions.addWidget(button("View Mod Radar", lambda: window.navigate("Mods")))
     actions.addWidget(button("Review unknown files", lambda: window.navigate("Graveyard")))
     page.content.addWidget(action_strip)
+    if linked_evidence is not None:
+        page.content.addWidget(linked_evidence)
+
+    # Keep the map/inspector dominant without consuming the lower modules.
+    for idx in range(page.content.count()):
+        item = page.content.itemAt(idx)
+        w = item.widget() if item else None
+        if w is not None and w.findChildren(RelationshipMap):
+            w.setFixedHeight(408)
+            break
 
     if selectors:
         chooser = selectors[0]
