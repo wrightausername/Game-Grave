@@ -12,10 +12,10 @@ from PySide6.QtGui import (
     QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen,
     QPolygonF, QRadialGradient,
 )
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget, QFrame
 
 
-class CinematicToolArtwork(QWidget):
+class CinematicToolArtwork(QFrame):
     """Unique high-DPI art for Resurrection Kit, Save Vault and local AI."""
 
     def __init__(self, mode: str = "kit", parent=None):
