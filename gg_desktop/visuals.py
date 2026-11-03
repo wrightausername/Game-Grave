@@ -510,7 +510,7 @@ class RecoveryRoute(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setMinimumHeight(150)
+        self.setMinimumHeight(168)
         self.path = "Select a recovery record"
         self.state = "Not checked"
         self.setAccessibleName("Recovery route and verification status")
@@ -525,6 +525,43 @@ class RecoveryRoute(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
         p.fillRect(self.rect(), QColor("#0A1420"))
+        # A three-column route clipped the third step completely in the
+        # approved Undo right inspector, which is only ~300px wide on 1366px
+        # screens. Stack it vertically at narrow widths instead.
+        if w < 500:
+            steps = (
+                ("ORIGINAL", Path(self.path).name or "Unknown", CYAN),
+                ("RECYCLE BIN", "Verify with Windows", RED),
+                ("RESTORE", self.state, QColor("#70BAA6")),
+            )
+            for i, (heading, detail, color) in enumerate(steps):
+                y = 7 + i * 41
+                card = QRectF(8, y, max(80, w - 16), 35)
+                p.setBrush(QColor("#11232F"))
+                p.setPen(_pen("#3A5360", 1))
+                p.drawRoundedRect(card, 6, 6)
+                p.setPen(_pen(color, 2))
+                p.drawLine(QPointF(15, y + 6), QPointF(15, y + 29))
+                p.setPen(WHITE)
+                p.setFont(QFont("Segoe UI", 9, QFont.DemiBold))
+                p.drawText(QRectF(23, y + 7, min(93, w * .35), 20),
+                           Qt.AlignVCenter, heading)
+                p.setPen(MUTED)
+                p.setFont(QFont("Segoe UI", 9))
+                text_x = min(116, max(95, w * .38))
+                available = max(38, w - text_x - 18)
+                rendered = p.fontMetrics().elidedText(
+                    str(detail), Qt.ElideMiddle, int(available))
+                p.drawText(QRectF(text_x, y + 7, available, 20),
+                           Qt.AlignVCenter, rendered)
+            p.setPen(MUTED)
+            p.setFont(QFont("Segoe UI", 9))
+            p.drawText(QRectF(8, 131, max(80, w - 16), 33),
+                       Qt.AlignLeft | Qt.TextWordWrap,
+                       "Recovery requires an exact Windows Recycle Bin match; "
+                       "no expiry is guaranteed.")
+            p.end()
+            return
         slots = [(20, "ORIGINAL", Path(self.path).name or "Unknown"),
                  (w/3+10, "RECYCLE BIN", "Verify with Windows"),
                  (w*2/3+5, "RESTORE", self.state)]
