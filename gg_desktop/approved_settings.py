@@ -230,9 +230,13 @@ def render_approved_settings(window):
               (("Scan now", window.start_scan),
                ("Backup & restore", lambda: select(6))), compact=True),
     ]
+    # The approved 4x2 dashboard fits normal 100% desktop scaling. At
+    # elevated Windows DPI, 2x4 preserves readable card text without a
+    # horizontal scrollbar or cropped security controls.
+    columns = 2 if window.devicePixelRatioF() >= 1.12 else 4
     for i, card in enumerate(cards):
-        grid.addWidget(card, i // 4, i % 4)
-    for col in range(4):
+        grid.addWidget(card, i // columns, i % columns)
+    for col in range(columns):
         grid.setColumnStretch(col, 1)
     page.content.insertWidget(2, dashboard)
 
