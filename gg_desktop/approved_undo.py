@@ -31,13 +31,30 @@ def _text(text, color="#C3CDD7", *, size=11, bold=False, wrap=True):
 
 
 def _stat(title, value, tone):
+    from gg_desktop.visuals import nav_icon
     frame = QFrame()
     frame.setObjectName("approvedUndoStat")
-    stack = QVBoxLayout(frame)
-    stack.setContentsMargins(10, 5, 10, 6)
-    stack.setSpacing(3)
-    stack.addWidget(_text(title.upper(), "#BEC7D3", size=12, bold=True))
-    stack.addWidget(_text(value, tone, size=23, bold=True))
+    layout = QHBoxLayout(frame)
+    layout.setContentsMargins(10, 6, 10, 7)
+    layout.setSpacing(9)
+    icon_route = {
+        "Actions logged": "Undo Center",
+        "Files recorded": "Old Files",
+        "Logged moves": "Other Storage",
+        "Verified available": "Settings",
+        "Not yet checked": "Graveyard",
+    }.get(title, "Undo Center")
+    icon = QLabel()
+    icon.setPixmap(nav_icon(icon_route).pixmap(30, 30))
+    icon.setFixedSize(31,31)
+    layout.addWidget(icon)
+    text = QWidget()
+    col = QVBoxLayout(text)
+    col.setContentsMargins(0, 0, 0, 0)
+    col.setSpacing(2)
+    col.addWidget(_text(title.upper(), "#BEC7D3", size=11, bold=True))
+    col.addWidget(_text(value, tone, size=23, bold=True))
+    layout.addWidget(text, 1)
     return frame
 
 
