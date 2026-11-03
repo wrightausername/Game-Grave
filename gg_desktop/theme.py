@@ -610,3 +610,71 @@ QFrame#referenceHero, QFrame#hero {
 }
 QFrame#landscapeArt {background:transparent;border:0;border-radius:0;}
 """
+
+# Owner visual-system calibration: geometry, spacing and contrast are treated as
+# shared design tokens. No fake controls, metrics or behavior is introduced.
+STYLE += r"""
+QMainWindow, QWidget#appRoot, QWidget#scrollBody { background:#080D13; color:#F3F6FA; }
+QWidget { font-family:"Segoe UI Variable", "Segoe UI", Arial; font-size:13px; }
+QFrame#navRail, QWidget#navBody, QScrollArea#navScroll { background:#091019; }
+QPushButton#navButton {
+    font-size:15px; font-weight:550; color:#DEE4EB;
+    padding:7px 14px; min-height:29px;
+    text-align:left; border:0; border-radius:2px;
+}
+QPushButton#navButton:hover { background:#2A1722; color:#FFFFFF; }
+QPushButton#navButton[active="true"] {
+    color:#FFFFFF; font-weight:750; background:#631729;
+    border:0; border-left:3px solid #F34256;
+}
+QLineEdit#globalSearch {
+    background:#0B111A; color:#F1F5FB; font-size:14px;
+    min-height:31px; padding:6px 15px;
+    border:1px solid #303A47; border-radius:8px;
+}
+QLineEdit#globalSearch:focus {border:1px solid #A63248;}
+QFrame#panel, QFrame#dashboardPanel {
+    background:#0D141D; border:1px solid #293340; border-radius:9px;
+}
+QFrame#approvedOverviewPanel {background:transparent;border:0;border-right:1px solid #2A3340;border-radius:0;}
+QFrame#approvedOverviewPanel:last-child {border-right:0;}
+QFrame#approvedGraveStat,QFrame#approvedUndoStat,QFrame#approvedDNAMetric {
+    background:transparent;border:0;border-right:1px solid #2B3441;border-radius:0;
+}
+QFrame#approvedSettingsTabs {background:transparent;border:0;border-radius:0;}
+QPushButton#approvedSettingsTab {
+    font-size:13px; font-weight:700; min-height:31px;
+    border:1px solid #46515D; background:#111B26;
+    border-radius:7px;padding:7px 9px;color:#E6ECF3;
+}
+QPushButton#approvedSettingsTab[active="true"] {
+    border:1px solid #F24B5E; background:#A21E36; color:white;
+}
+QPushButton#approvedSettingsTab:hover {border-color:#E83E55;background:#40202F;color:white;}
+QPushButton#primary { min-height:33px; font-size:13px; font-weight:800;
+    background:#A51C32; border:1px solid #E4495E; color:white; }
+QPushButton#primary:hover { background:#C42C43; }
+QPushButton#danger {min-height:32px;font-weight:700;}
+QLabel#sectionTitle {color:#F3F5F9;font-size:16px;font-weight:800;}
+QLabel#eyebrow {font-size:12px;font-weight:800;color:#FF5971;}
+QLabel#caption {font-size:12px;color:#B0BBCB;}
+QLabel#subtle {font-size:12px;color:#ADB9C9;}
+QTableWidget {background:#090F18;border:1px solid #2D3B49;alternate-background-color:#111B27;}
+QTableWidget::item {padding:8px 9px;border-bottom:1px solid #25303A;}
+QTableWidget::item:selected {background:#8B2339;color:white;}
+QHeaderView::section {font-size:12px;font-weight:800;background:#121D27;color:#D9E5F0;
+    border-bottom:1px solid #3D4C5B;padding:8px;}
+QFrame#ggAccentPanel {
+    background:#111923;border:1px solid #303B48;border-radius:9px;
+}
+QFrame#ggAccentPanel[accent="red"] {border-top:2px solid #DB314D;}
+QFrame#ggAccentPanel[accent="cyan"] {border-top:2px solid #31D1DC;}
+QFrame#ggAccentPanel[accent="purple"] {border-top:2px solid #A86BE1;}
+QFrame#ggAccentPanel[accent="amber"] {border-top:2px solid #F1B154;}
+QFrame#ggAccentPanel[accent="green"] {border-top:2px solid #3BDB91;}
+QFrame#ggActionStrip {background:#101820;border:1px solid #263644;border-radius:9px;}
+QFrame#ggToolBanner {background:#0C1420;border:1px solid #5F344A;border-radius:9px;}
+QFrame#ggStatusChip {background:#131E29;border:1px solid #314454;border-radius:6px;}
+QFrame#ggEmptyHero {background:#101721;border:1px solid #30404C;border-radius:10px;}
+QFrame#ggAssistantCard {background:#0F1722;border:1px solid #354150;border-radius:9px;}
+"""
