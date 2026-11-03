@@ -214,16 +214,16 @@ class ScreenMethods(LockedPagesMixin):
         artwork.setObjectName("ggActionStrip")
         artwork_line = row(spacing=9, margins=(12, 8, 12, 8))
         artwork.setLayout(artwork_line)
-        artwork_line.addWidget(label(
-            "OFFICIAL GAME COVER ART", "sectionTitle"), 1)
-        artwork_line.addWidget(label(
-            "Real Steam posters, local cache first", "caption"))
+        artwork_line.addWidget(label("GAME COVER ART", "sectionTitle"), 1)
         artwork_line.addWidget(button(
-            "Get missing Steam covers", self._download_game_covers,
-            kind="primary",
-            tip="Downloads public Steam portraits only when clicked. "
-                "Pauses when a game is detected. Other launchers: select "
-                "a game and use Set cover image in its inspector."))
+            "Get Steam covers", self._download_game_covers, kind="primary",
+            tip="Downloads official Steam portraits from public app IDs "
+                "only when clicked. Pauses if a game is running."))
+        artwork_line.addWidget(button(
+            "Match other-store covers", self._download_other_game_covers,
+            tip="With your confirmation, sends game titles from non-Steam "
+                "installations to Steam's public search API. Accepts only "
+                "unique exact-title matches, never guessed art."))
         page.content.addWidget(artwork)
 
         # The artwork-led library and the selection inspector share one
@@ -352,6 +352,59 @@ class ScreenMethods(LockedPagesMixin):
                 self.navigate("Games")
             self.info("Steam artwork", message)
         self.job(download, finished, error_title="Cover retrieval failed")
+
+    def _download_other_game_covers(self):
+        """Explicitly consented Steam Store title lookup for other launchers."""
+        if getattr(self, "_cover_fetch_busy", False):
+            self.info("Artwork retrieval running",
+                      "Finish the current cover lookup first.")
+            return
+        from gg_desktop.local_art import game_cover_path
+        other = [g for g in self.inventory.games
+                 if g.launcher.casefold() != "steam" and not game_cover_path(g)]
+        if not other:
+            self.info("Covers already available",
+                      "All detected non-Steam games already have a local "
+                      "cover image, or no non-Steam games were discovered.")
+            return
+        if not self.confirm(
+                "Match game covers using Steam's public catalog?",
+                "Game Grave will send the game title of up to 8 non-Steam "
+                "installations to Steam's Store Search service. It will "
+                "accept only unique, exact-title matches and download "
+                "official Steam poster images when available.\n\n"
+                "Your install paths, game files, screenshots and saves "
+                "are not sent. Any unmatched game keeps its existing art. "
+                "Artwork retrieval stops if gameplay is detected.\n\n"
+                "Continue with these optional HTTPS requests?"):
+            return
+        self._cover_fetch_busy = True
+        self.status.setText(
+            "Checking exact title matches from Steam's public catalog…")
+        def worker(_emit):
+            from gg_desktop.artwork_download import (
+                download_matched_catalog_covers)
+            return download_matched_catalog_covers(other, limit=8)
+        def finished(report):
+            self._cover_fetch_busy = False
+            from gg_desktop.local_art import invalidate_cover_cache
+            invalidate_cover_cache()
+            msg = (
+                f"{report['downloaded']} exact-title cover(s) imported. "
+                f"{report['unmatched']} title(s) could not be matched or "
+                f"had no public portrait. {report['checked']} checked. "
+                "No game files were modified.\n\n"
+                "Steam Store images are not presented as publisher-provided "
+                "artwork for your other launcher.")
+            if report["paused_for_game"]:
+                msg += (
+                    "\n\nGame Grave stopped further requests because "
+                    "a game was detected.")
+            if self.current_route == "Games":
+                self.navigate("Games")
+            self.info("Matched game covers", msg)
+        self.job(worker, finished,
+                 error_title="Could not retrieve matched covers")
 
     def _refresh_games_gallery(self, rows):
         keys = tuple(g.key for g in rows[:9])
