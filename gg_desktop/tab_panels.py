@@ -56,30 +56,26 @@ class GraphicCard(QFrame):
 
 
 class GameCover(QFrame):
-    """Local-art game card using verified game records, never invented covers.
+    """Real portrait artwork where present, with a clearly labeled fallback."""
 
-    Steam cache posters (when present) are decoded locally and bounded. Other
-    launchers may provide an explicit cover in the game's installed root.
-    No remote API, no download and no placeholder pretending to be real art.
-    """
     def __init__(self, game, on_selected):
         super().__init__()
         self.game = game
         self._select = on_selected
         self.setObjectName("gameCover")
-        self.setFixedHeight(211)
-        self.setMinimumWidth(195)
+        self.setFixedSize(180, 288)
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip(f"{game.name}\n{game.launcher}\n{game.install_path}")
+        self.setToolTip(
+            game.name + "\n" + game.launcher + "\n" + game.install_path)
         self.setAccessibleName("Select game: " + game.name)
-        layout = _layout(self, pad=(7, 7, 7, 8), gap=4)
+        layout = _layout(self, pad=(7, 7, 7, 7), gap=5)
         art = QLabel()
         art.setObjectName("gameCoverArt")
         art.setAlignment(Qt.AlignCenter)
-        art.setFixedHeight(134)
-        art.setMinimumWidth(185)
+        art.setFixedSize(164, 202)
         from gg_desktop.local_art import game_cover_path
         source = game_cover_path(game)
+        loaded = False
         if source:
             reader = QImageReader(source)
             reader.setAutoTransform(True)
@@ -87,80 +83,85 @@ class GameCover(QFrame):
             if (size.isValid() and 0 < size.width() <= 8192
                     and 0 < size.height() <= 8192
                     and size.width() * size.height() <= 32_000_000):
-                scale = min(1.0, 420 / max(size.width(), size.height()))
-                if scale < 1:
+                downscale = min(1.0, 620 / max(size.width(), size.height()))
+                if downscale < 1:
                     reader.setScaledSize(QSize(
-                        max(1, round(size.width() * scale)),
-                        max(1, round(size.height() * scale))))
+                        max(1, round(size.width() * downscale)),
+                        max(1, round(size.height() * downscale))))
                 image = reader.read()
                 if not image.isNull():
-                    pixmap = QPixmap.fromImage(image).scaled(
-                        290, 134, Qt.KeepAspectRatioByExpanding,
-                        Qt.SmoothTransformation)
-                    art.setPixmap(pixmap)
-                    art.setToolTip("Local artwork: " + source)
-        if art.pixmap() is None or art.pixmap().isNull():
-            # Original game-styled art, clearly marked as a generated fallback.
+                    art.setPixmap(QPixmap.fromImage(image).scaled(
+                        164, 202, Qt.KeepAspectRatioByExpanding,
+                        Qt.SmoothTransformation))
+                    art.setToolTip("Real local game cover: " + source)
+                    loaded = True
+        if not loaded:
             from gg_desktop.poster_art import generated_game_poster
-            art.setPixmap(generated_game_poster(game.name, 265, 134))
-            art.setToolTip("Original Game Grave artwork, not an official game cover")
-        layout.addWidget(art)
-        name = QLabel(game.name)
-        name.setObjectName("findingTitle")
-        name.setWordWrap(True)
-        name.setMaximumHeight(39)
-        layout.addWidget(name)
-        launcher = _small(game.launcher)
-        launcher.setStyleSheet("color:#64D2EC;")
+            art.setPixmap(generated_game_poster(game.name, 164, 202))
+            art.setToolTip(
+                "Game Grave generated placeholder. Use Get Steam Covers "
+                "or Set Cover Image for genuine artwork.")
+        layout.addWidget(art, 0, Qt.AlignCenter)
+        title = QLabel(game.name)
+        title.setObjectName("gameCoverTitle")
+        title.setWordWrap(True)
+        title.setMaximumHeight(35)
+        title.setToolTip(game.name)
+        layout.addWidget(title)
+        launcher = QLabel(game.launcher)
+        launcher.setObjectName("gameCoverLauncher")
+        launcher.setToolTip(game.launcher)
         layout.addWidget(launcher)
-        value = (human_size(game.size_bytes)
-                 if game.size_bytes is not None else "Size unknown")
-        layout.addWidget(_small(value))
         layout.addStretch()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton and self.rect().contains(event.pos()):
             self._select()
+            event.accept()
+            return
         super().mouseReleaseEvent(event)
 
 
-def game_gallery(games, selected_callback, *, limit=9, empty_message=None):
-    """Artwork-led game library grid, backed only by actual installations.
-
-    The full searchable record table remains below. This is visual navigation,
-    not an alternative data source or storage-deletion authority.
-    """
+def game_gallery(games, selected_callback, *, limit=12, empty_message=None):
+    """Scrollable Steam-style portrait shelf, backed only by scanned games."""
     section = QFrame()
     section.setObjectName("referenceLibrary")
-    section.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
-    layout = _layout(section, gap=10)
-    layout.addWidget(_small("YOUR GAME LIBRARY  •  VERIFIED INSTALLATIONS",
-                            "sectionTitle"))
+    section.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+    layout = _layout(section, pad=(13, 12, 13, 11), gap=8)
     layout.addWidget(_small(
-        "Select a cover to inspect its verified install and actions. "
-        "Artwork is loaded from local caches when available."))
+        "YOUR GAME LIBRARY  /  ALL LAUNCHERS", "sectionTitle"))
+    layout.addWidget(_small(
+        "Portrait covers from Steam's local library, your chosen image, "
+        "or an explicitly requested official Steam download. "
+        "Select a card to inspect its game."))
     if not games:
         layout.addWidget(_small(
-            empty_message or "No verified games yet. Run Scan PC to populate the library."))
+            empty_message or
+            "No verified games yet. Run Scan PC to populate the library."))
         return section
+
+    shelf_area = QScrollArea()
+    shelf_area.setObjectName("gameCoverShelf")
+    shelf_area.setFrameShape(QFrame.NoFrame)
+    shelf_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+    shelf_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    shelf_area.setWidgetResizable(False)
+    shelf_area.setFixedHeight(318)
     shelf = QWidget()
-    row_count = (min(len(games), limit) + 2) // 3
-    shelf.setFixedHeight(row_count * 211 + max(0, row_count - 1) * 11 + 8)
-    grid = QGridLayout(shelf)
-    grid.setContentsMargins(0, 5, 0, 3)
-    grid.setHorizontalSpacing(10)
-    grid.setVerticalSpacing(11)
-    for index, game in enumerate(games[:limit]):
-        grid.addWidget(GameCover(game,
-                       lambda g=game: selected_callback(g)),
-                       index // 3, index % 3)
-    for col in range(3):
-        grid.setColumnStretch(col, 1)
-    layout.addWidget(shelf, 0, Qt.AlignTop)
+    count = min(len(games), limit)
+    shelf.setFixedSize(count * 190 + 4, 295)
+    line = QHBoxLayout(shelf)
+    line.setContentsMargins(0, 2, 0, 2)
+    line.setSpacing(10)
+    for game in games[:count]:
+        line.addWidget(GameCover(
+            game, lambda g=game: selected_callback(g)))
+    shelf_area.setWidget(shelf)
+    layout.addWidget(shelf_area)
     if len(games) > limit:
         layout.addWidget(_small(
-            f"Showing {limit} of {len(games)} verified games. "
-            "Use search and the full list below for the rest."))
+            f"Showing {count} of {len(games)} verified installations. "
+            "Search or sort the complete list to see additional covers."))
     return section
 
 
