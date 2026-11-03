@@ -747,8 +747,7 @@ QLabel#gameCoverLauncher {
     background:transparent; color:#80CBDD;
     font-size:11px; font-weight:750;
 }
-QScrollArea#gameCoverShelf,
-QScrollArea#gameCoverShelf QWidget {
+QScrollArea#gameCoverShelf {
     background:transparent; border:0;
 }
 QScrollBar:horizontal {
