@@ -55,21 +55,37 @@ def _txt(text, role=None, *, size=None, color=None, bold=False, wrap=False):
 
 
 def _panel(title, *, subtitle=None):
+    from gg_desktop.visuals import nav_icon
     shell = QFrame()
     shell.setObjectName("approvedOverviewPanel")
-    col = _stack(shell, margin=(14, 12, 14, 12), gap=7)
-    col.addWidget(_txt(title, size=15, color="#F1F3F8", bold=True))
+    col = _stack(shell, margin=(8, 6, 15, 8), gap=6)
+    heading = QWidget()
+    headings = _line(heading, gap=8)
+    related = ("Undo Center" if "RECYCLE" in title or "ACTIVITY" in title
+               else "Games" if "LIBRARY" in title else "Graveyard")
+    glyph = QLabel()
+    glyph.setPixmap(nav_icon(related).pixmap(26, 26))
+    glyph.setFixedSize(28, 28)
+    headings.addWidget(glyph)
+    headings.addWidget(_txt(title.title(), size=20, color="#F6F7FB", bold=True), 1)
+    col.addWidget(heading)
     if subtitle:
-        col.addWidget(_txt(subtitle, size=10, color="#9BA9B9", wrap=True))
+        caption = _txt(subtitle, size=11, color="#ADB8C8", wrap=True)
+        col.addWidget(caption)
     return shell, col
 
 
 def _compact_action(text, handler, *, secondary=""):
-    action = QPushButton(text + ("   ›" if not text.endswith("›") else ""))
-    action.setObjectName("approvedAction")
-    action.setAccessibleName(text)
     if secondary:
-        action.setToolTip(secondary)
+        action = QPushButton(str(text) + "\n" + str(secondary))
+        action.setMinimumHeight(48)
+        action.setToolTip(str(secondary))
+        action.setProperty("multiLine", True)
+    else:
+        action = QPushButton(str(text) + "   ›")
+        action.setMinimumHeight(34)
+    action.setObjectName("approvedAction")
+    action.setAccessibleName(str(text))
     action.clicked.connect(handler)
     return action
 
@@ -133,20 +149,29 @@ def _monthly_moves():
 
 
 def _metric(label_text, value, accent, route, handler, description):
+    from gg_desktop.visuals import nav_icon
     tile = QPushButton()
-    # Buttons do not automatically size to a nested widget layout on all
-    # Windows Qt styles. An explicit height prevents clipped metric values.
-    tile.setMinimumHeight(75)
-    tile.setMaximumHeight(80)
+    tile.setMinimumHeight(82)
+    tile.setMaximumHeight(93)
     tile.setObjectName("approvedMetric")
     tile.setAccessibleName(label_text + ": " + str(value) + ". " + description)
     tile.setToolTip(description)
-    col = _stack(tile, margin=(9, 5, 9, 5), gap=3)
-    name = _txt(label_text.upper(), size=10, color="#AEB8C6", bold=True)
-    amount = _txt(value, size=20, color=accent, bold=True)
-    col.addWidget(name)
-    col.addWidget(amount)
-    tile.clicked.connect(lambda _=False: handler(route))
+    tile.setStyleSheet(
+        "QPushButton#approvedMetric{background:transparent;border:0;"
+        "border-bottom:2px solid " + accent + ";border-radius:0;"
+        "text-align:left;padding:5px;}"
+        "QPushButton#approvedMetric:hover{background:#18202B;}")
+    frame = _line(tile, margin=(6, 7, 6, 7), gap=12)
+    glyph = QLabel()
+    glyph.setFixedSize(37, 37)
+    glyph.setPixmap(nav_icon(route).pixmap(35,35))
+    frame.addWidget(glyph)
+    details = QWidget()
+    col = _stack(details, gap=1)
+    col.addWidget(_txt(label_text.upper(), size=11, color="#CAD2DB", bold=True))
+    col.addWidget(_txt(value, size=23, color=accent, bold=True))
+    frame.addWidget(details, 1)
+    tile.clicked.connect(lambda _checked=False: handler(route))
     return tile
 
 
@@ -156,14 +181,14 @@ def _cover(game, open_game):
     holder.setObjectName("approvedCover")
     holder.setMinimumWidth(132)
     holder.setMaximumWidth(165)
-    holder.setFixedHeight(167)
+    holder.setFixedHeight(184)
     holder.setToolTip(game.name + "\n" + game.launcher
                       + "\nCover from local cache if available")
     holder.setAccessibleName("Inspect " + game.name)
     outer = _stack(holder, margin=(5, 5, 5, 6), gap=4)
     art = QLabel()
     art.setAlignment(Qt.AlignCenter)
-    art.setFixedHeight(113)
+    art.setFixedHeight(129)
     art.setMinimumWidth(118)
     from gg_desktop.local_art import game_cover_path
     source = game_cover_path(game)
@@ -179,17 +204,17 @@ def _cover(game, open_game):
             image = reader.read()
             if not image.isNull():
                 pixmap = QPixmap.fromImage(image).scaled(
-                    140, 113, Qt.KeepAspectRatioByExpanding,
+                    148, 129, Qt.KeepAspectRatioByExpanding,
                     Qt.SmoothTransformation)
     if pixmap is None:
         from gg_desktop.poster_art import generated_game_poster
-        pixmap = generated_game_poster(game.name, 140, 113)
+        pixmap = generated_game_poster(game.name, 148, 129)
         art.setToolTip("Original Game Grave placeholder, not official box art")
     else:
         art.setToolTip("Locally verified artwork for " + game.name)
     art.setPixmap(pixmap)
     outer.addWidget(art)
-    title = _txt(game.name, size=11, color="#EDF1F7", bold=True)
+    title = _txt(game.name, size=12, color="#EDF1F7", bold=True)
     title.setMaximumHeight(33)
     title.setWordWrap(True)
     outer.addWidget(title)
@@ -200,7 +225,7 @@ def _cover(game, open_game):
 def render_approved_overview(window):
     """Construct the approved Overview without fabricated game or disk data."""
     page = window.page_for("Overview")
-    page.content.setSpacing(11)
+    page.content.setSpacing(9)
     page.content.setContentsMargins(12, 7, 12, 16)
 
     hero = HeroBanner(title="Overview",
@@ -218,7 +243,7 @@ def render_approved_overview(window):
     files = window.inventory.files
     captures = len(window.inventory.screenshots) + len(window.inventory.recordings)
     metrics = QWidget()
-    metrics.setMinimumHeight(80)
+    metrics.setMinimumHeight(91)
     metrics.setObjectName("approvedMetrics")
     mrow = _line(metrics, gap=8)
     values = (
@@ -326,7 +351,7 @@ def render_approved_overview(window):
         shelf.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         shelf.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         shelf.setWidgetResizable(True)
-        shelf.setMinimumHeight(192)
+        shelf.setMinimumHeight(207)
         row_widget = QWidget()
         row = _line(row_widget, gap=9)
         row.setAlignment(Qt.AlignLeft)
