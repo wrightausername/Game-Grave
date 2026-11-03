@@ -382,7 +382,7 @@ def render_approved_overview(window):
         for game in games[:16]:
             row.addWidget(_cover(game, inspect))
         # This is a real workflow tile, never an invented game cover.
-        discover = QPushButton("+\nADD A LIBRARY\n\nDetect games on another drive")
+        discover = QPushButton("+\nADD A LIBRARY\n\nScan more drives")
         discover.setObjectName("approvedDiscoveryTile")
         discover.setAccessibleName("Configure another game library")
         discover.setToolTip("Open local scan and library Settings")
