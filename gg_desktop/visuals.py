@@ -388,84 +388,147 @@ class RelationshipMap(QWidget):
                        self.height()*.51 + self.pan_y)
 
     def paintEvent(self, event):
+        # Eight source-aware groups painted as an atmospheric evidence map.
+        # No animation, game injection or simulated patch findings.
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         p.setRenderHint(QPainter.TextAntialiasing)
         w, h = self.width(), self.height()
-        p.fillRect(self.rect(), QColor("#080F1A"))
+        bg = QLinearGradient(0, 0, w, h)
+        bg.setColorAt(0, QColor("#07111B"))
+        bg.setColorAt(.58, QColor("#101525"))
+        bg.setColorAt(1, QColor("#090C17"))
+        p.fillRect(self.rect(), bg)
         center = self._center()
-        rx = max(100, min(270, w * .30)) * self.zoom
-        ry = max(84, min(156, h * .37)) * self.zoom
+        rx = max(145, min(305, w * .315)) * self.zoom
+        ry = max(118, min(181, h * .34)) * self.zoom
 
-        # Sparse radar chart background is useful orientation, not fake metrics.
-        p.setPen(_pen("#112735", 1))
-        for step in range(45, int(w), 45):
-            p.drawLine(step, 0, step, h)
-        for step in range(40, int(h), 40):
-            p.drawLine(0, step, w, step)
-        p.setPen(_pen("#1F3B49", 1))
-        for fraction in (0.6, 0.9, 1.13):
+        # Wide concentric red glow, restrained cyan radar and fine grid.
+        halo = QRadialGradient(center, max(w*.42, 190))
+        halo.setColorAt(0, QColor(224, 35, 67, 119))
+        halo.setColorAt(.28, QColor(155, 28, 56, 61))
+        halo.setColorAt(.65, QColor(33, 39, 68, 17))
+        halo.setColorAt(1, QColor(3, 8, 16, 0))
+        p.fillRect(self.rect(), halo)
+        p.setPen(_pen("#1B2A3C", .65))
+        for x in range(0, int(w), 42):
+            p.drawLine(QPointF(x, 0), QPointF(x, h))
+        for y in range(0, int(h), 42):
+            p.drawLine(QPointF(0, y), QPointF(w, y))
+        for idx, fraction in enumerate((.53, .81, 1.13, 1.35)):
+            p.setPen(_pen("#6A263A" if idx % 2 else "#1A5368",
+                          1 if idx != 1 else 1.6))
             p.drawEllipse(center, rx*fraction, ry*fraction)
-        p.setPen(_pen("#4D2839", 2))
-        p.drawEllipse(center, 99, 87)
-        p.setPen(_pen("#76263B", 2))
-        p.drawEllipse(center, 94, 82)
-        p.setPen(_pen("#FF4055", 3))
-        p.setBrush(QColor("#23121E"))
-        p.drawRoundedRect(QRectF(center.x()-82, center.y()-61, 164, 120), 16, 16)
-        p.setPen(QColor("#FF4055"))
-        p.setFont(QFont("Segoe UI", 10, QFont.Black))
-        p.drawText(QRectF(center.x()-75, center.y()-51, 150, 22),
-                   Qt.AlignCenter, "GAME CORE")
-        p.setPen(WHITE)
-        p.setFont(QFont("Segoe UI", 10, QFont.DemiBold))
-        p.drawText(QRectF(center.x()-73, center.y()-25, 146, 66),
-                   Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
 
+        # Radial traces are differentiated: solid indicates source evidence;
+        # dashed is unresolved/independent, never permission to delete.
         self.positions = {}
-        node_radius_x, node_radius_y = rx, ry
+        entries = []
         for i, name in enumerate(self.NODE_TYPES):
-            angle = (-math.pi/2) + (i * math.pi*2 / len(self.NODE_TYPES))
-            x = center.x() + math.cos(angle)*node_radius_x
-            y = center.y() + math.sin(angle)*node_radius_y
+            angle = (-math.pi/2) + i * 2*math.pi / len(self.NODE_TYPES)
+            x = center.x() + math.cos(angle)*rx
+            y = center.y() + math.sin(angle)*ry
             color = QColor(self.NODE_COLORS[i])
-            unknown = any(token in self.states.get(name, "Unverified").casefold()
-                          for token in ("unknown", "unverified", "protected", "independent"))
-            path = QPainterPath()
-            path.moveTo(center)
-            bend = QPointF((center.x() + x)*.5 + math.sin(angle)*27,
-                            (center.y() + y)*.5 - math.cos(angle)*12)
-            path.quadTo(bend, QPointF(x,y))
-            pen = _pen(color if not unknown else "#425867", 2)
-            if unknown:
-                pen.setStyle(Qt.DashLine)
-            p.setPen(pen)
+            state = self.states.get(name, "Not verified")
+            uncertain = any(term in state.casefold() for term in (
+                "unknown", "unverified", "protected", "independent"))
+            path = QPainterPath(center)
+            bend = QPointF((center.x()+x)/2 + math.sin(angle)*32,
+                           (center.y()+y)/2 - math.cos(angle)*15)
+            path.quadTo(bend, QPointF(x, y))
+            entries.append((name, x, y, color, uncertain, state, path))
+
+        # Dim outer strokes followed by bright core for optical depth.
+        for name, x, y, color, uncertain, state, path in entries:
+            outline = QColor(color)
+            outline.setAlpha(70 if uncertain else 105)
+            glow_pen = QPen(outline, 8, Qt.SolidLine,
+                           Qt.RoundCap, Qt.RoundJoin)
             p.setBrush(Qt.NoBrush)
+            p.setPen(glow_pen)
+            p.drawPath(path)
+            stroke = QColor("#55748A") if uncertain else QColor(color)
+            line = QPen(stroke, 2.1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+            if uncertain:
+                line.setStyle(Qt.DashLine)
+            p.setPen(line)
             p.drawPath(path)
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(color))
-            p.drawEllipse(QPointF(x, y), 3.5, 3.5)
+            p.setBrush(color)
+            p.drawEllipse(QPointF(x, y), 4.1, 4.1)
 
-            box = QRectF(x-72, y-30, 144, 60)
-            self.positions[name] = box
+        # Central game identity is selected from actual scan records.
+        for radius, alpha in ((108, 24), (101, 35), (94, 75)):
+            ring = QColor("#FA3658")
+            ring.setAlpha(alpha)
+            p.setPen(QPen(ring, 3.5))
+            p.setBrush(Qt.NoBrush)
+            p.drawEllipse(center, radius, radius*.81)
+        middle = QRectF(center.x()-97, center.y()-73, 194, 146)
+        middle_bg = QLinearGradient(middle.topLeft(), middle.bottomRight())
+        middle_bg.setColorAt(0, QColor("#4C172C"))
+        middle_bg.setColorAt(.56, QColor("#201522"))
+        middle_bg.setColorAt(1, QColor("#0C1B2A"))
+        p.setPen(QPen(QColor("#FF4D68"), 2.4))
+        p.setBrush(middle_bg)
+        p.drawRoundedRect(middle, 17, 17)
+        p.setPen(QPen(QColor("#E62E4F"), 1.3))
+        p.drawLine(QPointF(center.x()-63,center.y()-40),
+                   QPointF(center.x()+63,center.y()-40))
+        p.setPen(QColor("#F34A64"))
+        p.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        p.drawText(QRectF(center.x()-87, center.y()-67, 174, 25),
+                   Qt.AlignCenter, "GAME DNA")
+        p.setPen(WHITE)
+        p.setFont(QFont("Segoe UI", 13, QFont.DemiBold))
+        p.drawText(QRectF(center.x()-84,center.y()-31,168,76),
+                   Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
+        p.setPen(QColor("#B8D7E4"))
+        p.setFont(QFont("Segoe UI", 9))
+        p.drawText(QRectF(center.x()-87,center.y()+45,174,20),
+                   Qt.AlignCenter, "SCANNED RELATIONSHIPS")
+
+        # Large readable cards, bounded to the workspace at ordinary zoom.
+        for name, x, y, color, uncertain, state, path in entries:
             active = name == self.active
-            p.setBrush(QColor("#371522" if active else "#14232F"))
-            p.setPen(_pen(color if active else "#405868", 2 if active else 1.2))
-            p.drawRoundedRect(box, 10, 10)
+            box_w, box_h = (145, 66)
+            box = QRectF(x-box_w/2, y-box_h/2, box_w, box_h)
+            self.positions[name] = box
+            if active:
+                highlight = QColor(color)
+                highlight.setAlpha(56)
+                p.setPen(QPen(highlight, 8))
+                p.setBrush(Qt.NoBrush)
+                p.drawRoundedRect(box.adjusted(-1,-1,1,1), 9, 9)
+            base = QLinearGradient(box.topLeft(), box.bottomRight())
+            base.setColorAt(0, QColor("#243344") if active else QColor("#142A39"))
+            base.setColorAt(1, QColor("#341725") if active else QColor("#101824"))
+            p.setBrush(base)
+            p.setPen(QPen(color if active else QColor("#506779"),
+                          2.0 if active else 1.3))
+            p.drawRoundedRect(box, 9, 9)
+            p.setPen(QPen(color, 3, Qt.SolidLine, Qt.RoundCap))
+            p.drawLine(QPointF(box.x()+12,box.y()+11),
+                       QPointF(box.x()+28,box.y()+11))
             p.setPen(WHITE)
-            p.setFont(QFont("Segoe UI", 10, QFont.DemiBold))
-            p.drawText(QRectF(box.x()+7, box.y()+6, box.width()-14, 22),
-                       Qt.AlignCenter, name)
-            p.setPen(color if active else MUTED)
-            p.setFont(QFont("Segoe UI", 8))
-            p.drawText(QRectF(box.x()+6, box.y()+29, box.width()-12, 26),
-                       Qt.AlignCenter | Qt.TextWordWrap,
-                       self.states.get(name, "Not verified"))
-        # Small graph legend with truth-based link meanings
-        p.setFont(QFont("Segoe UI", 8))
-        p.setPen(QColor("#86A3B6"))
-        p.drawText(QRectF(10, h-27, w-20, 22), Qt.AlignLeft,
-                   "Solid: linked to this game     - -  Dashed: unresolved / independent")
+            p.setFont(QFont("Segoe UI", 11, QFont.DemiBold))
+            p.drawText(QRectF(box.x()+8,box.y()+14,box.width()-16,22),
+                       Qt.AlignCenter,name)
+            p.setPen(QColor("#7BDFBA") if not uncertain else QColor("#B4AEBB"))
+            p.setFont(QFont("Segoe UI", 9))
+            short = p.fontMetrics().elidedText(str(state), Qt.ElideRight, 132)
+            p.drawText(QRectF(box.x()+7,box.y()+39,box.width()-14,20),
+                       Qt.AlignCenter,short)
+
+        # Explicit evidence legend. Never promises that a link is removable.
+        p.setBrush(QColor(7, 12, 19, 223))
+        p.setPen(Qt.NoPen)
+        p.drawRoundedRect(QRectF(8,h-29,max(100,w-16),24),4,4)
+        p.setPen(QColor("#A2B9C9"))
+        p.setFont(QFont("Segoe UI", 9))
+        p.drawText(QRectF(16,h-25,max(50,w-32),18), Qt.AlignVCenter,
+                   "━━ Verified source link       - - - Unresolved / independent"
+                   "       Select a node for evidence")
         p.end()
 
     def mousePressEvent(self, event):
