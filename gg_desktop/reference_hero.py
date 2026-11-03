@@ -80,8 +80,8 @@ class ReferenceHero(SceneHeader):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.width()
-        self.title_overlay.setGeometry(24, 17, max(150, w - 52), 48)
-        self.subtitle_overlay.setGeometry(26, 65, max(150, w - 55), 44)
+        self.title_overlay.setGeometry(43, 17, max(150, w - 70), 48)
+        self.subtitle_overlay.setGeometry(44, 65, max(150, w - 76), 44)
         self.metrics.setGeometry(18, 143, max(250, w - 36), 71)
 
     def paintEvent(self, event):
@@ -111,9 +111,7 @@ class ReferenceHero(SceneHeader):
         bottom.setColorAt(1, QColor(6, 6, 11, 193))
         p.fillRect(full, bottom)
         p.restore()
-        p.setPen(QPen(QColor("#96243B"), 1))
-        p.setBrush(Qt.NoBrush)
-        p.drawRoundedRect(full.adjusted(.5, .5, -.5, -.5), 11, 11)
-        p.setPen(QPen(QColor("#E83250"), 2))
-        p.drawLine(20, h - 1, min(w - 20, w * .45), h - 1)
+        # Owner reference uses a slim red title accent, not a neon outline.
+        p.setPen(QPen(QColor("#EF334F"), 5, Qt.SolidLine, Qt.RoundCap))
+        p.drawLine(27, 31, 18, 91)
         p.end()
