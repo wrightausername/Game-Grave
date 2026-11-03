@@ -70,9 +70,12 @@ def render_approved_graveyard(window):
     page = window.page_for("Graveyard")
     page.content.setContentsMargins(11, 7, 11, 16)
     page.content.setSpacing(10)
-    page.content.addWidget(ReferenceHero(
+    hero = ReferenceHero(
         "graveyard", "Graveyard",
-        "Find and review old gaming files. You decide what gets removed."))
+        "Find and review old gaming files. You decide what gets removed.")
+    hero.setMinimumHeight(151)
+    hero.setMaximumHeight(151)
+    page.content.addWidget(hero)
     if not window.inventory.scanned_at:
         window._not_scanned(page)
         return page
@@ -146,7 +149,7 @@ def render_approved_graveyard(window):
         "SIZE", "AGE", "REVIEW STATUS"])
     window.grave_table.setSelectionBehavior(QAbstractItemView.SelectRows)
     window.grave_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-    for idx, width in enumerate((178, 112, 150, 80, 75, 132)):
+    for idx, width in enumerate((178, 112, 150, 80, 95, 143))
         window.grave_table.setColumnWidth(idx, width)
     window.grave_table.horizontalHeader().setStretchLastSection(True)
     window.grave_table.setMinimumHeight(292)
@@ -172,7 +175,7 @@ def render_approved_graveyard(window):
     icol.addWidget(details_scroll, 1)
     window.grave_detail = details_col
     main_row.addWidget(inspector, 3)
-    main.setMinimumHeight(363)
+    main.setFixedHeight(353)
     page.content.addWidget(main)
 
     def selected():
