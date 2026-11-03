@@ -8,6 +8,7 @@ on:
       - 'gg_desktop/**'
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
+      - 'tests/test_library_visuals.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - 'tools/windows_crimson_dpi_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
@@ -17,6 +18,7 @@ on:
       - 'gg_desktop/**'
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
+      - 'tests/test_library_visuals.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - 'tools/windows_crimson_dpi_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
@@ -58,6 +60,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python -m unittest tests.test_crimson_premium_panels -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson premium panels regression tests failed.' }
+          python -m unittest tests.test_library_visuals -v
+          if ($LASTEXITCODE -ne 0) { throw 'Real artwork and library sort tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
       - name: Verify 125 percent and 150 percent Windows UI scaling
