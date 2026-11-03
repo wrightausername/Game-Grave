@@ -385,7 +385,7 @@ class RelationshipMap(QWidget):
 
     def _center(self):
         return QPointF(self.width()*.50 + self.pan_x,
-                       self.height()*.51 + self.pan_y)
+                       self.height()*.48 + self.pan_y)
 
     def paintEvent(self, event):
         # Eight source-aware groups painted as an atmospheric evidence map.
@@ -401,7 +401,9 @@ class RelationshipMap(QWidget):
         p.fillRect(self.rect(), bg)
         center = self._center()
         rx = max(145, min(305, w * .315)) * self.zoom
-        ry = max(118, min(181, h * .34)) * self.zoom
+        # Keep lowest node clear of the source-verification legend on
+        # compact Windows screens, while retaining pan/zoom interaction.
+        ry = max(82, min(153, h * .27)) * self.zoom
 
         # Wide concentric red glow, restrained cyan radar and fine grid.
         halo = QRadialGradient(center, max(w*.42, 190))
