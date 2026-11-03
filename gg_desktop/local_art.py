@@ -145,6 +145,8 @@ def _cover_path(launcher: str, app_id: str, install_path: str,
         base / "custom" / f"{stable_key}.jpg",
         base / "custom" / f"{stable_key}.png",
         base / "custom" / f"{stable_key}.webp",
+        # Explicitly requested Steam Store title match for other launchers.
+        base / "catalog-match" / f"{stable_key}.jpg",
     ]
     if launcher.casefold() == "steam" and app_id.isascii() and (
             app_id.isdecimal() and len(app_id) <= 12):
