@@ -209,7 +209,7 @@ class ScreenMethods(LockedPagesMixin):
         # local cache assets, including 2026 content-hash directories. Other
         # launchers can receive a user-provided poster in the inspector.
         from gg_desktop.library_graphics import LauncherMixGraphic
-        page.content.addWidget(LauncherMixGraphic(self.inventory.games))
+        launcher_mix = LauncherMixGraphic(self.inventory.games)
         artwork = QFrame()
         artwork.setObjectName("ggActionStrip")
         artwork_line = row(spacing=9, margins=(12, 8, 12, 8))
@@ -224,8 +224,10 @@ class ScreenMethods(LockedPagesMixin):
             tip="With your confirmation, sends game titles from non-Steam "
                 "installations to Steam's public search API. Accepts only "
                 "unique exact-title matches, never guessed art."))
-        page.content.addWidget(artwork)
-
+        # Real covers and the live inspector take precedence above the fold.
+        # Secondary launcher analytics and art download utilities follow it,
+        # preserving the owner's art-first Games reference.
+        
         # The artwork-led library and the selection inspector share one
         # workspace. All detail actions still call the existing safe APIs.
         game_workspace = QWidget()
@@ -250,6 +252,8 @@ class ScreenMethods(LockedPagesMixin):
         self._gallery_keys = None
         game_left_col.addWidget(self.game_gallery_frame)
         page.content.addWidget(game_workspace)
+        page.content.addWidget(artwork)
+        page.content.addWidget(launcher_mix)
         p, pcol = panel()
         self.game_table = data_table(["GAME", "LAUNCHER", "SIZE", "LAST PLAYED", "EVIDENCE"])
         self.game_table.setColumnWidth(0, 245)
