@@ -133,7 +133,7 @@ class LockedPagesMixin:
             return shown[pos] if 0 <= pos < len(shown) else None
 
         def refill(*_):
-            nonlocal shown
+            nonlocal shown, gallery
             selected = selected_game()
             key = selected.key if selected else None
             candidates = filter_game_records(
@@ -208,8 +208,7 @@ class LockedPagesMixin:
         # Portrait artwork is a genuine navigational view of the very same
         # installation records; screenshots never use imaginary game names.
         gallery = game_gallery(
-            sort_game_records(self.inventory.games, DEFAULT_SORT),
-            inspect_game, limit=8)
+            [], inspect_game, limit=8)
         gallery.setObjectName("readyRoomCoverStrip")
         col.addWidget(gallery)
         body.addWidget(left, 7)
