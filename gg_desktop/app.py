@@ -318,6 +318,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             from gg_desktop.approved_settings import render_approved_settings
             render_approved_settings(self)
             return
+        if route == "More Tools":
+            from gg_desktop.approved_more_tools import render_approved_more_tools
+            render_approved_more_tools(self)
+            return
         methods = {
             "Overview": self.overview_page,
             "Ready Room": self.ready_room_page,
