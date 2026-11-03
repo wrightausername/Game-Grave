@@ -176,8 +176,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.sidebar_art = LandscapeArt(224, scene="footer")
         footer_layout = column(margins=(14, 22, 12, 4))
         self.sidebar_art.setLayout(footer_layout)
-        footer_layout.addWidget(label(
-            "KEEP THE GAMES.\\nLOSE THE CLUTTER.", "caption", wrap=True))
+        # Approved sidebar forest should remain atmospheric, not print
+        # decorative slogans over the artwork.
         footer_layout.addStretch()
         self.sidebar_art.setVisible(self.height() >= 795)
         r.addWidget(self.sidebar_art)
