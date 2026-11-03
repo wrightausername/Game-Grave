@@ -139,18 +139,20 @@ jobs:
           if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
           if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
           Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
-      - name: Upload Crimson screenshot and Windows engineering EXE
+      - name: Upload verified Windows installer only for direct testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Cinematic-Windows-Installer-Unsigned
+          path: |
+            release/GameGrave-Crimson-Preview-Setup.exe
+            release/GameGrave-Crimson-Preview-Setup.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload standalone engineering EXE separately
         uses: actions/upload-artifact@v4
         with:
           name: GameGrave-Crimson-Qt-Preview-Unsigned
-          path: |
-            dist/GameGrave-Crimson-Preview.exe
-            _ci_temp/crimson-*-1440.png
-            _ci_temp/crimson-*-1672.png
-            _ci_temp/crimson-*-1366.png
-            _ci_temp/cinematic-screenshot-manifest.json
-            release/GameGrave-Crimson-Preview-Setup.exe
-            release/GameGrave-Crimson-Preview-Setup.sha256
+          path: dist/GameGrave-Crimson-Preview.exe
           if-no-files-found: error
           retention-days: 14
 
