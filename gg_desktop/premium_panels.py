@@ -81,7 +81,7 @@ def _image(label, game, *, w=320, h=186):
 class GameInspector(QFrame):
     """Persistent selection detail area with only verified available actions."""
 
-    def __init__(self, on_details, on_open, on_mods, on_captures):
+    def __init__(self, on_details, on_open, on_mods, on_captures, on_cover=None):
         super().__init__()
         self.setObjectName("premiumInspector")
         self.setMinimumWidth(335)
@@ -91,6 +91,7 @@ class GameInspector(QFrame):
         self._open = on_open
         self._mods = on_mods
         self._captures = on_captures
+        self._cover = on_cover
         layout = _col(self, spacing=10, margins=(13, 15, 13, 15))
         layout.addWidget(_label("SELECTED GAME", "sceneKicker"))
         self.art = QLabel()
@@ -116,6 +117,15 @@ class GameInspector(QFrame):
         self.open_btn = QPushButton("Open install folder")
         self.open_btn.clicked.connect(lambda: self.game is not None and self._open(self.game))
         layout.addWidget(self.open_btn)
+        self.cover_btn = QPushButton("Set cover image…")
+        self.cover_btn.setObjectName("gameCoverOverride")
+        self.cover_btn.setToolTip(
+            "Choose a JPG, PNG or WebP file for this exact installed game. "
+            "Your image stays on this PC.")
+        self.cover_btn.clicked.connect(
+            lambda: self.game is not None and self._cover is not None
+            and self._cover(self.game))
+        layout.addWidget(self.cover_btn)
         self.mods_btn = QPushButton("View Mod Radar")
         self.mods_btn.clicked.connect(self._mods)
         layout.addWidget(self.mods_btn)
@@ -123,7 +133,8 @@ class GameInspector(QFrame):
         self.captures_btn.clicked.connect(self._captures)
         layout.addWidget(self.captures_btn)
         self.hint = _label(
-            "Local artwork is optional. Installations, sizes, and activity are never invented.",
+            "Real local and Steam artwork is preferred. Use Set cover image to choose "
+            "a custom poster for launchers without local art.",
             "caption")
         layout.addWidget(self.hint)
         layout.addStretch(1)
@@ -136,6 +147,7 @@ class GameInspector(QFrame):
         self.open_btn.setEnabled(active and "open_folder" in game.capabilities)
         self.mods_btn.setEnabled(active)
         self.captures_btn.setEnabled(active)
+        self.cover_btn.setEnabled(active and self._cover is not None)
         self.name.setText(game.name if active else "Choose a game from the library")
         self.status.setText(game.status if active else "Scan PC to populate verified games.")
         self.size.setText(
