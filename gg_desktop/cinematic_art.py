@@ -125,6 +125,10 @@ class CinematicToolArtwork(QFrame):
                 prev = pt
             p.setPen(QPen(primary, 1.5))
             p.drawEllipse(center, 37, 37)
+            p.setFont(QFont("Segoe UI", 17, QFont.Bold))
+            p.setPen(QColor("#F6F7FB"))
+            p.drawText(QRectF(center.x()-27, center.y()-16, 54, 32),
+                       Qt.AlignCenter, "GG")
         else:
             p.setPen(QPen(primary, 2))
             for radius in (21, 35, 46):
