@@ -254,7 +254,7 @@ def render_approved_overview(window):
                      else "Graveyard" if "cleanup" in kind
                      else "Games")
             action = _compact_action(
-                str(item["title"]), lambda r=route: window.navigate(r),
+                str(item["title"]), lambda _checked=False, r=route: window.navigate(r),
                 secondary=str(item["date"]) + " | " + str(item["status"]))
             action.setToolTip(str(item["explanation"]))
             activity.addWidget(action)
