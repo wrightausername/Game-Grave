@@ -94,7 +94,7 @@ def main():
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
             # Native reference-dashboard parity: all pictured controls must
             # exist and be wired to the real app, never static screenshot overlays.
-            from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox, QLabel
+            from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox, QLabel, QListWidget
             from PySide6.QtSvg import QSvgRenderer
             from gg_desktop.approved_overview import RecycledRing
             window.navigate("Overview")
@@ -165,6 +165,33 @@ def main():
                     window.grave_age.setCurrentText("All ages")
                     app.processEvents()
                     assert window.grave_table.rowCount() == 1
+                if route == "Undo Center":
+                    assert len(window.page.findChildren(QFrame, "approvedUndoStat")) == 5, (
+                        "Approved Undo summary must use real ledger counts")
+                    assert any(t.columnCount() == 5 for t in
+                               window.page.findChildren(QTableWidget)), (
+                        "Undo Center must show the evidence ledger and status")
+                if route == "Game DNA":
+                    assert len(window.page.findChildren(QFrame, "approvedDNAMetric")) == 4, (
+                        "DNA metrics must be sourced from the scanned game relationship model")
+                if route == "AI Assistant":
+                    from PySide6.QtWidgets import QPlainTextEdit
+                    assert window.page.findChildren(QPlainTextEdit), (
+                        "Approved AI page needs a real in-page conversation")
+                    sends = [w for w in window.page.findChildren(QPushButton)
+                             if w.text() == "Send"]
+                    assert len(sends) == 1
+                    assert not sends[0].isEnabled(), (
+                        "Optional AI must remain disabled before explicit consent")
+                if route == "Settings":
+                    nav = window.page.findChildren(QListWidget, "settingsCategories")
+                    assert len(nav) == 1 and not nav[0].isVisible(), (
+                        "Approved Settings uses horizontal categories")
+                    assert len(window.page.findChildren(
+                        QPushButton, "approvedSettingsTab")) == 7
+                if route == "More Tools":
+                    assert window.page.findChildren(QFrame, "approvedKitArt")
+                    assert window.page.findChildren(QFrame, "approvedVaultArt")
                 if route in ("Ready Room", "Games", "Mods", "Old Files", "Graveyard",
                              "Game DNA", "Undo Center", "Captures", "Settings",
                              "AI Assistant", "More Tools"):
