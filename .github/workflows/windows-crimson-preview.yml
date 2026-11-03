@@ -66,6 +66,7 @@ jobs:
             _ci_temp/crimson-*-1440.png
             _ci_temp/crimson-*-1672.png
             _ci_temp/crimson-*-1366.png
+            _ci_temp/cinematic-screenshot-manifest.json
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -147,6 +148,7 @@ jobs:
             _ci_temp/crimson-*-1440.png
             _ci_temp/crimson-*-1672.png
             _ci_temp/crimson-*-1366.png
+            _ci_temp/cinematic-screenshot-manifest.json
             release/GameGrave-Crimson-Preview-Setup.exe
             release/GameGrave-Crimson-Preview-Setup.sha256
           if-no-files-found: error
