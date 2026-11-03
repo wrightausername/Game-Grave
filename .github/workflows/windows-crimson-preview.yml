@@ -62,6 +62,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Crimson premium panels regression tests failed.' }
           python -m unittest tests.test_library_visuals -v
           if ($LASTEXITCODE -ne 0) { throw 'Real artwork and library sort tests failed.' }
+          python -m unittest tests.test_graveyard_filters -v
+          if ($LASTEXITCODE -ne 0) { throw 'Graveyard evidence filters and ordering failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
       - name: Verify 125 percent and 150 percent Windows UI scaling
