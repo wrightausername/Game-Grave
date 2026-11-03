@@ -327,7 +327,9 @@ class ScreenMethods(LockedPagesMixin):
             "No files or screenshots are uploaded.")
         def download(_emit):
             from gg_desktop.artwork_download import download_official_steam_covers
-            return download_official_steam_covers(steam, limit=20)
+            from performance_guard import background_worker_priority
+            with background_worker_priority():
+                return download_official_steam_covers(steam, limit=20)
 
         def finished(report):
             self._cover_fetch_busy = False
@@ -384,7 +386,9 @@ class ScreenMethods(LockedPagesMixin):
         def worker(_emit):
             from gg_desktop.artwork_download import (
                 download_matched_catalog_covers)
-            return download_matched_catalog_covers(other, limit=8)
+            from performance_guard import background_worker_priority
+            with background_worker_priority():
+                return download_matched_catalog_covers(other, limit=8)
         def finished(report):
             self._cover_fetch_busy = False
             from gg_desktop.local_art import invalidate_cover_cache
