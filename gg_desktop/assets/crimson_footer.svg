@@ -1,1 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="260" height="380" viewBox="0 0 260 380"><defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#0b1a2a"/><stop offset=".55" stop-color="#27354b"/><stop offset="1" stop-color="#100b1b"/></linearGradient><radialGradient id="glow"><stop stop-color="#ff4f6e" stop-opacity=".8"/><stop offset="1" stop-color="#ff4f6e" stop-opacity="0"/></radialGradient></defs><rect width="260" height="380" fill="url(#sky)"/><circle cx="137" cy="237" r="115" fill="url(#glow)"/><path d="M0 270 34 180 60 237 94 142 117 238 158 179 184 252 220 145 260 209V380H0Z" fill="#142435"/><path d="M0 318L40 284 68 305 110 239 149 322 185 235 225 300 260 255V380H0Z" fill="#0a121d"/><g fill="#090d15" stroke="#533347" stroke-width="1.5"><path d="M100 320L108 175 123 151 138 179 142 320Z"/><path d="M177 328L182 215 193 202 206 222 208 328Z"/></g><path d="M0 348 53 315 107 340 154 300 203 350 260 315V380H0Z" fill="#060b12"/><path d="M74 341Q110 315 145 339" stroke="#ec3a50" stroke-width="4" opacity=".58"/><path d="M5 372Q105 325 260 366" fill="none" stroke="#fc4054" opacity=".45" stroke-width="2"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="380" viewBox="0 0 260 380">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A0D12"/>
+      <stop offset=".39" stop-color="#0C0D13"/>
+      <stop offset=".76" stop-color="#33121D"/>
+      <stop offset="1" stop-color="#711C2C"/>
+    </linearGradient>
+    <radialGradient id="embers" cx=".5" cy=".87" r=".65">
+      <stop offset="0" stop-color="#F14958" stop-opacity=".77"/>
+      <stop offset=".53" stop-color="#B7253C" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#751126" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A0D12" stop-opacity="1"/>
+      <stop offset=".42" stop-color="#0A0D12" stop-opacity="0"/>
+    </linearGradient>
+    <g id="pine">
+      <path d="M0 -110 -18 -68 -10 -68 -30 -24 -20 -24 -43 28 -12 20 -12 50 12 50 12 20 43 28 20 -24 30 -24 10 -68 18 -68Z"/>
+    </g>
+  </defs>
+  <rect width="260" height="380" fill="url(#sky)"/>
+  <rect width="260" height="380" fill="url(#embers)"/>
+  <path d="M0 321Q80 301 145 321T260 308V380H0Z" fill="#300D19" opacity=".72"/>
+  <g fill="#200B16" opacity=".76">
+    <use href="#pine" transform="translate(23 327) scale(.58)"/>
+    <use href="#pine" transform="translate(67 345) scale(.42)"/>
+    <use href="#pine" transform="translate(104 329) scale(.70)"/>
+    <use href="#pine" transform="translate(148 347) scale(.51)"/>
+    <use href="#pine" transform="translate(191 323) scale(.80)"/>
+    <use href="#pine" transform="translate(246 339) scale(.55)"/>
+  </g>
+  <g fill="#090C12">
+    <use href="#pine" transform="translate(3 359) scale(.93)"/>
+    <use href="#pine" transform="translate(48 364) scale(.76)"/>
+    <use href="#pine" transform="translate(90 379) scale(.63)"/>
+    <use href="#pine" transform="translate(136 364) scale(1.11)"/>
+    <use href="#pine" transform="translate(196 366) scale(.83)"/>
+    <use href="#pine" transform="translate(257 373) scale(1.05)"/>
+  </g>
+  <rect width="260" height="380" fill="url(#fade)"/>
+</svg>
