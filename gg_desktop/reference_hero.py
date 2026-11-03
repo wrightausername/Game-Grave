@@ -28,8 +28,15 @@ class ReferenceHero(SceneHeader):
         self.setAccessibleName(title + ". " + subtitle)
         for child in self.findChildren(QLabel):
             child.hide()
+        # The seven owner-locked pages retain their exact approved art.
+        # Unlocked pages use unique original scenes rather than copying the
+        # Overview gravestone onto every screen.
+        themed = kind in (
+            "readyroom", "games", "mods", "oldfiles",
+            "otherstorage", "captures")
         self.background_art = QSvgRenderer(str(
-            Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
+            Path(__file__).parent / "assets" /
+            ("crimson_ruins.svg" if themed else "gg_cinematic_hero.svg")))
         # Exact cropped photographic art from the owner's approved PNG,
         # rather than the previous approximate vector headstone.
         self.owner_art = load_approved_hero(kind)
@@ -98,6 +105,26 @@ class ReferenceHero(SceneHeader):
         if self.background_art.isValid():
             self.background_art.render(p, QRectF(0, -62, w, h + 128))
         draw_approved_hero(p, self.owner_art, w, h)
+        if self.owner_art.isNull():
+            # Unique vector artwork, 100% local and repaint-only. These are
+            # atmospheric scene symbols, not screenshots of imaginary data.
+            p.save()
+            p.setClipRect(full)
+            p.setOpacity(.86)
+            p.translate(w - 380, h * .56)
+            if self.kind == "games":
+                self._game_shelf(p)
+            elif self.kind == "mods":
+                self._mod_network(p)
+            elif self.kind == "oldfiles":
+                self._archive(p)
+            elif self.kind == "otherstorage":
+                self._forensics(p)
+            elif self.kind == "captures":
+                self._captures(p)
+            elif self.kind == "readyroom":
+                self._game_shelf(p)
+            p.restore()
         # Red moon atmosphere, while preserving white text contrast.
         shade = QLinearGradient(0, 0, w, 0)
         shade.setColorAt(0.0, QColor(5, 7, 14, 248))
