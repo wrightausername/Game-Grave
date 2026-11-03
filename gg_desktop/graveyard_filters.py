@@ -4,8 +4,8 @@ import ntpath
 
 SORT_OPTIONS = ("Largest first", "Smallest first", "Oldest evidence first",
                 "Newest evidence first", "Name A to Z", "Name Z to A")
-AGE_OPTIONS = {"Any evidence age": None, "6+ months": 180,
-               "1+ year": 365, "2+ years": 730, "5+ years": 1825}
+AGE_OPTIONS = {"All ages": None, "1+ year": 365,
+               "2+ years": 730, "3+ years": 1095}
 
 def evidence_drive(path):
     text = str(path or "")
