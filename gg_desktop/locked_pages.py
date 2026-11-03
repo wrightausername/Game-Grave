@@ -175,6 +175,16 @@ class LockedPagesMixin:
                         column, Qt.AscendingOrder
                         if sort_name == modes[0] else Qt.DescendingOrder)
                     break
+            keys = tuple(g.key for g in shown[:8])
+            if getattr(gallery, "_gg_keys", None) != keys:
+                replacement = game_gallery(shown, inspect_game, limit=8)
+                replacement.setObjectName("readyRoomCoverStrip")
+                replacement._gg_keys = keys
+                col.replaceWidget(gallery, replacement)
+                gallery.setParent(None)
+                gallery.deleteLater()
+                gallery = replacement
+
         def header_clicked(index):
             if index in HEADER_OPTIONS:
                 sort_choice.setCurrentText(
