@@ -406,6 +406,14 @@ def main():
                     "Cannot render smaller-screen reference: " + route)
                 assert path.stat().st_size > 9000, (
                     "Blank smaller-screen screenshot: " + route)
+            # Full-height capture preserves all three bands of the reference
+            # dashboard. The 900px legacy capture deliberately tests scrolling.
+            window.navigate("Overview")
+            window.resize(1440, 1080)
+            app.processEvents()
+            full = root / "_ci_temp" / "crimson-desktop-full-1440.png"
+            assert window.grab().save(str(full)), "Cannot render full reference dashboard"
+            assert full.stat().st_size > 15000, "Full-height overview appears blank"
             # A manifest joins every rendered route to its native screenshot
             # and hash. Locked source PNGs stay separate; this report never
             # substitutes screenshot output for a human design comparison.
@@ -428,14 +436,6 @@ def main():
                     "captures": manifest,
                 }, indent=2), encoding="utf-8")
 
-            # Full-height capture preserves all three bands of the reference
-            # dashboard. The 900px legacy capture deliberately tests scrolling.
-            window.navigate("Overview")
-            window.resize(1440, 1080)
-            app.processEvents()
-            full = root / "_ci_temp" / "crimson-desktop-full-1440.png"
-            assert window.grab().save(str(full)), "Cannot render full reference dashboard"
-            assert full.stat().st_size > 15000, "Full-height overview appears blank"
             print("PASS: Qt Crimson dashboard, all pictured controls, original art, "
                   "9 interactive pages, mixed-launcher data, protected Graveyard, "
                   "and full-height screenshot without changing user data.")
