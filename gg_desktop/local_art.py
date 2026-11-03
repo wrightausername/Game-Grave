@@ -1,34 +1,52 @@
-"""Opt-in-free, read-only discovery of game artwork already present on this PC.
+"""Safe, bounded discovery of actual game cover art.
 
-No network requests, arbitrary folder crawling or images bundled from a store.
-Only well-known Steam library-cache locations and explicit root cover filenames
-are considered. Missing art is a normal outcome and never affects scanning.
+Prefers user-selected artwork, then previously fetched official Steam artwork,
+then installed launcher's local poster files. No internet requests here.
+Steam's legacy, appid/ and newer appid/content-hash caches are supported.
+Missing art remains explicitly labelled, not a fake official cover.
 """
 from __future__ import annotations
 
+import hashlib
 import os
+import re
 from functools import lru_cache
+from itertools import islice
 from pathlib import Path
 
 _IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp")
 _MAX_BYTES = 16 * 1024 * 1024
+_HASH = re.compile(r"^[a-fA-F0-9]{16,64}$")
+
+
+def artwork_cache_dir() -> Path:
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("XDG_CACHE_HOME")
+    if not base:
+        base = str(Path.home() / ".cache")
+    return Path(base) / "GameGrave" / "artwork"
+
+
+def _game_key(game) -> str:
+    return hashlib.sha256(str(getattr(game, "key", "")).encode(
+        "utf-8", errors="replace")).hexdigest()[:32]
 
 
 def _usable(path: Path) -> bool:
     try:
+        stat = path.stat()
         return (path.is_file() and not path.is_symlink()
                 and path.suffix.lower() in _IMAGE_EXT
-                and 1000 <= path.stat().st_size <= _MAX_BYTES)
+                and 1000 <= stat.st_size <= _MAX_BYTES)
     except (OSError, ValueError):
         return False
 
 
 def _steam_locations(install_path: str):
-    """Bounded root discovery, not a recursive disk search."""
+    """Bounded root discovery, never scan an entire drive recursively."""
     roots = []
     try:
         path = Path(install_path)
-        for node in (path, *list(path.parents)[:5]):
+        for node in (path, *list(path.parents)[:6]):
             if node.name.lower() == "steamapps":
                 roots.append(node.parent)
                 break
@@ -37,7 +55,8 @@ def _steam_locations(install_path: str):
     if os.name == "nt":
         try:
             import winreg
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as key:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                r"Software\Valve\Steam") as key:
                 roots.append(Path(winreg.QueryValueEx(key, "SteamPath")[0]))
         except (OSError, ValueError, ImportError):
             pass
@@ -47,53 +66,167 @@ def _steam_locations(install_path: str):
                 roots.append(Path(value) / "Steam")
     seen = set()
     for root in roots:
-        name = os.path.normcase(str(root))
-        if name not in seen:
-            seen.add(name)
+        norm = os.path.normcase(str(root)).casefold()
+        if norm not in seen:
+            seen.add(norm)
             yield root
 
 
-@lru_cache(maxsize=256)
-def _cover_path(launcher: str, app_id: str, install_path: str) -> str:
-    # Do not inspect every image in a game folder. The user selected a game
-    # install; only specifically named root poster/cover files may be opened.
-    candidate = []
+def _steam_cache_candidates(root, app_id):
+    """Portrait-first candidates across all three Steam cache layouts."""
+    cache = root / "appcache" / "librarycache"
+    preferred = []
+    secondary = []
+    for name in (
+        f"{app_id}_library_600x900_2x.jpg",
+        f"{app_id}_library_600x900.jpg",
+        f"{app_id}_library_600x900.png",
+        f"{app_id}_library_600x900.webp",
+    ):
+        preferred.append(cache / name)
+    parent = cache / app_id
+    image_names = (
+        "library_600x900_2x.jpg", "library_600x900.jpg",
+        "library_600x900.png", "library_600x900.webp",
+        "library_capsule.jpg", "library_capsule.png",
+    )
+    preferred.extend(parent / name for name in image_names)
     try:
-        folder = Path(install_path)
-        candidate.extend(folder / filename for filename in (
-            "cover.jpg", "cover.png", "poster.jpg", "poster.png",
-            "folder.jpg", "folder.png"))
+        # Steam 2026: <appid>/<contentHash>/library_600x900.jpg.
+        # Strictly inspect no more than 48 immediate hash directories.
+        if parent.is_dir() and not parent.is_symlink():
+            for child in islice(parent.iterdir(), 48):
+                if child.is_dir() and not child.is_symlink() and _HASH.fullmatch(child.name):
+                    preferred.extend(child / name for name in image_names)
+                    secondary.extend(child / name for name in (
+                        "library_header.jpg", "header.jpg", "library_hero.jpg"))
     except (OSError, ValueError):
         pass
+    preferred.extend((
+        root / "config" / "grid" / f"{app_id}p.jpg",
+        root / "config" / "grid" / f"{app_id}p.png",
+    ))
+    secondary.extend((
+        cache / f"{app_id}_header.jpg",
+        cache / f"{app_id}_library_hero.jpg",
+        parent / "library_header.jpg", parent / "header.jpg",
+        parent / "library_hero.jpg",
+        root / "config" / "grid" / f"{app_id}.jpg",
+        root / "config" / "grid" / f"{app_id}.png",
+    ))
+    return preferred, secondary
 
-    if launcher.casefold() == "steam" and app_id.isascii() and app_id.isdecimal() and len(app_id) <= 12:
-        for root in _steam_locations(install_path):
-            cache = root / "appcache" / "librarycache"
-            for name in (
-                f"{app_id}_library_600x900.jpg",
-                f"{app_id}_library_600x900.png",
-                f"{app_id}_library_600x900.webp",
-                f"{app_id}_header.jpg",
-                f"{app_id}_library_hero.jpg",
-            ):
-                candidate.append(cache / name)
-            for name in ("library_600x900.jpg", "library_600x900.png",
-                         "library_600x900.webp", "header.jpg"):
-                candidate.append(cache / app_id / name)
-            candidate.extend((
-                root / "config" / "grid" / f"{app_id}p.jpg",
-                root / "config" / "grid" / f"{app_id}p.png",
-                root / "config" / "grid" / f"{app_id}.jpg",
-                root / "config" / "grid" / f"{app_id}.png",
-            ))
-    for p in candidate[:80]:
+
+def steam_art_hashes(game):
+    """Public asset hashes are obtained only from this PC's Steam cache."""
+    app_id = str(getattr(game, "app_id", "") or "")
+    if str(getattr(game, "launcher", "")).casefold() != "steam" or (
+            not app_id.isascii() or not app_id.isdecimal() or len(app_id) > 12):
+        return ()
+    result = []
+    for root in _steam_locations(str(getattr(game, "install_path", "") or "")):
+        parent = root / "appcache" / "librarycache" / app_id
+        try:
+            if parent.is_dir() and not parent.is_symlink():
+                for child in islice(parent.iterdir(), 48):
+                    if child.is_dir() and not child.is_symlink() and _HASH.fullmatch(child.name):
+                        result.append(child.name)
+        except (OSError, ValueError):
+            continue
+    return tuple(dict.fromkeys(result[:6]))
+
+
+@lru_cache(maxsize=512)
+def _cover_path(launcher: str, app_id: str, install_path: str,
+                stable_key: str) -> str:
+    base = artwork_cache_dir()
+    # User overrides are stable across scans and distinct same-name games.
+    overrides = [
+        base / "custom" / f"{stable_key}.jpg",
+        base / "custom" / f"{stable_key}.png",
+        base / "custom" / f"{stable_key}.webp",
+    ]
+    if launcher.casefold() == "steam" and app_id.isascii() and (
+            app_id.isdecimal() and len(app_id) <= 12):
+        overrides.append(base / "official-steam" / f"{app_id}.jpg")
+    for p in overrides:
         if _usable(p):
             return str(p)
+
+    portraits, landscapes = [], []
+    try:
+        folder = Path(install_path)
+        portraits.extend(folder / filename for filename in (
+            "cover.jpg", "cover.png", "cover.webp",
+            "poster.jpg", "poster.png", "poster.webp",
+            "boxart.jpg", "boxart.png", "library_600x900.jpg",
+        ))
+        landscapes.extend(folder / filename for filename in (
+            "folder.jpg", "folder.png", "banner.jpg", "banner.png",
+            "header.jpg", "header.png",
+        ))
+    except (OSError, ValueError):
+        pass
+    if launcher.casefold() == "steam" and app_id.isascii() and (
+            app_id.isdecimal() and len(app_id) <= 12):
+        # Steam's own portrait is preferred to a generic game-folder image.
+        steam_portraits, steam_landscapes = [], []
+        for root in _steam_locations(install_path):
+            a, b = _steam_cache_candidates(root, app_id)
+            steam_portraits.extend(a)
+            steam_landscapes.extend(b)
+        for p in steam_portraits + portraits + steam_landscapes + landscapes:
+            if _usable(p):
+                return str(p)
+    else:
+        for p in portraits + landscapes:
+            if _usable(p):
+                return str(p)
     return ""
 
 
 def game_cover_path(game) -> str:
-    """Return an absolute local image path or an empty string (no guessing)."""
-    return _cover_path(str(getattr(game, "launcher", "")),
-                       str(getattr(game, "app_id", "") or ""),
-                       str(getattr(game, "install_path", "") or ""))
+    """Absolute path to verified local artwork, or empty when unavailable."""
+    return _cover_path(
+        str(getattr(game, "launcher", "") or ""),
+        str(getattr(game, "app_id", "") or ""),
+        str(getattr(game, "install_path", "") or ""),
+        _game_key(game))
+
+
+def invalidate_cover_cache():
+    """Call after a user override or official cover finishes downloading."""
+    _cover_path.cache_clear()
+
+
+def save_custom_cover(game, image_path: str) -> str:
+    """Validate and thumbnail one user-selected image into private app storage.
+
+    Does not retain the source path, open unrelated game files, or upload data.
+    """
+    from PIL import Image, UnidentifiedImageError
+    src = Path(image_path)
+    if not _usable(src):
+        raise ValueError("Select a JPG, PNG or WebP picture under 16 MB.")
+    try:
+        with Image.open(src) as image:
+            if image.format not in ("JPEG", "PNG", "WEBP"):
+                raise ValueError("Only JPG, PNG and WebP cover images are supported.")
+            if image.width < 100 or image.height < 100 or (
+                    image.width * image.height > 32_000_000):
+                raise ValueError("Cover dimensions must be 100-8000 pixels, at most 32 MP.")
+            image = image.convert("RGB")
+            image.thumbnail((720, 1080))
+            target_dir = artwork_cache_dir() / "custom"
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target = target_dir / (_game_key(game) + ".jpg")
+            tmp = target.with_suffix(".partial")
+            try:
+                image.save(tmp, format="JPEG", quality=90, optimize=True)
+                tmp.replace(target)
+            finally:
+                tmp.unlink(missing_ok=True)
+    except (OSError, UnidentifiedImageError) as exc:
+        raise ValueError("Could not decode this cover image.") from exc
+    invalidate_cover_cache()
+    return str(target)
