@@ -32,13 +32,27 @@ def _label(text, color="#BDCAD7", size=11, bold=False):
 
 
 def _stat(title, value, color):
+    from gg_desktop.visuals import nav_icon
     frame = QFrame()
     frame.setObjectName("approvedGraveStat")
-    col = QVBoxLayout(frame)
-    col.setContentsMargins(10, 6, 10, 6)
+    line = QHBoxLayout(frame)
+    line.setContentsMargins(11, 6, 11, 6)
+    line.setSpacing(10)
+    icons = {
+        "Candidates": "Graveyard", "Potential size": "Other Storage",
+        "Reviewable": "Undo Center", "Protected": "Settings",
+    }
+    image = label("", "caption")
+    image.setPixmap(nav_icon(icons.get(title, "Graveyard")).pixmap(32,32))
+    image.setFixedSize(34,34)
+    line.addWidget(image)
+    text = QWidget()
+    col = QVBoxLayout(text)
+    col.setContentsMargins(0,0,0,0)
     col.setSpacing(1)
-    col.addWidget(_label(title.upper(), "#C3CEDA", 10, True))
-    col.addWidget(_label(value, color, 20, True))
+    col.addWidget(_label(title.upper(), "#BBC8D5", 11, True))
+    col.addWidget(_label(value, color, 22, True))
+    line.addWidget(text,1)
     return frame
 
 
