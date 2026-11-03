@@ -243,7 +243,7 @@ def render_approved_overview(window):
     files = window.inventory.files
     captures = len(window.inventory.screenshots) + len(window.inventory.recordings)
     metrics = QWidget()
-    metrics.setMinimumHeight(91)
+    metrics.setMinimumHeight(80)
     metrics.setObjectName("approvedMetrics")
     mrow = _line(metrics, gap=8)
     values = (
@@ -358,11 +358,10 @@ def render_approved_overview(window):
     c.addWidget(quick_panel, 3)
     page.content.addWidget(center)
 
-    library, libcol = _panel("YOUR LIBRARY",
-        subtitle="Verified installations across launchers. Covers use local art where available.")
+    library, libcol = _panel("YOUR LIBRARY")
     heads = QWidget()
     h = _line(heads, gap=9)
-    h.addWidget(_txt("Installed games", color="#BBC9D6", size=11), 1)
+    h.addWidget(_txt("Only verified installed games; art may be missing.", color="#BBC9D6", size=11), 1)
     h.addWidget(_compact_action("View all games", lambda: window.navigate("Games")))
     libcol.addWidget(heads)
     if found and games:
@@ -372,7 +371,7 @@ def render_approved_overview(window):
         shelf.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         shelf.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         shelf.setWidgetResizable(True)
-        shelf.setMinimumHeight(207)
+        shelf.setMinimumHeight(199)
         row_widget = QWidget()
         row = _line(row_widget, gap=9)
         row.setAlignment(Qt.AlignLeft)
