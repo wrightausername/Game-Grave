@@ -202,11 +202,10 @@ class LandscapeArt(QFrame):
         painter.drawRoundedRect(area, 9, 9)
         painter.save()
         painter.setClipRect(area)
-        if not self.atlas.isNull():
-            painter.drawPixmap(area, self.atlas,
-                               self.crop_regions.get(self.scene,
-                                                     self.crop_regions["sunset"]))
-        elif self.renderer.isValid():
+        # Owner-approved fidelity requirement: always prefer resolution-
+        # independent SVG over the old pre-rendered JPEG atlas. The atlas
+        # remains only a last-resort fallback for missing vector artwork.
+        if self.renderer.isValid():
             size = self.renderer.defaultSize()
             if size.width() and size.height():
                 scale = max(self.width() / size.width(),
@@ -214,6 +213,10 @@ class LandscapeArt(QFrame):
                 w, h = size.width() * scale, size.height() * scale
                 self.renderer.render(painter, QRectF(
                     (self.width() - w) / 2, (self.height() - h) / 2, w, h))
+        elif not self.atlas.isNull():
+            painter.drawPixmap(area, self.atlas,
+                               self.crop_regions.get(self.scene,
+                                                     self.crop_regions["sunset"]))
         if self.note:
             painter.fillRect(QRectF(0, self.height() - 38, self.width(), 38),
                              QColor(4, 9, 15, 221))
