@@ -228,8 +228,24 @@ def main():
                     assert len(window.page.findChildren(RecoveryRoute)) == 1
                 if route == "Settings":
                     categories = window.page.findChildren(QStackedWidget)
-                    assert len(categories) == 1 and categories[0].count() == 8, (
-                        "Settings must show real controls in eight organized sections")
+                    assert len(categories) == 1 and categories[0].count() == 10, (
+                        "Seven locked categories plus real captures/privacy/about controls")
+                    category_tabs = {
+                        t.text(): t for t in window.page.findChildren(
+                            QPushButton, "approvedSettingsTab")}
+                    assert list(category_tabs) == [
+                        "General", "Libraries", "Safety", "Performance",
+                        "AI Assistant", "Notifications", "Advanced"], (
+                        "Owner-approved Settings category labels must not drift")
+                    category_tabs["Performance"].click()
+                    app.processEvents()
+                    assert categories[0].currentIndex() == 8
+                    category_tabs["Notifications"].click()
+                    app.processEvents()
+                    assert categories[0].currentIndex() == 9
+                    category_tabs["Advanced"].click()
+                    app.processEvents()
+                    assert categories[0].currentIndex() == 6
             # Locked design provides an AI hub page AND the existing optional
             # dockable companion. Never invoke inference or install a model.
             window.settings["ai_assistant_enabled"] = True
