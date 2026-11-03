@@ -355,6 +355,49 @@ def main():
                     "Cannot render exact-resolution owner reference: " + route)
                 assert shot.stat().st_size > 9000, (
                     "Blank exact-resolution screenshot: " + route)
+            # Smaller-window evidence: owners should not have to guess
+            # which controls vanished at 1366x768. Save every real Qt route.
+            for route, slug in (
+                ("Overview", "overview"), ("Ready Room", "ready-room"),
+                ("Games", "games"), ("Mods", "mods"),
+                ("Old Files", "old-files"), ("Other Storage", "other-storage"),
+                ("Captures", "captures"), ("Graveyard", "graveyard"),
+                ("Game DNA", "dna"), ("Undo Center", "undo"),
+                ("AI Assistant", "ai"), ("Settings", "settings"),
+                ("More Tools", "more-tools"),
+            ):
+                window.navigate(route)
+                window.resize(1366, 768)
+                app.processEvents()
+                assert window.global_search.isVisible(), (
+                    "Global search hidden at 1366x768: " + route)
+                path = root / "_ci_temp" / ("crimson-" + slug + "-1366.png")
+                assert window.grab().save(str(path)), (
+                    "Cannot render smaller-screen reference: " + route)
+                assert path.stat().st_size > 9000, (
+                    "Blank smaller-screen screenshot: " + route)
+            # A manifest joins every rendered route to its native screenshot
+            # and hash. Locked source PNGs stay separate; this report never
+            # substitutes screenshot output for a human design comparison.
+            import hashlib
+            import json
+            manifest = []
+            for image_path in sorted((root / "_ci_temp").glob("crimson-*.png")):
+                with Image.open(image_path) as shot:
+                    pixel_size = list(shot.size)
+                manifest.append({
+                    "screenshot": image_path.name,
+                    "pixel_size": pixel_size,
+                    "sha256": hashlib.sha256(image_path.read_bytes()).hexdigest(),
+                })
+            assert len(manifest) >= 35, "Missing per-route Qt acceptance captures"
+            (root / "_ci_temp" / "cinematic-screenshot-manifest.json").write_text(
+                json.dumps({
+                    "visual_authority": "docs/APPROVED_UI_VISUAL_CONTRACT.md",
+                    "reference_fidelity": "human review pending",
+                    "captures": manifest,
+                }, indent=2), encoding="utf-8")
+
             # Full-height capture preserves all three bands of the reference
             # dashboard. The 900px legacy capture deliberately tests scrolling.
             window.navigate("Overview")
