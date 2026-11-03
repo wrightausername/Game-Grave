@@ -9,7 +9,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from PIL import Image
+try:
+    from PIL import Image
+except ImportError:
+    Image = None  # Core-only runners do not install the optional UI image stack.
 from gg_desktop.models import GameRecord
 from gg_desktop.library_sort import (
     sort_game_records, filter_game_records, next_header_sort)
@@ -74,6 +77,7 @@ class LibrarySortingTests(unittest.TestCase):
             self.games, query="med", launcher="GOG")], ["Medium"])
 
 
+@unittest.skipUnless(Image is not None, "Pillow UI dependencies not installed")
 class RealCoverArtTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
