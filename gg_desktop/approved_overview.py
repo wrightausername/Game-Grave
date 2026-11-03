@@ -270,7 +270,6 @@ def render_approved_overview(window):
         activity.addWidget(_txt(
             "No recorded Game Grave activity yet. Scanning does not delete "
             "or recycle anything.", color="#AEB8C6", size=11, wrap=True))
-="#AEB8C6", size=11, wrap=True))
     activity.addStretch()
     activity.addWidget(_compact_action("Review history",
                         lambda: window.navigate("Undo Center")))
