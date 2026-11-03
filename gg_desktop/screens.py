@@ -2714,7 +2714,9 @@ class ScreenMethods(LockedPagesMixin):
         page.content.addWidget(access)
 
         content = QWidget()
-        columns = row(spacing=13)
+        # At Windows 125%/150% scaling, place the recommendations beneath
+        # the two prominent tools instead of forcing a too-wide split view.
+        columns = column(spacing=13) if high_dpi else row(spacing=13)
         content.setLayout(columns)
 
         main = QWidget()
