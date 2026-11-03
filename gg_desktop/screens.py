@@ -2695,7 +2695,10 @@ class ScreenMethods(LockedPagesMixin):
         access_row = row(spacing=11)
         access_bar.setLayout(access_row)
         access_row.addWidget(label("QUICK ACCESS", "sectionTitle"))
-        access_row.addWidget(label("Your recovery and maintenance shortcuts", "caption"))
+        high_dpi = self.devicePixelRatioF() >= 1.12
+        if not high_dpi:
+            access_row.addWidget(label(
+                "Your recovery and maintenance shortcuts", "caption"))
         access_row.addStretch(1)
         for name, callback in (
             ("Resurrection Kit", self._create_kit),
@@ -2703,7 +2706,10 @@ class ScreenMethods(LockedPagesMixin):
             ("Make Room", lambda: self.navigate("Other Storage")),
             ("Ghost Watch", lambda: self.navigate("Game DNA")),
         ):
-            access_row.addWidget(button(name + "  ›", callback))
+            visible = "Resurrection" if high_dpi and name == "Resurrection Kit" else name
+            shortcut = button(visible + "  ›", callback)
+            shortcut.setToolTip("Open " + name)
+            access_row.addWidget(shortcut)
         access_col.addWidget(access_bar)
         page.content.addWidget(access)
 
@@ -2762,9 +2768,10 @@ class ScreenMethods(LockedPagesMixin):
             ("Diagnostics", "Investigate game/mod links and warnings",
              lambda: self.navigate("Game DNA")),
         )
+        columns_per_row = 2 if high_dpi else 3
         for i, (name, description, callback) in enumerate(tiles):
             grid.addWidget(ActionCard("⌁", name, description, callback),
-                           i // 3, i % 3)
+                           i // columns_per_row, i % columns_per_row)
         main_col.addWidget(matrix)
         main_col.addStretch()
         columns.addWidget(main, 7)
