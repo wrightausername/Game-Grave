@@ -169,8 +169,10 @@ def download_official_steam_covers(
         "paused_for_game": paused,
         "remaining": sum(
             1 for g in games
-            if official_steam_urls(g) and
-            not (target_dir / (str(g.app_id) + ".jpg")).exists()),
+            if str(getattr(g, "launcher", "")).casefold() == "steam"
+            and str(getattr(g, "app_id", "") or "").isascii()
+            and str(getattr(g, "app_id", "") or "").isdecimal()
+            and not (target_dir / (str(g.app_id) + ".jpg")).exists()),
     }
 
 
@@ -255,13 +257,13 @@ def download_matched_catalog_covers(
         if key in seen:
             continue
         seen.add(key)
-        if game_cover_path(game):
-            continue
         if checked >= max_games or clock() > deadline:
             break
         if active():
             paused = True
             break
+        if game_cover_path(game):
+            continue
         checked += 1
         try:
             app_id = lookup(str(game.name))
