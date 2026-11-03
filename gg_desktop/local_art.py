@@ -201,9 +201,45 @@ def game_cover_path(game) -> str:
         _game_key(game))
 
 
+@lru_cache(maxsize=256)
+def _banner_path(launcher: str, app_id: str, install_path: str) -> str:
+    """Prefer a genuine wide Steam hero/header for the selected-game panel."""
+    candidates = []
+    if (launcher.casefold() == "steam" and app_id.isascii()
+            and app_id.isdecimal() and len(app_id) <= 12):
+        for root in _steam_locations(install_path):
+            _portraits, secondary = _steam_cache_candidates(root, app_id)
+            # Landscape headers/heroes are intended for the wide inspector.
+            candidates.extend(secondary)
+    try:
+        root = Path(install_path)
+        candidates.extend(root / name for name in (
+            "banner.jpg", "banner.png", "header.jpg", "header.png",
+            "background.jpg", "background.png",
+            "Images/banner.jpg", "Images/header.jpg",
+            "Assets/Wide310x150Logo.png", "Assets/SplashScreen.png",
+        ))
+    except (OSError, ValueError):
+        pass
+    for candidate in candidates[:100]:
+        if _usable(candidate):
+            return str(candidate)
+    return ""
+
+
+def game_banner_path(game) -> str:
+    """Wide verified header if available, otherwise the real cover poster."""
+    return (_banner_path(
+        str(getattr(game, "launcher", "") or ""),
+        str(getattr(game, "app_id", "") or ""),
+        str(getattr(game, "install_path", "") or ""))
+        or game_cover_path(game))
+
+
 def invalidate_cover_cache():
     """Call after a user override or official cover finishes downloading."""
     _cover_path.cache_clear()
+    _banner_path.cache_clear()
 
 
 def save_custom_cover(game, image_path: str) -> str:
