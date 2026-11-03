@@ -172,8 +172,8 @@ def main():
                                window.page.findChildren(QTableWidget)), (
                         "Undo Center must show the evidence ledger and status")
                 if route == "Game DNA":
-                    assert len(window.page.findChildren(QFrame, "approvedDNAMetric")) == 4, (
-                        "DNA metrics must be sourced from the scanned game relationship model")
+                    assert len(window.page.findChildren(QFrame, "approvedDNAMetric")) == 6, (
+                        "Six owner-approved DNA metrics need real evidence, no mockup values")
                 if route == "AI Assistant":
                     from PySide6.QtWidgets import QPlainTextEdit
                     assert window.page.findChildren(QPlainTextEdit), (
