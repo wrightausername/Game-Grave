@@ -106,6 +106,24 @@ def _steam_cache_candidates(root, app_id):
         root / "config" / "grid" / f"{app_id}p.jpg",
         root / "config" / "grid" / f"{app_id}p.png",
     ))
+    # User-specific Steam artwork lives in userdata/<numeric ID>/config/grid.
+    # Inspect only a small bounded set of account directories, never perform
+    # a recursive scan of userdata (which contains private game save data).
+    accounts = root / "userdata"
+    try:
+        if accounts.is_dir() and not accounts.is_symlink():
+            for account in islice(accounts.iterdir(), 24):
+                if (not account.name.isascii() or not account.name.isdecimal()
+                        or not account.is_dir() or account.is_symlink()):
+                    continue
+                grid = account / "config" / "grid"
+                preferred.extend((
+                    grid / f"{app_id}p.jpg",
+                    grid / f"{app_id}p.png",
+                    grid / f"{app_id}p.webp",
+                ))
+    except (OSError, ValueError):
+        pass
     secondary.extend((
         cache / f"{app_id}_header.jpg",
         cache / f"{app_id}_library_hero.jpg",
