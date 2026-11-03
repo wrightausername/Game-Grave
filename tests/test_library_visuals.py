@@ -17,7 +17,8 @@ from gg_desktop.local_art import (
     game_cover_path, save_custom_cover, invalidate_cover_cache,
     steam_art_hashes)
 from gg_desktop.artwork_download import (
-    official_steam_urls, download_official_steam_covers)
+    official_steam_urls, download_official_steam_covers,
+    search_exact_steam_catalog, download_matched_catalog_covers)
 
 
 def game(name, launcher="Steam", app_id="123", size=None, played=None,
@@ -134,6 +135,39 @@ class RealCoverArtTests(unittest.TestCase):
             fetch=fake_request, limit=1)
         self.assertTrue(paused["paused_for_game"])
         self.assertFalse(fetched)
+
+    def test_exact_title_matching_never_guesses_edition(self):
+        exact = {"items": [
+            {"type": "app", "id": 1091500, "name": "Cyberpunk 2077"},
+            {"type": "app", "id": 9999, "name": "Cyberpunk 2077 Demo"},
+        ]}
+        self.assertEqual(search_exact_steam_catalog(
+            "Cyberpunk 2077", fetch_json=lambda _url: exact),
+            "1091500")
+        self.assertEqual(search_exact_steam_catalog(
+            "Cyberpunk 2077 Ultimate Edition",
+            fetch_json=lambda _url: exact), "")
+        duplicate = {"items": [
+            {"type": "app", "id": 1091500, "name": "Cyberpunk 2077"},
+            {"type": "app", "id": 9999, "name": "Cyberpunk-2077"},
+        ]}
+        self.assertEqual(search_exact_steam_catalog(
+            "Cyberpunk 2077", fetch_json=lambda _url: duplicate), "")
+
+    def test_other_launcher_can_use_explicit_exact_cover(self):
+        epic = game("Cyberpunk 2077", "Epic Games", "eg123",
+                    path=str(self.root / "Epic" / "2077"))
+        image = BytesIO()
+        Image.new("RGB", (300, 450), (82, 46, 79)).save(image, "JPEG")
+        called = []
+        result = download_matched_catalog_covers(
+            [epic], search=lambda title: (
+                called.append(title) or "1091500"),
+            fetch=lambda url: image.getvalue(),
+            game_active=lambda: False, limit=1)
+        self.assertEqual(called, ["Cyberpunk 2077"])
+        self.assertEqual(result["downloaded"], 1)
+        self.assertIn("catalog-match", game_cover_path(epic))
 
     def test_invalid_launcher_and_images_rejected(self):
         self.assertEqual(official_steam_urls(
