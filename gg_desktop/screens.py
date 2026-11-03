@@ -205,6 +205,27 @@ class ScreenMethods(LockedPagesMixin):
         filters.addWidget(self.game_sort, 2)
         page.content.addWidget(ctrl)
 
+        # Cover art is not guessed from game titles. Steam uses verified
+        # local cache assets, including 2026 content-hash directories. Other
+        # launchers can receive a user-provided poster in the inspector.
+        from gg_desktop.library_graphics import LauncherMixGraphic
+        page.content.addWidget(LauncherMixGraphic(self.inventory.games))
+        artwork = QFrame()
+        artwork.setObjectName("ggActionStrip")
+        artwork_line = row(spacing=9, margins=(12, 8, 12, 8))
+        artwork.setLayout(artwork_line)
+        artwork_line.addWidget(label(
+            "OFFICIAL GAME COVER ART", "sectionTitle"), 1)
+        artwork_line.addWidget(label(
+            "Real Steam posters, local cache first", "caption"))
+        artwork_line.addWidget(button(
+            "Get missing Steam covers", self._download_game_covers,
+            kind="primary",
+            tip="Downloads public Steam portraits only when clicked. "
+                "Pauses when a game is detected. Other launchers: select "
+                "a game and use Set cover image in its inspector."))
+        page.content.addWidget(artwork)
+
         # The artwork-led library and the selection inspector share one
         # workspace. All detail actions still call the existing safe APIs.
         game_workspace = QWidget()
@@ -219,7 +240,8 @@ class ScreenMethods(LockedPagesMixin):
             self._inspect_game_record,
             lambda g: self._open_folder(g.install_path),
             lambda: self.navigate("Mods"),
-            lambda: self.navigate("Captures"))
+            lambda: self.navigate("Captures"),
+            self._choose_game_cover)
         game_workspace_row.addWidget(self.game_inspector, 0, Qt.AlignTop)
         # Start empty and populate once from the same filtered/sorted rows as
         # the table. No mismatch between search results and visible covers.
@@ -264,6 +286,72 @@ class ScreenMethods(LockedPagesMixin):
         self.game_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.game_table.customContextMenuRequested.connect(self._games_context_menu)
         self._fill_games()
+
+    def _choose_game_cover(self, game):
+        """One user-selected cover applies to this exact installed game."""
+        from gg_desktop.local_art import save_custom_cover
+        source, _ = QFileDialog.getOpenFileName(
+            self, "Choose official or custom game cover art",
+            str(Path.home()),
+            "Game cover images (*.jpg *.jpeg *.png *.webp)")
+        if not source:
+            return
+        try:
+            save_custom_cover(game, source)
+        except ValueError as exc:
+            self.error("Invalid cover artwork", str(exc))
+            return
+        self.status.setText("Cover saved locally for " + game.name)
+        self._pending_game_query = game.name
+        self.navigate("Games")
+
+    def _download_game_covers(self):
+        """Explicit Steam CDN fetch off the GUI thread; no background polling."""
+        if getattr(self, "_cover_fetch_busy", False):
+            self.info("Artwork retrieval running",
+                      "Another cover retrieval is already in progress.")
+            return
+        steam = [game for game in self.inventory.games
+                 if game.launcher.casefold() == "steam"
+                 and str(game.app_id or "").isascii()
+                 and str(game.app_id or "").isdecimal()]
+        if not steam:
+            self.info("No Steam game IDs",
+                      "No verified Steam installations with numeric IDs were "
+                      "found. Select an Epic, EA, GOG, Ubisoft, Xbox or other "
+                      "game and use Set cover image in its inspector.")
+            return
+        self._cover_fetch_busy = True
+        self.status.setText(
+            "Retrieving public Steam covers on demand. "
+            "No files or screenshots are uploaded.")
+        def download(_emit):
+            from gg_desktop.artwork_download import download_official_steam_covers
+            return download_official_steam_covers(steam, limit=20)
+
+        def finished(report):
+            self._cover_fetch_busy = False
+            from gg_desktop.local_art import invalidate_cover_cache
+            invalidate_cover_cache()
+            message = (
+                f"{report['downloaded']} official Steam covers saved locally. "
+                f"{report['already_cached']} were already downloaded. "
+                f"{report['unavailable']} could not be retrieved. "
+                "No game files or saved games were changed.")
+            if report["paused_for_game"]:
+                message += (
+                    "\n\nA running game was detected, so Game Grave "
+                    "stopped further artwork requests.")
+            if report["remaining"]:
+                message += (
+                    "\n\nSome Steam covers are still missing; use the "
+                    "button again or select a custom cover.")
+            self.status.setText(
+                f"Steam cover lookup: {report['downloaded']} downloaded.")
+            if self.current_route == "Games":
+                self.navigate("Games")
+            self.info("Steam artwork", message)
+        self.job(download, finished, error_title="Cover retrieval failed")
 
     def _refresh_games_gallery(self, rows):
         keys = tuple(g.key for g in rows[:9])
