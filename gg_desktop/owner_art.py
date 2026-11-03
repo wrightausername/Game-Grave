@@ -28,10 +28,14 @@ def load_approved_hero(kind: str) -> QPixmap:
 
 
 def draw_approved_hero(painter, art: QPixmap, width: int, height: int) -> bool:
-    """Place native artwork on right, without UI text/metrics or stretching GG."""
+    """Blend the owner-approved artwork across the header without stretching GG.
+
+    Host pages darken the left edge for legible copy. Starting the owner art
+    at 21% rather than 41% keeps the cinematic scene behind the title.
+    """
     if art.isNull() or width < 1 or height < 1:
         return False
-    dest = QRectF(width*.41, 0, width*.59, height)
+    dest = QRectF(width*.21, 0, width*.79, height)
     # Use the correct source aspect ratio and crop only the atmosphere at the
     # right edge. Stretching a gravestone/controller produces ugly proportions.
     crop_width = min(float(art.width()),
