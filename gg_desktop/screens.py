@@ -127,12 +127,41 @@ class ScreenMethods(LockedPagesMixin):
     def _not_scanned(self, page):
         if self.inventory.scanned_at:
             return False
-        frame, stack = panel(padding=18)
-        stack.addWidget(label("YOUR STORAGE. YOUR DECISION.", "eyebrow"))
-        stack.addWidget(label("Run Scan PC to see what's actually installed. "
-                              "Game Grave does not invent activity or disk usage.", "subtle", wrap=True))
-        stack.addWidget(button("Scan PC now", self.start_scan, kind="primary"))
-        page.content.addWidget(frame)
+        from gg_desktop.cinematic_art import CinematicToolArtwork
+        placeholder = QFrame()
+        placeholder.setObjectName("ggEmptyHero")
+        layout = row(spacing=18, margins=(21, 18, 21, 18))
+        placeholder.setLayout(layout)
+        illustration = CinematicToolArtwork("scanner")
+        illustration.setMinimumWidth(210)
+        illustration.setMaximumWidth(420)
+        illustration.setMinimumHeight(166)
+        illustration.setMaximumHeight(166)
+        layout.addWidget(illustration, 2)
+        info = QWidget()
+        details = column(spacing=12)
+        info.setLayout(details)
+        heading = label("YOUR PC. YOUR DATA. YOUR CALL.", "sectionTitle")
+        details.addWidget(heading)
+        details.addWidget(label(
+            "Run a read-only discovery scan to populate the real installed "
+            "games, mods and storage findings on this page. Game Grave never "
+            "fills an empty library with fictional games or fake disk usage.",
+            "subtle", wrap=True))
+        actions = QWidget()
+        action_row = row(spacing=10)
+        actions.setLayout(action_row)
+        action_row.addWidget(button("Scan my PC", self.start_scan, kind="primary"))
+        action_row.addWidget(button(
+            "Choose scan locations", lambda: self.navigate("Settings")))
+        action_row.addStretch()
+        details.addWidget(actions)
+        details.addWidget(label(
+            "No files will be changed by scanning. Protect, Delete and Restore "
+            "always require explicit review.", "caption", wrap=True))
+        details.addStretch()
+        layout.addWidget(info, 3)
+        page.content.addWidget(placeholder)
         return True
 
     def overview_page(self):
