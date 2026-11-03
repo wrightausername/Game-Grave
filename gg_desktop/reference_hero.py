@@ -13,6 +13,7 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from gg_desktop.visuals import SceneHeader
+from gg_desktop.owner_art import load_approved_hero, draw_approved_hero
 
 
 class ReferenceHero(SceneHeader):
@@ -29,6 +30,9 @@ class ReferenceHero(SceneHeader):
             child.hide()
         self.background_art = QSvgRenderer(str(
             Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
+        # Exact cropped photographic art from the owner's approved PNG,
+        # rather than the previous approximate vector headstone.
+        self.owner_art = load_approved_hero(kind)
 
         self.title_overlay = QLabel(title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
@@ -93,6 +97,7 @@ class ReferenceHero(SceneHeader):
         p.setClipRect(full)
         if self.background_art.isValid():
             self.background_art.render(p, QRectF(0, -62, w, h + 128))
+        draw_approved_hero(p, self.owner_art, w, h)
         # Red moon atmosphere, while preserving white text contrast.
         shade = QLinearGradient(0, 0, w, 0)
         shade.setColorAt(0.0, QColor(5, 7, 14, 243))
