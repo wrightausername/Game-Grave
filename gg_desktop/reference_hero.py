@@ -37,13 +37,13 @@ class ReferenceHero(SceneHeader):
         self.title_overlay = QLabel(title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
         self.title_overlay.setStyleSheet(
-            "background:transparent; color:#FFFFFF; font-size:34px;"
+            "background:transparent; color:#FFFFFF; font-size:42px;"
             "font-weight:900; letter-spacing:.3px;")
         self.subtitle_overlay = QLabel(subtitle, self)
         self.subtitle_overlay.setObjectName("referenceHeroSubtitle")
         self.subtitle_overlay.setWordWrap(True)
         self.subtitle_overlay.setStyleSheet(
-            "background:transparent;color:#E2DDE6;font-size:13px;")
+            "background:transparent;color:#E2DDE6;font-size:15px;")
 
         self.metrics = QWidget(self)
         self.metrics.setObjectName("referenceHeroMetrics")
@@ -80,8 +80,8 @@ class ReferenceHero(SceneHeader):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.width()
-        self.title_overlay.setGeometry(43, 17, max(150, w - 70), 48)
-        self.subtitle_overlay.setGeometry(44, 65, max(150, w - 76), 44)
+        self.title_overlay.setGeometry(53, 16, max(150, w - 80), 58)
+        self.subtitle_overlay.setGeometry(54, 79, max(150, w - 90), 59)
         self.metrics.setGeometry(18, 143, max(250, w - 36), 71)
 
     def paintEvent(self, event):
@@ -100,9 +100,9 @@ class ReferenceHero(SceneHeader):
         draw_approved_hero(p, self.owner_art, w, h)
         # Red moon atmosphere, while preserving white text contrast.
         shade = QLinearGradient(0, 0, w, 0)
-        shade.setColorAt(0.0, QColor(5, 7, 14, 243))
-        shade.setColorAt(.31, QColor(8, 8, 16, 194))
-        shade.setColorAt(.58, QColor(14, 7, 17, 64))
+        shade.setColorAt(0.0, QColor(5, 7, 14, 248))
+        shade.setColorAt(.31, QColor(8, 8, 16, 209))
+        shade.setColorAt(.58, QColor(14, 7, 17, 60))
         shade.setColorAt(1, QColor(22, 5, 12, 20))
         p.fillRect(full, shade)
         # Darken only the bottom where translucent tiles sit.
@@ -113,5 +113,5 @@ class ReferenceHero(SceneHeader):
         p.restore()
         # Owner reference uses a slim red title accent, not a neon outline.
         p.setPen(QPen(QColor("#EF334F"), 5, Qt.SolidLine, Qt.RoundCap))
-        p.drawLine(27, 31, 18, 91)
+        p.drawLine(30, 29, 16, 105)
         p.end()
