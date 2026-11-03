@@ -199,12 +199,23 @@ def _cover(game, open_game):
         if (geometry.isValid() and 0 < geometry.width() <= 8192
                 and 0 < geometry.height() <= 8192
                 and geometry.width()*geometry.height() <= 32_000_000):
-            reader.setScaledSize(QSize(240, 135))
+            # Preserve portrait aspect ratio before cropping to the
+            # wide cinematic tile. Decoding directly to a landscape size
+            # previously stretched publisher artwork out of proportion.
+            scale = max(344 / geometry.width(), 268 / geometry.height())
+            if scale < 1.0:
+                reader.setScaledSize(QSize(
+                    max(1, round(geometry.width() * scale)),
+                    max(1, round(geometry.height() * scale))))
             image = reader.read()
             if not image.isNull():
-                pixmap = QPixmap.fromImage(image).scaled(
-                    148, 129, Qt.KeepAspectRatioByExpanding,
+                scaled = QPixmap.fromImage(image).scaled(
+                    344, 268, Qt.KeepAspectRatioByExpanding,
                     Qt.SmoothTransformation)
+                x = max(0, (scaled.width() - 344) // 2)
+                y = max(0, (scaled.height() - 268) // 2)
+                pixmap = scaled.copy(x, y, 344, 268)
+                pixmap.setDevicePixelRatio(2)
     if pixmap is None:
         from gg_desktop.poster_art import generated_game_poster
         pixmap = generated_game_poster(game.name, 172, 134)
