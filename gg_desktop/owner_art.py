@@ -1,14 +1,13 @@
-"""Pixel-source artwork for owner-locked Game Grave cinematic heroes.
+"""Pixel-source artwork blended from the seven exact locked owner references.
 
-These small JPGs are cropped strictly from the owner's exact approved PNG
-screenshots, with all illustrative UI figures/text excluded. The functional
-Qt widgets, text, stats and actions remain native and scan-backed.
+Each native Qt page owns all text, status, data and controls. The isolated
+photo crop is only a decorative image; no fake UI values are baked into it.
 """
 from __future__ import annotations
 
 from pathlib import Path
-from PySide6.QtCore import QRectF
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPixmap
 
 IMAGE_BY_ROUTE = {
     "overview": "owner_cinematic_overview.jpg",
@@ -22,29 +21,40 @@ IMAGE_BY_ROUTE = {
 
 
 def load_approved_hero(kind: str) -> QPixmap:
-    """Original approved header art is optional; vector fallback still works."""
     name = IMAGE_BY_ROUTE.get(str(kind).casefold())
-    return QPixmap(str(Path(__file__).parent / "assets" / name)) if name else QPixmap()
+    return (QPixmap(str(Path(__file__).parent / "assets" / name))
+            if name else QPixmap())
 
 
 def draw_approved_hero(painter, art: QPixmap, width: int, height: int) -> bool:
-    """Blend the owner-approved artwork across the header without stretching GG.
+    """Show the owner's original proportions without a rectangular left seam.
 
-    Host pages darken the left edge for legible copy. Starting the owner art
-    at 21% rather than 41% keeps the cinematic scene behind the title.
+    Crops are approximately 835x150: stretching them across 1380x164 makes
+    the stone GG grotesquely wide. Render with preserved source aspect ratio
+    against the vector forest fallback and fade only the left edge. This is
+    a one-frame paint, not a game-running background animation.
     """
     if art.isNull() or width < 1 or height < 1:
         return False
-    # Fill the full header with the exact owner-cropped photographic asset.
-    # Host pages apply a broad, transparent left-to-right shade for titles.
-    # A partial-width image caused a hard rectangle / seam at 21% of the
-    # header, which did not exist in the locked owner reference.
-    dest = QRectF(0, 0, width, height)
-    # Use the correct source aspect ratio and crop only the atmosphere at the
-    # right edge. Stretching a gravestone/controller produces ugly proportions.
-    crop_width = min(float(art.width()),
-                     dest.width() * art.height() / max(1.0, dest.height()))
-    available = max(0.0, art.width() - crop_width)
-    source = QRectF(available*.50, 0, crop_width, float(art.height()))
-    painter.drawPixmap(dest, art, source)
+    w, h = max(1, int(width)), max(1, int(height))
+    natural = float(art.width()) / max(1.0, float(art.height()))
+    artwork_width = min(int(w*.86), max(1,int(h*natural*1.04)))
+    left = w-artwork_width
+    composite = QPixmap(artwork_width, h)
+    composite.fill(Qt.transparent)
+    layer = QPainter(composite)
+    layer.setRenderHint(QPainter.SmoothPixmapTransform)
+    src_width = min(float(art.width()), artwork_width*float(art.height()) / h)
+    src_x = max(0., (art.width()-src_width)*.5)
+    layer.drawPixmap(
+        QRectF(0, 0, artwork_width, h), art,
+        QRectF(src_x, 0, src_width, float(art.height())))
+    layer.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+    opacity = QLinearGradient(0, 0, max(1, artwork_width*.30), 0)
+    opacity.setColorAt(0., QColor(255, 255, 255, 0))
+    opacity.setColorAt(.55, QColor(255, 255, 255, 136))
+    opacity.setColorAt(1., QColor(255, 255, 255, 255))
+    layer.fillRect(composite.rect(), opacity)
+    layer.end()
+    painter.drawPixmap(left, 0, composite)
     return True
