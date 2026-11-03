@@ -94,7 +94,7 @@ def main():
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
             # Native reference-dashboard parity: all pictured controls must
             # exist and be wired to the real app, never static screenshot overlays.
-            from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox, QLabel, QListWidget
+            from PySide6.QtWidgets import QPushButton, QComboBox, QCheckBox, QLabel, QListWidget, QFrame
             from PySide6.QtSvg import QSvgRenderer
             from gg_desktop.approved_overview import RecycledRing
             window.navigate("Overview")
