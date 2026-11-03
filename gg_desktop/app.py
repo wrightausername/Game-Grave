@@ -130,8 +130,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
         rail = QFrame()
         rail.setObjectName("navRail")
-        rail.setFixedWidth(252)
-        r = column(spacing=5, margins=(10, 20, 10, 12))
+        rail.setFixedWidth(276)
+        r = column(spacing=4, margins=(13, 12, 10, 10))
         rail.setLayout(r)
         brand_holder = QWidget()
         brand_layout = row(spacing=9)
@@ -143,7 +143,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         glyph.setAccessibleName("Game Grave red GG monogram")
         brand_layout.addWidget(glyph)
         name = label("GAME GRAVE", "brand")
-        name.setStyleSheet("color:#F5F7FB;font-size:17px;font-weight:900;")
+        name.setStyleSheet("color:#F5F7FB;font-size:20px;font-weight:900;letter-spacing:.3px;")
         brand_layout.addWidget(name, 1)
         r.addWidget(brand_holder)
         r.addSpacing(12)
@@ -173,13 +173,13 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         r.addWidget(rail_scroll, 1)
         # Decorative local artwork remains separate from scan findings and
         # disappears on shorter screens so every navigation control stays usable.
-        self.sidebar_art = LandscapeArt(224, scene="footer")
+        self.sidebar_art = LandscapeArt(202, scene="footer")
         footer_layout = column(margins=(14, 22, 12, 4))
         self.sidebar_art.setLayout(footer_layout)
         # Approved sidebar forest should remain atmospheric, not print
         # decorative slogans over the artwork.
         footer_layout.addStretch()
-        self.sidebar_art.setVisible(self.height() >= 795)
+        self.sidebar_art.setVisible(self.height() >= 845)
         r.addWidget(self.sidebar_art)
         outer.addWidget(rail)
 
@@ -269,7 +269,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, "sidebar_art"):
-            self.sidebar_art.setVisible(event.size().height() >= 795)
+            self.sidebar_art.setVisible(event.size().height() >= 845)
 
     def page_for(self, title: str) -> ScrollPage:
         if self.page is not None:
