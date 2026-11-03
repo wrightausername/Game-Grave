@@ -6,7 +6,8 @@ marketing tiles. Quick Access and the diagnostic shortcuts remain usable.
 from __future__ import annotations
 
 from PySide6.QtWidgets import QFrame, QLabel
-from gg_desktop.widgets import LandscapeArt, ActionCard
+from gg_desktop.widgets import ActionCard
+from gg_desktop.cinematic_art import CinematicToolArtwork
 
 
 def render_approved_more_tools(window):
@@ -20,8 +21,7 @@ def render_approved_more_tools(window):
     prominent = page.findChildren(QFrame, "actionCardPrimary")
     if prominent:
         panel = prominent[0]
-        artwork = LandscapeArt(121, scene="sunset",
-                               note="Resurrection Kit • Backup before you change a setup")
+        artwork = CinematicToolArtwork("kit")
         artwork.setObjectName("approvedKitArt")
         panel.layout().insertWidget(2, artwork)
 
@@ -36,8 +36,7 @@ def render_approved_more_tools(window):
             vault = frame
             break
     if vault is not None:
-        artwork = LandscapeArt(121, scene="fog",
-                               note="Save Vault • Your local game progress")
+        artwork = CinematicToolArtwork("vault")
         artwork.setObjectName("approvedVaultArt")
         vault.layout().insertWidget(2, artwork)
 
