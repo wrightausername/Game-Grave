@@ -117,6 +117,8 @@ class HeroBanner(QFrame):
         self.detail = detail
         from PySide6.QtSvg import QSvgRenderer
         self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
+        from gg_desktop.owner_art import load_approved_hero
+        self.owner_art = load_approved_hero("overview") if title == "Overview" else QPixmap()
         # Vector original, rendered at display resolution to stay crisp on
         # 1440p, 4K and high-DPI monitors. Avoid the low-resolution JPG atlas.
 
@@ -131,6 +133,10 @@ class HeroBanner(QFrame):
         painter.setClipRect(target)
         if self.art.isValid():
             self.art.render(painter, QRectF(0, -6, self.width(), self.height() + 16))
+        if self.title == "Overview":
+            from gg_desktop.owner_art import draw_approved_hero
+            draw_approved_hero(painter, self.owner_art,
+                               self.width(), self.height())
         from PySide6.QtGui import QLinearGradient
         grad = QLinearGradient(0, 0, self.width() * .79, 0)
         grad.setColorAt(0, QColor(4, 9, 16, 247))
