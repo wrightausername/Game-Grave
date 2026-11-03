@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from gg_desktop.visuals import FeatureStrip, RelationshipMap
-from gg_desktop.widgets import row, label
+from gg_desktop.widgets import row, label, button
+from gg_desktop.models import readable_bytes
 
 
 def _metric(title, value, hint, color):
@@ -96,7 +97,7 @@ def render_approved_dna(window):
     page.content.insertWidget(2, bar)
 
     for graph in page.findChildren(RelationshipMap):
-        graph.setMinimumHeight(470)
+        graph.setMinimumHeight(389)
         graph.setToolTip(
             "Interactive evidence map. Click a node for source information, "
             "drag background to pan, use wheel or +/- to zoom. "
@@ -116,6 +117,106 @@ def render_approved_dna(window):
                 dynamic["Manager profiles"].setText("Unknown")
         selector.currentIndexChanged.connect(update)
         update(selector.currentIndex())
+
+    # The locked design has separate lower workspaces. Keep only genuine
+    # observations, and put manual investigative actions in clean cards rather
+    # than a second crowded introductory ribbon.
+    from gg_desktop.game_dna_tools import run_ghost_watch
+    from PySide6.QtWidgets import QHBoxLayout
+    lower = QWidget()
+    lower_row = row(spacing=9)
+    lower.setLayout(lower_row)
+
+    def info_card(title, desc, tone):
+        tile = QFrame()
+        tile.setObjectName("ggAccentPanel")
+        tile.setProperty("accent", tone)
+        col = QVBoxLayout(tile)
+        col.setContentsMargins(13, 10, 13, 10)
+        col.setSpacing(7)
+        heading = label(title, "sectionTitle")
+        col.addWidget(heading)
+        col.addWidget(label(desc, "caption", wrap=True))
+        return tile, col
+
+    storage, storage_col = info_card(
+        "STORAGE BREAKDOWN",
+        "Only launcher-reported install size is attributed to the selected "
+        "game; media and saves remain unassigned without source evidence.",
+        "cyan")
+    storage_size = label("Unknown", "sectionTitle")
+    storage_size.setStyleSheet(
+        "background:transparent;color:#66D5E7;font-size:22px;font-weight:850;")
+    storage_col.addWidget(storage_size)
+    storage_col.addWidget(label("Reported installed-game size", "caption"))
+    storage_col.addWidget(button(
+        "Inspect game files  ›", lambda: window.navigate("Games")))
+    lower_row.addWidget(storage, 4)
+
+    ghost, ghost_col = info_card(
+        "GHOST WATCH",
+        "Manually compare verified mod locations across scans. Nothing runs "
+        "in the background while you're gaming.",
+        "green")
+    ghost_col.addWidget(button(
+        "Compare mod observations  ›",
+        lambda: run_ghost_watch(window), kind="primary"))
+    ghost_col.addWidget(button(
+        "Open Mod Radar  ›", lambda: window.navigate("Mods")))
+    lower_row.addWidget(ghost, 4)
+
+    patch, patch_col = info_card(
+        "PATCH FALLOUT",
+        "Review changed files after a game update. An official patch feed or "
+        "compatibility verdict is not available in this preview.",
+        "amber")
+    patch_col.addWidget(button(
+        "Review local file changes  ›",
+        lambda: run_ghost_watch(window, patch_only=True)))
+    patch_col.addWidget(button(
+        "Open Ready Room  ›", lambda: window.navigate("Ready Room")))
+    lower_row.addWidget(patch, 4)
+
+    # Original large investigation panel repeated all three actions and
+    # pushed the approved lower workspace offscreen; retire only that visual
+    # wrapper, never its callable source functions.
+    for idx in reversed(range(page.content.count())):
+        item = page.content.itemAt(idx)
+        candidate = item.widget() if item is not None else None
+        if candidate is None or candidate is lower:
+            continue
+        headings = [x.text() for x in candidate.findChildren(QLabel)]
+        if any("INVESTIGATION WORKSPACE" in text for text in headings):
+            page.content.removeWidget(candidate)
+            candidate.hide()
+            candidate.deleteLater()
+    page.content.addWidget(lower)
+
+    action_strip = QFrame()
+    action_strip.setObjectName("ggActionStrip")
+    actions = row(spacing=9, margins=(11, 9, 11, 9))
+    action_strip.setLayout(actions)
+    actions.addWidget(button("Refresh local scan", window.start_scan, kind="primary"))
+    actions.addWidget(button("Open Save Vault", lambda: window.navigate("More Tools")))
+    actions.addWidget(button("View Mod Radar", lambda: window.navigate("Mods")))
+    actions.addWidget(button("Review unknown files", lambda: window.navigate("Graveyard")))
+    page.content.addWidget(action_strip)
+
+    if selectors:
+        chooser = selectors[0]
+        def update_storage(index):
+            if not (0 <= index < len(games)):
+                storage_size.setText("Unknown")
+                return
+            item = games[index]
+            recorded = next((
+                game for game in window.inventory.games
+                if game.name == item.get("game") and
+                game.launcher == item.get("launcher")), None)
+            count = getattr(recorded, "size_bytes", None) if recorded else None
+            storage_size.setText(readable_bytes(count))
+        chooser.currentIndexChanged.connect(update_storage)
+        update_storage(chooser.currentIndex())
 
     # Important ownership warning remains visible, but below the forensic
     # workspace rather than above and crowding out the interactive map.
