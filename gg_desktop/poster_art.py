@@ -99,10 +99,15 @@ def generated_game_poster(title: str, width: int, height: int) -> QPixmap:
     # accessible tooltip carries this disclosure rather than repeating
     # engineering labels on every beautiful game card.
     p.setPen(QColor("#D5EBF2"))
-    p.setFont(QFont("Segoe UI", max(10, min(16, int(w / 13))), QFont.Bold))
+    # Real titles can be very long. A generated poster should never crop
+    # letters outside the art; the native card below shows the full game name.
+    font = QFont("Segoe UI", max(9, min(14, int(w / 14))), QFont.Bold)
+    p.setFont(font)
+    fitted = p.fontMetrics().elidedText(
+        title.upper(), Qt.ElideRight, max(40, w - 18))
     p.setPen(QColor("#FFFFFF"))
-    p.drawText(QRectF(8, h * .58, w - 16, h * .28),
-               Qt.AlignCenter | Qt.TextWordWrap, title.upper())
+    p.drawText(QRectF(9, h * .68, w - 18, h * .19),
+               Qt.AlignCenter | Qt.TextSingleLine, fitted)
     p.setPen(QColor(edge))
     p.end()
     out.setDevicePixelRatio(scale)
