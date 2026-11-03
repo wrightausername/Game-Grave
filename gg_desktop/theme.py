@@ -678,3 +678,31 @@ QFrame#ggStatusChip {background:#131E29;border:1px solid #314454;border-radius:6
 QFrame#ggEmptyHero {background:#101721;border:1px solid #30404C;border-radius:10px;}
 QFrame#ggAssistantCard {background:#0F1722;border:1px solid #354150;border-radius:9px;}
 """
+
+# Cinematic feature-specific controls: live buttons, no decorative toggles.
+STYLE += r"""
+QPushButton#approvedAIModeActive {
+    border:1px solid #ED4059;border-radius:8px;
+    background:#7B1730;color:white;text-align:left;
+    min-height:36px;padding:9px 12px;font-size:14px;font-weight:850;
+}
+QPushButton#approvedAIWorkflow {
+    border:1px solid #293846;border-radius:5px;
+    background:#101A25;color:#E5EDF5;text-align:left;
+    min-height:32px;padding:8px 11px;font-size:13px;
+}
+QPushButton#approvedAIWorkflow:hover {
+    background:#271A2A;border-color:#B43A51;color:white;
+}
+QPushButton#approvedAIQuickTile {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 #30172C,stop:1 #0D1B29);
+    color:#F1F5FA;border:1px solid #69415E;border-radius:7px;
+    min-height:44px;font-size:13px;font-weight:700;padding:8px;
+}
+QPushButton#approvedAIQuickTile:hover {
+    background:#541E37;border-color:#F14960;
+}
+QFrame#ggAssistantWelcomeArt {border:0;background:transparent;}
+QFrame#approvedSettingsStatusPage {background:#101925;border:1px solid #314252;border-radius:8px;}
+"""
