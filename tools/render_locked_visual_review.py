@@ -9,6 +9,7 @@ import argparse
 from datetime import datetime, timedelta, timezone
 import json
 import os
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -69,6 +70,19 @@ def main():
             window.inventory.scanned_at = "SYNTHETIC visual-review inventory"
             window.inventory.graveyard = build_graveyard(games, [], files, 365,
                 never_touch=window.settings["never_touch"])
+            screenshot_records = []
+            for index, page_name in enumerate(("graveyard", "undo-center")):
+                # Existing screenshots of this application, explicitly used as
+                # review fixtures. No invented gameplay images or user pixels.
+                source = root / "docs" / "ui-review" / "2026-11-04" / "windows" / (
+                    "visual-review-" + page_name + "-1672.png")
+                path = data / "Videos" / "Captures" / f"UI-screenshot-fixture-{index+1}.png"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, path)
+                state = path.stat()
+                screenshot_records.append(OldFile(str(path), state.st_size, state.st_mtime,
+                    state.st_dev, state.st_ino, state.st_mtime_ns, state.st_nlink))
+            window.inventory.screenshots = screenshot_records
             now = datetime.now(timezone.utc)
             records = [{"id":f"demo-record-{index}",
                 "path":str(data / "Downloads" / f"demo-archive-{index+1:02d}.zip"),
@@ -95,7 +109,7 @@ def main():
             import gg_desktop.approved_overview
             import gg_desktop.approved_undo
             routes = ("Overview", "Graveyard", "Game DNA", "Undo Center",
-                      "AI Assistant", "Settings", "More Tools")
+                      "AI Assistant", "Settings", "More Tools", "Captures")
             captures = []
             with patch("core.get_activity", side_effect=lambda limit=1500: events[:limit]), \
                     patch("gg_desktop.approved_overview.get_activity", side_effect=lambda limit=1500: events[:limit]), \
@@ -110,6 +124,15 @@ def main():
                             window.navigate(route)
                             for _ in range(8):
                                 app.processEvents()
+                            if route == "Captures":
+                                from gg_desktop.capture_image import ScreenshotImage
+                                preview = window.page.findChild(ScreenshotImage, "captureSelectedImage")
+                                deadline = time.monotonic() + 10
+                                while preview is not None and not preview.has_image() and time.monotonic() < deadline:
+                                    app.processEvents()
+                                    time.sleep(.02)
+                                if preview is None or not preview.has_image():
+                                    raise RuntimeError("Actual Captures image did not render")
                             QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
                             slug = route.casefold().replace(" ", "-")
                             filename = f"visual-review-{slug}-{width}.png"
@@ -124,7 +147,8 @@ def main():
                     app.processEvents()
             (output / "visual-review.json").write_text(json.dumps({
                 "fixture":"Explicit synthetic visual data; no user data or AI inference",
-                "covers":"Labelled local demo illustrations; genuine publisher art loads from verified local cache",
+                "covers":"Genuine local images when available; neutral missing-artwork states otherwise",
+                "capture_images":"Existing actual application screenshots used as synthetic review fixtures",
                 "platform":sys.platform,"commit":os.environ.get("GITHUB_SHA", "local working tree"),
                 "source_reference":"Owner-supplied seven-page reference/running-UI comparison, left column",
                 "pixel_fidelity":"No automated claim of 1:1 equivalence",

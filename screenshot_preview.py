@@ -16,11 +16,15 @@ from screenshots import looks_like_screenshot
 MAX_IMAGE_BYTES = 80 * 1024 * 1024
 MAX_IMAGE_PIXELS = 40_000_000
 PREVIEW_SIZE = (920, 560)
+MAX_PREVIEW_SIZE = (2560, 1440)
 ALLOWED_FORMATS = frozenset({"PNG", "JPEG", "WEBP", "BMP"})
 
 
-def decode_screenshot_preview(record: OldFile):
+def decode_screenshot_preview(record: OldFile, *, preview_size=PREVIEW_SIZE):
     """Return a small image from an unchanged, ordinary screenshot candidate."""
+    if (len(preview_size) != 2 or any(type(v) is not int or v < 1 for v in preview_size)
+            or any(v > limit for v, limit in zip(preview_size, MAX_PREVIEW_SIZE))):
+        raise ValueError("Requested preview exceeds the bounded display size.")
     path = Path(record.path)
     if (not looks_like_screenshot(path) or _has_reparse_component(path)
             or is_protected_path(path, [])
@@ -42,7 +46,7 @@ def decode_screenshot_preview(record: OldFile):
                 if source.width * source.height > MAX_IMAGE_PIXELS:
                     raise ValueError("Image resolution exceeds the safe preview limit.")
                 frame = ImageOps.exif_transpose(source)
-                frame.thumbnail(PREVIEW_SIZE, Image.Resampling.LANCZOS)
+                frame.thumbnail(preview_size, Image.Resampling.LANCZOS)
                 preview = frame.convert("RGB").copy()
         if not is_unchanged(record):
             raise ValueError("Image changed during preview; scan again.")

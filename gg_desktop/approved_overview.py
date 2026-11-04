@@ -224,6 +224,7 @@ class LibraryCover(QPushButton):
         super().__init__()
         self.game = game
         self.art = pixmap
+        self.has_cover = official
         self.setObjectName("approvedCover")
         self.setMinimumWidth(150)
         self.setMaximumWidth(228)
@@ -232,7 +233,7 @@ class LibraryCover(QPushButton):
         self.setAccessibleName("Inspect " + game.name)
         self.setToolTip(game.name + " • " + game.launcher +
                         ("\nLocally verified game artwork" if official else
-                         "\nGame Grave illustration; official cover unavailable"))
+                         "\nCover not loaded. Use Get Steam Covers or set your own cover in Games."))
         self.clicked.connect(lambda: open_game(game))
 
     def sizeHint(self):
@@ -250,7 +251,21 @@ class LibraryCover(QPushButton):
         clip.addRoundedRect(bounds, 5, 5)
         painter.setClipPath(clip)
         painter.fillRect(bounds, QColor("#0A1119"))
-        if not self.art.isNull():
+        if not self.has_cover:
+            painter.setPen(QColor("#D4DAE2"))
+            font = QFont("Segoe UI")
+            font.setPixelSize(14)
+            font.setBold(True)
+            painter.setFont(font)
+            painter.drawText(bounds.adjusted(12, 25, -12, -45),
+                             Qt.AlignCenter | Qt.TextWordWrap, self.game.name)
+            font.setPixelSize(10)
+            font.setBold(False)
+            painter.setFont(font)
+            painter.setPen(QColor("#82909F"))
+            painter.drawText(QRectF(bounds.left()+8, bounds.bottom()-33, bounds.width()-16, 22),
+                             Qt.AlignCenter, "Cover not loaded")
+        elif not self.art.isNull():
             scale = max(bounds.width()/self.art.width(), bounds.height()/self.art.height())
             sw, sh = bounds.width()/scale, bounds.height()/scale
             painter.drawPixmap(bounds, self.art, QRectF(
@@ -263,7 +278,7 @@ class LibraryCover(QPushButton):
 
 
 def _cover(game, open_game):
-    """Verified local artwork or clearly identified generated placeholder."""
+    """Verified local artwork or an honest missing-cover state."""
     from gg_desktop.local_art import game_cover_path, game_banner_path
     source = game_cover_path(game) or game_banner_path(game)
     pixmap = None
@@ -287,8 +302,8 @@ def _cover(game, open_game):
                 pixmap = QPixmap.fromImage(image)
     official = pixmap is not None
     if pixmap is None:
-        from gg_desktop.poster_art import generated_game_poster
-        pixmap = generated_game_poster(game.name, 200, 240)
+        from gg_desktop.poster_art import missing_artwork
+        pixmap = missing_artwork(game.name, 200, 240)
     return LibraryCover(game, pixmap, open_game, official)
 
 
@@ -417,6 +432,8 @@ def render_approved_overview(window):
     def add_library():
         window._settings_category_index = 1
         window.navigate("Settings")
+    if any(str(game.launcher).casefold() == "steam" for game in games):
+        h.addWidget(_compact_action("Get Steam Covers", window._download_game_covers))
     h.addWidget(_compact_action("Add library", add_library))
     h.addWidget(_compact_action("View all games", lambda: window.navigate("Games")))
     libcol.addWidget(heads)

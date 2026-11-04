@@ -72,10 +72,10 @@ def _image(label, game, *, w=320, h=186):
         label.setPixmap(pixmap)
         label.setToolTip("Local game art found on this PC")
     else:
-        from gg_desktop.poster_art import generated_game_poster
+        from gg_desktop.poster_art import missing_artwork
         title = str(getattr(game, "name", "") or "MOD RADAR")
-        label.setPixmap(generated_game_poster(title, min(w, 320), h))
-        label.setToolTip("Original Game Grave artwork, not official game cover art")
+        label.setPixmap(missing_artwork(title, min(w, 320), h))
+        label.setToolTip("Local artwork not available")
 
 
 class GameInspector(QFrame):
@@ -212,8 +212,8 @@ class ModLocationCard(QFrame):
         art = QLabel()
         _image(art, game, w=248, h=135)
         if game is None:
-            from gg_desktop.poster_art import generated_game_poster
-            art.setPixmap(generated_game_poster(str(source or "MOD SOURCE"), 248, 135))
+            from gg_desktop.poster_art import missing_artwork
+            art.setPixmap(missing_artwork(str(source or "MOD SOURCE"), 248, 135))
         layout.addWidget(art)
         title = game.name if game else str(source or "Other locations")
         layout.addWidget(_label(title[:45], "findingTitle"))
@@ -239,12 +239,12 @@ def mod_gallery(games, mods, on_selected, *, limit=9):
         "Game-linked cards require a verified install-path match. "
         "External mod-manager folders remain separate and protected.", "caption"))
     if not mods:
-        from gg_desktop.poster_art import generated_game_poster
+        from gg_desktop.poster_art import missing_artwork
         illustration = QLabel()
         illustration.setObjectName("noModsArtwork")
         illustration.setAlignment(Qt.AlignCenter)
         illustration.setPixmap(
-            generated_game_poster("MOD RADAR • SCAN READY", 630, 208))
+            missing_artwork("MOD RADAR • SCAN READY", 630, 208))
         illustration.setMinimumHeight(225)
         column.addWidget(illustration)
         empty = _label("NO MOD LOCATIONS FOUND", "premiumTitle")
@@ -347,8 +347,8 @@ class ModInspector(QFrame):
             if len(self.locations) > 1 else "Send location to Graveyard review…")
         _image(self.art, game, w=320, h=158)
         if game is None:
-            from gg_desktop.poster_art import generated_game_poster
-            self.art.setPixmap(generated_game_poster("MOD RADAR", 300, 158))
+            from gg_desktop.poster_art import missing_artwork
+            self.art.setPixmap(missing_artwork("MOD RADAR", 300, 158))
 
     def open_selected(self):
         if self.locations:

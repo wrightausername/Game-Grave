@@ -14,6 +14,18 @@ conversation and action is a real widget over the existing local backend.
 | AI Assistant | `gg_desktop/approved_ai.py` | Optional local conversation, workflow shortcuts, inventory context, session continuity across navigation |
 | Settings | `gg_desktop/approved_settings.py` | Seven category tabs over existing preference controls, protection/library management, local AI configuration, saved checkpoint/revert |
 | More Tools | `gg_desktop/approved_more_tools.py` | Illustrated Resurrection Kit/Save Vault workflows, editable pinned shortcuts, local history and recovery diagnostics |
+| Captures | `gg_desktop/screens.py` | Adjustable screenshot list on the left, larger selected image on the right, individual review, separate Videos tab |
+
+Captures uses the owner's existing forest/GG artwork and the same compact
+controls. Its draggable divider allocates most of the workspace to the selected
+image. The local preview expands with the window and decodes up to 2560×1440,
+retaining original aspect ratio and all original file/pixel/identity checks.
+Late decode results cannot overwrite a newer selection or a cleared preview.
+
+Procedural moon/forest placeholder posters have been removed. Verified local
+publisher or owner-selected artwork remains authoritative; missing covers use
+a neutral state. Overview exposes the existing Get Steam Covers action so
+authentic artwork can be loaded deliberately.
 
 ## Resize and navigation behavior
 

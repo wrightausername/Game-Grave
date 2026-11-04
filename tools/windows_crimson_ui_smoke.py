@@ -375,6 +375,14 @@ def main():
                 time.sleep(0.06)
             assert thumbnail_widgets[0].has_image(), (
                 "The actual scanned 1920px screenshot must render, not placeholder art")
+            from PySide6.QtWidgets import QSplitter
+            capture_workspace = window.page.findChild(QSplitter, "captureScreenshotWorkspace")
+            assert capture_workspace is not None
+            assert capture_workspace.widget(0).geometry().right() < capture_workspace.widget(1).geometry().left()
+            assert capture_workspace.widget(1).width() > capture_workspace.widget(0).width(), (
+                "The selected screenshot needs the larger right side of Captures")
+            assert thumbnail_widgets[0].height() > 215, (
+                "The expanded preview must exceed the old 215px thumbnail")
             assert screen_path.is_file() and video_path.is_file()
             window.navigate("Other Storage")
             app.processEvents()

@@ -4,6 +4,12 @@
 
 **Reference integrity:** This markdown does not claim the original image is committed here. Keep a separate copy of the owner-supplied image in the design pack and import the original visual reference into the repository when practical. An approximation is not a substitute.
 
+**Captures direction, 2026-11-04:** The owner requested the screenshot browser
+on the left and the selected screenshot on the right, giving the selected image
+more space. This authorizes the side-by-side Captures layout and larger preview.
+Keep the established photo-based shell; it is not approval of an unrelated
+redesign or a declaration that the whole application has reached 1:1 parity.
+
 ## 1. Identity and visual language: never silently replace
 
 - **Brand:** flat, sharply geometric red double-`G` monogram at top left, bold `GAME GRAVE®` adjacent. Do not substitute tombstone/controller clip-art logo, the older crest, or a fantasy-styled `GG` mark.

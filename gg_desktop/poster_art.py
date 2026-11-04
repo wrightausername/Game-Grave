@@ -1,114 +1,33 @@
-"""Original high-DPI illustrated cover fallback for Game Grave Crimson.
-
-Never presents decorative graphics as a real publisher's cover. Used only when
-no legitimate locally installed game artwork is available.
-"""
+"""Quiet missing-artwork states; game covers come from genuine local images."""
 from __future__ import annotations
 
-from PySide6.QtCore import QRectF, QPointF, Qt
-from PySide6.QtGui import (
-    QColor, QFont, QLinearGradient, QPainter, QPainterPath,
-    QPen, QPixmap, QRadialGradient,
-)
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 
 
-def generated_game_poster(title: str, width: int, height: int) -> QPixmap:
-    """Generate stable procedural art, not a fabricated store image."""
-    title = str(title or "Unknown game").strip()[:80]
-    w, h = max(100, int(width)), max(90, int(height))
-    scale = 2
-    out = QPixmap(w * scale, h * scale)
-    out.fill(QColor("#081019"))
-    p = QPainter(out)
-    p.setRenderHint(QPainter.Antialiasing)
-    p.setRenderHint(QPainter.SmoothPixmapTransform)
-    p.scale(scale, scale)
-    seed = sum((i + 1) * ord(c) for i, c in enumerate(title))
-    colors = [
-        ("#EF3C5D", "#12142A", "#30C2D3"),
-        ("#25BCD3", "#10182B", "#F74261"),
-        ("#F08953", "#1C1528", "#F6405A"),
-        ("#A36BDB", "#151329", "#E84D70"),
-    ]
-    main, dark, edge = colors[seed % len(colors)]
-    background = QLinearGradient(0, 0, w, h)
-    background.setColorAt(0, QColor(dark))
-    background.setColorAt(.49, QColor("#172336"))
-    background.setColorAt(1, QColor("#060B11"))
-    p.fillRect(QRectF(0, 0, w, h), background)
-
-    # Decorative red moon and distant citadel silhouette.
-    cx, cy = w * (.68 + (seed % 4) * .025), h * .30
-    radius = min(w * .30, h * .37)
-    glow = QRadialGradient(cx, cy, radius * 2.0)
-    glow.setColorAt(0, QColor(main))
-    soft = QColor(main)
-    soft.setAlpha(108)
-    glow.setColorAt(.48, soft)
-    glow.setColorAt(1, QColor("#00000000"))
-    p.setPen(Qt.NoPen)
-    p.setBrush(glow)
-    p.drawEllipse(QPointF(cx, cy), radius * 2, radius * 2)
-    p.setBrush(QColor(main))
-    p.drawEllipse(QPointF(cx, cy), radius * .78, radius * .78)
-    p.setBrush(QColor("#E6E2E9"))
-    p.setOpacity(.10)
-    p.drawEllipse(QPointF(cx - radius * .18, cy - radius * .15),
-                  radius * .32, radius * .32)
-    p.setOpacity(1.0)
-
-    # Ancient broken walls. Vary the roofline deterministically for each card.
-    p.setBrush(QColor("#0A1823"))
-    mountains = QPainterPath()
-    mountains.moveTo(0, h * .63)
-    for x, y in [
-        (w * .10, .40), (w * .18, .51), (w * .29, .33),
-        (w * .39, .56), (w * .55, .41), (w * .67, .55),
-        (w * .84, .34), (w, .57)]:
-        mountains.lineTo(x, h * y)
-    mountains.lineTo(w, h)
-    mountains.lineTo(0, h)
-    p.drawPath(mountains)
-    p.setBrush(QColor("#050D16"))
-    for i, xpos in enumerate((.09, .48, .87)):
-        bw = w * (.085 if i == 1 else .055)
-        bh = h * (.28 + (seed % (i + 4)) * .025)
-        bx, by = w * xpos, h * .72 - bh
-        p.drawRect(QRectF(bx, by, bw, bh))
-        tower = QPainterPath()
-        tower.moveTo(bx - 3, by)
-        tower.lineTo(bx + bw / 2, by - bh * .19)
-        tower.lineTo(bx + bw + 3, by)
-        tower.closeSubpath()
-        p.drawPath(tower)
-
-    # Sharp red/Cyan highlight accents retain the approved theme.
-    pen = QPen(QColor(edge), max(1.0, w / 160))
-    pen.setCapStyle(Qt.RoundCap)
-    p.setPen(pen)
-    for a, b in ((.12, .44), (.58, .84)):
-        p.drawLine(QPointF(w * a, h * .62), QPointF(w * b, h * .62))
-    p.setPen(Qt.NoPen)
-    shade = QLinearGradient(0, h * .42, 0, h)
-    shade.setColorAt(0, QColor("#00000000"))
-    shade.setColorAt(.48, QColor(3, 8, 12, 200))
-    shade.setColorAt(1, QColor("#010509"))
-    p.fillRect(QRectF(0, h * .35, w, h * .65), shade)
-
-    # Decorative fallback must not impersonate licensed store art. Its
-    # accessible tooltip carries this disclosure rather than repeating
-    # engineering labels on every beautiful game card.
-    p.setPen(QColor("#D5EBF2"))
-    # Real titles can be very long. A generated poster should never crop
-    # letters outside the art; the native card below shows the full game name.
-    font = QFont("Segoe UI", max(9, min(14, int(w / 14))), QFont.Bold)
-    p.setFont(font)
-    fitted = p.fontMetrics().elidedText(
-        title.upper(), Qt.ElideRight, max(40, w - 18))
-    p.setPen(QColor("#FFFFFF"))
-    p.drawText(QRectF(9, h * .68, w - 18, h * .19),
-               Qt.AlignCenter | Qt.TextSingleLine, fitted)
-    p.setPen(QColor(edge))
-    p.end()
-    out.setDevicePixelRatio(scale)
-    return out
+def missing_artwork(title: str, width: int, height: int) -> QPixmap:
+    """Show an honest empty cover, without inventing a poster for the game."""
+    w, h = max(1, int(width)), max(1, int(height))
+    image = QPixmap(w, h)
+    image.fill(QColor("#0D141C"))
+    painter = QPainter(image)
+    painter.setRenderHint(QPainter.TextAntialiasing)
+    painter.setPen(QPen(QColor("#2E3742"), 1))
+    painter.drawRect(0, 0, w-1, h-1)
+    painter.setPen(QPen(QColor("#8F3447"), 2))
+    painter.drawLine(14, 16, max(14, w-14), 16)
+    title_font = QFont("Segoe UI")
+    title_font.setPixelSize(max(12, min(18, round(w*.08))))
+    title_font.setBold(True)
+    painter.setFont(title_font)
+    painter.setPen(QColor("#D4DAE2"))
+    painter.drawText(QRectF(12, h*.20, max(1,w-24), h*.52),
+                     Qt.AlignCenter | Qt.TextWordWrap, str(title))
+    caption = QFont("Segoe UI")
+    caption.setPixelSize(10)
+    painter.setFont(caption)
+    painter.setPen(QColor("#82909F"))
+    painter.drawText(QRectF(8, max(20,h-32), max(1,w-16), 22),
+                     Qt.AlignCenter, "Artwork not loaded")
+    painter.end()
+    return image

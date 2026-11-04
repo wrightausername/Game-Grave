@@ -96,10 +96,10 @@ class GameCover(QFrame):
                     art.setToolTip("Real local game cover: " + source)
                     loaded = True
         if not loaded:
-            from gg_desktop.poster_art import generated_game_poster
-            art.setPixmap(generated_game_poster(game.name, 164, 202))
+            from gg_desktop.poster_art import missing_artwork
+            art.setPixmap(missing_artwork(game.name, 164, 202))
             art.setToolTip(
-                "Game Grave generated placeholder. Use Get Steam Covers "
+                "Cover not loaded. Use Get Steam Covers "
                 "or Set Cover Image for genuine artwork.")
         layout.addWidget(art, 0, Qt.AlignCenter)
         title = QLabel(game.name)

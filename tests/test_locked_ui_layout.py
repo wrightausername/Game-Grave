@@ -21,7 +21,7 @@ if HAS_QT:
 @unittest.skipUnless(HAS_QT, "Optional Qt preview dependencies are not installed")
 class LockedUILayoutTests(unittest.TestCase):
     routes = ("Overview", "Graveyard", "Game DNA", "Undo Center",
-              "AI Assistant", "Settings", "More Tools")
+              "AI Assistant", "Settings", "More Tools", "Captures")
 
     @classmethod
     def setUpClass(cls):
@@ -165,6 +165,77 @@ class LockedUILayoutTests(unittest.TestCase):
                   if label.text() == "EA")
         row = [label.text() for label in ea.parentWidget().findChildren(QLabel)]
         self.assertEqual(row, ["EA", "1 games"])
+
+    def populate_captures(self):
+        from core import OldFile
+        from PIL import Image
+        records = []
+        for index, color in enumerate(((50, 95, 140), (145, 65, 45))):
+            path = self.root / "Videos" / "Captures" / f"game-screenshot-{index}.png"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (2560, 1440), color).save(path)
+            state = path.stat()
+            records.append(OldFile(str(path), state.st_size, state.st_mtime,
+                state.st_dev, state.st_ino, state.st_mtime_ns, state.st_nlink))
+        self.window.inventory.scanned_at = "Disposable capture fixture"
+        self.window.inventory.screenshots = records
+        return records
+
+    def test_captures_stay_side_by_side_with_an_expanded_preview_and_live_selection(self):
+        self.populate_captures()
+        from PySide6.QtWidgets import QSplitter, QTableWidget
+        from gg_desktop.capture_image import ScreenshotImage
+        def synchronous_job(fn, ready, **kwargs):
+            ready(fn(lambda *_: None))
+        with patch.object(self.window, "job", side_effect=synchronous_job):
+            self.window.resize(1672, 941)
+            self.window.navigate("Captures")
+            self.assert_page_fits()
+            splitter = self.window.page.findChild(QSplitter, "captureScreenshotWorkspace")
+            table = self.window.page.findChild(QTableWidget, "captureScreenshotTable")
+            image = self.window.page.findChild(ScreenshotImage, "captureSelectedImage")
+            table.selectRow(1)
+            source = image.property("sourcePath")
+            for width in (1672, 1366, 1040, 1672):
+                self.window.resize(width, 941 if width == 1672 else 768)
+                self.assert_page_fits()
+                left, right = splitter.widget(0), splitter.widget(1)
+                self.assertLess(left.geometry().right(), right.geometry().left())
+                self.assertGreater(right.width(), left.width())
+                self.assertGreater(image.height(), 215)
+                self.assertTrue(image.has_image())
+                self.assertEqual(image.property("sourcePath"), source)
+                self.assertEqual(table.selectionModel().selectedRows()[0].row(), 1)
+            old_width = image.width()
+            splitter.setSizes([260, splitter.width()-269])
+            self.flush()
+            self.assertGreaterEqual(image.width(), old_width)
+            self.assertEqual(image.property("sourcePath"), source)
+
+    def test_captures_ignore_stale_decode_after_selection_changes_or_clears(self):
+        self.populate_captures()
+        from PIL import Image
+        from PySide6.QtWidgets import QTableWidget
+        from gg_desktop.capture_image import ScreenshotImage
+        pending = []
+        def hold_job(fn, ready, **kwargs):
+            pending.append(ready)
+        with patch.object(self.window, "job", side_effect=hold_job):
+            self.window.navigate("Captures")
+            table = self.window.page.findChild(QTableWidget, "captureScreenshotTable")
+            image = self.window.page.findChild(ScreenshotImage, "captureSelectedImage")
+            table.selectRow(1)
+            stale = pending[0]
+            current = pending[-1]
+            sample = Image.new("RGB", (1600, 900))
+            stale(sample)
+            self.assertFalse(image.has_image())
+            current(sample)
+            self.assertTrue(image.has_image())
+            table.clearSelection()
+            current(sample)
+            self.assertFalse(image.has_image())
+            self.assertIsNone(image.property("sourcePath"))
 
     def test_checked_findings_preserve_protection_and_drop_hidden_items(self):
         self.populate()

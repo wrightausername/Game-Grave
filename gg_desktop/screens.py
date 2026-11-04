@@ -15,9 +15,9 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QImage, QPixmap, QCursor
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
-    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QTabWidget, QTableWidget,
-    QTableWidgetItem, QVBoxLayout, QWidget, QStackedWidget,
+    QTableWidgetItem, QVBoxLayout, QWidget, QStackedWidget, QSplitter,
 )
 from core import (
     human_size, age_text, is_game_neglected, is_protected_path, is_unchanged,
@@ -354,7 +354,7 @@ class ScreenMethods(LockedPagesMixin):
                     "button again or select a custom cover.")
             self.status.setText(
                 f"Steam cover lookup: {report['downloaded']} downloaded.")
-            if self.current_route in ("Games", "Ready Room"):
+            if self.current_route in ("Games", "Ready Room", "Overview"):
                 self.navigate(self.current_route)
             self.info("Steam artwork", message)
         self.job(download, finished, error_title="Cover retrieval failed")
@@ -2070,85 +2070,100 @@ class ScreenMethods(LockedPagesMixin):
         """
         page = self._new(
             "Captures", "Your gaming screenshots and recordings, organized separately.")
+        page.content.setContentsMargins(11, 7, 11, 13)
+        page.content.setSpacing(8)
+        from gg_desktop.reference_hero import ReferenceHero
+        for hero in page.findChildren(ReferenceHero):
+            hero.setFixedHeight(112)
         if self._not_scanned(page):
             return
         shots = sorted(self.inventory.screenshots,
                        key=lambda x: (-x.modified, x.path.casefold()))
         recordings = sorted(self.inventory.recordings,
                             key=lambda x: (-x.modified, x.path.casefold()))
-        counts = QWidget()
-        statrow = row(spacing=10)
-        counts.setLayout(statrow)
-        statrow.addWidget(MetricCard(
-            "SCREENSHOTS", str(len(shots)),
-            "Recognized game captures • metadata only", tone="cyan"))
-        statrow.addWidget(MetricCard(
-            "VIDEOS / RECORDINGS", str(len(recordings)),
-            "Known capture sources • metadata only", tone="text"))
-        page.content.addWidget(counts)
-
         tabs = QTabWidget()
         tabs.setObjectName("captureTabs")
         tabs.setDocumentMode(True)
         tabs.setTabPosition(QTabWidget.North)
         tabs.setAccessibleName("Separate screenshot and video capture panels")
-        page.content.addWidget(tabs)
+        page.content.addWidget(tabs, 1)
+        capture_actions = QWidget()
+        capture_controls = row(spacing=7)
+        capture_actions.setLayout(capture_controls)
+        capture_controls.addWidget(button("Scan PC", self.start_scan, kind="primary"))
+        capture_controls.addWidget(button("Review old captures",
+                                          lambda: self.navigate("Graveyard")))
+        tabs.setCornerWidget(capture_actions, Qt.TopRightCorner)
 
         def build_panel(title, description):
             tab = QWidget()
-            stack = column(spacing=12, margins=(12, 14, 12, 14))
+            stack = column(spacing=8, margins=(0, 9, 0, 0))
             tab.setLayout(stack)
-            header, body = panel(padding=16)
-            header.setObjectName("dashboardPanel")
-            body.addWidget(section_title(title))
-            body.addWidget(label(description, "subtle", wrap=True))
-            stack.addWidget(header)
             tabs.addTab(tab, title)
-            return stack, body
+            tab.setToolTip(description)
+            return stack, stack
 
         # ---------- SCREENSHOT PANEL ----------
         screenshot_stack, photo_col = build_panel(
             f"▧  Screenshots  ({len(shots)})",
-            "Game Grave automatically finds game screenshots in supported Steam, "
-            "launcher, capture and game-named screenshot folders. "
-            "The dashboard shows your newest actual image. "
-            "No personal Pictures-folder crawl; photos are decoded locally only "
-            "for previews. Every Recycle Bin move requires separate approval.")
-        actions = QWidget()
-        controls = row(spacing=9)
-        actions.setLayout(controls)
-        controls.addWidget(button("Scan PC again", self.start_scan, kind="primary"))
-        controls.addWidget(button("Review old screenshots in Graveyard",
-                                  lambda: self.navigate("Graveyard")))
-        controls.addStretch()
-        photo_col.addWidget(actions)
+            "Browse your screenshots on the left. Select one to view it on the right.")
+        workspace = QSplitter(Qt.Horizontal)
+        workspace.setObjectName("captureScreenshotWorkspace")
+        workspace.setAccessibleName("Screenshot browser on the left, expanded selected image on the right")
+        workspace.setChildrenCollapsible(False)
+        workspace.setHandleWidth(9)
+        workspace.setMinimumHeight(420)
+        browser, browser_col = panel(padding=10, spacing=7)
+        browser.setObjectName("captureScreenshotBrowser")
+        browser.setMinimumWidth(260)
+        browser_col.addWidget(section_title("Screenshots", str(len(shots)) + " files"))
         photos = shots[:700]
-        photo_table = data_table(["SCREENSHOT", "SIZE", "MODIFIED", "LOCATION"])
+        photo_table = data_table(["SCREENSHOT", "SIZE"])
+        photo_table.setObjectName("captureScreenshotTable")
+        photo_table.setAccessibleName("Screenshot files — select to display on the right")
         photo_table.setSelectionMode(QAbstractItemView.SingleSelection)
-        photo_table.setMinimumHeight(350)
-        photo_table.setColumnWidth(0, 285)
-        photo_table.setColumnWidth(1, 105)
-        photo_table.setColumnWidth(2, 135)
+        photo_table.setMinimumHeight(280)
+        photo_table.setMinimumWidth(0)
+        from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE
+        photo_table.setItemDelegateForColumn(0, EvidenceNameDelegate(photo_table))
+        photo_table.horizontalHeader().setStretchLastSection(False)
+        photo_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        photo_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         photo_table.setRowCount(len(photos))
         for i, shot in enumerate(photos):
             for colno, value in enumerate((
                 Path(shot.path).name, human_size(shot.size),
-                datetime.fromtimestamp(shot.modified).strftime("%Y-%m-%d %H:%M"),
-                str(Path(shot.path).parent),
             )):
                 _table_text(photo_table, i, colno, value)
-            photo_table.setRowHeight(i, 37)
-        photo_col.addWidget(photo_table)
+            photo_table.item(i, 0).setData(PATH_ROLE, shot.path)
+            photo_table.item(i, 0).setToolTip(shot.path)
+            photo_table.setRowHeight(i, 38)
+        browser_col.addWidget(photo_table, 1)
+        workspace.addWidget(browser)
         from gg_desktop.capture_image import ScreenshotImage, request_screenshot
-        photo_col.addWidget(label(
-            "SELECTED SCREENSHOT  •  ACTUAL IMAGE FROM YOUR PC",
-            "eyebrow"))
-        selected_photo_image = ScreenshotImage(height=215)
-        photo_col.addWidget(selected_photo_image)
+        selected_panel, selected_col = panel(padding=10, spacing=7)
+        selected_panel.setObjectName("captureSelectedScreenshot")
+        selected_panel.setMinimumWidth(360)
+        selected_col.addWidget(section_title("Selected screenshot"))
+        selected_name = label("Choose a screenshot", "sectionTitle", wrap=True)
+        selected_name.setObjectName("captureSelectedName")
+        selected_name.setMinimumWidth(0)
+        selected_col.addWidget(selected_name)
+        selected_metadata = label("", "caption", wrap=True)
+        selected_metadata.setObjectName("captureSelectedMetadata")
+        selected_col.addWidget(selected_metadata)
+        selected_photo_image = ScreenshotImage(height=280, expanding=True)
+        selected_photo_image.setObjectName("captureSelectedImage")
+        selected_photo_image.set_status("Select a screenshot from the list")
+        selected_col.addWidget(selected_photo_image, 1)
+        workspace.addWidget(selected_panel)
+        workspace.setStretchFactor(0, 1)
+        workspace.setStretchFactor(1, 3)
+        workspace.setSizes([350, 950])
+        photo_col.addWidget(workspace, 1)
         if not shots:
-            photo_col.addWidget(label(
-                "No in-game screenshots found yet. Scan PC or add a specific "
-                "capture folder under Settings. No sample image will be substituted.",
+            browser_col.addWidget(label(
+                "No screenshots found. Add a capture folder in Settings or scan again.",
                 "subtle", wrap=True))
 
         def current_photo():
@@ -2158,8 +2173,15 @@ class ScreenMethods(LockedPagesMixin):
         def update_photo_thumbnail():
             item = current_photo()
             if item is None:
-                selected_photo_image.set_status("Choose a screenshot to see its real thumbnail")
+                selected_name.setText("Choose a screenshot")
+                selected_metadata.setText("")
+                selected_photo_image.set_status("Select a screenshot from the list")
             else:
+                selected_name.setText(Path(item.path).name)
+                selected_name.setToolTip(item.path)
+                selected_metadata.setText(human_size(item.size) + "  •  " +
+                    datetime.fromtimestamp(item.modified).strftime("%b %d, %Y  •  %H:%M"))
+                selected_metadata.setToolTip(item.path)
                 request_screenshot(self, item, selected_photo_image)
         photo_table.itemSelectionChanged.connect(update_photo_thumbnail)
         if photos:
@@ -2184,7 +2206,7 @@ class ScreenMethods(LockedPagesMixin):
             "Preview selected screenshot…", preview_photo, kind="primary"))
         photo_buttons_row.addWidget(button("Open folder", folder_photo))
         photo_buttons_row.addStretch()
-        photo_col.addWidget(photo_buttons)
+        selected_col.addWidget(photo_buttons)
         photo_table.cellDoubleClicked.connect(
             lambda index, _column: self._preview_capture(photos[index])
             if 0 <= index < len(photos) else None)
@@ -2219,19 +2241,7 @@ class ScreenMethods(LockedPagesMixin):
         # ---------- VIDEO PANEL ----------
         video_stack, video_col = build_panel(
             f"▣  Videos / Recordings  ({len(recordings)})",
-            "Game Grave detects gaming clips, highlights and recordings from "
-            "recognized capture locations, including recent files. "
-            "Videos stay in their original folders; click Open in player "
-            "to use your Windows default media app. No video bytes are "
-            "decoded or uploaded during scanning.")
-        video_actions = QWidget()
-        va = row(spacing=8)
-        video_actions.setLayout(va)
-        va.addWidget(button("Scan PC again", self.start_scan, kind="primary"))
-        va.addWidget(button("Review old recordings in Graveyard",
-                            lambda: self.navigate("Graveyard")))
-        va.addStretch()
-        video_col.addWidget(video_actions)
+            "Your detected game recordings. Open a selected file in your video player.")
 
         clips = recordings[:700]
         video_table = data_table(["VIDEO / RECORDING", "SIZE", "MODIFIED", "LOCATION"])

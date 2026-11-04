@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from core import is_unchanged
 from screenshot_preview import decode_screenshot_preview
@@ -18,22 +18,26 @@ from screenshot_preview import decode_screenshot_preview
 
 def decode_capture_for_display(record):
     """Existing safeguards check extension, metadata, file size and pixel count."""
-    return decode_screenshot_preview(record)
+    return decode_screenshot_preview(record, preview_size=(2560, 1440))
 
 
 class ScreenshotImage(QWidget):
     """Aspect-fitted source image. Never upscales tiny screenshots into pixel art."""
 
-    def __init__(self, *, height=160, parent=None):
+    def __init__(self, *, height=160, expanding=False, parent=None):
         super().__init__(parent)
         self.setMinimumHeight(height)
-        self.setMaximumHeight(height)
+        if expanding:
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        else:
+            self.setMaximumHeight(height)
         self._pixmap = QPixmap()
         self._message = "Scan your PC to see your latest game screenshot"
         self.setAccessibleName("Actual locally detected game screenshot preview")
         self.setToolTip("Only screenshot pixels from your own PC appear here.")
 
     def set_status(self, message: str):
+        self.setProperty("sourcePath", None)
         self._pixmap = QPixmap()
         self._message = str(message)
         self.update()

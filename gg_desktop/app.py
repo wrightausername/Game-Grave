@@ -283,7 +283,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.page = ScrollPage()
         self.page.body.setProperty("lockedReference", title in (
             "Overview", "Graveyard", "Game DNA", "Undo Center",
-            "AI Assistant", "Settings", "More Tools"))
+            "AI Assistant", "Settings", "More Tools", "Captures"))
         self.stack_layout.addWidget(self.page, 1)
         self.current_route = title
         for route, control in self.nav_buttons.items():

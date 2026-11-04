@@ -342,7 +342,6 @@ class RelationshipMap(QWidget):
         self.setToolTip("Click a node to inspect evidence. Wheel zoom; drag empty space to pan.")
         self.game_name = "Choose a game"
         self.cover = QPixmap()
-        self.cover_is_placeholder = False
         self.states = {}
         self.active = "Install"
         self.positions = {}
@@ -354,7 +353,6 @@ class RelationshipMap(QWidget):
     def set_game(self, name: str, states: dict[str, str], *, cover_path=""):
         self.game_name = str(name)[:120]
         self.cover = QPixmap()
-        self.cover_is_placeholder = False
         if cover_path:
             # Trust only a bounded, locally resolved image for this exact game.
             reader = QImageReader(str(cover_path))
@@ -372,12 +370,6 @@ class RelationshipMap(QWidget):
                 image = reader.read()
                 if not image.isNull():
                     self.cover = QPixmap.fromImage(image)
-        if self.cover.isNull():
-            # Original local artwork creates an illustrated identity only,
-            # clearly disclosed below. No other game's official art is used.
-            from gg_desktop.poster_art import generated_game_poster
-            self.cover = generated_game_poster(self.game_name, 230, 320)
-            self.cover_is_placeholder = True
         self.states = {str(k): str(v)[:100] for k, v in states.items()}
         self.active = "Install"
         self.reset_view()
@@ -533,11 +525,6 @@ class RelationshipMap(QWidget):
             p.setFont(QFont("Segoe UI", 9, QFont.Bold))
             p.drawText(QRectF(middle.left()+7, middle.bottom()-36, 126, 29),
                        Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
-            if self.cover_is_placeholder:
-                p.setPen(QColor("#E8B7BA"))
-                p.setFont(QFont("Segoe UI", 7))
-                p.drawText(QRectF(middle.left()+4, middle.top()+4, 132, 16),
-                           Qt.AlignCenter, "LOCAL ILLUSTRATION")
         else:
             p.setPen(QPen(QColor("#E62E4F"), 1.3))
             p.drawLine(QPointF(center.x()-63,center.y()-22),
