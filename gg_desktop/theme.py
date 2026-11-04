@@ -847,3 +847,13 @@ QPushButton#primary {
 QPushButton#danger {font-size:14px;min-height:38px;}
 QFrame#graveEvidenceBanner {border:0;background:transparent;}
 """
+
+STYLE += r"""
+QFrame#approvedSettingsMiniCard {
+    background:#0F1823;border:1px solid #354552;border-radius:8px;
+}
+QFrame#approvedSettingsMiniCard[accent="red"] {border-top:2px solid #E7425D;}
+QFrame#approvedSettingsMiniCard[accent="amber"] {border-top:2px solid #DFAA53;}
+QFrame#approvedSettingsMiniCard[accent="cyan"] {border-top:2px solid #43C8D7;}
+QFrame#approvedFeaturedTool {background:transparent;border:0;}
+"""
