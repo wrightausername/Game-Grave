@@ -53,8 +53,8 @@ def _stat(title, value, color):
     col = QVBoxLayout(text)
     col.setContentsMargins(0,0,0,0)
     col.setSpacing(1)
-    col.addWidget(_label(title.upper(), "#BBC8D5", 11, True))
-    col.addWidget(_label(value, color, 22, True))
+    col.addWidget(_label(title.upper(), "#BBC8D5", 13, True))
+    col.addWidget(_label(value, color, 28, True))
     line.addWidget(text,1)
     return frame
 
@@ -144,7 +144,7 @@ def render_approved_graveyard(window):
     main_row = row(spacing=8)
     main.setLayout(main_row)
     browser, bcol = panel(padding=9, spacing=7)
-    bcol.addWidget(_label("CANDIDATE FILES", "#F4F6F9", 14, True))
+    bcol.addWidget(_label("CANDIDATE FILES", "#F4F6F9", 17, True))
     window.grave_table = data_table([
         "ITEM", "SOURCE / TYPE", "GAME / RELATIONSHIP",
         "SIZE", "AGE", "REVIEW STATUS"])
@@ -153,14 +153,15 @@ def render_approved_graveyard(window):
     for idx, width in enumerate((178, 112, 150, 80, 95, 143)):
         window.grave_table.setColumnWidth(idx, width)
     window.grave_table.horizontalHeader().setStretchLastSection(True)
-    window.grave_table.setMinimumHeight(292)
+    window.grave_table.setMinimumHeight(315)
+    window.grave_table.verticalHeader().setDefaultSectionSize(47)
     window.grave_table.setAccessibleName("Graveyard discovered candidates table")
     bcol.addWidget(window.grave_table, 1)
 
     main_row.addWidget(browser, 7)
 
     inspector, icol = panel(padding=12, spacing=6)
-    icol.addWidget(_label("ITEM DETAILS", "#F6F3F7", 14, True))
+    icol.addWidget(_label("ITEM DETAILS", "#F6F3F7", 17, True))
     # Paths and evidence can be arbitrarily long. Without a separate
     # inspector scroll area, Qt compresses the labels until they overlap.
     details_scroll = QScrollArea()
@@ -176,7 +177,7 @@ def render_approved_graveyard(window):
     icol.addWidget(details_scroll, 1)
     window.grave_detail = details_col
     main_row.addWidget(inspector, 3)
-    main.setFixedHeight(353)
+    main.setFixedHeight(383)
     page.content.addWidget(main)
 
     def selected():
@@ -337,9 +338,9 @@ def render_approved_graveyard(window):
                 unlock.setAccessibleName("Unprotect your personal rule for " + entry.name)
                 unlock.setToolTip("Remove only your own Never Touch rule. No deletion.")
                 table.setCellWidget(idx, 5, unlock)
-                table.setRowHeight(idx, 42)
+                table.setRowHeight(idx, 47)
             else:
-                table.setRowHeight(idx, 32)
+                table.setRowHeight(idx, 47)
         pending = getattr(window, "_pending_grave_key", None) or previous_key
         if pending:
             for i, e in enumerate(window._shown_graves):
