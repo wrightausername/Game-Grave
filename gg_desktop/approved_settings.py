@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFrame, QGridLayout, QHBoxLayout, QLabel, QListWidget,
+    QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QListWidget,
     QStackedWidget, QVBoxLayout, QWidget,
 )
 from gg_desktop.widgets import button, label, row
@@ -69,6 +69,19 @@ def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
         right.setWordWrap(True)
         line_layout.addWidget(left, 2)
         line_layout.addWidget(right, 1)
+        if (heading in ("Protection & Cleanup", "Gaming Performance")
+                and name in ("Recycle Bin", "Delete confirmation",
+                             "Pause heavy work")):
+            locked = QCheckBox()
+            locked.setChecked(True)
+            locked.setEnabled(False)
+            locked.setAccessibleName(name + " mandatory Game Grave safeguard")
+            locked.setToolTip("Required safeguard, not an editable preference")
+            locked.setStyleSheet(
+                "QCheckBox::indicator{width:31px;height:17px;"
+                "border:1px solid #F0445E;border-radius:8px;"
+                "background:#A91D37;}")
+            line_layout.addWidget(locked)
         col.addWidget(line)
     col.addStretch(1)
     for title, callback in actions:
@@ -223,6 +236,8 @@ def render_approved_settings(window):
               "Built-in protection cannot be bypassed.",
               (("Recycle Bin", "Required", "#55D9AA"),
                ("Delete confirmation", "Required", "#55D9AA"),
+               ("Protect saves", "Always", "#55D9AA"),
+               ("Protect active mods", "Always", "#55D9AA"),
                ("Never Touch rules", str(never_touch), "#EAC090")),
               "amber", "Graveyard",
               (("Manage protection", lambda: select(2)),)),
@@ -230,6 +245,8 @@ def render_approved_settings(window):
               "No intrusive game overlays or continuous heavy scans.",
               (("Pause heavy work", "On", "#55D9AA"),
                ("Background priority", "Low", "#55D9AA"),
+               ("No game overlays", "Required", "#55D9AA"),
+               ("Game activity polling", "Bounded", "#55D9AA"),
                ("FPS measured here", "Not available", "#EBC18B")),
               "red", "Game DNA",
               (("Performance details", lambda: select(perf_idx)),)),
