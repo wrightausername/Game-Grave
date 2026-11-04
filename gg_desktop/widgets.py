@@ -199,6 +199,10 @@ class LandscapeArt(QFrame):
         self.renderer = QSvgRenderer(str(
             Path(__file__).parent / "assets" / self.SCENES[self.scene]))
         self.atlas = QPixmap(str(Path(__file__).parent / "assets" / "crimson_atlas.jpg"))
+        # Cropped directly from the owner's locked Overview design: decorative
+        # forest only, with no mockup data, controls, or painted text.
+        self.locked_sidebar = QPixmap(str(
+            Path(__file__).parent / "assets" / "owner_locked_sidebar.jpg"))
         self.crop_regions = {
             "sunset": QRectF(2, 211, 352, 181),
             "fog": QRectF(393, 235, 325, 119),
@@ -218,7 +222,11 @@ class LandscapeArt(QFrame):
         # Owner-approved fidelity requirement: always prefer resolution-
         # independent SVG over the old pre-rendered JPEG atlas. The atlas
         # remains only a last-resort fallback for missing vector artwork.
-        if self.renderer.isValid():
+        if self.scene == "footer" and not self.locked_sidebar.isNull():
+            painter.drawPixmap(area, self.locked_sidebar,
+                               QRectF(0, 0, self.locked_sidebar.width(),
+                                      self.locked_sidebar.height()))
+        elif self.renderer.isValid():
             size = self.renderer.defaultSize()
             if size.width() and size.height():
                 scale = max(self.width() / size.width(),
