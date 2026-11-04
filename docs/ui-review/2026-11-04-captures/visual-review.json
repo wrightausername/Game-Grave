@@ -1,0 +1,83 @@
+{
+  "fixture": "Explicit synthetic visual data; no user data or AI inference",
+  "covers": "Genuine local images when available; neutral missing-artwork states otherwise",
+  "capture_images": "Existing actual application screenshots used as synthetic review fixtures",
+  "platform": "linux",
+  "commit": "1debbee332cc50f631fe7c7caf6d7c9e6c86724a",
+  "source_reference": "Owner-supplied seven-page reference/running-UI comparison, left column",
+  "pixel_fidelity": "No automated claim of 1:1 equivalence",
+  "captures": [
+    {
+      "page": "Overview",
+      "file": "visual-review-overview-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1386,
+      "viewport_width": 1386,
+      "vertical_scroll_maximum": 13,
+      "sha256": "50441429ceb084232695bc6e03d97b03fa73a3ac912cb68abf711d15659b643c"
+    },
+    {
+      "page": "Game DNA",
+      "file": "visual-review-game-dna-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "dac411de4487780c796474842e0940bf46ffa7e3561126fc7d119de9d2f888df"
+    },
+    {
+      "page": "Captures",
+      "file": "visual-review-captures-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "f96545d24baae32d1f88b0eb6d894af38ce24df634beb3c501a5f912718d3e52"
+    },
+    {
+      "page": "Overview",
+      "file": "visual-review-overview-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 186,
+      "sha256": "788d65063b32655dcbc42af627b86d70917a24343779eae00de023b7d583f8ab"
+    },
+    {
+      "page": "Game DNA",
+      "file": "visual-review-game-dna-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 249,
+      "sha256": "e4a44c650fd90b8b3419c9dd32361b36fac316ba0e38b0f03c84d3d4fab3787d"
+    },
+    {
+      "page": "Captures",
+      "file": "visual-review-captures-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1090,
+      "viewport_width": 1090,
+      "vertical_scroll_maximum": 0,
+      "sha256": "e81f1b14e93e0b662c21d6c4aa9021c3915579b70761e3c4bb12d0781e788ca0"
+    }
+  ]
+}
