@@ -10,70 +10,106 @@ from contextlib import contextmanager
 import ctypes
 import ntpath
 import os
+import sys
 import time
 from typing import Callable, Iterable
+from ctypes import wintypes
+
+
+# These can remain running after a game exits, including inside Steam libraries.
+_NON_GAME_PROCESSES = frozenset({
+    "steam.exe", "steamwebhelper.exe", "gameoverlayui.exe",
+    "epicgameslauncher.exe", "galaxyclient.exe", "galaxyclient helper.exe",
+    "eadesktop.exe", "ealauncher.exe", "eabackgroundservice.exe",
+    "ubisoftconnect.exe", "upc.exe", "riotclientservices.exe",
+    "riotclientux.exe", "riotclientuxrender.exe",
+    "wallpaper32.exe", "wallpaper64.exe", "wallpaperservice32.exe",
+    "wallpaperservice64.exe", "wallpaperui.exe", "lively.exe",
+    "crashpad_handler.exe", "crashreportclient.exe", "crashreporter.exe",
+    "unitycrashhandler32.exe", "unitycrashhandler64.exe",
+    "unins000.exe", "uninstall.exe",
+})
 
 
 def _normalize_windows_path(value: str) -> str:
     return ntpath.normcase(ntpath.normpath(value)).rstrip("\\/")
 
 
-def _foreground_is_fullscreen() -> bool:
-    """Conservatively treat another fullscreen app as gaming.
+class _Rect(ctypes.Structure):
+    _fields_ = [("left", wintypes.LONG), ("top", wintypes.LONG),
+                ("right", wintypes.LONG), ("bottom", wintypes.LONG)]
 
-    This can also pause for videos/presentations, which is safer than stealing
-    disk/CPU time. A maximized Game Grave window does not count as a game.
+
+class _MonitorInfo(ctypes.Structure):
+    _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", _Rect),
+                ("rcWork", _Rect), ("dwFlags", wintypes.DWORD)]
+
+
+def _windows_user32():
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    signatures = {
+        "GetForegroundWindow": ([], wintypes.HWND),
+        "GetDesktopWindow": ([], wintypes.HWND),
+        "GetShellWindow": ([], wintypes.HWND),
+        "GetWindowThreadProcessId": ([wintypes.HWND, ctypes.POINTER(wintypes.DWORD)], wintypes.DWORD),
+        "GetClassNameW": ([wintypes.HWND, wintypes.LPWSTR, ctypes.c_int], ctypes.c_int),
+        "GetWindowLongW": ([wintypes.HWND, ctypes.c_int], wintypes.LONG),
+        "GetWindowRect": ([wintypes.HWND, ctypes.POINTER(_Rect)], wintypes.BOOL),
+        "MonitorFromWindow": ([wintypes.HWND, wintypes.DWORD], wintypes.HMONITOR),
+        "GetMonitorInfoW": ([wintypes.HMONITOR, ctypes.POINTER(_MonitorInfo)], wintypes.BOOL),
+    }
+    for name, (arguments, result) in signatures.items():
+        function = getattr(user32, name)
+        function.argtypes = arguments
+        function.restype = result
+    return user32
+
+
+def _window_is_fullscreen(user32, hwnd) -> bool:
+    """Require another app's borderless window to match its monitor bounds."""
+    if not hwnd or hwnd in (user32.GetDesktopWindow(), user32.GetShellWindow()):
+        return False
+    pid = wintypes.DWORD()
+    if not user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid)):
+        return False
+    if not pid.value or pid.value == os.getpid():
+        return False
+    window_class = ctypes.create_unicode_buffer(256)
+    if not user32.GetClassNameW(hwnd, window_class, len(window_class)):
+        return False
+    if window_class.value.casefold() in {
+            "progman", "workerw", "shell_traywnd", "shell_secondarytraywnd"}:
+        return False
+    style = user32.GetWindowLongW(hwnd, -16)  # GWL_STYLE; 32-bit flags on Win64 too.
+    if not style or style & 0x00C00000:  # WS_CAPTION: ordinary/maximized app frame.
+        return False
+    rect = _Rect()
+    if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+        return False
+    monitor = user32.MonitorFromWindow(hwnd, 2)
+    if not monitor:
+        return False
+    info = _MonitorInfo()
+    info.cbSize = ctypes.sizeof(info)
+    if not user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+        return False
+    bounds = info.rcMonitor
+    return (rect.right > rect.left and rect.bottom > rect.top and
+            all(abs(a - b) <= 4 for a, b in zip(
+                (rect.left, rect.top, rect.right, rect.bottom),
+                (bounds.left, bounds.top, bounds.right, bounds.bottom))))
+
+
+def _foreground_is_fullscreen() -> bool:
+    """Pause for foreign borderless fullscreen apps, including videos.
+
+    The desktop, taskbars, Game Grave and ordinary maximized apps do not count.
     """
     if os.name != "nt":
         return False
     try:
-        from ctypes import wintypes
-
-        class Rect(ctypes.Structure):
-            _fields_ = [("left", wintypes.LONG), ("top", wintypes.LONG),
-                        ("right", wintypes.LONG), ("bottom", wintypes.LONG)]
-
-        class MonitorInfo(ctypes.Structure):
-            _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", Rect),
-                        ("rcWork", Rect), ("dwFlags", wintypes.DWORD)]
-
-        user32 = ctypes.WinDLL("user32", use_last_error=True)
-        # Explicit pointer-sized signatures are essential on 64-bit Windows.
-        user32.GetForegroundWindow.restype = wintypes.HWND
-        user32.GetWindowThreadProcessId.argtypes = [
-            wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
-        user32.GetWindowThreadProcessId.restype = wintypes.DWORD
-        user32.GetWindowRect.argtypes = [
-            wintypes.HWND, ctypes.POINTER(Rect)]
-        user32.GetWindowRect.restype = wintypes.BOOL
-        user32.GetMonitorInfoW.argtypes = [
-            wintypes.HMONITOR, ctypes.POINTER(MonitorInfo)]
-        user32.GetMonitorInfoW.restype = wintypes.BOOL
-        user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
-        user32.MonitorFromWindow.restype = wintypes.HMONITOR
-        hwnd = user32.GetForegroundWindow()
-        if not hwnd:
-            return False
-        pid = wintypes.DWORD()
-        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        if pid.value == os.getpid():
-            return False
-        rect = Rect()
-        if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
-            return False
-        monitor = user32.MonitorFromWindow(hwnd, 2)
-        if not monitor:
-            return False
-        info = MonitorInfo()
-        info.cbSize = ctypes.sizeof(info)
-        if not user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
-            return False
-        bounds = info.rcMonitor
-        tolerance = 4
-        return (rect.left <= bounds.left + tolerance and
-                rect.top <= bounds.top + tolerance and
-                rect.right >= bounds.right - tolerance and
-                rect.bottom >= bounds.bottom - tolerance)
+        user32 = _windows_user32()
+        return _window_is_fullscreen(user32, user32.GetForegroundWindow())
     except (OSError, AttributeError, TypeError, ValueError):
         return False
 
@@ -94,6 +130,8 @@ class GameActivityDetector:
         self._clock = clock
         self._last_checked: float | None = None
         self._last_active = False
+        self.pause_reason = ""
+        self._own_executable = _normalize_windows_path(sys.executable)
         self._game_roots: tuple[str, ...] = ()
         self._game_prefixes: tuple[str, ...] = ()
         self._process_paths = process_paths or self._running_process_paths
@@ -110,6 +148,8 @@ class GameActivityDetector:
         paths = []
         for process in psutil.process_iter(attrs=("exe",), ad_value=None):
             try:
+                if process.pid == os.getpid():
+                    continue
                 exe = process.info.get("exe")
                 if isinstance(exe, str) and exe:
                     paths.append(exe)
@@ -132,7 +172,8 @@ class GameActivityDetector:
 
     def _looks_like_game(self, raw: str) -> bool:
         path = _normalize_windows_path(raw)
-        if not path.endswith(".exe"):
+        if (path == self._own_executable or not path.endswith(".exe")
+                or ntpath.basename(path) in _NON_GAME_PROCESSES):
             return False
         # Launcher clients are often running all day. Never interpret them
         # as an active game merely because they live inside a store folder.
@@ -152,7 +193,6 @@ class GameActivityDetector:
             "\\riot games\\league of legends\\",
             "\\riot games\\valorant\\",
             "\\xboxgames\\", "\\ea games\\",
-            "\\games\\",  # Custom Windows game-library roots
         )):
             return True
         return any(path.startswith(prefix) for prefix in self._game_prefixes)
@@ -163,15 +203,24 @@ class GameActivityDetector:
                 now - self._last_checked < self.refresh_seconds):
             return self._last_active
         self._last_checked = now
+        self.pause_reason = ""
         try:
             # Process evidence catches borderless/windowed or background games.
-            running = any(self._looks_like_game(p) for p in self._process_paths())
-            self._last_active = bool(running or self._fullscreen())
+            running = next((p for p in self._process_paths() if self._looks_like_game(p)), None)
+            if running:
+                self.pause_reason = "Running game process: " + ntpath.basename(running)
+                self._last_active = True
+            else:
+                self._last_active = bool(self._fullscreen())
+                if self._last_active:
+                    self.pause_reason = "Fullscreen application — leave fullscreen to resume"
         except (OSError, ValueError, TypeError):
             # An unavailable process list must never crash a scan. The
             # fullscreen fallback is independent and may still pause it.
             try:
                 self._last_active = bool(self._fullscreen())
+                if self._last_active:
+                    self.pause_reason = "Fullscreen application — leave fullscreen to resume"
             except (OSError, ValueError, TypeError):
                 self._last_active = False
         return self._last_active

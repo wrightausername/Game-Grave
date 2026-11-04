@@ -469,7 +469,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
         def progress(percent, stage):
             self.progress.setValue(percent)
-            self.status.setText("Scanning: " + stage + " (" + str(percent) + "%)")
+            prefix = "" if stage.startswith(("Paused", "Resuming")) else "Scanning: "
+            self.status.setText(prefix + stage + " (" + str(percent) + "%)")
         def finish(inventory):
             self.scanning = False
             self.scan_button.setEnabled(True)

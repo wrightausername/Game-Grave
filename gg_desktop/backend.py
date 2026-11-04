@@ -53,14 +53,19 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
         GameActivityDetector, CooperativeGameplayPause, background_worker_priority,
     )
     detector = GameActivityDetector(refresh_seconds=3.0)
+    last_progress = [0, "Preparing local inventory"]
+    def report(percent, stage):
+        last_progress[:] = [percent, stage]
+        if progress:
+            progress(percent, stage)
     def paused(active: bool):
         if progress:
-            progress(0, "Paused for active game or fullscreen application"
-                     if active else "Resuming local scan")
+            progress(last_progress[0], "Paused — " + detector.pause_reason
+                     if active else "Resuming: " + last_progress[1])
     checkpoint = CooperativeGameplayPause(
         canceled, detector=detector, on_pause=paused).checkpoint
     with background_worker_priority():
-        return _scan_inventory_impl(settings, checkpoint, progress, detector)
+        return _scan_inventory_impl(settings, checkpoint, report, detector)
 
 
 def _scan_inventory_impl(settings: dict, canceled: Callable[[], bool],

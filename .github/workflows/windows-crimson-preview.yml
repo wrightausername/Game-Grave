@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - 'gg_desktop/**'
+      - 'performance_guard.py'
+      - 'tests/test_gameplay_performance_guard.py'
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
       - 'tests/test_library_visuals.py'
@@ -18,6 +20,8 @@ on:
     branches: [main]
     paths:
       - 'gg_desktop/**'
+      - 'performance_guard.py'
+      - 'tests/test_gameplay_performance_guard.py'
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
       - 'tests/test_library_visuals.py'
@@ -60,6 +64,8 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
+          python -m unittest tests.test_gameplay_performance_guard -v
+          if ($LASTEXITCODE -ne 0) { throw 'Gameplay detection regression tests failed.' }
           python -m unittest tests.test_gg_desktop_models -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python -m unittest tests.test_crimson_premium_panels -v
