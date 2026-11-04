@@ -20,6 +20,7 @@ from graveyard_protection import protection_action
 from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.widgets import button, data_table, label, panel, row
 from gg_desktop.cinematic_art import CinematicImpactTrack
+from gg_desktop.grave_evidence_art import GraveEvidenceBanner
 from gg_desktop.graveyard_filters import (
     SORT_OPTIONS, AGE_OPTIONS, available_drives, select_graveyard_entries,
 )
@@ -162,6 +163,8 @@ def render_approved_graveyard(window):
 
     inspector, icol = panel(padding=12, spacing=6)
     icol.addWidget(_label("ITEM DETAILS", "#F6F3F7", 17, True))
+    window.grave_art = GraveEvidenceBanner()
+    icol.addWidget(window.grave_art)
     # Paths and evidence can be arbitrarily long. Without a separate
     # inspector scroll area, Qt compresses the labels until they overlap.
     details_scroll = QScrollArea()
@@ -357,6 +360,10 @@ def render_approved_graveyard(window):
     def update_details():
         window._grave_details()
         entries = window._selected_grave_entries()
+        if len(entries) == 1:
+            window.grave_art.set_entry(entries[0])
+        else:
+            window.grave_art.set_entry(None)
         window.grave_counter.setText(
             (str(len(entries)) + " selected | " +
              human_size(sum(_size(e) for e in entries)) + " apparent bytes")
