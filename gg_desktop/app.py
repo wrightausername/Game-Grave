@@ -131,10 +131,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         rail = QFrame()
         rail.setObjectName("navRail")
         rail.setFixedWidth(276)
-        r = column(spacing=4, margins=(13, 12, 10, 10))
+        r = column(spacing=4, margins=(0, 12, 0, 0))
         rail.setLayout(r)
         brand_holder = QWidget()
-        brand_layout = row(spacing=9)
+        brand_layout = row(spacing=9, margins=(29, 0, 13, 0))
         brand_holder.setLayout(brand_layout)
         glyph = QLabel()
         glyph.setPixmap(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg"))
@@ -154,7 +154,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         rail_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         nav_body = QWidget()
         nav_body.setObjectName("navBody")
-        nav_stack = column(spacing=4)
+        nav_stack = column(spacing=2, margins=(0, 0, 0, 0))
         nav_body.setLayout(nav_stack)
         self.nav_buttons = {}
         for route, _legacy_icon in ROUTES:
@@ -162,7 +162,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
                              lambda _checked=False, route=route: self.navigate(route),
                              kind="navButton")
             control.setIcon(nav_icon(route))
-            control.setIconSize(QSize(20, 20))
+            control.setIconSize(QSize(24, 24))
             control.setProperty("active", route == self.current_route)
             control.setAccessibleName(route + " page")
             control.setFocusPolicy(Qt.StrongFocus)
@@ -173,7 +173,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         r.addWidget(rail_scroll, 1)
         # Decorative local artwork remains separate from scan findings and
         # disappears on shorter screens so every navigation control stays usable.
-        self.sidebar_art = LandscapeArt(202, scene="footer")
+        self.sidebar_art = LandscapeArt(229, scene="footer")
         footer_layout = column(margins=(14, 22, 12, 4))
         self.sidebar_art.setLayout(footer_layout)
         # Approved sidebar forest should remain atmospheric, not print
