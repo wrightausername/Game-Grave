@@ -5,7 +5,7 @@ marketing tiles. Quick Access and the diagnostic shortcuts remain usable.
 """
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFrame, QLabel
+from PySide6.QtWidgets import QFrame, QLabel, QHBoxLayout, QVBoxLayout, QWidget
 from gg_desktop.widgets import ActionCard
 from gg_desktop.cinematic_art import CinematicToolArtwork
 
@@ -16,18 +16,45 @@ def render_approved_more_tools(window):
     page.content.setContentsMargins(11, 7, 11, 15)
     page.content.setSpacing(9)
 
-    # Add distinct high-DPI cinematic art to the two prominent real tools.
-    # The imagery contains no fabricated scan results or sample game metrics.
+    def illustrated_feature(panel, kind, accessible_name):
+        # The locked cards place big atmospheric art BESIDE their title and
+        # actions. A narrow illustration stacked between buttons was wrong.
+        original = panel.layout()
+        if original is None:
+            return
+        saved = []
+        while original.count():
+            part = original.takeAt(0)
+            if part.widget() is not None:
+                saved.append(part.widget())
+        split = QWidget()
+        split.setObjectName("approvedFeaturedTool")
+        horizontal = QHBoxLayout(split)
+        horizontal.setContentsMargins(0, 0, 0, 0)
+        horizontal.setSpacing(8)
+        left = QWidget()
+        left_col = QVBoxLayout(left)
+        left_col.setContentsMargins(0, 0, 0, 0)
+        left_col.setSpacing(8)
+        for widget in saved:
+            left_col.addWidget(widget)
+        left_col.addStretch()
+        graphic = CinematicToolArtwork(kind)
+        graphic.setObjectName(accessible_name)
+        graphic.setMinimumWidth(136)
+        graphic.setMaximumWidth(205)
+        horizontal.addWidget(left, 3)
+        horizontal.addWidget(graphic, 2)
+        original.addWidget(split)
+        panel.setMinimumHeight(206)
+
     prominent = page.findChildren(QFrame, "actionCardPrimary")
     if prominent:
-        panel = prominent[0]
-        artwork = CinematicToolArtwork("kit")
-        artwork.setObjectName("approvedKitArt")
-        panel.layout().insertWidget(2, artwork)
+        illustrated_feature(prominent[0], "kit", "approvedKitArt")
 
     vault = None
     for frame in page.findChildren(QFrame):
-        if frame is prominent[0] if prominent else False:
+        if prominent and frame is prominent[0]:
             continue
         if frame.objectName() not in ("actionCard", "panel"):
             continue
@@ -36,9 +63,7 @@ def render_approved_more_tools(window):
             vault = frame
             break
     if vault is not None:
-        artwork = CinematicToolArtwork("vault")
-        artwork.setObjectName("approvedVaultArt")
-        vault.layout().insertWidget(2, artwork)
+        illustrated_feature(vault, "vault", "approvedVaultArt")
 
     tile_styles = (
         ("Make Room", "#D8A75C"),
