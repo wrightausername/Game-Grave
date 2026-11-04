@@ -58,7 +58,7 @@ def _panel(title, *, subtitle=None):
     from gg_desktop.visuals import nav_icon
     shell = QFrame()
     shell.setObjectName("approvedOverviewPanel")
-    col = _stack(shell, margin=(8, 6, 15, 8), gap=6)
+    col = _stack(shell, margin=(11, 8, 17, 10), gap=8)
     heading = QWidget()
     headings = _line(heading, gap=8)
     related = ("Undo Center" if "RECYCLE" in title or "ACTIVITY" in title
@@ -67,7 +67,7 @@ def _panel(title, *, subtitle=None):
     glyph.setPixmap(nav_icon(related).pixmap(26, 26))
     glyph.setFixedSize(28, 28)
     headings.addWidget(glyph)
-    headings.addWidget(_txt(title.title(), size=20, color="#F6F7FB", bold=True), 1)
+    headings.addWidget(_txt(title.title(), size=23, color="#F6F7FB", bold=True), 1)
     col.addWidget(heading)
     if subtitle:
         caption = _txt(subtitle, size=11, color="#ADB8C8", wrap=True)
@@ -78,12 +78,12 @@ def _panel(title, *, subtitle=None):
 def _compact_action(text, handler, *, secondary=""):
     if secondary:
         action = QPushButton(str(text) + "\n" + str(secondary))
-        action.setMinimumHeight(48)
+        action.setMinimumHeight(49)
         action.setToolTip(str(secondary))
         action.setProperty("multiLine", True)
     else:
         action = QPushButton(str(text) + "   ›")
-        action.setMinimumHeight(34)
+        action.setMinimumHeight(42)
     action.setObjectName("approvedAction")
     action.setAccessibleName(str(text))
     action.clicked.connect(handler)
@@ -95,8 +95,8 @@ class RecycledRing(QWidget):
     def __init__(self, amount: int, parent=None):
         super().__init__(parent)
         self.amount = max(0, amount)
-        self.setMinimumSize(126, 126)
-        self.setMaximumSize(175, 175)
+        self.setMinimumSize(160, 160)
+        self.setMaximumSize(191, 191)
         self.setToolTip(
             "Bytes moved through Game Grave's logged Recycle Bin actions. "
             "This is not confirmed free space and may include restored items.")
@@ -107,16 +107,14 @@ class RecycledRing(QWidget):
         length = min(self.width(), self.height()) - 10
         rect = QRectF((self.width()-length)/2, (self.height()-length)/2,
                       length, length)
-        stroke = max(11, length*.095)
+        stroke = max(15, length*.13)
         paint.setPen(QPen(QColor("#27313E"), stroke, Qt.SolidLine, Qt.RoundCap))
         paint.drawArc(rect.adjusted(stroke/2, stroke/2, -stroke/2, -stroke/2),
                       0, 360*16)
-        # A nonzero amount produces a complete accent rather than a fake %
-        # progress against an unmeasured disk-reclamation target.
-        if self.amount:
-            paint.setPen(QPen(QColor(STORAGE_RED), stroke, Qt.SolidLine, Qt.RoundCap))
-            paint.drawArc(rect.adjusted(stroke/2, stroke/2, -stroke/2, -stroke/2),
-                          90*16, -285*16)
+        # Brand-red decorative ring; never imply an unmeasured percentage.
+        paint.setPen(QPen(QColor(STORAGE_RED), stroke, Qt.SolidLine, Qt.RoundCap))
+        paint.drawArc(rect.adjusted(stroke/2, stroke/2, -stroke/2, -stroke/2),
+                      90*16, -275*16)
         paint.setPen(QColor("#FFFFFF"))
         from PySide6.QtGui import QFont
         font = QFont("Segoe UI", 15)
@@ -151,8 +149,8 @@ def _monthly_moves():
 def _metric(label_text, value, accent, route, handler, description):
     from gg_desktop.visuals import nav_icon
     tile = QPushButton()
-    tile.setMinimumHeight(82)
-    tile.setMaximumHeight(93)
+    tile.setMinimumHeight(83)
+    tile.setMaximumHeight(90)
     tile.setObjectName("approvedMetric")
     tile.setAccessibleName(label_text + ": " + str(value) + ". " + description)
     tile.setToolTip(description)
@@ -169,7 +167,7 @@ def _metric(label_text, value, accent, route, handler, description):
     details = QWidget()
     col = _stack(details, gap=1)
     col.addWidget(_txt(label_text.upper(), size=11, color="#CAD2DB", bold=True))
-    col.addWidget(_txt(value, size=23, color=accent, bold=True))
+    col.addWidget(_txt(value, size=28, color="#FFFFFF", bold=True))
     frame.addWidget(details, 1)
     tile.clicked.connect(lambda _checked=False: handler(route))
     return tile
@@ -179,18 +177,19 @@ def _cover(game, open_game):
     """Verified local artwork or clearly identified generated placeholder."""
     holder = QPushButton()
     holder.setObjectName("approvedCover")
-    holder.setMinimumWidth(182)
-    holder.setMaximumWidth(190)
-    holder.setFixedHeight(182)
+    holder.setMinimumWidth(186)
+    holder.setMaximumWidth(200)
+    holder.setFixedHeight(184)
     holder.setToolTip(game.name + "\n" + game.launcher
                       + "\nCover from local cache if available")
     holder.setAccessibleName("Inspect " + game.name)
-    outer = _stack(holder, margin=(5, 5, 5, 6), gap=4)
+    outer = _stack(holder, margin=(0, 0, 0, 0), gap=0)
     art = QLabel()
     art.setAlignment(Qt.AlignCenter)
-    art.setFixedSize(172, 134)
-    from gg_desktop.local_art import game_cover_path
-    source = game_cover_path(game)
+    art.setMinimumSize(186, 184)
+    art.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    from gg_desktop.local_art import game_banner_path
+    source = game_banner_path(game)
     pixmap = None
     if source:
         reader = QImageReader(source)
@@ -202,7 +201,7 @@ def _cover(game, open_game):
             # Preserve portrait aspect ratio before cropping to the
             # wide cinematic tile. Decoding directly to a landscape size
             # previously stretched publisher artwork out of proportion.
-            scale = max(344 / geometry.width(), 268 / geometry.height())
+            scale = max(400 / geometry.width(), 368 / geometry.height())
             if scale < 1.0:
                 reader.setScaledSize(QSize(
                     max(1, round(geometry.width() * scale)),
@@ -210,24 +209,20 @@ def _cover(game, open_game):
             image = reader.read()
             if not image.isNull():
                 scaled = QPixmap.fromImage(image).scaled(
-                    344, 268, Qt.KeepAspectRatioByExpanding,
+                    400, 368, Qt.KeepAspectRatioByExpanding,
                     Qt.SmoothTransformation)
-                x = max(0, (scaled.width() - 344) // 2)
-                y = max(0, (scaled.height() - 268) // 2)
-                pixmap = scaled.copy(x, y, 344, 268)
+                x = max(0, (scaled.width() - 400) // 2)
+                y = max(0, (scaled.height() - 368) // 2)
+                pixmap = scaled.copy(x, y, 400, 368)
                 pixmap.setDevicePixelRatio(2)
     if pixmap is None:
         from gg_desktop.poster_art import generated_game_poster
-        pixmap = generated_game_poster(game.name, 172, 134)
+        pixmap = generated_game_poster(game.name, 188, 184)
         art.setToolTip("Original Game Grave placeholder, not official box art")
     else:
         art.setToolTip("Locally verified artwork for " + game.name)
     art.setPixmap(pixmap)
     outer.addWidget(art)
-    title = _txt(game.name, size=12, color="#EDF1F7", bold=True)
-    title.setMaximumHeight(33)
-    title.setWordWrap(True)
-    outer.addWidget(title)
     holder.clicked.connect(lambda _=False: open_game(game))
     return holder
 
@@ -278,8 +273,7 @@ def render_approved_overview(window):
     center = QWidget()
     c = _line(center, gap=10)
 
-    activity_panel, activity = _panel("RECENT ACTIVITY",
-        subtitle="Verified local events only. No simulated gaming history.")
+    activity_panel, activity = _panel("RECENT ACTIVITY")
     # Scans count as real activity even when no files were removed. Existing
     # audit entries are presented before the separate Recycle Bin ledger.
     events = get_activity(limit=6)
@@ -326,10 +320,9 @@ def render_approved_overview(window):
     activity.addStretch()
     activity.addWidget(_compact_action("Review history",
                         lambda: window.navigate("Undo Center")))
-    c.addWidget(activity_panel, 4)
+    c.addWidget(activity_panel, 5)
 
-    recycled_panel, rc = _panel("RECYCLE BIN ACTIVITY",
-        subtitle="Logged moves, not confirmed disk space reclaimed")
+    recycled_panel, rc = _panel("SPACE RECLAIMED")
     ring_row = QWidget()
     rr = _line(ring_row, gap=10)
     ring = RecycledRing(recycled)
@@ -349,12 +342,13 @@ def render_approved_overview(window):
             " Graveyard candidate(s) await separate manual review. "
             "No unconfirmed freed space is counted.",
             color="#A7D2D1", size=11, wrap=True))
-    rc.addWidget(_compact_action("Open Undo Center",
-                lambda: window.navigate("Undo Center")))
-    c.addWidget(recycled_panel, 4)
+    action = _compact_action("Review Cleanup",
+                             lambda: window.navigate("Graveyard"))
+    action.setObjectName("approvedCleanupCTA")
+    rc.addWidget(action)
+    c.addWidget(recycled_panel, 5)
 
-    quick_panel, quick = _panel("QUICK ACTIONS",
-                               subtitle="Every action opens a real workflow")
+    quick_panel, quick = _panel("QUICK ACTIONS")
     for name, callback in (
         ("Scan Library", window.start_scan),
         ("Find Unused Mods", lambda: window.navigate("Mods")),
@@ -381,7 +375,7 @@ def render_approved_overview(window):
         shelf.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         shelf.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         shelf.setWidgetResizable(True)
-        shelf.setMinimumHeight(199)
+        shelf.setMinimumHeight(207)
         row_widget = QWidget()
         row = _line(row_widget, gap=9)
         row.setAlignment(Qt.AlignLeft)
@@ -397,7 +391,7 @@ def render_approved_overview(window):
         discover.setToolTip("Open local scan and library Settings")
         discover.setMinimumWidth(172)
         discover.setMaximumWidth(190)
-        discover.setFixedHeight(182)
+        discover.setFixedHeight(184)
         discover.clicked.connect(lambda: window.navigate("Settings"))
         row.addWidget(discover)
         row.addStretch()
