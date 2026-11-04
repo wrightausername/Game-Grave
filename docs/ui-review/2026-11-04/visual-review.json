@@ -1,0 +1,178 @@
+{
+  "fixture": "Explicit synthetic visual data; no user data or AI inference",
+  "covers": "Labelled local demo illustrations; genuine publisher art loads from verified local cache",
+  "platform": "linux",
+  "commit": "859d7b28f8c5f4f9a144031808752aacabc74216",
+  "source_reference": "Owner-supplied seven-page reference/running-UI comparison, left column",
+  "pixel_fidelity": "No automated claim of 1:1 equivalence",
+  "captures": [
+    {
+      "page": "Overview",
+      "file": "visual-review-overview-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1386,
+      "viewport_width": 1386,
+      "vertical_scroll_maximum": 13,
+      "sha256": "3dcea749ad18399a3ac47f56d9320035bfa16f2041eb680ea4ea0130d420f6d9"
+    },
+    {
+      "page": "Graveyard",
+      "file": "visual-review-graveyard-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "f291d98092dff9eeb307f31cade00810b11085c2290d05c7d59f42da55bdfe16"
+    },
+    {
+      "page": "Game DNA",
+      "file": "visual-review-game-dna-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "8b84278402d810ac1ac641cb0c1ae52e618a771985e57e402790c5ba757d0279"
+    },
+    {
+      "page": "Undo Center",
+      "file": "visual-review-undo-center-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1386,
+      "viewport_width": 1386,
+      "vertical_scroll_maximum": 8,
+      "sha256": "52380ba8529989e99f0b5b6e3629addae347530940ffd5f9f46688446729d9d1"
+    },
+    {
+      "page": "AI Assistant",
+      "file": "visual-review-ai-assistant-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "fd46f98a6f4d20c9f36a56480556c14c9cdac6ef480d21708c56e1021ca94ded"
+    },
+    {
+      "page": "Settings",
+      "file": "visual-review-settings-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "7e2e127147143cda2af968b73f9cbca1de7630b08667fa1d40a8232ff9055935"
+    },
+    {
+      "page": "More Tools",
+      "file": "visual-review-more-tools-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "576391df343411f4fb18e938d75d65d2f85f9ae08a51d64c624b8bc69f71ec1b"
+    },
+    {
+      "page": "Overview",
+      "file": "visual-review-overview-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 186,
+      "sha256": "39645373cf2f7f6798eed35a7aedcd473c1b00cb1a6d0006c1d94cca944a875c"
+    },
+    {
+      "page": "Graveyard",
+      "file": "visual-review-graveyard-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 275,
+      "sha256": "0d1c8b04cc0d736d5b473716e4b55b095b4fae0ef44bf76d4c14b7183f7ac88a"
+    },
+    {
+      "page": "Game DNA",
+      "file": "visual-review-game-dna-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 249,
+      "sha256": "28637755afa0d02937801a4998778a1023b1db11db0e6c3b43a8bb5b12794c15"
+    },
+    {
+      "page": "Undo Center",
+      "file": "visual-review-undo-center-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 181,
+      "sha256": "b4434dc77c5290cdc9b060560b073b76b0c5bd602f68532e3cecc58d7ce9870b"
+    },
+    {
+      "page": "AI Assistant",
+      "file": "visual-review-ai-assistant-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 77,
+      "sha256": "2dc05c66fd243bc6ecae247f68cddb681c3d2320091c8515a07a6e3886cab5da"
+    },
+    {
+      "page": "Settings",
+      "file": "visual-review-settings-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 670,
+      "sha256": "0f2e8294aad2d801b012d1fdc1885e32cf0372e1abaad29d0a32a3d8b156167a"
+    },
+    {
+      "page": "More Tools",
+      "file": "visual-review-more-tools-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 520,
+      "sha256": "8ec723e8afc764c73b04500fe79d7fb4d9916e815c9ee23e93c51074243ff386"
+    }
+  ]
+}
