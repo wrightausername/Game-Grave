@@ -12,10 +12,10 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal, QSize
 from PySide6.QtGui import (
     QColor, QFont, QIcon, QLinearGradient, QPainter, QPainterPath, QPen,
-    QPixmap, QPolygonF, QRadialGradient,
+    QPixmap, QPolygonF, QRadialGradient, QImageReader,
 )
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from PySide6.QtSvg import QSvgRenderer
@@ -339,6 +339,7 @@ class RelationshipMap(QWidget):
             "drag to pan, scroll to zoom, 0 to fit.")
         self.setToolTip("Click a node to inspect evidence. Wheel zoom; drag empty space to pan.")
         self.game_name = "Choose a game"
+        self.cover = QPixmap()
         self.states = {}
         self.active = "Install"
         self.positions = {}
@@ -347,8 +348,21 @@ class RelationshipMap(QWidget):
         self.pan_y = 0.0
         self._drag = None
 
-    def set_game(self, name: str, states: dict[str, str]):
+    def set_game(self, name: str, states: dict[str, str], *, cover_path=""):
         self.game_name = str(name)[:120]
+        self.cover = QPixmap()
+        if cover_path:
+            # Trust only a bounded, locally resolved image for this exact game.
+            reader = QImageReader(str(cover_path))
+            reader.setAutoTransform(True)
+            dims = reader.size()
+            if (dims.isValid() and 100 <= dims.width() <= 8192
+                    and 100 <= dims.height() <= 8192
+                    and dims.width() * dims.height() <= 32_000_000):
+                reader.setScaledSize(QSize(240, 360))
+                image = reader.read()
+                if not image.isNull():
+                    self.cover = QPixmap.fromImage(image)
         self.states = {str(k): str(v)[:100] for k, v in states.items()}
         self.active = "Install"
         self.reset_view()
@@ -459,14 +473,19 @@ class RelationshipMap(QWidget):
             p.setBrush(color)
             p.drawEllipse(QPointF(x, y), 4.1, 4.1)
 
-        # Central game identity is selected from actual scan records.
+        # Central card may show this game's own verified local publisher
+        # poster. With no reliable cover, retain the truthful title-only
+        # identity instead of borrowing a different game's attractive art.
+        has_cover = not self.cover.isNull()
         for radius, alpha in ((108, 24), (101, 35), (94, 75)):
             ring = QColor("#FA3658")
             ring.setAlpha(alpha)
             p.setPen(QPen(ring, 3.5))
             p.setBrush(Qt.NoBrush)
             p.drawEllipse(center, radius, radius*.81)
-        middle = QRectF(center.x()-97, center.y()-44, 194, 88)
+        middle = (QRectF(center.x()-86, center.y()-78, 172, 156)
+                  if has_cover else
+                  QRectF(center.x()-97, center.y()-44, 194, 88))
         middle_bg = QLinearGradient(middle.topLeft(), middle.bottomRight())
         middle_bg.setColorAt(0, QColor("#4C172C"))
         middle_bg.setColorAt(.56, QColor("#201522"))
@@ -474,21 +493,44 @@ class RelationshipMap(QWidget):
         p.setPen(QPen(QColor("#FF4D68"), 2.4))
         p.setBrush(middle_bg)
         p.drawRoundedRect(middle, 17, 17)
-        p.setPen(QPen(QColor("#E62E4F"), 1.3))
-        p.drawLine(QPointF(center.x()-63,center.y()-22),
-                   QPointF(center.x()+63,center.y()-22))
-        p.setPen(QColor("#F34A64"))
-        p.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        p.drawText(QRectF(center.x()-87, center.y()-43, 174, 18),
-                   Qt.AlignCenter, "GAME DNA")
-        p.setPen(WHITE)
-        p.setFont(QFont("Segoe UI", 13, QFont.DemiBold))
-        p.drawText(QRectF(center.x()-84,center.y()-20,168,43),
-                   Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
-        p.setPen(QColor("#B8D7E4"))
-        p.setFont(QFont("Segoe UI", 9))
-        p.drawText(QRectF(center.x()-87,center.y()+25,174,15),
-                   Qt.AlignCenter, "SCANNED RELATIONSHIPS")
+        if has_cover:
+            portrait = self.cover.scaled(
+                162, 113, Qt.KeepAspectRatioByExpanding,
+                Qt.SmoothTransformation)
+            cropx = max(0, (portrait.width()-162)//2)
+            cropy = max(0, (portrait.height()-113)//2)
+            p.save()
+            clip = QPainterPath()
+            clip.addRoundedRect(middle.adjusted(4, 4, -4, -4), 12, 12)
+            p.setClipPath(clip)
+            p.drawPixmap(QRectF(middle.left()+5, middle.top()+5, 162, 113),
+                         portrait,
+                         QRectF(cropx, cropy, 162, 113))
+            fade = QLinearGradient(0, middle.top()+70, 0, middle.bottom())
+            fade.setColorAt(0, QColor(5, 8, 16, 0))
+            fade.setColorAt(1, QColor(5, 8, 16, 244))
+            p.fillRect(middle.adjusted(4, 4, -4, -4), fade)
+            p.restore()
+            p.setPen(WHITE)
+            p.setFont(QFont("Segoe UI", 11, QFont.Bold))
+            p.drawText(QRectF(middle.left()+8, middle.bottom()-41, 156, 33),
+                       Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
+        else:
+            p.setPen(QPen(QColor("#E62E4F"), 1.3))
+            p.drawLine(QPointF(center.x()-63,center.y()-22),
+                       QPointF(center.x()+63,center.y()-22))
+            p.setPen(QColor("#F34A64"))
+            p.setFont(QFont("Segoe UI", 11, QFont.Bold))
+            p.drawText(QRectF(center.x()-87, center.y()-43, 174, 18),
+                       Qt.AlignCenter, "GAME DNA")
+            p.setPen(WHITE)
+            p.setFont(QFont("Segoe UI", 13, QFont.DemiBold))
+            p.drawText(QRectF(center.x()-84,center.y()-20,168,43),
+                       Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
+            p.setPen(QColor("#B8D7E4"))
+            p.setFont(QFont("Segoe UI", 9))
+            p.drawText(QRectF(center.x()-87,center.y()+25,174,15),
+                       Qt.AlignCenter, "SCANNED RELATIONSHIPS")
 
         # Large readable cards, bounded to the workspace at ordinary zoom.
         for name, x, y, color, uncertain, state, path in entries:
