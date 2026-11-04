@@ -74,9 +74,8 @@ def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
         right.setWordWrap(True)
         line_layout.addWidget(left, 2)
         line_layout.addWidget(right, 1)
-        if (heading in ("Protection & Cleanup", "Gaming Performance")
-                and name in ("Recycle Bin", "Delete confirmation",
-                             "Pause heavy work")):
+        if (heading == "Protection & Cleanup"
+                and name in ("Recycle Bin", "Delete confirmation")):
             locked = QCheckBox()
             locked.setChecked(True)
             locked.setEnabled(False)
@@ -150,8 +149,8 @@ def render_approved_settings(window):
 
     perf_idx = stack.addWidget(_status_page(
         "GAMING PERFORMANCE GUARD",
-        "Game-aware suspension and low CPU/disk priority are safety "
-        "requirements, not optional high-impact background features. "
+        "Inventory and manual mod scans run even with games or fullscreen apps open. "
+        "Workers use low CPU/disk priority and can be canceled. "
         "Actual FPS and 1%-low results are not measured here.",
         (("Configure scans", lambda: select(1)),
          ("Open Games", lambda: window.navigate("Games")))))
@@ -267,11 +266,11 @@ def render_approved_settings(window):
               "amber", "Graveyard",
               (("Manage protection", lambda: select(2)),)),
         _card("Gaming Performance",
-              "No intrusive game overlays or continuous heavy scans.",
-              (("Pause heavy work", "On", "#55D9AA"),
+              "Requested scans run even during gameplay or fullscreen apps.",
+              (("Scan during gameplay", "Always", "#55D9AA"),
                ("Background priority", "Low", "#55D9AA"),
                ("No game overlays", "Required", "#55D9AA"),
-               ("Game activity polling", "Bounded", "#55D9AA"),
+               ("Game pause for scans", "Off", "#55D9AA"),
                ("FPS measured here", "Not available", "#EBC18B")),
               "red", "Game DNA",
               (("Performance details", lambda: select(perf_idx)),)),

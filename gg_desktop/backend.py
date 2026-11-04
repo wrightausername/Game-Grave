@@ -48,30 +48,19 @@ class ScanCanceled(InterruptedError):
 
 def scan_inventory(settings: dict, canceled: Callable[[], bool],
                    progress: Callable[[int, str], None] | None = None) -> Inventory:
-    """Game-aware, off-thread read-only scan; no file changes."""
-    from performance_guard import (
-        GameActivityDetector, CooperativeGameplayPause, background_worker_priority,
-    )
-    detector = GameActivityDetector(refresh_seconds=3.0)
-    last_progress = [0, "Preparing local inventory"]
-    def report(percent, stage):
-        last_progress[:] = [percent, stage]
-        if progress:
-            progress(percent, stage)
-    def paused(active: bool):
-        if progress:
-            progress(last_progress[0], "Paused — " + detector.pause_reason
-                     if active else "Resuming: " + last_progress[1])
-    checkpoint = CooperativeGameplayPause(
-        canceled, detector=detector, on_pause=paused).checkpoint
+    """Run the requested read-only scan regardless of games/fullscreen apps.
+
+    Game activity never delays a scan. The caller's cancellation callback stays
+    authoritative and the worker retains low CPU/IO priority.
+    """
+    from performance_guard import background_worker_priority
     with background_worker_priority():
-        return _scan_inventory_impl(settings, checkpoint, report, detector)
+        return _scan_inventory_impl(settings, canceled, progress)
 
 
 def _scan_inventory_impl(settings: dict, canceled: Callable[[], bool],
-                         progress: Callable[[int, str], None] | None = None,
-                         detector=None) -> Inventory:
-    """Implementation receives cooperative cancellation/pause checks."""
+                         progress: Callable[[int, str], None] | None = None) -> Inventory:
+    """Implementation receives cancellation checks, with no activity pause gate."""
     def stage(i, name):
         if canceled():
             raise ScanCanceled("Scan canceled. The earlier accepted inventory is unchanged.")
@@ -82,9 +71,6 @@ def _scan_inventory_impl(settings: dict, canceled: Callable[[], bool],
     staged.steam = find_games(list(settings.get("steam_extra_roots", [])), cancel=canceled)
     staged.other = find_launcher_games(list(settings.get("other_library_roots", [])), cancel=canceled)
     staged.games = merge_games(staged.steam, staged.other)
-    if detector is not None:
-        detector.set_game_roots([g.install_path for g in staged.games
-                                 if "open_folder" in g.capabilities])
     stage(1, STAGES[1])
     staged.mods = find_all_mod_storage(
         list(settings.get("steam_extra_roots", [])),

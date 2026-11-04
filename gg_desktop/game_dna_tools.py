@@ -18,11 +18,6 @@ def run_ghost_watch(window, *, patch_only=False):
         window.info("Scan first", "Scan local inventory before capturing mod observations.")
         return
 
-    from performance_guard import GameActivityDetector
-    if GameActivityDetector(refresh_seconds=3).active():
-        window.info("Paused while gaming",
-                    "Ghost Watch will not read mod metadata while a game is active.")
-        return
     from game_intelligence import load_observation
     previous = load_observation()
     if previous is None and patch_only:

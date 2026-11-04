@@ -5,10 +5,12 @@ import tempfile
 import ctypes
 import ntpath
 import os
+import importlib.util
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from ctypes import wintypes
 
 from core import run_auto_cleanup, scan_old_files
@@ -81,7 +83,8 @@ class GameActivityDetectorTests(unittest.TestCase):
 
     def test_wallpaper_launcher_and_crash_helpers_do_not_hold_scan_forever(self):
         for name in ("wallpaper64.exe", "wallpaper32.exe", "wallpaperui.exe",
-                     "UnityCrashHandler64.exe", "crashpad_handler.exe", "steamwebhelper.exe"):
+                     "UnityCrashHandler64.exe", "crashpad_handler.exe", "steamwebhelper.exe",
+                     "EOSOverlayRenderer-Win64-Shipping.exe", "EOSOverlayRenderer-Win32-Shipping.exe"):
             with self.subTest(executable=name):
                 root = r"D:\Steam\steamapps\common\Some App"
                 detector = GameActivityDetector(
@@ -191,28 +194,80 @@ class FullscreenWindowTests(unittest.TestCase):
         self.assertFalse(_window_is_fullscreen(api, api.GetShellWindow()))
 
 
-class ScanPauseReportingTests(unittest.TestCase):
-    def test_resume_retains_progress_and_pause_reports_actual_process(self):
-        from gg_desktop.backend import scan_inventory, Inventory
-        now, playing, messages = [0.0], [True], []
-        detector = GameActivityDetector(
-            process_paths=lambda: [r"D:\EA Games\Battlefield\bf.exe"] if playing[0] else [],
-            fullscreen=lambda: False, clock=lambda: now[0])
-        def close_game(_seconds):
-            playing[0], now[0] = False, now[0] + 4
-        def gate(*args, **kwargs):
-            return CooperativeGameplayPause(*args, **kwargs, sleep=close_game)
-        def scan(_settings, checkpoint, report, _detector):
-            report(60, "Game captures")
-            self.assertFalse(checkpoint())
-            return Inventory()
-        with patch("performance_guard.GameActivityDetector", return_value=detector), \
-                patch("performance_guard.CooperativeGameplayPause", side_effect=gate), \
-                patch("gg_desktop.backend._scan_inventory_impl", side_effect=scan):
-            scan_inventory({}, lambda: False, lambda p, text: messages.append((p, text)))
-        self.assertEqual([percent for percent, _ in messages], [60, 60, 60])
-        self.assertIn("bf.exe", messages[1][1])
-        self.assertEqual(messages[2][1], "Resuming: Game captures")
+class ActivityIndependentScanTests(unittest.TestCase):
+    def setUp(self):
+        self.stack = ExitStack()
+        self.addCleanup(self.stack.close)
+        # Any attempt to inspect a game/fullscreen state fails immediately,
+        # rather than hanging the regression test in the old pause loop.
+        self.detector = self.stack.enter_context(patch(
+            "performance_guard.GameActivityDetector",
+            side_effect=AssertionError("Requested scans must not query game activity")))
+        self.stack.enter_context(patch(
+            "performance_guard.CooperativeGameplayPause.checkpoint",
+            side_effect=AssertionError("Requested scans must never enter a gameplay wait")))
+        self.stack.enter_context(patch(
+            "performance_guard._foreground_is_fullscreen", return_value=True))
+        self.scanners = {}
+        def scan(*args, cancel, **kwargs):
+            if cancel():
+                raise InterruptedError("Scan canceled")
+            return []
+        for name in ("find_games", "find_launcher_games", "find_all_mod_storage",
+                     "find_old_recordings", "find_old_screenshots"):
+            self.scanners[name] = self.stack.enter_context(patch(
+                "gg_desktop.backend." + name, side_effect=scan))
+        self.stack.enter_context(patch("gg_desktop.backend.scan_old_files_scope",
+            return_value=SimpleNamespace(files=[], status="complete", message="Done")))
+        self.stack.enter_context(patch("save_discovery.discover_saves", return_value=[]))
+        self.stack.enter_context(patch("gg_desktop.backend.build_graveyard", return_value=[]))
+
+    def test_inventory_finishes_all_stages_without_game_or_fullscreen_wait(self):
+        from gg_desktop.backend import scan_inventory
+        messages = []
+        inventory = scan_inventory({}, lambda: False,
+            lambda percent, stage: messages.append((percent, stage)))
+        self.assertTrue(inventory.scanned_at)
+        self.assertEqual(inventory.old_files_scan_status, "complete")
+        self.assertEqual([p for p, _ in messages], [0, 20, 40, 60, 80, 100])
+        self.assertFalse(any("Paused" in text for _, text in messages))
+        for scanner in self.scanners.values():
+            scanner.assert_called_once()
+        self.detector.assert_not_called()
+
+    def test_cancel_before_scan_still_stops_before_launcher_reads(self):
+        from gg_desktop.backend import scan_inventory, ScanCanceled
+        with self.assertRaises(ScanCanceled):
+            scan_inventory({}, lambda: True)
+        self.scanners["find_games"].assert_not_called()
+        self.detector.assert_not_called()
+
+    def test_cancel_during_traversal_still_stops_scan(self):
+        from gg_desktop.backend import scan_inventory
+        canceled = [False]
+        def cancel_inside_scan(*args, cancel, **kwargs):
+            canceled[0] = True
+            self.assertTrue(cancel())
+            raise InterruptedError("Scan canceled during traversal")
+        self.scanners["find_games"].side_effect = cancel_inside_scan
+        with self.assertRaises(InterruptedError):
+            scan_inventory({}, lambda: canceled[0])
+        self.scanners["find_launcher_games"].assert_not_called()
+        self.detector.assert_not_called()
+
+    @unittest.skipUnless(importlib.util.find_spec("PySide6"), "Optional Qt dependency")
+    def test_requested_mod_scans_are_not_blocked_by_game_detection(self):
+        from gg_desktop.game_dna_tools import run_ghost_watch
+        for patch_only in (False, True):
+            with self.subTest(patch_only=patch_only):
+                window = SimpleNamespace(scanning=False, cleaning=False,
+                    inventory=SimpleNamespace(scanned_at="Fixture", mods=[]),
+                    info=Mock(), job=Mock())
+                with patch("game_intelligence.load_observation", return_value={"entries": {}}):
+                    run_ghost_watch(window, patch_only=patch_only)
+                window.job.assert_called_once()
+                window.info.assert_not_called()
+        self.detector.assert_not_called()
 
 
 class CooperativePauseTests(unittest.TestCase):

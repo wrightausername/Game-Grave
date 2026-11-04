@@ -1,8 +1,8 @@
 """Conservative Windows gameplay guard for nonessential Game Grave scans.
 
-No hooks, injection, overlays or polling inside games. Never run deep scans from a
-timer during gameplay. Background-priority worker threads and cooperative checks
-minimize contention; no software can promise an absolute 0-FPS impact on every PC.
+No hooks, injection, overlays or polling inside games. Background tools can defer
+work; inventory and manual mod scans run regardless of activity as requested by
+the owner. Background-priority worker threads minimize contention.
 """
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from ctypes import wintypes
 _NON_GAME_PROCESSES = frozenset({
     "steam.exe", "steamwebhelper.exe", "gameoverlayui.exe",
     "epicgameslauncher.exe", "galaxyclient.exe", "galaxyclient helper.exe",
+    "eosoverlayrenderer-win64-shipping.exe", "eosoverlayrenderer-win32-shipping.exe",
     "eadesktop.exe", "ealauncher.exe", "eabackgroundservice.exe",
     "ubisoftconnect.exe", "upc.exe", "riotclientservices.exe",
     "riotclientux.exe", "riotclientuxrender.exe",

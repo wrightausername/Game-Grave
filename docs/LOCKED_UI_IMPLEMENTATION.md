@@ -27,6 +27,13 @@ Settings uses exact launcher identities when counting installations; the string
 `EA` inside `Steam` is not EA installation evidence. Ambiguous installations
 retain their existing separate classification.
 
+## Scan behavior
+
+Inventory and requested Ghost Watch/Patch Fallout scans run regardless of game,
+overlay or fullscreen activity. Workers retain low CPU/IO priority and normal
+cancellation. File protection, cleanup confirmation and restoration validation
+remain separate from read-only scan scheduling.
+
 ## Verification and screenshot evidence
 
 `python -m unittest tests.test_locked_ui_layout -v` exercises all seven populated
