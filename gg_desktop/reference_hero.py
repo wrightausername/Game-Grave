@@ -44,13 +44,13 @@ class ReferenceHero(SceneHeader):
         self.title_overlay = QLabel(title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
         self.title_overlay.setStyleSheet(
-            "background:transparent; color:#FFFFFF; font-size:42px;"
+            "background:transparent; color:#FFFFFF; font-size:48px;"
             "font-weight:900; letter-spacing:.3px;")
         self.subtitle_overlay = QLabel(subtitle, self)
         self.subtitle_overlay.setObjectName("referenceHeroSubtitle")
         self.subtitle_overlay.setWordWrap(True)
         self.subtitle_overlay.setStyleSheet(
-            "background:transparent;color:#E2DDE6;font-size:15px;")
+            "background:transparent;color:#E2DDE6;font-size:17px;")
 
         self.metrics = QWidget(self)
         self.metrics.setObjectName("referenceHeroMetrics")
@@ -87,8 +87,8 @@ class ReferenceHero(SceneHeader):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.width()
-        self.title_overlay.setGeometry(53, 16, max(150, w - 80), 58)
-        self.subtitle_overlay.setGeometry(54, 79, max(150, w - 90), 59)
+        self.title_overlay.setGeometry(72, 10, max(150, w - 92), 61)
+        self.subtitle_overlay.setGeometry(73, 61, max(150, w - 106), 57)
         self.metrics.setGeometry(18, 143, max(250, w - 36), 71)
 
     def paintEvent(self, event):
@@ -128,8 +128,8 @@ class ReferenceHero(SceneHeader):
         # Red moon atmosphere, while preserving white text contrast.
         shade = QLinearGradient(0, 0, w, 0)
         shade.setColorAt(0.0, QColor(5, 7, 14, 248))
-        shade.setColorAt(.31, QColor(8, 8, 16, 209))
-        shade.setColorAt(.58, QColor(14, 7, 17, 60))
+        shade.setColorAt(.31, QColor(8, 8, 16, 160))
+        shade.setColorAt(.58, QColor(14, 7, 17, 25))
         shade.setColorAt(1, QColor(22, 5, 12, 20))
         p.fillRect(full, shade)
         # Darken only the bottom where translucent tiles sit.
@@ -140,5 +140,5 @@ class ReferenceHero(SceneHeader):
         p.restore()
         # Owner reference uses a slim red title accent, not a neon outline.
         p.setPen(QPen(QColor("#EF334F"), 5, Qt.SolidLine, Qt.RoundCap))
-        p.drawLine(30, 29, 16, 105)
+        p.drawLine(52, 29, 35, 105)
         p.end()
