@@ -857,3 +857,75 @@ QFrame#approvedSettingsMiniCard[accent="amber"] {border-top:2px solid #DFAA53;}
 QFrame#approvedSettingsMiniCard[accent="cyan"] {border-top:2px solid #43C8D7;}
 QFrame#approvedFeaturedTool {background:transparent;border:0;}
 """
+
+
+# Locked 2026-11-02 cinematic Overview: image-led library and brand red cleanup
+# action. These selectors affect native controls only; no screenshot/fake data.
+STYLE += r"""
+QPushButton#approvedCover {
+    background:#070C13;
+    border:1px solid #29323E;
+    border-radius:9px;
+    padding:0;
+    text-align:center;
+}
+QPushButton#approvedCover:hover {
+    border:2px solid #ED3B56;
+    background:#111824;
+}
+QFrame#approvedOverviewPanel {
+    background:transparent;
+    border:0;
+    border-right:1px solid #24313D;
+}
+QFrame#approvedOverviewPanel QPushButton#approvedAction {
+    color:#EBF0F7;
+    font-size:14px;
+    font-weight:650;
+    background:transparent;
+    border:0;
+    border-radius:0;
+    border-bottom:1px solid #263340;
+    text-align:left;
+    padding:9px 10px;
+}
+QFrame#approvedOverviewPanel QPushButton#approvedAction:hover {
+    background:#291823;
+    border-bottom:1px solid #CF3450;
+}
+QFrame#approvedOverviewPanel QPushButton#approvedCleanupCTA {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #83162B,stop:.55 #BE2540,stop:1 #811425);
+    color:#FFFFFF;
+    font-size:17px;
+    font-weight:850;
+    border:1px solid #F14860;
+    border-radius:8px;
+    padding:10px 18px;
+    min-height:36px;
+    text-align:center;
+}
+QFrame#approvedOverviewPanel QPushButton#approvedCleanupCTA:hover {
+    background:#C12843;
+    border:1px solid #FF687C;
+}
+QWidget#approvedMetrics {background:transparent;}
+QPushButton#approvedMetric {background:transparent;border-radius:0;}
+QPushButton#approvedMetric:hover {background:#17212A;}
+QScrollArea#approvedLibraryScroll {
+    background:transparent;
+    border:0;
+}
+QPushButton#approvedDiscoveryTile {
+    background:#0E1822;
+    border:1px dashed #455364;
+    color:#D7E8F4;
+    font-size:14px;
+    font-weight:700;
+    border-radius:9px;
+}
+QPushButton#approvedDiscoveryTile:hover {
+    border:1px solid #EF3B56;
+    background:#201724;
+}
+"""
