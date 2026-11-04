@@ -10,7 +10,7 @@ from pathlib import Path
 import math
 
 from PySide6.QtCore import Qt, QRectF, QSize
-from PySide6.QtGui import QColor, QImageReader, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QImageReader, QPainter, QPen, QPixmap, QFont, QLinearGradient, QPainterPath
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
     QScrollArea, QVBoxLayout, QGridLayout, QWidget,
@@ -20,6 +20,7 @@ from core import human_size, get_activity, friendly_activity
 from recovery import get_records
 from gg_desktop.widgets import HeroBanner, button, label
 from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
+from gg_desktop.reference_icons import metric_icon
 
 
 COLORS = ("#49CBED", "#BB97EF", "#F6AD63", "#73DCC7", "#A995F0")
@@ -59,7 +60,7 @@ def _panel(title, *, subtitle=None):
     from gg_desktop.visuals import nav_icon
     shell = QFrame()
     shell.setObjectName("approvedOverviewPanel")
-    col = _stack(shell, margin=(11, 8, 17, 10), gap=8)
+    col = _stack(shell, margin=(10, 8, 13, 8), gap=6)
     heading = QWidget()
     headings = _line(heading, gap=8)
     related = ("Undo Center" if "RECYCLE" in title or "ACTIVITY" in title
@@ -68,7 +69,7 @@ def _panel(title, *, subtitle=None):
     glyph.setPixmap(nav_icon(related).pixmap(26, 26))
     glyph.setFixedSize(28, 28)
     headings.addWidget(glyph)
-    headings.addWidget(_txt(title.title(), size=23, color="#F6F7FB", bold=True), 1)
+    headings.addWidget(_txt(title.title(), size=17, color="#F6F7FB", bold=True), 1)
     col.addWidget(heading)
     if subtitle:
         caption = _txt(subtitle, size=11, color="#ADB8C8", wrap=True)
@@ -77,15 +78,49 @@ def _panel(title, *, subtitle=None):
 
 
 def _compact_action(text, handler, *, secondary=""):
+    from gg_desktop.visuals import nav_icon
     if secondary:
-        action = QPushButton(str(text) + "\n" + str(secondary))
-        action.setMinimumHeight(49)
+        action = QPushButton()
+        action.setObjectName("approvedActivity")
+        action.setStyleSheet("QPushButton#approvedActivity{min-height:28px;max-height:28px;"
+            "padding:4px;border:0;border-bottom:1px solid #29333D;"
+            "border-radius:0;background:transparent;text-align:left;}"
+            "QPushButton#approvedActivity:hover{background:#201B28;}")
+        line = _line(action, margin=(5, 2, 5, 2), gap=8)
+        glyph = QLabel()
+        glyph.setFixedSize(25,25)
+        glyph.setPixmap(nav_icon("Mods" if "mod" in text.casefold() else
+            "Undo Center" if "recycl" in text.casefold() or "restor" in text.casefold()
+            else "Games").pixmap(23,23))
+        line.addWidget(glyph)
+        copy = QWidget()
+        words = _stack(copy, gap=0)
+        words.addWidget(_txt(text, size=11, color="#E7EDF5", bold=True))
+        stamp, _, state = str(secondary).partition("|")
+        words.addWidget(_txt(stamp.strip(), size=9, color="#8F9CAA"))
+        line.addWidget(copy,1)
+        if state:
+            chip = _txt(state.strip(), size=9, color="#7BD5AD")
+            chip.setStyleSheet("color:#7BD5AD;background:#152C27;"
+                              "border:1px solid #295242;border-radius:3px;padding:2px 5px;font-size:9px;")
+            line.addWidget(chip)
+        for child in action.findChildren(QWidget):
+            child.setAttribute(Qt.WA_TransparentForMouseEvents)
         action.setToolTip(str(secondary))
-        action.setProperty("multiLine", True)
+        action.setAccessibleName(str(text))
+        action.clicked.connect(handler)
+        return action
     else:
         action = QPushButton(str(text) + "   ›")
-        action.setMinimumHeight(42)
+        action.setMinimumHeight(29)
     action.setObjectName("approvedAction")
+    route = {"Scan Library": "Games", "Find Unused Mods": "Mods",
+             "Review Old Files": "Old Files", "Open Graveyard": "Graveyard",
+             "Manage Captures": "Captures", "Undo Center": "Undo Center",
+             "Review Cleanup": "Graveyard", "Review history": "Undo Center"}.get(text)
+    if route:
+        action.setIcon(nav_icon(route))
+        action.setIconSize(QSize(18, 18))
     action.setAccessibleName(str(text))
     action.clicked.connect(handler)
     return action
@@ -96,8 +131,8 @@ class RecycledRing(QWidget):
     def __init__(self, amount: int, parent=None):
         super().__init__(parent)
         self.amount = max(0, amount)
-        self.setMinimumSize(160, 160)
-        self.setMaximumSize(191, 191)
+        self.setMinimumSize(164, 164)
+        self.setMaximumSize(188, 188)
         self.setToolTip(
             "Bytes moved through Game Grave's logged Recycle Bin actions. "
             "This is not confirmed free space and may include restored items.")
@@ -109,19 +144,26 @@ class RecycledRing(QWidget):
         rect = QRectF((self.width()-length)/2, (self.height()-length)/2,
                       length, length)
         stroke = max(15, length*.13)
-        paint.setPen(QPen(QColor("#27313E"), stroke, Qt.SolidLine, Qt.RoundCap))
+        paint.setPen(QPen(QColor("#321D29"), stroke + 9, Qt.SolidLine, Qt.RoundCap))
         paint.drawArc(rect.adjusted(stroke/2, stroke/2, -stroke/2, -stroke/2),
                       0, 360*16)
-        # Brand-red decorative ring; never imply an unmeasured percentage.
+        # Full decorative halo, not an invented progress percentage.
         paint.setPen(QPen(QColor(STORAGE_RED), stroke, Qt.SolidLine, Qt.RoundCap))
         paint.drawArc(rect.adjusted(stroke/2, stroke/2, -stroke/2, -stroke/2),
-                      90*16, -275*16)
+                      0, 360*16)
+        paint.setPen(QPen(QColor("#FE8394"), 1.2))
+        paint.drawEllipse(rect.adjusted(stroke, stroke, -stroke, -stroke))
         paint.setPen(QColor("#FFFFFF"))
         from PySide6.QtGui import QFont
         font = QFont("Segoe UI", 15)
         font.setBold(True)
         paint.setFont(font)
-        paint.drawText(rect, Qt.AlignCenter, human_size(self.amount))
+        paint.drawText(rect.adjusted(0, -10, 0, 0), Qt.AlignCenter, human_size(self.amount))
+        font.setPixelSize(10)
+        font.setBold(False)
+        paint.setFont(font)
+        paint.setPen(QColor("#BAA6B5"))
+        paint.drawText(rect.adjusted(0, 34, 0, 0), Qt.AlignCenter, "LOGGED MOVES")
         paint.end()
 
 
@@ -150,25 +192,25 @@ def _monthly_moves():
 def _metric(label_text, value, accent, route, handler, description):
     from gg_desktop.visuals import nav_icon
     tile = QPushButton()
-    tile.setMinimumHeight(83)
-    tile.setMaximumHeight(90)
+    tile.setMinimumHeight(70)
+    tile.setMaximumHeight(76)
     tile.setObjectName("approvedMetric")
     tile.setAccessibleName(label_text + ": " + str(value) + ". " + description)
     tile.setToolTip(description)
     tile.setStyleSheet(
         "QPushButton#approvedMetric{background:transparent;border:0;"
-        "border-bottom:2px solid " + accent + ";border-radius:0;"
-        "text-align:left;padding:5px;min-height:72px;max-height:72px;}"
+        "border-bottom:1px solid " + accent + ";border-radius:0;"
+        "text-align:left;padding:4px;min-height:62px;max-height:62px;}"
         "QPushButton#approvedMetric:hover{background:#18202B;}")
     frame = _line(tile, margin=(6, 7, 6, 7), gap=12)
     glyph = QLabel()
     glyph.setFixedSize(37, 37)
-    glyph.setPixmap(nav_icon(route).pixmap(35,35))
+    glyph.setPixmap(metric_icon(route, accent, 35))
     frame.addWidget(glyph)
     details = QWidget()
     col = _stack(details, gap=1)
     col.addWidget(_txt(label_text.upper(), size=11, color="#CAD2DB", bold=True))
-    col.addWidget(_txt(value, size=28, color="#FFFFFF", bold=True))
+    col.addWidget(_txt(value, size=25, color=accent, bold=True))
     frame.addWidget(details, 1)
     for child in tile.findChildren(QWidget):
         child.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -176,23 +218,54 @@ def _metric(label_text, value, accent, route, handler, description):
     return tile
 
 
+class LibraryCover(QPushButton):
+    """Edge-to-edge local poster; native focus/selection, no screenshot controls."""
+    def __init__(self, game, pixmap, open_game, official):
+        super().__init__()
+        self.game = game
+        self.art = pixmap
+        self.setObjectName("approvedCover")
+        self.setMinimumWidth(150)
+        self.setMaximumWidth(228)
+        self.setFixedHeight(206)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setAccessibleName("Inspect " + game.name)
+        self.setToolTip(game.name + " • " + game.launcher +
+                        ("\nLocally verified game artwork" if official else
+                         "\nGame Grave illustration; official cover unavailable"))
+        self.clicked.connect(lambda: open_game(game))
+
+    def sizeHint(self):
+        return QSize(190, 206)
+
+    def minimumSizeHint(self):
+        return QSize(150, 206)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        bounds = QRectF(self.rect()).adjusted(1, 1, -1, -1)
+        clip = QPainterPath()
+        clip.addRoundedRect(bounds, 5, 5)
+        painter.setClipPath(clip)
+        painter.fillRect(bounds, QColor("#0A1119"))
+        if not self.art.isNull():
+            scale = max(bounds.width()/self.art.width(), bounds.height()/self.art.height())
+            sw, sh = bounds.width()/scale, bounds.height()/scale
+            painter.drawPixmap(bounds, self.art, QRectF(
+                (self.art.width()-sw)/2, (self.art.height()-sh)/2, sw, sh))
+        painter.setClipping(False)
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(QPen(QColor("#ED3F59" if self.underMouse() or self.hasFocus()
+                                  else "#36414E"), 2 if self.hasFocus() else 1))
+        painter.drawRoundedRect(bounds, 5, 5)
+
+
 def _cover(game, open_game):
     """Verified local artwork or clearly identified generated placeholder."""
-    holder = QPushButton()
-    holder.setObjectName("approvedCover")
-    holder.setMinimumWidth(186)
-    holder.setMaximumWidth(200)
-    holder.setFixedHeight(184)
-    holder.setToolTip(game.name + "\n" + game.launcher
-                      + "\nCover from local cache if available")
-    holder.setAccessibleName("Inspect " + game.name)
-    outer = _stack(holder, margin=(0, 0, 0, 0), gap=0)
-    art = QLabel()
-    art.setAlignment(Qt.AlignCenter)
-    art.setMinimumSize(186, 184)
-    art.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-    from gg_desktop.local_art import game_banner_path
-    source = game_banner_path(game)
+    from gg_desktop.local_art import game_cover_path, game_banner_path
+    source = game_cover_path(game) or game_banner_path(game)
     pixmap = None
     if source:
         reader = QImageReader(source)
@@ -204,30 +277,19 @@ def _cover(game, open_game):
             # Preserve portrait aspect ratio before cropping to the
             # wide cinematic tile. Decoding directly to a landscape size
             # previously stretched publisher artwork out of proportion.
-            scale = max(400 / geometry.width(), 368 / geometry.height())
+            scale = max(456 / geometry.width(), 412 / geometry.height())
             if scale < 1.0:
                 reader.setScaledSize(QSize(
                     max(1, round(geometry.width() * scale)),
                     max(1, round(geometry.height() * scale))))
             image = reader.read()
             if not image.isNull():
-                scaled = QPixmap.fromImage(image).scaled(
-                    400, 368, Qt.KeepAspectRatioByExpanding,
-                    Qt.SmoothTransformation)
-                x = max(0, (scaled.width() - 400) // 2)
-                y = max(0, (scaled.height() - 368) // 2)
-                pixmap = scaled.copy(x, y, 400, 368)
-                pixmap.setDevicePixelRatio(2)
+                pixmap = QPixmap.fromImage(image)
+    official = pixmap is not None
     if pixmap is None:
         from gg_desktop.poster_art import generated_game_poster
-        pixmap = generated_game_poster(game.name, 188, 184)
-        art.setToolTip("Original Game Grave placeholder, not official box art")
-    else:
-        art.setToolTip("Locally verified artwork for " + game.name)
-    art.setPixmap(pixmap)
-    outer.addWidget(art)
-    holder.clicked.connect(lambda _=False: open_game(game))
-    return holder
+        pixmap = generated_game_poster(game.name, 200, 240)
+    return LibraryCover(game, pixmap, open_game, official)
 
 
 def render_approved_overview(window):
@@ -239,8 +301,8 @@ def render_approved_overview(window):
     hero = HeroBanner(title="Overview",
                       subtitle="Your games. All their baggage. Under control.",
                       detail="")
-    hero.setMinimumHeight(162)
-    hero.setMaximumHeight(162)
+    hero.setMinimumHeight(148)
+    hero.setMaximumHeight(148)
     hero.setAccessibleName(
         "Overview. Your games. All their baggage. Under control.")
     page.content.addWidget(hero)
@@ -271,7 +333,7 @@ def render_approved_overview(window):
     page.content.addWidget(metrics)
 
     recycled, move_count, recent = _monthly_moves()
-    center = ResponsiveRow(breakpoint=1000)
+    center = ResponsiveRow(breakpoint=1000, horizontal_height=302)
     c = center
 
     activity_panel, activity = _panel("RECENT ACTIVITY")
@@ -303,21 +365,6 @@ def render_approved_overview(window):
         activity.addWidget(_txt(
             "No recorded Game Grave activity yet. Scanning does not delete "
             "or recycle anything.", color="#AEB8C6", size=11, wrap=True))
-    # A recent audit can be genuinely short. Fill unused dashboard space
-    # with explicitly labeled, verifiable scan facts, never invented events.
-    if found and len(events) < 3:
-        activity.addWidget(_txt("LATEST SCAN SNAPSHOT",
-                                size=11, color="#F15A73", bold=True))
-        snapshots = (
-            ("Installed games", len(games), "Games"),
-            ("Detected mod locations", len(mods), "Mods"),
-            ("Graveyard candidates", len(window.inventory.graveyard), "Graveyard"),
-        )
-        for text, number, route in snapshots[:3-len(events)]:
-            activity.addWidget(_compact_action(
-                text + ": " + str(number),
-                lambda _checked=False, r=route: window.navigate(r),
-                secondary="From the latest scan  •  not a cleanup event"))
     activity.addStretch()
     activity.addWidget(_compact_action("Review history",
                         lambda: window.navigate("Undo Center")))
@@ -347,7 +394,7 @@ def render_approved_overview(window):
                              lambda: window.navigate("Graveyard"))
     action.setObjectName("approvedCleanupCTA")
     rc.addWidget(action)
-    c.addWidget(recycled_panel, 5)
+    c.addWidget(recycled_panel, 4)
 
     quick_panel, quick = _panel("QUICK ACTIONS")
     for name, callback in (
@@ -360,13 +407,17 @@ def render_approved_overview(window):
     ):
         quick.addWidget(_compact_action(name, callback))
     quick.addStretch()
-    c.addWidget(quick_panel, 3)
+    c.addWidget(quick_panel, 5)
     page.content.addWidget(center)
 
     library, libcol = _panel("YOUR LIBRARY")
     heads = QWidget()
     h = _line(heads, gap=9)
-    h.addWidget(_txt("Only verified installed games; art may be missing.", color="#BBC9D6", size=11), 1)
+    h.addStretch(1)
+    def add_library():
+        window._settings_category_index = 1
+        window.navigate("Settings")
+    h.addWidget(_compact_action("Add library", add_library))
     h.addWidget(_compact_action("View all games", lambda: window.navigate("Games")))
     libcol.addWidget(heads)
     if found and games:
@@ -376,7 +427,7 @@ def render_approved_overview(window):
         shelf.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         shelf.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         shelf.setWidgetResizable(True)
-        shelf.setMinimumHeight(207)
+        shelf.setMinimumHeight(222)
         row_widget = QWidget()
         row = _line(row_widget, gap=9)
         row.setAlignment(Qt.AlignLeft)
@@ -384,17 +435,7 @@ def render_approved_overview(window):
             window._pending_game_query = game.name
             window.navigate("Games")
         for game in games[:16]:
-            row.addWidget(_cover(game, inspect))
-        # This is a real workflow tile, never an invented game cover.
-        discover = QPushButton("+\nADD A LIBRARY\n\nScan more drives")
-        discover.setObjectName("approvedDiscoveryTile")
-        discover.setAccessibleName("Configure another game library")
-        discover.setToolTip("Open local scan and library Settings")
-        discover.setMinimumWidth(172)
-        discover.setMaximumWidth(190)
-        discover.setFixedHeight(184)
-        discover.clicked.connect(lambda: window.navigate("Settings"))
-        row.addWidget(discover)
+            row.addWidget(_cover(game, inspect), 1)
         row.addStretch()
         shelf.setWidget(row_widget)
         libcol.addWidget(shelf)

@@ -133,7 +133,7 @@ class HeroBanner(QFrame):
         painter.drawRoundedRect(target, 11, 11)
         painter.save()
         painter.setClipRect(target)
-        if self.art.isValid():
+        if self.art.isValid() and self.owner_art.isNull():
             self.art.render(painter, QRectF(0, -6, self.width(), self.height() + 16))
         if self.title == "Overview":
             from gg_desktop.owner_art import draw_approved_hero
@@ -149,14 +149,19 @@ class HeroBanner(QFrame):
             # Owner's exact Overview headline hierarchy: one large white
             # title, one restrained white subtitle, no secondary red slogan.
             painter.setPen(QColor("#F7F8FA"))
-            painter.setFont(QFont("Segoe UI", 34, QFont.Bold))
+            title_font = QFont("Segoe UI")
+            title_font.setPixelSize(38)
+            title_font.setBold(True)
+            painter.setFont(title_font)
             painter.setPen(QPen(QColor("#F0445A"), 5, Qt.SolidLine, Qt.RoundCap))
-            painter.drawLine(52, 40, 35, 120)
+            painter.drawLine(24, 31, 12, 103)
             painter.setPen(QColor("#F7F8FA"))
-            painter.drawText(73, 75, self.title)
+            painter.drawText(38, 59, self.title)
             painter.setPen(QColor("#C8CFDA"))
-            painter.setFont(QFont("Segoe UI", 15, QFont.Normal))
-            painter.drawText(QRectF(75, 88, max(160, self.width() * .55), 62),
+            subtitle_font = QFont("Segoe UI")
+            subtitle_font.setPixelSize(14)
+            painter.setFont(subtitle_font)
+            painter.drawText(QRectF(39, 72, max(160, self.width() * .65), 48),
                              Qt.AlignLeft | Qt.TextWordWrap, self.subtitle)
         else:
             painter.setPen(QColor("#F5F7FB"))

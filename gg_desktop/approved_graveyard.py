@@ -22,6 +22,8 @@ from gg_desktop.widgets import button, data_table, label, panel, row
 from gg_desktop.cinematic_art import CinematicImpactTrack
 from gg_desktop.grave_evidence_art import GraveEvidenceBanner
 from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
+from gg_desktop.reference_icons import metric_icon
+from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE
 from gg_desktop.graveyard_filters import (
     SORT_OPTIONS, AGE_OPTIONS, available_drives, select_graveyard_entries,
 )
@@ -48,7 +50,7 @@ def _stat(title, value, color):
         "Reviewable": "Undo Center", "Protected": "Settings",
     }
     image = label("", "caption")
-    image.setPixmap(nav_icon(icons.get(title, "Graveyard")).pixmap(32,32))
+    image.setPixmap(metric_icon(icons.get(title, "Graveyard"), color, 32))
     image.setFixedSize(34,34)
     line.addWidget(image)
     text = QWidget()
@@ -105,8 +107,8 @@ def render_approved_graveyard(window):
     hero = ReferenceHero(
         "graveyard", "Graveyard",
         "Find and review old gaming files. You decide what gets removed.")
-    hero.setMinimumHeight(151)
-    hero.setMaximumHeight(151)
+    hero.setMinimumHeight(132)
+    hero.setMaximumHeight(132)
     page.content.addWidget(hero)
     if not window.inventory.scanned_at:
         window._not_scanned(page)
@@ -167,20 +169,22 @@ def render_approved_graveyard(window):
     controls.addWidget(window.grave_sort)
     page.content.addWidget(filters)
 
-    main = ResponsiveRow(breakpoint=980, spacing=8, horizontal_height=383)
+    main = ResponsiveRow(breakpoint=980, spacing=8, horizontal_height=355)
     main_row = main
     browser, bcol = panel(padding=9, spacing=7)
     bcol.addWidget(_label("CANDIDATE FILES", "#F4F6F9", 17, True))
     window.grave_table = data_table([
         "ITEM", "SOURCE / TYPE", "GAME / RELATIONSHIP",
-        "SIZE", "AGE", "REVIEW STATUS"])
+        "SIZE", "MODIFIED", "REVIEW STATUS"])
+    window.grave_table.setItemDelegateForColumn(0, EvidenceNameDelegate(window.grave_table))
     window.grave_table.setSelectionBehavior(QAbstractItemView.SelectRows)
     window.grave_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-    for idx, width in enumerate((178, 112, 150, 80, 95, 143)):
+    window.grave_table.setProperty("usesCheckSelection", True)
+    for idx, width in enumerate((270, 130, 150, 85, 80, 143)):
         window.grave_table.setColumnWidth(idx, width)
     window.grave_table.horizontalHeader().setStretchLastSection(True)
-    window.grave_table.setMinimumHeight(315)
-    window.grave_table.verticalHeader().setDefaultSectionSize(47)
+    window.grave_table.setMinimumHeight(290)
+    window.grave_table.verticalHeader().setDefaultSectionSize(34)
     window.grave_table.setAccessibleName("Graveyard discovered candidates table")
     window.grave_table.setIconSize(QSize(29, 29))
     bcol.addWidget(window.grave_table, 1)
@@ -188,9 +192,10 @@ def render_approved_graveyard(window):
     main_row.addWidget(browser, 7)
 
     inspector, icol = panel(padding=12, spacing=6)
-    inspector.setMinimumHeight(360)
+    inspector.setMinimumHeight(340)
     icol.addWidget(_label("ITEM DETAILS", "#F6F3F7", 17, True))
     window.grave_art = GraveEvidenceBanner()
+    window.grave_art.set_candidates(entries)
     icol.addWidget(window.grave_art)
     # Paths and evidence can be arbitrarily long. Without a separate
     # inspector scroll area, Qt compresses the labels until they overlap.
@@ -207,15 +212,12 @@ def render_approved_graveyard(window):
     icol.addWidget(details_scroll, 1)
     window.grave_detail = details_col
     main_row.addWidget(inspector, 3)
-    main.setMinimumHeight(383)
+    main.setMinimumHeight(355)
     page.content.addWidget(main)
 
     def selected():
-        rows = window.grave_table.selectionModel().selectedRows()
-        if len(rows) != 1:
-            return None
-        i = rows[0].row()
-        return window._shown_graves[i] if 0 <= i < len(window._shown_graves) else None
+        entries = window._selected_grave_entries()
+        return entries[0] if len(entries) == 1 else None
 
     def _personal_rule():
         entry = selected()
@@ -257,13 +259,22 @@ def render_approved_graveyard(window):
     # The locked action strip belongs immediately under the review table.
     # All three mutations still delegate to the existing confirmation/safety
     # code. A protection override never implicitly deletes anything.
-    actions = ResponsiveGrid(columns=((0, 1), (490, 2), (900, 3), (1250, 6)),
-                             margins=(12, 9, 12, 9))
+    actions = ResponsiveGrid(columns=((0, 1), (490, 2), (900, 3), (1250, 7)),
+                             margins=(9, 5, 9, 5))
     actions.setObjectName("ggActionStrip")
     action_layout = actions
     window.grave_counter = _label("No items selected.", "#DBE4ED", 12, True)
     action_layout.addWidget(window.grave_counter)
     action_layout.addWidget(button("Select reviewable", window._select_eligible))
+    def clear_selection():
+        table = window.grave_table
+        table.blockSignals(True)
+        for i in range(table.rowCount()):
+            table.item(i, 0).setCheckState(Qt.Unchecked)
+        table.clearSelection()
+        table.blockSignals(False)
+        update_details()
+    action_layout.addWidget(button("Clear", clear_selection))
     action_layout.addWidget(button("Protect", protect))
     action_layout.addWidget(button("Unprotect", unprotect))
     action_layout.addWidget(button("Open Path", open_path))
@@ -277,14 +288,14 @@ def render_approved_graveyard(window):
     impact = QFrame()
     impact.setObjectName("ggAccentPanel")
     impact.setProperty("accent", "red")
-    impact_row = row(spacing=15, margins=(15, 11, 15, 10))
+    impact_row = row(spacing=12, margins=(12, 7, 12, 7))
     impact.setLayout(impact_row)
     impact_left = QWidget()
     left_col = QVBoxLayout(impact_left)
     left_col.setContentsMargins(0, 0, 0, 0)
     left_col.setSpacing(4)
     left_col.addWidget(_label("STORAGE IMPACT  /  CANDIDATE SIZES",
-                              "#F4F7FB", 14, True))
+                              "#F4F7FB", 12, True))
     left_col.addWidget(CinematicImpactTrack(can_review, protected))
     left_col.addWidget(_label(
         human_size(can_review) + " reviewable   •   " +
@@ -315,8 +326,7 @@ def render_approved_graveyard(window):
     recovery_row.setLayout(recovery)
     recovery.addWidget(_label(
         "Manual review only  •  Recycle Bin + Undo  •  Saved games protected",
-        "#A2CDBE", 11))
-    recovery.addStretch()
+        "#A2CDBE", 11), 1)
     recovery.addWidget(button(
         "Test Recycle Bin recovery", window._test_recycle_bin_safely))
     recovery.addWidget(button(
@@ -324,6 +334,11 @@ def render_approved_graveyard(window):
     page.content.addWidget(recovery_row)
 
     def refresh():
+        checked_keys = set()
+        for index, entry in enumerate(getattr(window, "_shown_graves", [])):
+            item = window.grave_table.item(index, 0)
+            if item is not None and item.checkState() == Qt.Checked:
+                checked_keys.add(entry.key)
         selected_rows = window.grave_table.selectionModel().selectedRows()
         previous_key = None
         if len(selected_rows) == 1 and hasattr(window, "_shown_graves"):
@@ -362,18 +377,18 @@ def render_approved_graveyard(window):
                         "#88D9B1" if entry.can_recycle else
                         "#EFAB6D" if rule == "Unprotect" else "#D7B7BC")))
                 if col == 0:
+                    cell.setData(PATH_ROLE, entry.path)
                     cell.setIcon(_candidate_icon(entry.category))
+                    cell.setFlags(cell.flags() | Qt.ItemIsUserCheckable)
+                    cell.setCheckState(Qt.Checked if entry.key in checked_keys else Qt.Unchecked)
                 table.setItem(idx, col, cell)
-                if col == 0:
-                    from gg_desktop.visuals import nav_icon
-                    cell.setIcon(nav_icon("Old Files"))
             if rule == "Unprotect":
                 unlock = button(
                     "Unprotect", lambda _=False, e=entry: window._unprotect_grave(e))
                 unlock.setAccessibleName("Unprotect your personal rule for " + entry.name)
                 unlock.setToolTip("Remove only your own Never Touch rule. No deletion.")
                 table.setCellWidget(idx, 5, unlock)
-                table.setRowHeight(idx, 47)
+                table.setRowHeight(idx, 34)
             else:
                 # Decorative status chip; selection and action authority are
                 # still controlled exclusively by the scan-backed entry.
@@ -381,14 +396,14 @@ def render_approved_graveyard(window):
                 chip.setAlignment(Qt.AlignCenter)
                 chip.setAttribute(Qt.WA_TransparentForMouseEvents)
                 chip.setStyleSheet(
-                    "QLabel{border-radius:7px;padding:3px 8px;"
-                    "font-size:12px;font-weight:800;"
+                    "QLabel{border-radius:4px;padding:2px 6px;"
+                    "font-size:10px;font-weight:700;"
                     + ("color:#77E7B5;background:#113D31;border:1px solid #268F69;"
                        if entry.can_recycle else
                        "color:#EAB1BD;background:#351923;border:1px solid #693044;")
                     + "}")
                 table.setCellWidget(idx, 5, chip)
-                table.setRowHeight(idx, 47)
+                table.setRowHeight(idx, 34)
         pending = getattr(window, "_pending_grave_key", None) or previous_key
         if pending:
             for i, e in enumerate(window._shown_graves):
@@ -438,6 +453,8 @@ def render_approved_graveyard(window):
     ):
         choice.connect(refresh)
     window.grave_table.itemSelectionChanged.connect(update_details)
+    window.grave_table.itemChanged.connect(
+        lambda item: update_details() if item.column() == 0 else None)
     window.grave_table.cellDoubleClicked.connect(
         lambda i, _c: window._inspect_grave_entry(window._shown_graves[i])
         if 0 <= i < len(window._shown_graves) else None)

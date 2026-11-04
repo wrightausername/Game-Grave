@@ -6,9 +6,11 @@ unreviewed repair actions are provided to the assistant.
 """
 from __future__ import annotations
 
+from html import escape
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
+    QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QTextBrowser,
     QPushButton, QVBoxLayout, QWidget,
 )
 
@@ -63,15 +65,18 @@ def render_approved_ai(window):
         ("Permissions", "Read-only", "#D6A9ED"),
     ):
         ss.addWidget(_small_status(title, value, color))
-    ss.addWidget(button("Settings", lambda: window.navigate("Settings")))
+    def configure_ai():
+        window._settings_category_index = 4
+        window.navigate("Settings")
+    ss.addWidget(button("Configure local AI", configure_ai))
     page.content.addWidget(statuses)
 
     workspace = ResponsiveGrid(
-        columns=((0, 1), (620, 2), (1000, 4)), spacing=9,
+        columns=((0, 1), (620, 2), (1000, 5)), spacing=9,
         positions={
             1: ((1, 0, 1, 1), (0, 0, 1, 1), (2, 0, 1, 1)),
             2: ((1, 0, 1, 1), (0, 0, 1, 2), (1, 1, 1, 1)),
-            4: ((0, 0, 1, 1), (0, 1, 1, 2), (0, 3, 1, 1)),
+            5: ((0, 0, 1, 1), (0, 1, 1, 3), (0, 4, 1, 1)),
         })
     workspace.setObjectName("approvedAIWorkspace")
     wrow = workspace
@@ -104,32 +109,41 @@ def render_approved_ai(window):
         action.setObjectName(
             "approvedAIModeActive" if route == "AI Assistant"
             else "approvedAIWorkflow")
-        action.setMinimumHeight(39)
+        action.setMinimumHeight(27)
         action.setToolTip(tooltip)
         ml.addWidget(action)
     ml.addStretch()
     wrow.addWidget(modes)
 
     hub, chat = panel(padding=10, spacing=9)
-    chat.addWidget(_label("GAME GRAVE AI", color="#FFFFFF", font=15, strong=True))
-    chat.addWidget(_label(
-        "Your opt-in local gaming companion. Explanations remain read-only; "
-        "deletion, unprotecting and repairs are never delegated to AI.",
-        color="#B8C7D5", font=12))
-    welcome = CinematicToolArtwork("assistant")
+    heading = QWidget()
+    heading_row = row(spacing=9)
+    heading.setLayout(heading_row)
+    welcome = QLabel("GG")
     welcome.setObjectName("ggAssistantWelcomeArt")
-    welcome.setMinimumHeight(124)
-    welcome.setMaximumHeight(124)
-    chat.addWidget(welcome)
+    welcome.setAlignment(Qt.AlignCenter)
+    welcome.setFixedSize(40, 40)
+    welcome.setStyleSheet("color:#FF697C;background:#351524;border:1px solid #B33A55;"
+                         "border-radius:20px;font-size:15px;font-weight:850;")
+    heading_row.addWidget(welcome)
+    titles = QWidget()
+    title_col = QVBoxLayout(titles)
+    title_col.setContentsMargins(0,0,0,0)
+    title_col.setSpacing(2)
+    title_col.addWidget(_label("GAME GRAVE AI", color="#FFFFFF", font=14, strong=True))
+    title_col.addWidget(_label("Private • Local • Read-only guidance", font=10))
+    heading_row.addWidget(titles, 1)
+    chat.addWidget(heading)
     if not (enabled and installed):
         offline = _label(
             "ENGINE OFFLINE  •  Enable local AI in Settings to ask questions. "
             "All other Game Grave tools remain fully usable.",
-            color="#F0C188", font=12, strong=True)
+            color="#F0C188", font=10, strong=True)
         chat.addWidget(offline)
-    transcript = QPlainTextEdit()
+    transcript = QTextBrowser()
     transcript.setReadOnly(True)
-    transcript.setMinimumHeight(178 if not enabled else 205)
+    transcript.setOpenExternalLinks(False)
+    transcript.setMinimumHeight(230)
     transcript.setAccessibleName("Local AI conversation history for this session")
     transcript.setPlaceholderText(
         "Ask Game Grave AI about your gaming storage, detected mods, "
@@ -158,13 +172,35 @@ def render_approved_ai(window):
     send.setEnabled(enabled and installed)
     entry.setEnabled(enabled and installed)
 
+    rendered = {"text": None}
     def refresh_session():
         from shiboken6 import isValid
         if not isValid(transcript):
             return
         text = "\n\n".join(session["messages"])
-        if transcript.toPlainText() != text:
-            transcript.setPlainText(text)
+        if rendered["text"] != text:
+            rendered["text"] = text
+            blocks = []
+            for message in session["messages"]:
+                speaker, separator, content = message.partition(":")
+                accent = "#F27488" if speaker == "You" else "#70DCB4"
+                content = content if separator else message
+                background = "#241823" if speaker == "You" else "#14211F"
+                blocks.append(
+                    '<table width="100%" cellspacing="0" cellpadding="8"><tr><td bgcolor="' +
+                    background + '" style="border-left:2px solid ' + accent + ';">'
+                    '<span style="font-weight:700;color:' + accent + ';">' +
+                    escape(speaker if separator else "Game Grave AI") + '</span><br>' +
+                    '<span style="color:#D6DFE9;line-height:1.5;">' +
+                    escape(content.strip()).replace("\n", "<br>") +
+                    '</span></td></tr></table><p style="margin:0;font-size:4px;">&nbsp;</p>')
+            if not blocks:
+                blocks.append('<h3 style="color:#EBE5F0;">Your gaming workspace, explained.</h3>'
+                    '<p style="color:#AEBCCB;">Ask about a detected game, mod location, '
+                    'cleanup candidate or recovery action.</p>'
+                    '<p style="color:#D7AD86;">Local AI is optional. Enable it in Settings '
+                    'when you want to start a conversation.</p>')
+            transcript.setHtml(''.join(blocks))
             transcript.verticalScrollBar().setValue(
                 transcript.verticalScrollBar().maximum())
         ready = (window.settings.get("ai_assistant_enabled") is True
@@ -224,22 +260,28 @@ def render_approved_ai(window):
     side, scol = panel(padding=11, spacing=9)
     scol.addWidget(_label("ACTIVE CONTEXT", color="#FFFFFF", font=14, strong=True))
     if window.inventory.scanned_at:
-        scol.addWidget(_label(
-            f"{len(window.inventory.games)} games • "
-            f"{len(window.inventory.mods)} mod locations",
-            color="#DDE7F2", font=13, strong=True))
-        scol.addWidget(_label(
-            f"{len(window.inventory.graveyard)} Graveyard candidates • "
-            f"{len(window.inventory.saves)} protected save locations"))
+        for name, value, accent in (
+            ("Installed games", len(window.inventory.games), "#72D5E7"),
+            ("Mod locations", len(window.inventory.mods), "#CAA0E8"),
+            ("Graveyard candidates", len(window.inventory.graveyard), "#ECAF7C"),
+            ("Protected save locations", len(window.inventory.saves), "#73DAB0"),
+            ("Capture files", len(window.inventory.screenshots) +
+             len(window.inventory.recordings), "#ADA8EB"),
+        ):
+            item = QWidget()
+            facts = row(spacing=5)
+            item.setLayout(facts)
+            facts.addWidget(_label("●  " + name, color=accent, font=10), 1)
+            facts.addWidget(_label(value, color=accent, font=14, strong=True))
+            scol.addWidget(item)
     else:
         scol.addWidget(_label(
             "No inventory scan yet. The assistant does not invent results."))
     scol.addWidget(_label("SOURCE & PRIVACY", color="#EDB9C5",
                           font=11, strong=True))
     scol.addWidget(_label(
-        "Only the local AI engine receives your question and aggregate "
-        "inventory context. No filenames, game lists, screenshots or save "
-        "contents are automatically shared."))
+        "Questions and aggregate context stay local. No automatic sharing "
+        "of filenames, screenshots or save contents.", font=10))
     scol.addWidget(_label("INVESTIGATE", color="#F2C46F", font=12, strong=True))
     scol.addWidget(button(
         "Open Game DNA", lambda: window.navigate("Game DNA")))

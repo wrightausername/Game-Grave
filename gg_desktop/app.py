@@ -142,8 +142,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         glyph.setFixedSize(64, 56)
         glyph.setAccessibleName("Game Grave red GG monogram")
         brand_layout.addWidget(glyph)
-        name = label("GAME GRAVE", "brand")
-        name.setStyleSheet("color:#F5F7FB;font-size:23px;font-weight:900;letter-spacing:.2px;")
+        name = label("GAME GRAVE®", "brand")
+        name.setStyleSheet("color:#F5F7FB;font-size:21px;font-weight:850;letter-spacing:.2px;")
         brand_layout.addWidget(name, 1)
         r.addWidget(brand_holder)
         r.addSpacing(12)
@@ -281,6 +281,9 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             self.stack_layout.removeWidget(self.page)
             self.page.deleteLater()
         self.page = ScrollPage()
+        self.page.body.setProperty("lockedReference", title in (
+            "Overview", "Graveyard", "Game DNA", "Undo Center",
+            "AI Assistant", "Settings", "More Tools"))
         self.stack_layout.addWidget(self.page, 1)
         self.current_route = title
         for route, control in self.nav_buttons.items():

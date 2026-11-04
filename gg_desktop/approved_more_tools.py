@@ -5,9 +5,11 @@ marketing tiles. Quick Access and the diagnostic shortcuts remain usable.
 """
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QHBoxLayout, QVBoxLayout, QWidget
 from gg_desktop.widgets import ActionCard
 from gg_desktop.cinematic_art import CinematicToolArtwork
+from gg_desktop.visuals import nav_icon
 
 
 def render_approved_more_tools(window):
@@ -46,7 +48,7 @@ def render_approved_more_tools(window):
         horizontal.addWidget(left, 3)
         horizontal.addWidget(graphic, 2)
         original.addWidget(split)
-        panel.setMinimumHeight(206)
+        panel.setMinimumHeight(168)
 
     prominent = page.findChildren(QFrame, "actionCardPrimary")
     if prominent:
@@ -76,6 +78,17 @@ def render_approved_more_tools(window):
     for tile in page.findChildren(ActionCard):
         for name, accent in tile_styles:
             if tile.accessibleName().startswith(name + "."):
+                glyph = tile.layout().itemAt(0).widget()
+                if isinstance(glyph, QLabel):
+                    glyph.setText("")
+                    glyph.setPixmap(nav_icon({
+                        "Make Room": "Graveyard", "Storage Explorer": "Other Storage",
+                        "Ghost Watch": "Game DNA", "Capture Studio": "Captures",
+                        "Game Exodus": "Games", "Diagnostics": "Settings",
+                    }[name]).pixmap(27, 27))
+                    glyph.setFixedSize(30, 30)
+                tile.layout().setContentsMargins(10, 8, 10, 8)
+                tile.layout().itemAt(1).widget().layout().setAlignment(Qt.AlignVCenter)
                 tile.setProperty("toolAccent", name.replace(" ", ""))
                 tile.setStyleSheet(
                     "QFrame#actionCard{background:#121720;"

@@ -324,10 +324,12 @@ class RelationshipMap(QWidget):
     Supports selection, wheel zoom, drag pan and keyboard zoom/reset.
     """
     selected = Signal(str)
-    NODE_TYPES = ("Install", "Mods", "Profiles", "Saves",
-                  "Captures", "Configs", "Caches", "Leftovers")
-    NODE_COLORS = ("#FF4055", "#CB82F0", "#49CBED", "#62DBA7",
-                   "#539FEA", "#FFBF60", "#ECA567", "#F85B73")
+    NODE_TYPES = ("Install", "Launcher", "Workshop", "Mods", "Profiles", "Saves",
+                  "Captures", "Configs", "Caches", "Leftovers", "Addons", "Unresolved")
+    NODE_COLORS = ("#FF536B", "#5ACFF0", "#D8AE62", "#D384F3", "#55D4EA", "#68DEAC",
+                   "#6CAEF7", "#F3C06B", "#EBA679", "#F36A8D", "#AE9CF0", "#BCA5C7")
+    NODE_PLACES = ((.50,.09),(.25,.09),(.75,.09),(.30,.32),(.70,.32),(.70,.77),
+                   (.50,.83),(.30,.77),(.10,.63),(.90,.32),(.10,.32),(.90,.63))
 
     def __init__(self):
         super().__init__()
@@ -422,9 +424,9 @@ class RelationshipMap(QWidget):
         p.setRenderHint(QPainter.TextAntialiasing)
         w, h = self.width(), self.height()
         bg = QLinearGradient(0, 0, w, h)
-        bg.setColorAt(0, QColor("#07111B"))
-        bg.setColorAt(.58, QColor("#101525"))
-        bg.setColorAt(1, QColor("#090C17"))
+        bg.setColorAt(0, QColor("#070D13"))
+        bg.setColorAt(.58, QColor("#11121D"))
+        bg.setColorAt(1, QColor("#080C13"))
         p.fillRect(self.rect(), bg)
         center = self._center()
         rx = max(145, min(305, w * .315)) * self.zoom
@@ -434,8 +436,8 @@ class RelationshipMap(QWidget):
 
         # Wide concentric red glow, restrained cyan radar and fine grid.
         halo = QRadialGradient(center, max(w*.42, 190))
-        halo.setColorAt(0, QColor(234, 37, 73, 177))
-        halo.setColorAt(.28, QColor(155, 28, 56, 105))
+        halo.setColorAt(0, QColor(209, 126, 61, 100))
+        halo.setColorAt(.28, QColor(155, 28, 56, 65))
         halo.setColorAt(.65, QColor(33, 39, 68, 17))
         halo.setColorAt(1, QColor(3, 8, 16, 0))
         p.fillRect(self.rect(), halo)
@@ -444,7 +446,7 @@ class RelationshipMap(QWidget):
             p.drawLine(QPointF(x, 0), QPointF(x, h))
         for y in range(0, int(h), 42):
             p.drawLine(QPointF(0, y), QPointF(w, y))
-        for idx, fraction in enumerate((.53, .81, 1.13, 1.35)):
+        for idx, fraction in enumerate((.81, 1.24)):
             p.setPen(_pen("#6A263A" if idx % 2 else "#1A5368",
                           1 if idx != 1 else 1.6))
             p.drawEllipse(center, rx*fraction, ry*fraction)
@@ -454,30 +456,33 @@ class RelationshipMap(QWidget):
         self.positions = {}
         entries = []
         for i, name in enumerate(self.NODE_TYPES):
-            angle = (-math.pi/2) + i * 2*math.pi / len(self.NODE_TYPES)
-            x = center.x() + math.cos(angle)*rx
-            y = center.y() + math.sin(angle)*ry
+            xn, yn = self.NODE_PLACES[i]
+            x = center.x() + (xn-.50)*w*self.zoom
+            y = center.y() + (yn-.48)*h*self.zoom
             color = QColor(self.NODE_COLORS[i])
             state = self.states.get(name, "Not verified")
             uncertain = any(term in state.casefold() for term in (
-                "unknown", "unverified", "protected", "independent"))
+                "unknown", "unverified", "protected", "independent",
+                "not verified", "not observed", "unresolved"))
             path = QPainterPath(center)
-            bend = QPointF((center.x()+x)/2 + math.sin(angle)*32,
-                           (center.y()+y)/2 - math.cos(angle)*15)
-            path.quadTo(bend, QPointF(x, y))
+            bend_x = center.x() + (x-center.x())*.55
+            path.lineTo(QPointF(bend_x, center.y()))
+            path.lineTo(QPointF(bend_x, y))
+            path.lineTo(QPointF(x, y))
             entries.append((name, x, y, color, uncertain, state, path))
 
         # Dim outer strokes followed by bright core for optical depth.
         for name, x, y, color, uncertain, state, path in entries:
             outline = QColor(color)
-            outline.setAlpha(105 if uncertain else 160)
-            glow_pen = QPen(outline, 10, Qt.SolidLine,
+            outline.setAlpha(48 if uncertain else 88)
+            glow_pen = QPen(outline, 8, Qt.SolidLine,
                            Qt.RoundCap, Qt.RoundJoin)
             p.setBrush(Qt.NoBrush)
             p.setPen(glow_pen)
             p.drawPath(path)
-            stroke = QColor("#55748A") if uncertain else QColor(color)
-            line = QPen(stroke, 2.1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+            stroke = QColor(color)
+            stroke.setAlpha(155 if uncertain else 240)
+            line = QPen(stroke, 1.7, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
             if uncertain:
                 line.setStyle(Qt.DashLine)
             p.setPen(line)
@@ -490,49 +495,49 @@ class RelationshipMap(QWidget):
         # poster. With no reliable cover, retain the truthful title-only
         # identity instead of borrowing a different game's attractive art.
         has_cover = not self.cover.isNull()
-        for radius, alpha in ((108, 54), (101, 85), (94, 126)):
-            ring = QColor("#FA3658")
+        for radius, alpha in ((93, 40), (87, 70), (81, 116)):
+            ring = QColor("#F1C15F")
             ring.setAlpha(alpha)
             p.setPen(QPen(ring, 3.5))
             p.setBrush(Qt.NoBrush)
             p.drawEllipse(center, radius, radius*.81)
-        middle = (QRectF(center.x()-86, center.y()-78, 172, 156)
+        middle = (QRectF(center.x()-70, center.y()-69, 140, 138)
                   if has_cover else
                   QRectF(center.x()-97, center.y()-44, 194, 88))
         middle_bg = QLinearGradient(middle.topLeft(), middle.bottomRight())
         middle_bg.setColorAt(0, QColor("#4C172C"))
         middle_bg.setColorAt(.56, QColor("#201522"))
         middle_bg.setColorAt(1, QColor("#0C1B2A"))
-        p.setPen(QPen(QColor("#FF4D68"), 2.4))
+        p.setPen(QPen(QColor("#DFAE54"), 2.0))
         p.setBrush(middle_bg)
         p.drawRoundedRect(middle, 17, 17)
         if has_cover:
             portrait = self.cover.scaled(
-                162, 113, Qt.KeepAspectRatioByExpanding,
+                130, 101, Qt.KeepAspectRatioByExpanding,
                 Qt.SmoothTransformation)
-            cropx = max(0, (portrait.width()-162)//2)
-            cropy = max(0, (portrait.height()-113)//2)
+            cropx = max(0, (portrait.width()-130)//2)
+            cropy = max(0, (portrait.height()-101)//2)
             p.save()
             clip = QPainterPath()
             clip.addRoundedRect(middle.adjusted(4, 4, -4, -4), 12, 12)
             p.setClipPath(clip)
-            p.drawPixmap(QRectF(middle.left()+5, middle.top()+5, 162, 113),
+            p.drawPixmap(QRectF(middle.left()+5, middle.top()+5, 130, 101),
                          portrait,
-                         QRectF(cropx, cropy, 162, 113))
+                         QRectF(cropx, cropy, 130, 101))
             fade = QLinearGradient(0, middle.top()+70, 0, middle.bottom())
             fade.setColorAt(0, QColor(5, 8, 16, 0))
             fade.setColorAt(1, QColor(5, 8, 16, 244))
             p.fillRect(middle.adjusted(4, 4, -4, -4), fade)
             p.restore()
             p.setPen(WHITE)
-            p.setFont(QFont("Segoe UI", 11, QFont.Bold))
-            p.drawText(QRectF(middle.left()+8, middle.bottom()-41, 156, 33),
+            p.setFont(QFont("Segoe UI", 9, QFont.Bold))
+            p.drawText(QRectF(middle.left()+7, middle.bottom()-36, 126, 29),
                        Qt.AlignCenter | Qt.TextWordWrap, self.game_name)
             if self.cover_is_placeholder:
                 p.setPen(QColor("#E8B7BA"))
                 p.setFont(QFont("Segoe UI", 7))
-                p.drawText(QRectF(middle.left()+4, middle.top()+4, 164, 16),
-                           Qt.AlignCenter, "GAME GRAVE ILLUSTRATION")
+                p.drawText(QRectF(middle.left()+4, middle.top()+4, 132, 16),
+                           Qt.AlignCenter, "LOCAL ILLUSTRATION")
         else:
             p.setPen(QPen(QColor("#E62E4F"), 1.3))
             p.drawLine(QPointF(center.x()-63,center.y()-22),
@@ -553,7 +558,7 @@ class RelationshipMap(QWidget):
         # Large readable cards, bounded to the workspace at ordinary zoom.
         for name, x, y, color, uncertain, state, path in entries:
             active = name == self.active
-            box_w, box_h = (145, 54)
+            box_w, box_h = (max(96, min(124, w*.145)), 44)
             box = QRectF(x-box_w/2, y-box_h/2, box_w, box_h)
             self.positions[name] = box
             if active:
@@ -563,23 +568,26 @@ class RelationshipMap(QWidget):
                 p.setBrush(Qt.NoBrush)
                 p.drawRoundedRect(box.adjusted(-1,-1,1,1), 9, 9)
             base = QLinearGradient(box.topLeft(), box.bottomRight())
-            base.setColorAt(0, QColor("#413047") if active else QColor("#193246"))
-            base.setColorAt(1, QColor("#5E2034") if active else QColor("#101824"))
+            tint = QColor(color)
+            tint.setAlpha(68 if active else 27)
+            base.setColorAt(0, tint)
+            base.setColorAt(1, QColor("#111720"))
             p.setBrush(base)
-            p.setPen(QPen(color if active else QColor("#506779"),
-                          2.0 if active else 1.3))
-            p.drawRoundedRect(box, 9, 9)
+            edge = QColor(color)
+            edge.setAlpha(255 if active else 160)
+            p.setPen(QPen(edge, 1.8 if active else .9))
+            p.drawRoundedRect(box, 5, 5)
             p.setPen(QPen(color, 3, Qt.SolidLine, Qt.RoundCap))
-            p.drawLine(QPointF(box.x()+12,box.y()+11),
-                       QPointF(box.x()+28,box.y()+11))
+            p.drawLine(QPointF(box.x()+9,box.y()+9),
+                       QPointF(box.x()+20,box.y()+9))
             p.setPen(WHITE)
-            p.setFont(QFont("Segoe UI", 11, QFont.DemiBold))
-            p.drawText(QRectF(box.x()+8,box.y()+9,box.width()-16,20),
+            p.setFont(QFont("Segoe UI", 9, QFont.DemiBold))
+            p.drawText(QRectF(box.x()+7,box.y()+5,box.width()-14,18),
                        Qt.AlignCenter,name)
             p.setPen(QColor("#7BDFBA") if not uncertain else QColor("#B4AEBB"))
-            p.setFont(QFont("Segoe UI", 9))
-            short = p.fontMetrics().elidedText(str(state), Qt.ElideRight, 132)
-            p.drawText(QRectF(box.x()+7,box.y()+30,box.width()-14,17),
+            p.setFont(QFont("Segoe UI", 8))
+            short = p.fontMetrics().elidedText(str(state), Qt.ElideRight, round(box.width()-12))
+            p.drawText(QRectF(box.x()+6,box.y()+24,box.width()-12,15),
                        Qt.AlignCenter,short)
 
         # Explicit evidence legend. Never promises that a link is removable.

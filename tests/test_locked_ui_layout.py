@@ -14,8 +14,8 @@ HAS_QT = importlib.util.find_spec("PySide6") is not None
 if HAS_QT:
     if os.name != "nt":
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QRect
-    from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPlainTextEdit, QPushButton
+    from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QRect, QTimer
+    from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QTextBrowser, QPushButton
 
 
 @unittest.skipUnless(HAS_QT, "Optional Qt preview dependencies are not installed")
@@ -112,7 +112,7 @@ class LockedUILayoutTests(unittest.TestCase):
             "platform": os.name,
             "source_commit": os.environ.get("GITHUB_SHA", "local working tree"),
             "reference_size": [1672, 941],
-            "visual_approval": "Pending comparison to full original reference images",
+            "visual_approval": "Rendered against owner-supplied comparison; exact pixel parity is not certified",
         }, indent=2), encoding="utf-8")
 
     def test_locked_pages_reflow_live_with_populated_inventory(self):
@@ -166,6 +166,85 @@ class LockedUILayoutTests(unittest.TestCase):
         row = [label.text() for label in ea.parentWidget().findChildren(QLabel)]
         self.assertEqual(row, ["EA", "1 games"])
 
+    def test_checked_findings_preserve_protection_and_drop_hidden_items(self):
+        self.populate()
+        from core import OldFile
+        from gg_desktop.backend import refresh_graveyard
+        another = self.root / "another-game-mod.zip"
+        another.write_bytes(b"another disposable archive fixture")
+        stamp = time.time() - 800*86400
+        os.utime(another, (stamp, stamp))
+        stat = another.stat()
+        self.window.inventory.files.append(OldFile(str(another), stat.st_size,
+            stat.st_mtime, stat.st_dev, stat.st_ino, stat.st_mtime_ns, stat.st_nlink))
+        self.window.settings["never_touch"] = [self.window.inventory.files[0].path]
+        refresh_graveyard(self.window.inventory, self.window.settings)
+        self.window.navigate("Graveyard")
+        from PySide6.QtCore import Qt
+        for index in range(self.window.grave_table.rowCount()):
+            self.window.grave_table.item(index, 0).setCheckState(Qt.Checked)
+        self.assertEqual(len(self.window._selected_grave_entries()), 2)
+        with patch.object(self.window, "error") as error, \
+                patch.object(self.window, "_approve_recycle") as recycle:
+            self.window._delete_grave_selected()
+            error.assert_called_once()
+            recycle.assert_not_called()
+        self.window.grave_search.setText("another-game-mod")
+        self.flush()
+        selected = self.window._selected_grave_entries()
+        self.assertEqual([entry.path for entry in selected], [str(another)])
+        clear = next(button for button in self.window.page.findChildren(QPushButton)
+                     if button.text() == "Clear")
+        clear.click()
+        self.assertEqual(self.window._selected_grave_entries(), [])
+
+    def test_settings_save_and_revert_use_the_last_checkpoint(self):
+        self.window.navigate("Settings")
+        with patch("core.save_settings") as save, \
+                patch.object(self.window, "info"), \
+                patch.object(self.window, "confirm", return_value=True):
+            self.window.settings["scan_on_launch"] = True
+            save_button = next(b for b in self.window.page.findChildren(QPushButton)
+                               if b.text() == "Save changes")
+            save_button.click()
+            self.window.settings["scan_on_launch"] = False
+            revert = next(b for b in self.window.page.findChildren(QPushButton)
+                          if b.text() == "Revert changes")
+            revert.click()
+            self.assertTrue(self.window.settings["scan_on_launch"])
+            self.assertTrue(save.call_args.args[0]["scan_on_launch"])
+
+    def test_settings_revert_never_removes_personal_rules_without_confirmation(self):
+        self.window.navigate("Settings")
+        rule = str(self.root / "protected-personal-folder")
+        self.window.settings["never_touch"] = [rule]
+        with patch("core.save_settings") as save, \
+                patch.object(self.window, "confirm", return_value=False) as confirm:
+            revert = next(b for b in self.window.page.findChildren(QPushButton)
+                          if b.text() == "Revert changes")
+            revert.click()
+            confirm.assert_called_once()
+            self.assertTrue(confirm.call_args.kwargs["destructive"])
+            self.assertEqual(self.window.settings["never_touch"], [rule])
+            save.assert_not_called()
+
+    def test_editing_tool_pins_does_not_launch_the_tools(self):
+        def unpin_first():
+            menu = self.app.activePopupWidget()
+            if menu is not None:
+                menu.actions()[0].setChecked(False)
+                menu.close()
+        with patch.object(self.window, "_create_kit") as create, \
+                patch("gg_desktop.screens.save_settings") as save:
+            self.window.navigate("More Tools")
+            edit = next(b for b in self.window.page.findChildren(QPushButton)
+                        if b.text() == "Edit pins")
+            QTimer.singleShot(0, unpin_first)
+            edit.click()
+            self.assertNotIn("Resurrection Kit", self.window.settings["pinned_tools"])
+            self.assertNotIn("Resurrection Kit", save.call_args.args[0]["pinned_tools"])
+            create.assert_not_called()
+
     def test_ai_reply_survives_leaving_and_reopening_page(self):
         self.window.settings["ai_assistant_enabled"] = True
         pending = {}
@@ -178,16 +257,16 @@ class LockedUILayoutTests(unittest.TestCase):
             self.flush()
             entry = next(field for field in self.window.page.findChildren(QLineEdit)
                          if field.accessibleName() == "Optional local AI question")
-            entry.setText("Explain my findings")
+            entry.setText("Explain my findings <b>literally</b>")
             entry.returnPressed.emit()
             self.window.navigate("Overview")
             self.flush()  # Destroy the old conversation widgets before the reply.
-            pending["success"]((True, "Review evidence before removing a file."))
+            pending["success"]((True, "Review evidence <i>literally</i> before removing a file."))
             self.window.navigate("AI Assistant")
             self.flush()
-            transcript = self.window.page.findChildren(QPlainTextEdit)[0]
-            self.assertIn("Explain my findings", transcript.toPlainText())
-            self.assertIn("Review evidence", transcript.toPlainText())
+            transcript = self.window.page.findChildren(QTextBrowser)[0]
+            self.assertIn("Explain my findings <b>literally</b>", transcript.toPlainText())
+            self.assertIn("Review evidence <i>literally</i>", transcript.toPlainText())
             send = next(button for button in self.window.page.findChildren(QPushButton)
                         if button.text() == "Send")
             self.assertTrue(send.isEnabled())

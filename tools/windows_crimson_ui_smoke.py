@@ -218,8 +218,13 @@ def main():
                     assert window.page.findChildren(
                         QFrame, "graveEvidenceBanner"), (
                         "Graveyard needs the selected-file cinematic evidence graphic")
-                    assert window.grave_table.rowHeight(0) >= 44, (
-                        "Graveyard items must stay readable like the locked layout")
+                    from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE
+                    assert window.grave_table.rowHeight(0) >= 32, (
+                        "Compact filename/path rows need room for both text lines")
+                    assert isinstance(window.grave_table.itemDelegateForColumn(0),
+                                      EvidenceNameDelegate)
+                    assert window.grave_table.item(0, 0).data(PATH_ROLE), (
+                        "Filename/path rows must retain the actual source path")
                     window.grave_age.setCurrentText("3+ years")
                     app.processEvents()
                     assert window.grave_table.rowCount() == 0, (
@@ -237,8 +242,8 @@ def main():
                     assert len(window.page.findChildren(QFrame, "approvedDNAMetric")) == 6, (
                         "Six owner-approved DNA metrics need real evidence, no mockup values")
                 if route == "AI Assistant":
-                    from PySide6.QtWidgets import QPlainTextEdit
-                    assert window.page.findChildren(QPlainTextEdit), (
+                    from PySide6.QtWidgets import QTextBrowser
+                    assert window.page.findChildren(QTextBrowser), (
                         "Approved AI page needs a real in-page conversation")
                     sends = [w for w in window.page.findChildren(QPushButton)
                              if w.text() == "Send"]

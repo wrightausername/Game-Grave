@@ -38,17 +38,19 @@ def draw_approved_hero(painter, art: QPixmap, width: int, height: int) -> bool:
         return False
     w, h = max(1, int(width)), max(1, int(height))
     natural = float(art.width()) / max(1.0, float(art.height()))
-    artwork_width = min(int(w*.86), max(1,int(h*natural*1.04)))
-    left = w-artwork_width
+    artwork_width = max(1, round(h * natural))
+    # In the supplied comparison the GG stone is in the right third. The
+    # narrow 700x96 crops have the stone near their left third: right-aligning
+    # the entire crop incorrectly placed the stone behind the page title.
+    source_focus = .35 if natural > 6 else .50
+    left = round(w * .79 - artwork_width * source_focus)
     composite = QPixmap(artwork_width, h)
     composite.fill(Qt.transparent)
     layer = QPainter(composite)
     layer.setRenderHint(QPainter.SmoothPixmapTransform)
-    src_width = min(float(art.width()), artwork_width*float(art.height()) / h)
-    src_x = max(0., (art.width()-src_width)*.5)
     layer.drawPixmap(
         QRectF(0, 0, artwork_width, h), art,
-        QRectF(src_x, 0, src_width, float(art.height())))
+        QRectF(0, 0, float(art.width()), float(art.height())))
     layer.setCompositionMode(QPainter.CompositionMode_DestinationIn)
     opacity = QLinearGradient(0, 0, max(1, artwork_width*.30), 0)
     opacity.setColorAt(0., QColor(255, 255, 255, 0))

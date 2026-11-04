@@ -67,6 +67,8 @@ def default_settings() -> dict:
         "save_review_paths": [],
         "graveyard_watchlist": [],
         "recording_roots": [],  # Optional user-chosen capture folders, read-only scan
+        "pinned_tools": ["Resurrection Kit", "Save Vault", "Make Room",
+                         "Storage Explorer", "Capture Studio", "Diagnostics"],
         "screenshot_roots": [],  # Explicit user-selected game screenshot folders
     }
 

@@ -11,6 +11,7 @@ from gg_desktop.visuals import FeatureStrip, RelationshipMap
 from gg_desktop.widgets import row, label, button
 from gg_desktop.models import readable_bytes
 from gg_desktop.responsive import ResponsiveGrid
+from gg_desktop.reference_icons import metric_icon
 
 
 def _metric(title, value, hint, color):
@@ -33,7 +34,7 @@ def _metric(title, value, hint, color):
         "Capture files": "Captures",
     }
     glyph = QLabel()
-    glyph.setPixmap(nav_icon(routes.get(title, "Games")).pixmap(25,25))
+    glyph.setPixmap(metric_icon(routes.get(title, "Games"), color, 25))
     glyph.setFixedSize(26,26)
     heading.addWidget(glyph)
     a = label(title.upper(), "caption")
@@ -60,7 +61,7 @@ def render_approved_dna(window):
     page = window.page
     if not window.inventory.scanned_at:
         return page
-    page.content.setSpacing(8)
+    page.content.setSpacing(6)
     page.content.setContentsMargins(11, 6, 11, 13)
     for strip in page.findChildren(FeatureStrip):
         page.content.removeWidget(strip)
@@ -69,8 +70,8 @@ def render_approved_dna(window):
 
     from gg_desktop.reference_hero import ReferenceHero
     for hero in page.findChildren(ReferenceHero):
-        hero.setMinimumHeight(139)
-        hero.setMaximumHeight(139)
+        hero.setMinimumHeight(112)
+        hero.setMaximumHeight(112)
 
     selectors = [
         obj for obj in page.findChildren(QComboBox)
@@ -117,7 +118,7 @@ def render_approved_dna(window):
     page.content.insertWidget(2, bar)
 
     for graph in page.findChildren(RelationshipMap):
-        graph.setMinimumHeight(312)
+        graph.setMinimumHeight(260)
         graph.setToolTip(
             "Interactive evidence map. Click a node for source information, "
             "drag background to pan, use wheel or +/- to zoom. "
@@ -152,8 +153,8 @@ def render_approved_dna(window):
         tile.setObjectName("ggAccentPanel")
         tile.setProperty("accent", tone)
         col = QVBoxLayout(tile)
-        col.setContentsMargins(13, 10, 13, 10)
-        col.setSpacing(7)
+        col.setContentsMargins(10, 8, 10, 8)
+        col.setSpacing(5)
         heading = label(title, "sectionTitle")
         col.addWidget(heading)
         col.addWidget(label(desc, "caption", wrap=True))
@@ -234,6 +235,14 @@ def render_approved_dna(window):
     actions.addWidget(button("Review unknown files", lambda: window.navigate("Graveyard")))
     page.content.addWidget(action_strip)
     if linked_evidence is not None:
+        linked_evidence.setVisible(False)
+        reveal = button("›  Linked file locations", lambda: (
+            linked_evidence.setVisible(not linked_evidence.isVisible())))
+        reveal.setAccessibleName("Show or hide full linked file locations")
+        if selectors:
+            selectors[0].parentWidget().layout().addWidget(reveal)
+        else:
+            page.content.addWidget(reveal)
         page.content.addWidget(linked_evidence)
 
     # Keep the map/inspector dominant without consuming the lower modules.
@@ -241,7 +250,8 @@ def render_approved_dna(window):
         item = page.content.itemAt(idx)
         w = item.widget() if item else None
         if w is not None and w.findChildren(RelationshipMap):
-            w.setMinimumHeight(408)
+            w.horizontal_height = 350
+            w.setMinimumHeight(350)
             break
 
     if selectors:
@@ -263,11 +273,11 @@ def render_approved_dna(window):
     # Important ownership warning remains visible, but below the forensic
     # workspace rather than above and crowding out the interactive map.
     notice = label(
-        "DNA links use installed-game and mod-manager evidence. Saves, caches, "
-        "media and unknown leftovers stay protected without verified ownership. "
-        "Ghost Watch and Patch Fallout are manual observations, not automated "
-        "compatibility or FPS measurements.",
+        "Saves, caches, media and unknown leftovers remain protected without verified ownership.",
         "caption", wrap=True)
+    notice.setToolTip(
+        "DNA links use installed-game and mod-manager evidence. Ghost Watch and "
+        "Patch Fallout are manual observations, not automated compatibility or FPS measurements.")
     notice.setObjectName("approvedDNAEvidenceNotice")
     notice.setStyleSheet(
         "background:transparent; color:#A6B6C5; font-size:11px; "

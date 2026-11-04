@@ -12,7 +12,7 @@ import sys
 import uuid
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QImage, QPixmap
+from PySide6.QtGui import QDesktopServices, QImage, QPixmap, QCursor
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
@@ -912,6 +912,12 @@ class ScreenMethods(LockedPagesMixin):
         self._grave_details()
 
     def _selected_grave_entries(self):
+        if self.grave_table.property("usesCheckSelection"):
+            checked = [entry for i, entry in enumerate(self._shown_graves)
+                if self.grave_table.item(i, 0) is not None and
+                self.grave_table.item(i, 0).checkState() == Qt.Checked]
+            if checked:
+                return checked
         return [self._shown_graves[i] for i in _selected_indices(self.grave_table)
                 if i < len(self._shown_graves)]
 
@@ -936,7 +942,7 @@ class ScreenMethods(LockedPagesMixin):
         action, reason = graveyard_protection_decision(
             e, self.settings.get("never_touch", []))
         self.grave_detail.addWidget(label(e.name, "sectionTitle", wrap=True))
-        for text in (e.category, human_size(e.apparent_bytes) + " apparent", e.path, e.finding):
+        for text in (e.category, human_size(e.apparent_bytes) + " apparent", e.path):
             self.grave_detail.addWidget(label(text, "subtle", wrap=True))
         self.grave_detail.addWidget(label(
             "WHY IT WAS FOUND", "eyebrow"))
@@ -1116,16 +1122,22 @@ class ScreenMethods(LockedPagesMixin):
         self.job(run, finished, error_title="Recycle Bin test failed: no user data moved")
 
     def _select_eligible(self):
-        from PySide6.QtCore import QItemSelectionModel
-        self.grave_table.clearSelection()
-        selector = self.grave_table.selectionModel()
-        for i, entry in enumerate(self._shown_graves):
-            if entry.can_recycle and entry.old_file is not None and (
-                    entry.category != "Old game screenshot") and (
-                    not is_protected_path(Path(entry.path),
-                                          self.settings.get("never_touch", []))):
-                index = self.grave_table.model().index(i, 0)
-                selector.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        from PySide6.QtCore import QItemSelectionModel, QSignalBlocker
+        with QSignalBlocker(self.grave_table):
+            self.grave_table.clearSelection()
+            selector = self.grave_table.selectionModel()
+            for i, entry in enumerate(self._shown_graves):
+                if self.grave_table.property("usesCheckSelection"):
+                    self.grave_table.item(i, 0).setCheckState(Qt.Unchecked)
+                if entry.can_recycle and entry.old_file is not None and (
+                        entry.category != "Old game screenshot") and (
+                        not is_protected_path(Path(entry.path),
+                                              self.settings.get("never_touch", []))):
+                    index = self.grave_table.model().index(i, 0)
+                    selector.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+                    if self.grave_table.property("usesCheckSelection"):
+                        self.grave_table.item(i, 0).setCheckState(Qt.Checked)
+        self.grave_table.itemSelectionChanged.emit()
 
     def _delete_grave_selected(self):
         selected = self._selected_grave_entries()
@@ -1321,7 +1333,7 @@ class ScreenMethods(LockedPagesMixin):
         # This screen is an interactive relationship map, NOT another stats
         # dashboard with invented percentages or fictional game disk sizes.
         from gg_desktop.responsive import ResponsiveRow
-        workspace = ResponsiveRow(breakpoint=980, spacing=12, horizontal_height=408)
+        workspace = ResponsiveRow(breakpoint=980, spacing=12, horizontal_height=380)
         board_row = workspace
         overview, overview_col = panel(padding=10)
         overview_col.addWidget(section_title(
@@ -1409,6 +1421,14 @@ class ScreenMethods(LockedPagesMixin):
                        "the game. Game DNA does not mark them disposable from age alone.",
             "Leftovers": "Leftovers cannot be established by a missing game manifest "
                          "alone. Unmatched files stay protected until reviewed.",
+            "Launcher": "The provider comes from this game's installation record, "
+                        "not from a guessed executable or game-title match.",
+            "Workshop": "Workshop links require recorded source evidence. "
+                        "A relationship does not make subscribed content removable.",
+            "Addons": "Add-on ownership requires source evidence. Unknown files "
+                      "are not assigned to this game by name alone.",
+            "Unresolved": "Unresolved sources have no verified ownership link "
+                          "to the selected game and stay protected.",
         }
 
         def inspect_node(name):
@@ -1426,7 +1446,7 @@ class ScreenMethods(LockedPagesMixin):
                 evidence.setText(
                     f"{len(game['manager_profiles'])} matching manager profile(s) with "
                     "verified game installation roots; protected from cleanup.")
-            elif name == "Install":
+            elif name in ("Install", "Launcher"):
                 evidence.setText(
                     "Install: " + str(game["install_path"]) +
                     "\nSource: " + str(game["launcher"]))
@@ -1461,6 +1481,9 @@ class ScreenMethods(LockedPagesMixin):
                 cover = game_cover_path(matching_record)
             relationship.set_game(game["game"], {
                 "Install": "Verified record",
+                "Launcher": str(game["launcher"]),
+                "Workshop": str(sum("workshop" in str(asset.get("source", "")).casefold()
+                    for asset in game["assets"])) + " linked",
                 "Mods": f"{associated} linked",
                 "Profiles": f"{len(game['manager_profiles'])} matched",
                 "Saves": "Unverified",
@@ -1468,6 +1491,8 @@ class ScreenMethods(LockedPagesMixin):
                 "Configs": "Protected",
                 "Caches": "Unknown",
                 "Leftovers": "Unknown",
+                "Addons": "Not verified",
+                "Unresolved": "Unresolved sources",
             }, cover_path=cover)
             linked_text.setText(
                 (("\n\n").join(
@@ -2853,18 +2878,45 @@ class ScreenMethods(LockedPagesMixin):
         # Quick Access: all buttons open an actual working screen or verified
         # existing backend action. No unimplemented fake tool controls.
         access, access_col = panel(padding=14)
-        access_bar = ResponsiveGrid(columns=((0, 1), (490, 2), (900, 5)), spacing=11)
+        access_bar = ResponsiveGrid(columns=((0, 2), (800, 4), (1250, 8)), spacing=7)
         access_row = access_bar
         access_row.addWidget(label("QUICK ACCESS", "sectionTitle"))
-        for name, callback in (
-            ("Resurrection Kit", self._create_kit),
-            ("Save Vault", self._create_save_backup),
-            ("Make Room", lambda: self.navigate("Other Storage")),
-            ("Ghost Watch", lambda: self.navigate("Game DNA")),
-        ):
+        quick_tools = {
+            "Resurrection Kit": self._create_kit,
+            "Save Vault": self._create_save_backup,
+            "Make Room": lambda: self.navigate("Other Storage"),
+            "Storage Explorer": lambda: self.navigate("Other Storage"),
+            "Capture Studio": lambda: self.navigate("Captures"),
+            "Diagnostics": lambda: self.navigate("Game DNA"),
+            "Ghost Watch": lambda: self.navigate("Game DNA"),
+            "Undo Center": lambda: self.navigate("Undo Center"),
+        }
+        pins = [name for name in self.settings.get("pinned_tools", [])
+                if isinstance(name, str) and name in quick_tools]
+        for name in dict.fromkeys(pins):
+            callback = quick_tools[name]
             shortcut = button(name + "  ›", callback)
             shortcut.setToolTip("Open " + name)
             access_row.addWidget(shortcut)
+        def edit_pins():
+            menu = QMenu(self)
+            for name in quick_tools:
+                action = menu.addAction(name)
+                action.setCheckable(True)
+                action.setChecked(name in pins)
+            menu.exec(QCursor.pos())
+            selected = [action.text() for action in menu.actions() if action.isChecked()]
+            if selected == pins:
+                return
+            updated = dict(self.settings)
+            updated["pinned_tools"] = selected
+            try:
+                save_settings(updated)
+                self.settings = updated
+                self.navigate("More Tools")
+            except (OSError, ValueError) as exc:
+                self.error("Could not save pinned tools", str(exc))
+        access_row.addWidget(button("Edit pins", edit_pins))
         access_col.addWidget(access_bar)
         page.content.addWidget(access)
 
@@ -2920,8 +2972,7 @@ class ScreenMethods(LockedPagesMixin):
         )
         for i, (name, description, callback) in enumerate(tiles):
             matrix.addWidget(ActionCard("⌁", name, description, callback))
-        main_col.addWidget(matrix)
-        main_col.addStretch()
+        main_col.addWidget(matrix, 1)
         columns.addWidget(main, 7)
 
         sidebar = QWidget()
@@ -2936,7 +2987,7 @@ class ScreenMethods(LockedPagesMixin):
                 "No recorded Game Grave actions yet. This list reflects local logs only.",
                 "subtle", wrap=True))
         else:
-            for event in activities[:5]:
+            for event in activities[:3]:
                 name = str(event.get("kind", "Local action"))[:60]
                 stamp = str(event.get("date", ""))[:16]
                 recent_col.addWidget(label(name, "sectionTitle", wrap=True))

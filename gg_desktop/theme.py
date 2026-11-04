@@ -929,3 +929,80 @@ QPushButton#approvedDiscoveryTile:hover {
     background:#201724;
 }
 """
+
+# Calibration against the owner's seven-page comparison, left column.
+# Compact native controls and coloured evidence states replace the sparse
+# engineering-dashboard scale; the shared shell and original art stay fixed.
+STYLE += r"""
+QWidget[lockedReference="true"] QLabel#sectionTitle {font-size:14px;font-weight:750;}
+QWidget[lockedReference="true"] QLabel#caption {font-size:10px;color:#AAB6C5;}
+QWidget[lockedReference="true"] QLabel#subtle {font-size:11px;color:#B3BFCC;}
+QWidget[lockedReference="true"] QPushButton {
+    min-height:22px;padding:5px 9px;font-size:12px;
+    border-radius:5px;border:1px solid #35404C;background:#141D27;
+}
+QWidget[lockedReference="true"] QPushButton:hover {background:#26202C;border-color:#805064;}
+QWidget[lockedReference="true"] QPushButton#primary {
+    min-height:26px;padding:6px 11px;font-size:12px;font-weight:750;
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #B72E43,stop:1 #761529);
+    border:1px solid #D44259;
+}
+QWidget[lockedReference="true"] QPushButton#danger {
+    min-height:26px;padding:6px 11px;font-size:12px;font-weight:750;
+    background:#8A2034;border:1px solid #D54259;
+}
+QWidget[lockedReference="true"] QLineEdit,
+QWidget[lockedReference="true"] QComboBox {
+    min-height:21px;padding:5px 8px;font-size:11px;
+    background:#0C131D;border:1px solid #343A48;border-radius:4px;
+}
+QWidget[lockedReference="true"] QTableWidget {
+    color:#DDE5ED;font-size:12px;alternate-background-color:#0D1721;
+    background:#090F17;border:1px solid #303743;
+}
+QWidget[lockedReference="true"] QTableWidget::item {padding:4px 6px;border-bottom:1px solid #212A36;}
+QWidget[lockedReference="true"] QTableWidget::item:selected {background:#582234;color:white;}
+QWidget[lockedReference="true"] QHeaderView::section {
+    font-size:10px;letter-spacing:.2px;padding:6px;background:#151C27;
+    border-bottom:1px solid #38424F;color:#B9C5D4;
+}
+QWidget[lockedReference="true"] QFrame#panel,
+QWidget[lockedReference="true"] QFrame#ggAccentPanel {
+    border:1px solid #303443;background:#0D141E;border-radius:6px;
+}
+QWidget[lockedReference="true"] QFrame#ggAccentPanel[accent="red"] {border-top:1px solid #BE3B57;}
+QWidget[lockedReference="true"] QFrame#ggAccentPanel[accent="cyan"] {border-top:1px solid #408D9C;}
+QWidget[lockedReference="true"] QFrame#ggAccentPanel[accent="green"] {border-top:1px solid #3B8C78;}
+QWidget[lockedReference="true"] QFrame#ggAccentPanel[accent="amber"] {border-top:1px solid #A8824C;}
+QWidget[lockedReference="true"] QFrame#ggAccentPanel[accent="purple"] {border-top:1px solid #8F639D;}
+QWidget[lockedReference="true"] QPushButton#approvedSettingsTab {
+    min-height:21px;padding:4px 7px;font-size:11px;border-radius:4px;
+}
+QWidget[lockedReference="true"] QPushButton#approvedSettingsTab[active="true"] {
+    background:#8E243A;border-color:#CB4257;
+}
+QWidget[lockedReference="true"] QFrame#approvedOverviewPanel {background:transparent;border:0;border-right:1px solid #28333E;}
+QWidget[lockedReference="true"] QPushButton#approvedAction {
+    min-height:23px;padding:5px 7px;font-size:12px;border:0;
+    border-bottom:1px solid #27303A;border-radius:0;background:transparent;text-align:left;
+}
+QWidget[lockedReference="true"] QPushButton#approvedCleanupCTA {
+    min-height:26px;padding:7px;font-size:13px;border:1px solid #D34960;
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #68162A,stop:.5 #A72842,stop:1 #6D172B);
+}
+QWidget[lockedReference="true"] QPushButton#approvedAIWorkflow {
+    min-height:23px;padding:5px 8px;font-size:12px;text-align:left;border:0;
+    border-bottom:1px solid #2A3140;border-radius:0;background:transparent;
+}
+QWidget[lockedReference="true"] QPushButton#approvedAIModeActive {
+    min-height:25px;padding:6px 8px;font-size:12px;text-align:left;
+    border:1px solid #CE3D55;border-radius:4px;background:#862139;
+}
+QWidget[lockedReference="true"] QPushButton#approvedAIQuickTile {
+    min-height:31px;padding:7px;font-size:11px;border-radius:5px;
+}
+QWidget[lockedReference="true"] QTextBrowser {
+    background:#0A111A;border:1px solid #343344;border-radius:6px;
+    padding:8px;color:#D6DFEA;font-size:12px;
+}
+"""

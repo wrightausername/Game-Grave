@@ -16,15 +16,23 @@ class GraveEvidenceBanner(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("graveEvidenceBanner")
-        self.setFixedHeight(112)
+        self.setFixedHeight(90)
         self._title = "Select a finding"
         self._category = "LOCAL EVIDENCE"
+        self._samples = []
+        self._selected_key = None
         self.setAccessibleName("Selected Graveyard file visual context")
 
     def set_entry(self, entry):
         self._title = str(getattr(entry, "name", "") or "Unnamed finding")
         self._category = str(getattr(entry, "category", "") or "Unknown source")
+        self._selected_key = getattr(entry, "key", None)
         self.setToolTip(self._title + "\n" + self._category)
+        self.update()
+
+    def set_candidates(self, entries):
+        self._samples = [(getattr(item, "key", None), max(0, int(
+            getattr(item, "apparent_bytes", 0)))) for item in entries[:24]]
         self.update()
 
     def paintEvent(self, _event):
@@ -39,39 +47,30 @@ class GraveEvidenceBanner(QFrame):
         p.setBrush(bg)
         p.setPen(QPen(QColor("#693147"), 1))
         p.drawRoundedRect(rect, 9, 9)
-        # Atmospheric red light behind the archive/folder shape.
-        glow = QLinearGradient(12, 0, 112, h)
-        glow.setColorAt(0, QColor(242, 41, 69, 110))
-        glow.setColorAt(1, QColor(242, 41, 69, 0))
-        p.setPen(Qt.NoPen)
-        p.setBrush(glow)
-        p.drawEllipse(QRectF(5, -14, 133, 138))
-        p.setPen(QPen(QColor("#FE4B64"), 2))
-        folder = QPainterPath()
-        folder.moveTo(18, 40)
-        folder.lineTo(38, 40)
-        folder.lineTo(45, 30)
-        folder.lineTo(76, 30)
-        folder.lineTo(83, 40)
-        folder.lineTo(103, 40)
-        folder.lineTo(99, 88)
-        folder.lineTo(21, 88)
-        folder.closeSubpath()
-        p.setBrush(QColor("#A41D39"))
-        p.drawPath(folder)
-        p.setPen(QPen(QColor("#FF8691"), 1))
-        p.drawLine(QPointF(25, 50), QPointF(96, 50))
-        # Real selected item name, never sample/mockup labels.
         p.setPen(QColor("#FFFFFF"))
-        p.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        p.setFont(QFont("Segoe UI", 10, QFont.Bold))
         fm = p.fontMetrics()
-        title = fm.elidedText(self._title, Qt.ElideMiddle, max(50, w-145))
-        p.drawText(QRectF(123, 24, max(48, w-139), 34),
+        title = fm.elidedText(self._title, Qt.ElideMiddle, max(50, w-22))
+        p.drawText(QRectF(11, 5, max(48, w-22), 22),
                    Qt.AlignLeft | Qt.AlignVCenter, title)
         p.setPen(QColor("#DD9AAA"))
-        p.setFont(QFont("Segoe UI", 10))
+        p.setFont(QFont("Segoe UI", 8))
         category = p.fontMetrics().elidedText(
-            self._category.upper(), Qt.ElideRight, max(50, w-145))
-        p.drawText(QRectF(123, 59, max(48, w-139), 29),
+            self._category.upper(), Qt.ElideRight, max(50, w-22))
+        p.drawText(QRectF(11, 27, max(48, w-22), 17),
                    Qt.AlignLeft | Qt.AlignVCenter, category)
+        # Actual candidate sizes, not an invented usage/FPS/time history.
+        maximum = max((size for _, size in self._samples), default=0)
+        if maximum:
+            pitch = max(2., (w-24)/max(1, len(self._samples)))
+            for index, (key, size) in enumerate(self._samples):
+                bar_h = max(2., 24 * size/maximum)
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor("#F3AE64" if key == self._selected_key else "#93444E"))
+                p.drawRoundedRect(QRectF(12+index*pitch, 70-bar_h,
+                                         max(1., pitch-3), bar_h), 1.5, 1.5)
+        p.setPen(QColor("#A6B4C4"))
+        p.setFont(QFont("Segoe UI", 7))
+        p.drawText(QRectF(11, 75, w-22, 13), Qt.AlignLeft,
+                   "Candidate sizes • relative")
         p.end()

@@ -8,11 +8,11 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QColor, QBrush, QPainter, QPen, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QTableWidgetItem, QVBoxLayout, QWidget,
+    QTableWidgetItem, QVBoxLayout, QWidget, QProgressBar, QScrollArea,
 )
 
 from core import human_size
@@ -21,6 +21,8 @@ from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.visuals import RecoveryRoute
 from gg_desktop.widgets import button, data_table, label, panel, row
 from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
+from gg_desktop.reference_icons import metric_icon
+from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE
 
 
 def _text(text, color="#C3CDD7", *, size=11, bold=False, wrap=True):
@@ -46,7 +48,7 @@ def _stat(title, value, tone):
         "Not yet checked": "Graveyard",
     }.get(title, "Undo Center")
     icon = QLabel()
-    icon.setPixmap(nav_icon(icon_route).pixmap(30, 30))
+    icon.setPixmap(metric_icon(icon_route, tone, 30))
     icon.setFixedSize(31,31)
     layout.addWidget(icon)
     text = QWidget()
@@ -68,6 +70,38 @@ def _bytes(record):
     return size if type(size) is int and size >= 0 else 0
 
 
+class RecoveryAvailabilityDial(QWidget):
+    """Recorded availability counts, never a recovery guarantee or health score."""
+    def __init__(self, available, total):
+        super().__init__()
+        self.available, self.total = available, total
+        self.setFixedSize(103, 103)
+        self.setAccessibleName(f"{available} of {total} records available at last verification")
+        self.setToolTip("Recorded state only. Verify the exact Windows match before restoring.")
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        ring = QRectF(9, 7, 84, 84)
+        p.setPen(QPen(QColor("#17392F"), 9))
+        p.drawArc(ring, 0, 360*16)
+        if self.total and self.available:
+            p.setPen(QPen(QColor("#64DCAC"), 9, Qt.SolidLine, Qt.RoundCap))
+            p.drawArc(ring, 90*16, -round(360*16*self.available/self.total))
+        p.setPen(QColor("#AEF1CF"))
+        font = QFont("Segoe UI")
+        font.setPixelSize(26)
+        font.setBold(True)
+        p.setFont(font)
+        p.drawText(ring.adjusted(0,-5,0,0), Qt.AlignCenter,
+                   str(self.available) if self.total else "—")
+        font.setPixelSize(8)
+        font.setBold(False)
+        p.setFont(font)
+        p.setPen(QColor("#A1BDB1"))
+        p.drawText(ring.adjusted(0,36,0,0), Qt.AlignCenter, "LAST VERIFIED")
+
+
 def render_approved_undo(window):
     page = window.page_for("Undo Center")
     page.content.setContentsMargins(11, 7, 11, 17)
@@ -75,8 +109,8 @@ def render_approved_undo(window):
     hero = ReferenceHero(
         "undo", "Undo Center",
         "Review previous cleanup actions and restore items safely.")
-    hero.setMinimumHeight(146)
-    hero.setMaximumHeight(146)
+    hero.setMinimumHeight(132)
+    hero.setMaximumHeight(132)
     page.content.addWidget(hero)
 
     records = list(reversed(get_records()))[:500]
@@ -123,8 +157,10 @@ def render_approved_undo(window):
     table = data_table([
         "ORIGINAL LOCATION", "ACTION", "SIZE", "RECORDED", "WINDOWS STATUS"])
     table.setAccessibleName("Real Game Grave recovery ledger")
+    table.setItemDelegateForColumn(0, EvidenceNameDelegate(table))
     table.setSelectionBehavior(QAbstractItemView.SelectRows)
     table.setSelectionMode(QAbstractItemView.SingleSelection)
+    table.verticalHeader().setDefaultSectionSize(32)
     for idx, width in enumerate((255, 125, 95, 152, 115)):
         table.setColumnWidth(idx, width)
     table.horizontalHeader().setStretchLastSection(True)
@@ -134,8 +170,17 @@ def render_approved_undo(window):
     hcol.addWidget(summary)
     wrow.addWidget(history, 7)
 
-    details, dcol = panel(padding=12, spacing=6)
+    details, details_outer = panel(padding=8, spacing=0)
     details.setMinimumHeight(347)
+    details_scroll = QScrollArea()
+    details_scroll.setFrameShape(QFrame.NoFrame)
+    details_scroll.setWidgetResizable(True)
+    details_body = QWidget()
+    dcol = QVBoxLayout(details_body)
+    dcol.setContentsMargins(4, 4, 4, 4)
+    dcol.setSpacing(6)
+    details_scroll.setWidget(details_body)
+    details_outer.addWidget(details_scroll)
     dcol.addWidget(_text("RESTORE DETAILS", "#F5F5FB", size=14, bold=True))
     heading = _text("Choose an operation", "#FFFFFF", size=13, bold=True)
     dcol.addWidget(heading)
@@ -206,6 +251,8 @@ def render_approved_undo(window):
             )
             for col, value in enumerate(cols):
                 item = QTableWidgetItem(str(value))
+                if col == 0:
+                    item.setData(PATH_ROLE, str(rec.get("path", "")))
                 item.setToolTip(str(rec.get("path", "")) if col == 0 else str(value))
                 if col == 4:
                     item.setForeground(QBrush(QColor(
@@ -283,17 +330,24 @@ def render_approved_undo(window):
     safety, sc = panel(padding=13, spacing=7)
     sc.addWidget(_text("RECOVERY SAFETY  •  CHECK BEFORE RESTORING",
                        "#97D4AF", size=12, bold=True))
-    sc.addWidget(_text(
-        "Game Grave will not silently overwrite an existing file or guess a "
-        "Recycle Bin match. Emptying the bin, system cleanup and duplicate "
-        "paths can make restoration impossible. No countdown is guaranteed.",
-        "#BDC9D7", wrap=True))
+    safeguards = QWidget()
+    safeguards_row = row(spacing=12)
+    safeguards.setLayout(safeguards_row)
+    safeguards_row.addWidget(RecoveryAvailabilityDial(known_available, len(records)))
+    rules = QWidget()
+    rule_col = QVBoxLayout(rules)
+    rule_col.setContentsMargins(0, 0, 0, 0)
+    rule_col.setSpacing(5)
+    for rule in ("Exact Windows Recycle Bin match required",
+                 "Existing files are never overwritten",
+                 "Each restore requires your confirmation"):
+        rule_col.addWidget(_text("✓  " + rule, "#A5D8BF", size=11))
+    rule_col.addWidget(_text("Recorded availability can change in Windows.",
+                             "#94A89E", size=10))
+    safeguards_row.addWidget(rules, 1)
+    sc.addWidget(safeguards)
     safety.setObjectName("ggAccentPanel")
     safety.setProperty("accent", "green")
-    sc.addWidget(_text(
-        "An exact Windows Recycle Bin match must still exist. A previous "
-        "successful check is not a promise that restoration remains possible.",
-        "#A1D8C1", size=11, wrap=True))
 
     insight, ic = panel(padding=13, spacing=6)
     insight.setObjectName("ggAccentPanel")
@@ -311,6 +365,15 @@ def render_approved_undo(window):
         line.addWidget(_text(heading, "#BFC9D5", size=12), 1)
         line.addWidget(_text(str(value), tone, size=16, bold=True))
         ic.addWidget(metric)
+        track = QProgressBar()
+        track.setRange(0, max(1, len(records)))
+        track.setValue(value)
+        track.setTextVisible(False)
+        track.setAccessibleName(heading + ": " + str(value) + " recorded items")
+        track.setStyleSheet("QProgressBar{min-height:4px;max-height:4px;border:0;"
+                           "background:#1B2530;border-radius:2px;}"
+                           "QProgressBar::chunk{background:" + tone + ";border-radius:2px;}")
+        ic.addWidget(track)
     ic.addWidget(_text(
         "Windows Recycle Bin items have no predictable expiration that "
         "Game Grave can promise. Use Save Vault or Resurrection Kit when "

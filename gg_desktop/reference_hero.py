@@ -23,8 +23,8 @@ class ReferenceHero(SceneHeader):
         super().__init__(kind, title, subtitle, note="GAME GRAVE")
         self.setObjectName("referenceHero")
         self._has_metrics = bool(metrics)
-        self.setMinimumHeight(224 if self._has_metrics else 164)
-        self.setMaximumHeight(224 if self._has_metrics else 164)
+        self.setMinimumHeight(224 if self._has_metrics else 132)
+        self.setMaximumHeight(224 if self._has_metrics else 132)
         self.setAccessibleName(title + ". " + subtitle)
         for child in self.findChildren(QLabel):
             child.hide()
@@ -44,13 +44,13 @@ class ReferenceHero(SceneHeader):
         self.title_overlay = QLabel(title, self)
         self.title_overlay.setObjectName("referenceHeroTitle")
         self.title_overlay.setStyleSheet(
-            "background:transparent; color:#FFFFFF; font-size:48px;"
+            "background:transparent; color:#FFFFFF; font-size:38px;"
             "font-weight:900; letter-spacing:.3px;")
         self.subtitle_overlay = QLabel(subtitle, self)
         self.subtitle_overlay.setObjectName("referenceHeroSubtitle")
         self.subtitle_overlay.setWordWrap(True)
         self.subtitle_overlay.setStyleSheet(
-            "background:transparent;color:#E2DDE6;font-size:17px;")
+            "background:transparent;color:#C7CDD8;font-size:14px;")
 
         self.metrics = QWidget(self)
         self.metrics.setObjectName("referenceHeroMetrics")
@@ -87,8 +87,8 @@ class ReferenceHero(SceneHeader):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.width()
-        self.title_overlay.setGeometry(72, 10, max(150, w - 92), 61)
-        self.subtitle_overlay.setGeometry(73, 61, max(150, w - 106), 57)
+        self.title_overlay.setGeometry(38, 13, max(150, w - 58), 49)
+        self.subtitle_overlay.setGeometry(39, 61, max(150, round(w * .66 - 42)), 43)
         self.metrics.setGeometry(18, 143, max(250, w - 36), 71)
 
     def paintEvent(self, event):
@@ -102,7 +102,7 @@ class ReferenceHero(SceneHeader):
         p.drawRoundedRect(full, 12, 12)
         p.save()
         p.setClipRect(full)
-        if self.background_art.isValid():
+        if self.background_art.isValid() and self.owner_art.isNull():
             self.background_art.render(p, QRectF(0, -62, w, h + 128))
         draw_approved_hero(p, self.owner_art, w, h)
         if self.owner_art.isNull():
@@ -140,5 +140,5 @@ class ReferenceHero(SceneHeader):
         p.restore()
         # Owner reference uses a slim red title accent, not a neon outline.
         p.setPen(QPen(QColor("#EF334F"), 5, Qt.SolidLine, Qt.RoundCap))
-        p.drawLine(52, 29, 35, 105)
+        p.drawLine(24, 27, 12, 99)
         p.end()

@@ -12,6 +12,7 @@ on:
       - 'tests/test_locked_ui_layout.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - 'tools/windows_crimson_dpi_smoke.py'
+      - 'tools/render_locked_visual_review.py'
       - '.github/workflows/windows-crimson-preview.yml'
   pull_request:
     branches: [main]
@@ -23,6 +24,7 @@ on:
       - 'tests/test_locked_ui_layout.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - 'tools/windows_crimson_dpi_smoke.py'
+      - 'tools/render_locked_visual_review.py'
       - '.github/workflows/windows-crimson-preview.yml'
 
 concurrency:
@@ -81,6 +83,8 @@ jobs:
           python tools/windows_crimson_dpi_smoke.py
           if ($LASTEXITCODE -ne 0) { throw '150% Windows layout smoke failed.' }
           Remove-Item Env:QT_SCALE_FACTOR
+      - name: Render populated owner-reference review pages
+        run: python tools/render_locked_visual_review.py --output _ci_temp/visual-review
       - name: Upload actual Qt screen captures for design review
         if: always()
         uses: actions/upload-artifact@v4
@@ -93,6 +97,7 @@ jobs:
             _ci_temp/crimson-locked-*-1040.png
             _ci_temp/cinematic-screenshot-manifest.json
             _ci_temp/locked-ui-evidence.json
+            _ci_temp/visual-review/
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE

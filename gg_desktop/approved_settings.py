@@ -7,6 +7,7 @@ measurements, subscriptions and launcher connections are never faked.
 from __future__ import annotations
 
 from pathlib import Path
+from copy import deepcopy
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -38,19 +39,20 @@ def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
     shell = QFrame()
     shell.setObjectName("ggAccentPanel")
     shell.setProperty("accent", tone)
-    shell.setMinimumHeight(190 if compact else 244)
+    shell.setMinimumHeight(155 if compact else 216)
     col = QVBoxLayout(shell)
-    col.setContentsMargins(14, 12, 14, 12)
-    col.setSpacing(7)
+    col.setContentsMargins(11, 9, 11, 9)
+    col.setSpacing(5)
     title_bar = QWidget()
     headings = QHBoxLayout(title_bar)
     headings.setContentsMargins(0, 0, 0, 0)
     headings.setSpacing(8)
     icon = QLabel()
-    icon.setPixmap(nav_icon(route_icon).pixmap(27, 27))
-    icon.setFixedSize(28, 28)
+    icon.setPixmap(nav_icon(route_icon).pixmap(21, 21))
+    icon.setFixedSize(22, 22)
     headings.addWidget(icon)
     text_title = label(heading, "sectionTitle", wrap=True)
+    text_title.setStyleSheet("font-size:14px;font-weight:750;color:#EEF1F7;")
     headings.addWidget(text_title, 1)
     col.addWidget(title_bar)
     description = label(info, "caption", wrap=True)
@@ -60,6 +62,7 @@ def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
         line_layout = QHBoxLayout(line)
         line_layout.setContentsMargins(0, 0, 0, 0)
         line_layout.setSpacing(5)
+        line.setMinimumHeight(20)
         left = QLabel(str(name))
         left.setStyleSheet("background:transparent;color:#C9D4DF;font-size:12px;")
         left.setWordWrap(True)
@@ -131,6 +134,7 @@ def _mini_card(title, facts, tone, route_icon, action=None):
 
 
 def render_approved_settings(window):
+    baseline = deepcopy(window.settings)
     window.settings_page()
     page = window.page
     page.content.setContentsMargins(11, 7, 11, 16)
@@ -283,19 +287,27 @@ def render_approved_settings(window):
               (("AI", "On" if ai_on else "Off",
                 "#58DCB1" if ai_on else "#F2BE87"),
                ("Local engine", "Installed" if ai_installed else "Not installed",
-                "#58DCB1" if ai_installed else "#F2BE87")),
+                "#58DCB1" if ai_installed else "#F2BE87"),
+               ("Model", str(data.get("ai_model", "Not selected")), "#9BC7E5"),
+               ("Permissions", "Read-only", "#C3AFE6"),
+               ("Setup", "Consent required", "#E6BB85")),
               "purple", "AI Assistant",
               (("Configure local AI", lambda: select(4)),)),
         _card("Ready Room & Notices",
               "Local warnings are real; official patch feeds are pending.",
               (("Scan notifications", "On demand", "#6ED2ED"),
-               ("Official Patch Watch", "Not connected", "#F0BD80")),
+               ("Official Patch Watch", "Not connected", "#F0BD80"),
+               ("Game Memory", "Local only", "#82D9B5"),
+               ("Session records", "Manually timed", "#B5B4E6"),
+               ("Publisher polling", "Off", "#B6C4D1")),
               "amber", "Ready Room",
               (("Notification details", lambda: select(notices_idx)),)),
         _card("Privacy & Data",
               "Your game list, file paths and saves stay local.",
               (("File uploads", "None", "#55D9AA"),
                ("Optional AI", "Local only", "#72D5EA"),
+               ("File paths", "On device", "#A2C4D8"),
+               ("Game/save data", "On device", "#A2C4D8"),
                ("Delete authority", "User only", "#D5B2EA")),
               "green", "Settings",
               (("Open privacy controls", lambda: select(5)),)),
@@ -341,6 +353,60 @@ def render_approved_settings(window):
     dashboard.addWidget(sidebar_bottom)
     page.content.insertWidget(2, dashboard)
 
+    # Reuse the existing, connected startup checkbox inside the control centre.
+    # A second General page beneath the dashboard changed the approved anatomy.
+    startup = stack.widget(0).findChildren(QCheckBox)
+    if startup:
+        startup[0].setText("Scan on launch")
+        startup[0].setToolTip("Read-only local inventory scan when Game Grave starts")
+        cards[7].layout().insertWidget(1, startup[0])
+
+    footer = QFrame()
+    footer.setObjectName("ggActionStrip")
+    footer_row = row(spacing=8, margins=(10, 8, 10, 8))
+    footer.setLayout(footer_row)
+    footer_row.addWidget(label("Local preferences • changes save automatically", "caption"), 1)
+
+    def save_current():
+        nonlocal baseline
+        from core import save_settings
+        try:
+            save_settings(dict(window.settings))
+            baseline = deepcopy(window.settings)
+            window.info("Settings saved", "Your current local preferences have been saved.")
+        except (OSError, ValueError) as exc:
+            window.error("Could not save settings", str(exc))
+
+    def revert_changes():
+        from core import save_settings
+        changed = [key for key in baseline if baseline[key] != window.settings.get(key)]
+        if not changed:
+            window.info("No changes to revert", "Preferences match the last saved checkpoint.")
+            return
+        explanation = "Restore preferences from when Settings was opened or last saved?\n\n"
+        if "never_touch" in changed:
+            explanation += ("This also changes your personal Never Touch rules and may "
+                            "make previously protected children reviewable. Built-in "
+                            "game/save protection stays active.\n\n")
+        explanation += "No game, mod, save or capture files will be changed."
+        if not window.confirm("Revert these preference changes?", explanation,
+                              destructive="never_touch" in changed):
+            return
+        try:
+            restored = deepcopy(baseline)
+            save_settings(restored)
+            window.settings = restored
+            from gg_desktop.backend import refresh_graveyard
+            refresh_graveyard(window.inventory, restored)
+            window._settings_category_index = 0
+            window.navigate("Settings")
+        except (OSError, ValueError) as exc:
+            window.error("Could not revert settings", str(exc))
+
+    footer_row.addWidget(button("Revert changes", revert_changes))
+    footer_row.addWidget(button("Save changes", save_current, kind="primary"))
+    page.content.addWidget(footer)
+
     def active(_index=None):
         selected = stack.currentIndex()
         highlight = 6 if selected in (3, 5, 7) else selected
@@ -349,13 +415,10 @@ def render_approved_settings(window):
             tab.style().unpolish(tab)
             tab.style().polish(tab)
         dashboard.setVisible(selected == 0)
-        # Original General preference remains below the overview in General.
+        settings_root.setVisible(selected != 0)
+        footer.setVisible(selected == 0)
     stack.currentChanged.connect(active)
     target = getattr(window, "_settings_category_index", 0)
     select(target if 0 <= target < stack.count() else 0)
     active()
-    page.content.addWidget(label(
-        "Changes to actual preferences save when selected. Game Grave never "
-        "reports simulated connected services, FPS measurements, or Pro licenses.",
-        "caption", wrap=True))
     return page
