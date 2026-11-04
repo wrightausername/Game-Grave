@@ -80,8 +80,10 @@ class CinematicToolArtwork(QFrame):
         p.setBrush(QColor("#101A26"))
         p.setPen(QPen(primary, 2.6))
         if self.mode == "vault":
+            # Locked reference: cyan secure-vault silhouette, not a generic
+            # checkmark. Original vector art, drawn only on exposure.
             shield = QPainterPath()
-            shield.moveTo(center.x(), center.y() - 41)
+            shield.moveTo(center.x(), center.y() - 43)
             shield.lineTo(center.x() + 39, center.y() - 29)
             shield.lineTo(center.x() + 32, center.y() + 16)
             shield.quadTo(center.x() + 18, center.y() + 37,
@@ -91,28 +93,58 @@ class CinematicToolArtwork(QFrame):
             shield.lineTo(center.x() - 39, center.y() - 29)
             shield.closeSubpath()
             p.drawPath(shield)
-            p.setPen(QPen(primary, 4.5, Qt.SolidLine, Qt.RoundCap,
-                          Qt.RoundJoin))
-            p.drawLine(QPointF(center.x() - 17, center.y() + 1),
-                       QPointF(center.x() - 4, center.y() + 13))
-            p.drawLine(QPointF(center.x() - 4, center.y() + 13),
-                       QPointF(center.x() + 22, center.y() - 13))
+            p.setPen(QPen(primary, 3.8, Qt.SolidLine, Qt.RoundCap))
+            p.drawArc(QRectF(center.x()-19, center.y()-21, 38, 40),
+                      0, 180*16)
+            p.setPen(QPen(QColor("#89F5F3"), 2.3))
+            p.setBrush(QColor("#09212C"))
+            p.drawRoundedRect(QRectF(center.x()-23,center.y()-2,46,31),4,4)
+            p.setPen(Qt.NoPen)
+            p.setBrush(primary)
+            p.drawEllipse(QPointF(center.x(),center.y()+9),3.4,3.4)
+            p.drawRoundedRect(QRectF(center.x()-2,center.y()+9,4,9),1,1)
         elif self.mode == "kit":
-            p.setBrush(QColor("#261520"))
-            p.drawEllipse(center, 34, 34)
-            p.setPen(QPen(primary, 5, Qt.SolidLine, Qt.RoundCap))
-            p.drawArc(QRectF(center.x()-39,center.y()-39,78,78), 45*16, 270*16)
+            # The approved Resurrection Kit is a controller framed by a
+            # crimson resurrection halo, not a second GG logo.
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(primary, 4.4, Qt.SolidLine, Qt.RoundCap))
+            p.drawArc(QRectF(center.x()-42,center.y()-42,84,84),
+                      50*16, 262*16)
             arrow = QPolygonF([
-                QPointF(center.x()+27,center.y()-32),
-                QPointF(center.x()+44,center.y()-23),
-                QPointF(center.x()+26,center.y()-16)])
+                QPointF(center.x()+29,center.y()-36),
+                QPointF(center.x()+47,center.y()-28),
+                QPointF(center.x()+27,center.y()-17)])
             p.setPen(Qt.NoPen)
             p.setBrush(primary)
             p.drawPolygon(arrow)
-            p.setFont(QFont("Segoe UI", 20, QFont.Bold))
-            p.setPen(QColor("#F3FAFF"))
-            p.drawText(QRectF(center.x()-22,center.y()-18,44,36),
-                       Qt.AlignCenter, "GG")
+            controller = QPainterPath()
+            controller.moveTo(center.x()-27,center.y()-4)
+            controller.quadTo(center.x()-26,center.y()-16,
+                              center.x()-10,center.y()-14)
+            controller.lineTo(center.x()+10,center.y()-14)
+            controller.quadTo(center.x()+26,center.y()-16,
+                              center.x()+27,center.y()-4)
+            controller.lineTo(center.x()+33,center.y()+14)
+            controller.quadTo(center.x()+34,center.y()+25,
+                              center.x()+23,center.y()+20)
+            controller.lineTo(center.x()+13,center.y()+12)
+            controller.lineTo(center.x()-13,center.y()+12)
+            controller.lineTo(center.x()-23,center.y()+20)
+            controller.quadTo(center.x()-34,center.y()+25,
+                              center.x()-33,center.y()+14)
+            controller.closeSubpath()
+            p.setBrush(QColor("#170E1B"))
+            p.setPen(QPen(QColor("#FF9A9F"), 2.7))
+            p.drawPath(controller)
+            p.setPen(QPen(QColor("#FFF3F5"), 2.8, Qt.SolidLine, Qt.RoundCap))
+            p.drawLine(QPointF(center.x()-17,center.y()-2),
+                       QPointF(center.x()-17,center.y()+9))
+            p.drawLine(QPointF(center.x()-23,center.y()+4),
+                       QPointF(center.x()-11,center.y()+4))
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor("#F75674"))
+            for xx, yy in ((17,0),(22,5),(12,5)):
+                p.drawEllipse(QPointF(center.x()+xx,center.y()+yy),2.3,2.3)
         elif self.mode == "assistant":
             p.setPen(QPen(primary, 3, Qt.SolidLine, Qt.RoundCap))
             prev = QPointF(center.x()-55, center.y())
