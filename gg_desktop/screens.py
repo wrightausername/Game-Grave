@@ -2844,7 +2844,7 @@ class ScreenMethods(LockedPagesMixin):
         access_row = row(spacing=11)
         access_bar.setLayout(access_row)
         access_row.addWidget(label("QUICK ACCESS", "sectionTitle"))
-        high_dpi = self.devicePixelRatioF() >= 1.12
+        high_dpi = self.devicePixelRatioF() >= 1.12 or self.width() < 1420
         if not high_dpi:
             access_row.addWidget(label(
                 "Your recovery and maintenance shortcuts", "caption"))
