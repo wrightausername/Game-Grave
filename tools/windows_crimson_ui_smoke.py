@@ -213,6 +213,11 @@ def main():
                     assert window.grave_table.columnCount() == 6
                     assert window.grave_drive.count() >= 1
                     assert window.grave_age.count() == 4
+                    assert window.page.findChildren(
+                        QFrame, "graveEvidenceBanner"), (
+                        "Graveyard needs the selected-file cinematic evidence graphic")
+                    assert window.grave_table.rowHeight(0) >= 44, (
+                        "Graveyard items must stay readable like the locked layout")
                     window.grave_age.setCurrentText("3+ years")
                     app.processEvents()
                     assert window.grave_table.rowCount() == 0, (
@@ -244,9 +249,16 @@ def main():
                         "Approved Settings uses horizontal categories")
                     assert len(window.page.findChildren(
                         QPushButton, "approvedSettingsTab")) == 7
+                    if window.devicePixelRatioF() < 1.12:
+                        assert len(window.page.findChildren(
+                            QFrame, "approvedSettingsMiniCard")) >= 4, (
+                            "Locked Settings right-hand status column missing")
                 if route == "More Tools":
                     assert window.page.findChildren(QFrame, "approvedKitArt")
                     assert window.page.findChildren(QFrame, "approvedVaultArt")
+                    assert window.page.findChildren(
+                        QWidget, "approvedFeaturedTool"), (
+                        "Approved More Tools cards must use side-by-side artwork")
                 if route in ("Ready Room", "Games", "Mods", "Old Files", "Graveyard",
                              "Game DNA", "Undo Center", "Captures", "Settings",
                              "AI Assistant", "More Tools"):
