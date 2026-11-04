@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtCore import Qt, QSize, QRectF
+from PySide6.QtGui import QColor, QBrush, QIcon, QPixmap, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QFrame,
     QHBoxLayout, QLabel, QLineEdit, QScrollArea, QTableWidgetItem, QVBoxLayout, QWidget,
@@ -67,6 +67,33 @@ def _size(entry):
 def _age(entry):
     return (str(entry.age_days) + " days"
             if entry.age_days is not None else "Unknown")
+
+
+def _candidate_icon(category: str) -> QIcon:
+    """Crisp original red folder/file icon, never a guessed game logo."""
+    px = QPixmap(36, 36)
+    px.fill(Qt.transparent)
+    paint = QPainter(px)
+    paint.setRenderHint(QPainter.Antialiasing)
+    is_file = "screenshot" in category.casefold() or "recording" in category.casefold()
+    if is_file:
+        paint.setBrush(QColor("#A92239"))
+        paint.setPen(QPen(QColor("#FB5C6B"), 1.4))
+        paint.drawRoundedRect(QRectF(9, 5, 20, 27), 3, 3)
+        paint.setPen(QPen(QColor("#FFB2AF"), 1.2))
+        paint.drawLine(13, 14, 25, 14)
+        paint.drawLine(13, 19, 25, 19)
+        paint.drawLine(13, 24, 22, 24)
+    else:
+        paint.setPen(QPen(QColor("#FC6270"), 1.3))
+        paint.setBrush(QColor("#DB354C"))
+        paint.drawRoundedRect(QRectF(3, 11, 30, 21), 3, 3)
+        paint.setBrush(QColor("#F46B74"))
+        paint.drawRoundedRect(QRectF(4, 7, 13, 8), 2, 2)
+        paint.setBrush(QColor("#B91E36"))
+        paint.drawRoundedRect(QRectF(3, 14, 30, 18), 3, 3)
+    paint.end()
+    return QIcon(px)
 
 
 def render_approved_graveyard(window):
@@ -157,6 +184,7 @@ def render_approved_graveyard(window):
     window.grave_table.setMinimumHeight(315)
     window.grave_table.verticalHeader().setDefaultSectionSize(47)
     window.grave_table.setAccessibleName("Graveyard discovered candidates table")
+    window.grave_table.setIconSize(QSize(29, 29))
     bcol.addWidget(window.grave_table, 1)
 
     main_row.addWidget(browser, 7)
@@ -334,6 +362,8 @@ def render_approved_graveyard(window):
                     cell.setForeground(QBrush(QColor(
                         "#88D9B1" if entry.can_recycle else
                         "#EFAB6D" if rule == "Unprotect" else "#D7B7BC")))
+                if col == 0:
+                    cell.setIcon(_candidate_icon(entry.category))
                 table.setItem(idx, col, cell)
                 if col == 0:
                     from gg_desktop.visuals import nav_icon
