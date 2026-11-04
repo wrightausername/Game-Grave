@@ -2872,7 +2872,7 @@ class ScreenMethods(LockedPagesMixin):
         main_col = column(spacing=13)
         main.setLayout(main_col)
         headline = QWidget()
-        feats = row(spacing=13)
+        feats = column(spacing=13) if high_dpi else row(spacing=13)
         headline.setLayout(feats)
         rescue, rescue_col = panel(kind="actionCardPrimary", padding=17)
         rescue_col.addWidget(label("♻  RESURRECTION KIT", "eyebrow"))
