@@ -1,27 +1,87 @@
-# Captures and artwork update
+# Captures and approved-photo shell update
 
-Actual running Qt screenshots at 1672×941 and 1366×768. Captured on Linux; the Windows workflow also renders these pages before packaging.
+Actual running Qt screens at 1672×941 and 1366×768, captured on Linux. The Windows workflow renders the same 13 pages before packaging.
 
-Captures now has an adjustable screenshot browser on the left and a much larger selected-image preview on the right. The preview grows with the window and retains image proportions. The existing forest/GG photo replaces the generic Captures illustration.
+Captures has an adjustable screenshot browser on the left and a much larger selected-image preview on the right. The image expands with the window. The photo family from the locked design is now used throughout the shell, including the other workspace headers. Oversized scanner illustrations and procedural cover posters were removed. Genuine local or owner-selected art remains; missing artwork uses a neutral state.
 
-The images shown inside Captures are prior application screenshots used as an explicit review fixture, not the owner’s private screenshots or invented gameplay.
+The images inside Captures are existing application screenshots used as explicit review fixtures. No private user screenshots or invented gameplay images are involved.
 
-Procedural moon/forest cover posters were removed. Local publisher or owner-selected artwork is retained. Missing artwork uses a neutral state, and Overview exposes Get Steam Covers.
+Runtime source: [`81ba576`](https://github.com/wrightausername/Game-Grave/commit/81ba576b9d1ead5f951445800cbdfcb3f627883f). [Capture provenance and hashes](visual-review.json). These changes do not declare complete 1:1 visual acceptance.
 
-Runtime source: [`1debbee`](https://github.com/wrightausername/Game-Grave/commit/1debbee332cc50f631fe7c7caf6d7c9e6c86724a). [Capture provenance and hashes](visual-review.json). These targeted corrections do not declare full 1:1 visual acceptance.
+## Captures
 
-## Captures — 1672×941
+![Captures — running Qt application](visual-review-captures-1672.png)
 
-![Running Captures screen](visual-review-captures-1672.png)
+[1366×768 capture](visual-review-captures-1366.png)
 
-## Captures — 1366×768
+## Overview
 
-![Running Captures at 1366×768](visual-review-captures-1366.png)
+![Overview — running Qt application](visual-review-overview-1672.png)
 
-## Overview missing-artwork state
+[1366×768 capture](visual-review-overview-1366.png)
 
-![No procedural cover posters](visual-review-overview-1672.png)
+## Ready Room
 
-## Game DNA without invented game art
+![Ready Room — running Qt application](visual-review-ready-room-1672.png)
 
-![Source-backed Game DNA identity](visual-review-game-dna-1672.png)
+[1366×768 capture](visual-review-ready-room-1366.png)
+
+## Games
+
+![Games — running Qt application](visual-review-games-1672.png)
+
+[1366×768 capture](visual-review-games-1366.png)
+
+## Mods
+
+![Mods — running Qt application](visual-review-mods-1672.png)
+
+[1366×768 capture](visual-review-mods-1366.png)
+
+## Old Files
+
+![Old Files — running Qt application](visual-review-old-files-1672.png)
+
+[1366×768 capture](visual-review-old-files-1366.png)
+
+## Other Storage
+
+![Other Storage — running Qt application](visual-review-other-storage-1672.png)
+
+[1366×768 capture](visual-review-other-storage-1366.png)
+
+## Graveyard
+
+![Graveyard — running Qt application](visual-review-graveyard-1672.png)
+
+[1366×768 capture](visual-review-graveyard-1366.png)
+
+## Game DNA
+
+![Game DNA — running Qt application](visual-review-game-dna-1672.png)
+
+[1366×768 capture](visual-review-game-dna-1366.png)
+
+## Undo Center
+
+![Undo Center — running Qt application](visual-review-undo-center-1672.png)
+
+[1366×768 capture](visual-review-undo-center-1366.png)
+
+## AI Assistant
+
+![AI Assistant — running Qt application](visual-review-ai-assistant-1672.png)
+
+[1366×768 capture](visual-review-ai-assistant-1366.png)
+
+## Settings
+
+![Settings — running Qt application](visual-review-settings-1672.png)
+
+[1366×768 capture](visual-review-settings-1366.png)
+
+## More Tools
+
+![More Tools — running Qt application](visual-review-more-tools-1672.png)
+
+[1366×768 capture](visual-review-more-tools-1366.png)
