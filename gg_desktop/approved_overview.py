@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, QRectF, QSize
 from PySide6.QtGui import QColor, QImageReader, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
-    QScrollArea, QVBoxLayout, QWidget,
+    QScrollArea, QVBoxLayout, QGridLayout, QWidget,
 )
 
 from core import human_size, get_activity, friendly_activity
@@ -242,6 +242,7 @@ def render_approved_overview(window):
         "Overview. Your games. All their baggage. Under control.")
     page.content.addWidget(hero)
 
+    compact = window.devicePixelRatioF() >= 1.12 and window.width() <= 1400
     found = bool(window.inventory.scanned_at)
     games = window.inventory.games
     mods = window.inventory.mods
@@ -250,7 +251,13 @@ def render_approved_overview(window):
     metrics = QWidget()
     metrics.setMinimumHeight(80)
     metrics.setObjectName("approvedMetrics")
-    mrow = _line(metrics, gap=8)
+    if compact:
+        mrow = QGridLayout(metrics)
+        mrow.setContentsMargins(0, 0, 0, 0)
+        mrow.setHorizontalSpacing(8)
+        mrow.setVerticalSpacing(6)
+    else:
+        mrow = _line(metrics, gap=8)
     values = (
         ("Games", str(len(games)) if found else "Not scanned", "Games",
          "Verified installed game records", COLORS[0]),
@@ -264,14 +271,17 @@ def render_approved_overview(window):
         ("Captures", str(captures) if found else "Not scanned", "Captures",
          "Screenshots and video records from latest scan", COLORS[4]),
     )
-    for text, val, route, description, accent in values:
-        mrow.addWidget(_metric(text, val, accent, route, window.navigate,
-                               description), 1)
+    for index, (text, val, route, description, accent) in enumerate(values):
+        tile = _metric(text, val, accent, route, window.navigate, description)
+        if compact:
+            mrow.addWidget(tile, index // 2, index % 2)
+        else:
+            mrow.addWidget(tile, 1)
     page.content.addWidget(metrics)
 
     recycled, move_count, recent = _monthly_moves()
     center = QWidget()
-    c = _line(center, gap=10)
+    c = _stack(center, gap=10) if compact else _line(center, gap=10)
 
     activity_panel, activity = _panel("RECENT ACTIVITY")
     # Scans count as real activity even when no files were removed. Existing
