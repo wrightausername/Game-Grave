@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-preview-d2c682a
+  group: publish-preview-5594aa9
   cancel-in-progress: false
 
 jobs:
@@ -22,9 +22,9 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_RUN: '41913552946'
-      SOURCE_SHA: d2c682a03b3c3227b0ac63f52fe586d890911192
-      PREVIEW_TAG: preview-d2c682a
+      SOURCE_RUN: '41915931360'
+      SOURCE_SHA: 5594aa906a34da9a6590702652f4b1ffc536b466
+      PREVIEW_TAG: preview-5594aa9
     steps:
       - name: Verify the exact tested source run
         shell: bash
@@ -45,7 +45,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           repository: wrightausername/Game-Grave
-          run-id: '41913552946'
+          run-id: '41915931360'
           name: GameGrave-Cinematic-Windows-Installer-Unsigned
           path: original
       - name: Download actual native UI captures
@@ -53,7 +53,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           repository: wrightausername/Game-Grave
-          run-id: '41913552946'
+          run-id: '41915931360'
           name: GameGrave-Crimson-Rendered-UI-Screenshots
           path: visual-review
       - name: Verify and prepare the public download
@@ -71,17 +71,17 @@ jobs:
           assert actual == expected, 'Installer checksum mismatch'
           delivery = pathlib.Path('delivery')
           delivery.mkdir()
-          installer = delivery / 'GameGrave-Setup-d2c682a.exe'
+          installer = delivery / 'GameGrave-Setup-5594aa9.exe'
           shutil.copyfile(original, installer)
-          checksum = delivery / 'GameGrave-Setup-d2c682a.sha256'
+          checksum = delivery / 'GameGrave-Setup-5594aa9.sha256'
           checksum.write_text(actual + '  ' + installer.name + '\n')
           readme = delivery / 'README.txt'
           readme.write_text(
-              'Game Grave Windows UI preview — build d2c682a\n\n'
-              'Close Game Grave, extract this ZIP, and run GameGrave-Setup-d2c682a.exe.\n'
+              'Game Grave Windows UI preview — build 5594aa9\n\n'
+              'Close Game Grave, extract this ZIP, and run GameGrave-Setup-5594aa9.exe.\n'
               'Inventory and manual mod scans run with games, overlays and fullscreen apps open.\n'
               'This is an unsigned engineering preview.\n')
-          with zipfile.ZipFile(delivery / 'GameGrave-Windows-Preview-d2c682a.zip', 'w',
+          with zipfile.ZipFile(delivery / 'GameGrave-Windows-Preview-5594aa9.zip', 'w',
                                compression=zipfile.ZIP_STORED) as archive:
               for path in (installer, checksum, readme):
                   archive.write(path, path.name)
@@ -97,27 +97,27 @@ jobs:
           cat > release-notes.md <<'NOTES'
           Windows UI preview with an expanded Captures workspace and genuine artwork states.
 
-          Captures now places the screenshot browser on the left and a larger, expanding selected-image preview on the right. Drag the divider to adjust the balance. The existing locked forest/GG photo is used in the header.
+          Captures now places the screenshot browser on the left and a larger, expanding selected-image preview on the right. Drag the divider to adjust the balance. The approved forest/GG photo family is used throughout all 13 workspace headers, replacing generated scene illustrations. Oversized empty-state scanner graphics are removed.
 
           Procedural moon/forest cover stand-ins have been removed. Verified local publisher or owner-selected covers are retained, with a neutral state for missing artwork and Get Steam Covers available on Overview.
 
           Inventory and manual mod scans still run while games, overlays or fullscreen applications are open. Cancellation and file protections remain active.
 
-          ![Actual native Windows Captures view](https://github.com/wrightausername/Game-Grave/releases/download/preview-d2c682a/Captures-preview.png)
+          ![Actual native Windows Captures view](https://github.com/wrightausername/Game-Grave/releases/download/preview-5594aa9/Captures-preview.png)
 
           The displayed screenshot is an explicit review fixture, not private user content.
 
           Download the ZIP, extract it, and run the installer. The EXE is also available separately. These public release links require no GitHub sign-in.
 
-          This is an unsigned engineering preview, not a stable 1.0 release or a claim of exact pixel parity. The installer bytes are unchanged from the successful Windows build and install/launch/uninstall tests in run 41913552946. Source commit: d2c682a03b3c3227b0ac63f52fe586d890911192. SHA-256 is included.
+          This is an unsigned engineering preview, not a stable 1.0 release or a claim of exact pixel parity. The installer bytes are unchanged from the successful Windows build and install/launch/uninstall tests in run 41915931360. Source commit: 5594aa906a34da9a6590702652f4b1ffc536b466. SHA-256 is included.
           NOTES
           gh release create "$PREVIEW_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$SOURCE_SHA" \
-            --title 'Game Grave Windows UI Preview — d2c682a (unsigned)' \
+            --title 'Game Grave Windows UI Preview — 5594aa9 (unsigned)' \
             --prerelease --latest=false \
             --notes-file release-notes.md \
-            delivery/GameGrave-Windows-Preview-d2c682a.zip \
-            delivery/GameGrave-Setup-d2c682a.exe \
-            delivery/GameGrave-Setup-d2c682a.sha256 \
+            delivery/GameGrave-Windows-Preview-5594aa9.zip \
+            delivery/GameGrave-Setup-5594aa9.exe \
+            delivery/GameGrave-Setup-5594aa9.sha256 \
             delivery/Captures-preview.png
