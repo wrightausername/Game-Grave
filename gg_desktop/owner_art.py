@@ -21,9 +21,17 @@ IMAGE_BY_ROUTE = {
 
 
 def load_approved_hero(kind: str) -> QPixmap:
-    name = IMAGE_BY_ROUTE.get(str(kind).casefold())
-    return (QPixmap(str(Path(__file__).parent / "assets" / name))
-            if name else QPixmap())
+    route = str(kind).casefold()
+    name = IMAGE_BY_ROUTE.get(route)
+    photo = (QPixmap(str(Path(__file__).parent / "assets" / name))
+             if name else QPixmap())
+    # The archived source crops include tiny edges of adjacent mockup controls.
+    # Exclude those edges from the decorative view; keep the original assets.
+    if not photo.isNull() and route == "graveyard":
+        return photo.copy(0, 0, photo.width(), max(1, photo.height() - 16))
+    if not photo.isNull() and route == "overview":
+        return photo.copy(0, 12, photo.width(), max(1, photo.height() - 12))
+    return photo
 
 
 def draw_approved_hero(painter, art: QPixmap, width: int, height: int) -> bool:
