@@ -135,7 +135,9 @@ def main():
                 "Library strip must be backed by all three verified test game records")
             labels = {b.text() for b in window.page.findChildren(QLabel)}
             assert any("recent activity" in t.casefold() for t in labels)
-            assert any("recycle bin activity" in t.casefold() for t in labels)
+            assert any("space reclaimed" in t.casefold() for t in labels)
+            assert any("moved this month" in t.casefold() for t in labels), (
+                "Overview cannot present Recycle Bin moves as confirmed reclaimed space")
             assert any("quick actions" in t.casefold() for t in labels)
             for name in ("gg_cinematic_hero.svg", "crimson_sunset.svg",
                          "crimson_fog.svg", "crimson_footer.svg"):
