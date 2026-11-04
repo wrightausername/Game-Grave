@@ -143,7 +143,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         glyph.setAccessibleName("Game Grave red GG monogram")
         brand_layout.addWidget(glyph)
         name = label("GAME GRAVE", "brand")
-        name.setStyleSheet("color:#F5F7FB;font-size:20px;font-weight:900;letter-spacing:.3px;")
+        name.setStyleSheet("color:#F5F7FB;font-size:23px;font-weight:900;letter-spacing:.2px;")
         brand_layout.addWidget(name, 1)
         r.addWidget(brand_holder)
         r.addSpacing(12)
@@ -195,7 +195,9 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.global_search.setPlaceholderText(
             "⌕  Search games, mods, files, and more…           Ctrl + K")
         self.global_search.returnPressed.connect(self.open_global_search)
-        topbox.addWidget(self.global_search, 1)
+        self.global_search.setMaximumWidth(590)
+        topbox.addWidget(self.global_search, 0)
+        topbox.addStretch(1)
         # The approved Nov 2 shell has quiet notification/help controls, not
         # a persistent SCAN PC toolbar on every route. Scanning remains in
         # Overview, Graveyard and other explicit user-invoked workflows.
