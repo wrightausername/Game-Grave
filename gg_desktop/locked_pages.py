@@ -220,10 +220,20 @@ class LockedPagesMixin:
         gallery = game_gallery(
             [], inspect_game, limit=8)
         gallery.setObjectName("readyRoomCoverStrip")
-        col.addWidget(gallery)
-        # Covers are the primary visual entry point. Keep the sortable table
-        # accessible below rather than hiding all real artwork off-screen.
+        # Cover art leads, while the sortable inventory remains accessible.
         col.insertWidget(col.indexOf(table), gallery)
+        art_controls = QWidget()
+        art_row = row(spacing=8)
+        art_controls.setLayout(art_row)
+        art_row.addWidget(button(
+            "Get missing Steam covers",
+            self._download_game_covers,
+            kind="primary"))
+        art_row.addWidget(button(
+            "Match other-launcher covers…",
+            self._download_other_game_covers))
+        art_row.addStretch()
+        col.insertWidget(col.indexOf(gallery) + 1, art_controls)
         body.addWidget(left, 7)
 
         patch, patch_col = panel(padding=12, spacing=9)
