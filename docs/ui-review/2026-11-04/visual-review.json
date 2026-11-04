@@ -2,7 +2,7 @@
   "fixture": "Explicit synthetic visual data; no user data or AI inference",
   "covers": "Labelled local demo illustrations; genuine publisher art loads from verified local cache",
   "platform": "linux",
-  "commit": "5c2a3ac20ef1216e8a469197e693eccb46c9ff20",
+  "commit": "b6ba8c41021094874c38f27625f85980c960ce93",
   "source_reference": "Owner-supplied seven-page reference/running-UI comparison, left column",
   "pixel_fidelity": "No automated claim of 1:1 equivalence",
   "captures": [
@@ -16,7 +16,7 @@
       "body_width": 1386,
       "viewport_width": 1386,
       "vertical_scroll_maximum": 13,
-      "sha256": "7f7d52bfc1b1fbad2c69ccfadc8901431f973c03203ea86cdea480c911efd9f9"
+      "sha256": "2c42b316dca72fb996602052ede90713f9321ce3a6746cbcd6de0bd140a71e72"
     },
     {
       "page": "Graveyard",
@@ -28,7 +28,7 @@
       "body_width": 1396,
       "viewport_width": 1396,
       "vertical_scroll_maximum": 0,
-      "sha256": "bccb24034f23113ba0c790714bba14f6af0d1e4c06075d3aed0aec81d118baff"
+      "sha256": "6adf445498a19dd8757fe6111e13d82a315189f573421caf3278feafaf69c9d2"
     },
     {
       "page": "Game DNA",
@@ -40,7 +40,7 @@
       "body_width": 1396,
       "viewport_width": 1396,
       "vertical_scroll_maximum": 0,
-      "sha256": "6502284e38dc8dd95cfe7120d77cbea0617acd52793fc36c6c536512226e9d36"
+      "sha256": "367d4679be791cdaf946e754c7a7bccbb5ea0f9450645618df7c12f1917501ef"
     },
     {
       "page": "Undo Center",
@@ -52,7 +52,7 @@
       "body_width": 1386,
       "viewport_width": 1386,
       "vertical_scroll_maximum": 8,
-      "sha256": "9f1a37dd9ea3d1e272d2a105b08983826c1e0efe63488ce0be214c54c666e17e"
+      "sha256": "0a88f91792134f8083ea42a0c0eb7014f95781367b23819437ce9ae89b59efc5"
     },
     {
       "page": "AI Assistant",
@@ -88,7 +88,7 @@
       "body_width": 1396,
       "viewport_width": 1396,
       "vertical_scroll_maximum": 0,
-      "sha256": "46da26ddceed57651d08e2604ccd2fc5c6b42788aee83e84b7a240986fe9c4bc"
+      "sha256": "9137428e412dc08a1c560a0c78bb61c39f0c2cba435dd61763f7cfe90768659f"
     },
     {
       "page": "Overview",
@@ -100,7 +100,7 @@
       "body_width": 1080,
       "viewport_width": 1080,
       "vertical_scroll_maximum": 186,
-      "sha256": "1e571614f9105075726bf8bed78e0c022ed57f706928cab09b0bec846753d445"
+      "sha256": "9952a4e3917f156190adfed21a31f0db4ffd29b20496a49c581ca338bc8ded36"
     },
     {
       "page": "Graveyard",
@@ -112,7 +112,7 @@
       "body_width": 1080,
       "viewport_width": 1080,
       "vertical_scroll_maximum": 275,
-      "sha256": "76e131b972bca1ce16852846cfbbf9f543724b0a3e24de3695661bda1dc1131f"
+      "sha256": "fc0d01aa73c82d065355c53dbaf9d4934126da8141b88a59a4ffebffc4f46ed1"
     },
     {
       "page": "Game DNA",
@@ -124,7 +124,7 @@
       "body_width": 1080,
       "viewport_width": 1080,
       "vertical_scroll_maximum": 249,
-      "sha256": "59725e0acfb9d0db45a595e3e4ec854ded01855fe9e4e61ba831292451a3b738"
+      "sha256": "5a0836424c06cb2e28930b38056820df8fc2b5297857b6c6e97888a56b7b7e36"
     },
     {
       "page": "Undo Center",
@@ -136,7 +136,7 @@
       "body_width": 1080,
       "viewport_width": 1080,
       "vertical_scroll_maximum": 181,
-      "sha256": "50267cf49123d0b856bcbc9ad5b74ef162d31bf61609c0bae7a0683b77693ed7"
+      "sha256": "a755c88637e28fe40752a6e9616c6dbb97a817ad7e907e4a91744420fe61ee78"
     },
     {
       "page": "AI Assistant",

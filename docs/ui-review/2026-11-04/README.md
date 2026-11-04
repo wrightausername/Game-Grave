@@ -4,7 +4,7 @@ These are captures of the running native Qt application after the visual pass ag
 
 Captured on Linux with Qt 6.11.3 at 1672×941 and 1366×768. Inventory, recovery records, activity and conversation use an isolated synthetic review fixture; no user files or AI inference were involved. Demo covers are local illustrations. Production uses verified local publisher artwork when available. Native Windows captures are also produced by the PR’s Crimson preview workflow.
 
-Source implementation: [`5c2a3ac`](https://github.com/wrightausername/Game-Grave/commit/5c2a3ac20ef1216e8a469197e693eccb46c9ff20). [Capture provenance and hashes](visual-review.json). Tests and these screenshots do not certify exact 1:1 pixel parity with the original full-resolution approved PNGs.
+Source implementation: [`b6ba8c4`](https://github.com/wrightausername/Game-Grave/commit/b6ba8c41021094874c38f27625f85980c960ce93). [Capture provenance and hashes](visual-review.json). Tests and these screenshots do not certify exact 1:1 pixel parity with the original full-resolution approved PNGs.
 
 ## Overview
 
