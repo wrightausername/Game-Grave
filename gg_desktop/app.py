@@ -195,6 +195,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.global_search.setPlaceholderText(
             "⌕  Search games, mods, files, and more…           Ctrl + K")
         self.global_search.returnPressed.connect(self.open_global_search)
+        self.global_search.setMinimumWidth(540)
         self.global_search.setMaximumWidth(590)
         topbox.addWidget(self.global_search, 0)
         topbox.addStretch(1)
