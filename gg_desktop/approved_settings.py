@@ -224,12 +224,29 @@ def render_approved_settings(window):
     scan_folder = str(data.get("scan_folder", "")).strip()
     scan_label = Path(scan_folder).name if scan_folder else "Not set"
 
+    # Ground source rows in this PC's discovered installations. A missing
+    # launcher game is not treated as a disconnected account or proof that
+    # the publisher is installed.
+    source_names = (
+        "Steam", "Epic Games", "EA", "Battle.net",
+        "Ubisoft Connect", "Xbox (PC)", "GOG",
+    )
+    source_counts = {
+        name: sum(name.casefold() in str(game.launcher).casefold()
+                  for game in window.inventory.games)
+        for name in source_names
+    }
+    source_facts = tuple(
+        (name, (str(source_counts[name]) + " games" if window.inventory.scanned_at
+                else "Not scanned"),
+         "#5FDAB2" if source_counts[name] else "#B6C4D1")
+        for name in source_names
+    )
+
     cards = [
         _card("Libraries & Detection",
               "Verified launcher records and owner-selected scan roots.",
-              (("Extra game roots", str(library_roots), "#74D9E9"),
-               ("Capture locations", str(captures), "#BFA7E9"),
-               ("Old Files scope", scan_label, "#D9E2EC")),
+              source_facts,
               "cyan", "Games",
               (("Manage libraries", lambda: select(1)),)),
         _card("Protection & Cleanup",
