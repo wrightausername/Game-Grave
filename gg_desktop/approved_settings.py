@@ -76,6 +76,45 @@ def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
     return shell
 
 
+def _mini_card(title, facts, tone, route_icon, action=None):
+    """Compact reference-style status column with verified local values."""
+    frame = QFrame()
+    frame.setObjectName("ggAccentPanel")
+    frame.setProperty("accent", tone)
+    col = QVBoxLayout(frame)
+    col.setContentsMargins(12, 8, 12, 8)
+    col.setSpacing(3)
+    heading = QWidget()
+    line = QHBoxLayout(heading)
+    line.setContentsMargins(0, 0, 0, 0)
+    icon = QLabel()
+    icon.setFixedSize(22, 22)
+    icon.setPixmap(nav_icon(route_icon).pixmap(21, 21))
+    line.addWidget(icon)
+    title_widget = label(title, "sectionTitle")
+    title_widget.setStyleSheet(
+        "font-size:14px;color:#F2F5F8;font-weight:800;background:transparent;")
+    line.addWidget(title_widget, 1)
+    col.addWidget(heading)
+    for key, value in facts:
+        pair = QWidget()
+        item = QHBoxLayout(pair)
+        item.setContentsMargins(0,0,0,0)
+        item.setSpacing(4)
+        left = QLabel(str(key))
+        left.setStyleSheet("color:#B9C6D2;font-size:11px;background:transparent;")
+        right = QLabel(str(value))
+        right.setStyleSheet(
+            "color:#D6E5F0;font-size:11px;font-weight:800;background:transparent;")
+        right.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        item.addWidget(left, 1)
+        item.addWidget(right)
+        col.addWidget(pair)
+    if action:
+        col.addWidget(button(action[0], action[1]))
+    return frame
+
+
 def render_approved_settings(window):
     window.settings_page()
     page = window.page
@@ -230,14 +269,59 @@ def render_approved_settings(window):
               (("Scan now", window.start_scan),
                ("Backup & restore", lambda: select(6))), compact=True),
     ]
-    # The approved 4x2 dashboard fits normal 100% desktop scaling. At
-    # elevated Windows DPI, 2x4 preserves readable card text without a
-    # horizontal scrollbar or cropped security controls.
-    columns = 2 if window.devicePixelRatioF() >= 1.12 else 4
-    for i, card in enumerate(cards):
-        grid.addWidget(card, i // columns, i % columns)
-    for col in range(columns):
-        grid.setColumnStretch(col, 1)
+    # The locked reference has THREE large functional columns and a narrow
+    # stack of compact status panels. Equal 4x2 cards were visibly wrong.
+    if window.devicePixelRatioF() >= 1.12:
+        # At 125/150% DPI use scrollable two-column layout with no clipping.
+        for i, card in enumerate(cards):
+            grid.addWidget(card, i // 2, i % 2)
+        for i in range(2):
+            grid.setColumnStretch(i, 1)
+    else:
+        # Main top row: libraries / protection / gaming performance.
+        for index in range(3):
+            cards[index].setMinimumHeight(285)
+            grid.addWidget(cards[index], 0, index)
+        # Bottom row: optional AI / notices / privacy.
+        for index in range(3):
+            cards[index + 4].setMinimumHeight(226)
+            grid.addWidget(cards[index + 4], 1, index)
+
+        sidebar_top = QWidget()
+        narrow_top = QVBoxLayout(sidebar_top)
+        narrow_top.setContentsMargins(0,0,0,0)
+        narrow_top.setSpacing(7)
+        narrow_top.addWidget(_mini_card(
+            "System Status",
+            (("Scan", "Complete" if window.inventory.scanned_at else "Not run"),
+             ("CPU/FPS", "Not sampled")),
+            "red", "Other Storage",
+            ("Review", window._show_notifications)))
+        narrow_top.addWidget(_mini_card(
+            "Storage Paths",
+            (("Extra roots", str(library_roots)),
+             ("Old Files", scan_label)),
+            "amber", "Old Files",
+            ("Manage", lambda: select(1))))
+        narrow_top.addWidget(_mini_card(
+            "Connected Services",
+            (("Steam / Epic / EA", "Scan evidence only"),
+             ("Publisher feeds", "Not connected")),
+            "cyan", "Games"))
+        grid.addWidget(sidebar_top, 0, 3)
+
+        sidebar_bottom = QWidget()
+        narrow_bottom = QVBoxLayout(sidebar_bottom)
+        narrow_bottom.setContentsMargins(0,0,0,0)
+        narrow_bottom.setSpacing(7)
+        narrow_bottom.addWidget(_mini_card(
+            "License / Edition",
+            (("Current", "Unsigned preview"),),
+            "amber", "Settings"))
+        narrow_bottom.addWidget(cards[7], 1)
+        grid.addWidget(sidebar_bottom, 1, 3)
+        for idx, stretch in enumerate((4, 4, 4, 3)):
+            grid.setColumnStretch(idx, stretch)
     page.content.insertWidget(2, dashboard)
 
     def active(_index=None):
