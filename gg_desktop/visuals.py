@@ -434,8 +434,8 @@ class RelationshipMap(QWidget):
 
         # Wide concentric red glow, restrained cyan radar and fine grid.
         halo = QRadialGradient(center, max(w*.42, 190))
-        halo.setColorAt(0, QColor(224, 35, 67, 119))
-        halo.setColorAt(.28, QColor(155, 28, 56, 61))
+        halo.setColorAt(0, QColor(234, 37, 73, 177))
+        halo.setColorAt(.28, QColor(155, 28, 56, 105))
         halo.setColorAt(.65, QColor(33, 39, 68, 17))
         halo.setColorAt(1, QColor(3, 8, 16, 0))
         p.fillRect(self.rect(), halo)
@@ -470,8 +470,8 @@ class RelationshipMap(QWidget):
         # Dim outer strokes followed by bright core for optical depth.
         for name, x, y, color, uncertain, state, path in entries:
             outline = QColor(color)
-            outline.setAlpha(70 if uncertain else 105)
-            glow_pen = QPen(outline, 8, Qt.SolidLine,
+            outline.setAlpha(105 if uncertain else 160)
+            glow_pen = QPen(outline, 10, Qt.SolidLine,
                            Qt.RoundCap, Qt.RoundJoin)
             p.setBrush(Qt.NoBrush)
             p.setPen(glow_pen)
@@ -490,7 +490,7 @@ class RelationshipMap(QWidget):
         # poster. With no reliable cover, retain the truthful title-only
         # identity instead of borrowing a different game's attractive art.
         has_cover = not self.cover.isNull()
-        for radius, alpha in ((108, 24), (101, 35), (94, 75)):
+        for radius, alpha in ((108, 54), (101, 85), (94, 126)):
             ring = QColor("#FA3658")
             ring.setAlpha(alpha)
             p.setPen(QPen(ring, 3.5))
@@ -563,8 +563,8 @@ class RelationshipMap(QWidget):
                 p.setBrush(Qt.NoBrush)
                 p.drawRoundedRect(box.adjusted(-1,-1,1,1), 9, 9)
             base = QLinearGradient(box.topLeft(), box.bottomRight())
-            base.setColorAt(0, QColor("#243344") if active else QColor("#142A39"))
-            base.setColorAt(1, QColor("#341725") if active else QColor("#101824"))
+            base.setColorAt(0, QColor("#413047") if active else QColor("#193246"))
+            base.setColorAt(1, QColor("#5E2034") if active else QColor("#101824"))
             p.setBrush(base)
             p.setPen(QPen(color if active else QColor("#506779"),
                           2.0 if active else 1.3))
