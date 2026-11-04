@@ -27,7 +27,7 @@ def main():
     from gg_desktop.tab_panels import GraphicCard, GameCover
     from gg_desktop.premium_panels import GameInspector, ModInspector
     from gg_desktop.reference_hero import ReferenceHero
-    from PySide6.QtCore import QPoint
+    from PySide6.QtCore import QPoint, QRect
     from PySide6.QtWidgets import QTabWidget, QStackedWidget, QDockWidget
     from PySide6.QtGui import QPalette
     from PIL import Image
@@ -215,9 +215,18 @@ def main():
                     assert window.grave_table.columnCount() == 6
                     assert window.grave_drive.count() >= 1
                     assert window.grave_age.count() == 4
-                    assert window.page.findChildren(
-                        QFrame, "graveEvidenceBanner"), (
-                        "Graveyard needs the selected-file cinematic evidence graphic")
+                    from gg_desktop.inspector_widgets import InspectorFacts
+                    assert window.page.findChildren(InspectorFacts), (
+                        "Graveyard needs selected-item source facts")
+                    actions = window.page.findChild(QWidget, "graveyardDetailActions")
+                    assert actions is not None and actions.isVisible(), (
+                        "Selected-item actions must remain outside scrollable evidence")
+                    assert actions.parentWidget().rect().contains(QRect(
+                        actions.mapTo(actions.parentWidget(), QPoint(0, 0)), actions.size())), (
+                        "The Graveyard inspector clips its item actions")
+                    assert window.grave_table.horizontalHeader().length() <= (
+                        window.grave_table.viewport().width() + 1), (
+                        "Review status must fit beside the file evidence")
                     from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE
                     assert window.grave_table.rowHeight(0) >= 32, (
                         "Compact filename/path rows need room for both text lines")
