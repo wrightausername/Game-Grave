@@ -335,6 +335,9 @@ def render_approved_graveyard(window):
                         "#88D9B1" if entry.can_recycle else
                         "#EFAB6D" if rule == "Unprotect" else "#D7B7BC")))
                 table.setItem(idx, col, cell)
+                if col == 0:
+                    from gg_desktop.visuals import nav_icon
+                    cell.setIcon(nav_icon("Old Files"))
             if rule == "Unprotect":
                 unlock = button(
                     "Unprotect", lambda _=False, e=entry: window._unprotect_grave(e))
@@ -343,6 +346,19 @@ def render_approved_graveyard(window):
                 table.setCellWidget(idx, 5, unlock)
                 table.setRowHeight(idx, 47)
             else:
+                # Decorative status chip; selection and action authority are
+                # still controlled exclusively by the scan-backed entry.
+                chip = QLabel(status)
+                chip.setAlignment(Qt.AlignCenter)
+                chip.setAttribute(Qt.WA_TransparentForMouseEvents)
+                chip.setStyleSheet(
+                    "QLabel{border-radius:7px;padding:3px 8px;"
+                    "font-size:12px;font-weight:800;"
+                    + ("color:#77E7B5;background:#113D31;border:1px solid #268F69;"
+                       if entry.can_recycle else
+                       "color:#EAB1BD;background:#351923;border:1px solid #693044;")
+                    + "}")
+                table.setCellWidget(idx, 5, chip)
                 table.setRowHeight(idx, 47)
         pending = getattr(window, "_pending_grave_key", None) or previous_key
         if pending:
