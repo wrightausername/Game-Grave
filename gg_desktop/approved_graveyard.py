@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QFrame,
-    QHBoxLayout, QLineEdit, QScrollArea, QTableWidgetItem, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QLineEdit, QScrollArea, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from core import human_size
