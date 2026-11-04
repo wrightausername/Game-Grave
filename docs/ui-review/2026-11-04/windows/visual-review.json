@@ -1,0 +1,181 @@
+{
+  "fixture": "Explicit synthetic visual data; no user data or AI inference",
+  "covers": "Labelled local demo illustrations; genuine publisher art loads from verified local cache",
+  "platform": "win32",
+  "commit": "a658111f121d253899d888d2c05f7111ad7a7f9b",
+  "source_reference": "Owner-supplied seven-page reference/running-UI comparison, left column",
+  "pixel_fidelity": "No automated claim of 1:1 equivalence",
+  "captures": [
+    {
+      "page": "Overview",
+      "file": "visual-review-overview-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1386,
+      "viewport_width": 1386,
+      "vertical_scroll_maximum": 13,
+      "sha256": "45791890890634db0f3b4d8358ab84fdbd640acd2af7ac0e7089376f203b4d12"
+    },
+    {
+      "page": "Graveyard",
+      "file": "visual-review-graveyard-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "31a2a82b645cd04544b60883ef3b4e5d59255a3d14c05b39d2380c43eedd3283"
+    },
+    {
+      "page": "Game DNA",
+      "file": "visual-review-game-dna-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1386,
+      "viewport_width": 1386,
+      "vertical_scroll_maximum": 8,
+      "sha256": "119f3f1977fd0b0ba4de01e4e9cb663968f02826eb11e21daadf906068851082"
+    },
+    {
+      "page": "Undo Center",
+      "file": "visual-review-undo-center-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1386,
+      "viewport_width": 1386,
+      "vertical_scroll_maximum": 19,
+      "sha256": "d9b3ed0d7cfc772895887f980611fae266362304b29863e4bd1f2d3656b80c39"
+    },
+    {
+      "page": "AI Assistant",
+      "file": "visual-review-ai-assistant-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "04d78aeff7697a628ac76c65ba99af80dd3d1cbc23573087ce2be14e22ce3af0"
+    },
+    {
+      "page": "Settings",
+      "file": "visual-review-settings-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "588cfb339991c75448eac8ec9da060ce4f937dbf558454f6b181ee439a819cf3"
+    },
+    {
+      "page": "More Tools",
+      "file": "visual-review-more-tools-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1396,
+      "viewport_width": 1396,
+      "vertical_scroll_maximum": 0,
+      "sha256": "af38d273a5a0bfa6f6a6d6db63e3116c0bfb030bf7ed1cd34e16672d5e4c4f2a"
+    },
+    {
+      "page": "Overview",
+      "file": "visual-review-overview-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 186,
+      "sha256": "7b35cf19ffed98cf9bba4d1f271fd7b75d8b47a6faecbc734464d53db97c0e97"
+    },
+    {
+      "page": "Graveyard",
+      "file": "visual-review-graveyard-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 282,
+      "sha256": "afa142c848a823b44e7bc187cf8e00dcfe9f20bc42241cac61cafd1a58f53638"
+    },
+    {
+      "page": "Game DNA",
+      "file": "visual-review-game-dna-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 270,
+      "sha256": "c86a0fed955e47f02a974e0bde04504ec4e84cb6929937ed9e5364be8243d9a9"
+    },
+    {
+      "page": "Undo Center",
+      "file": "visual-review-undo-center-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 192,
+      "sha256": "79474f524499e3a50edc393ed2d658c1ecb619bbebcd822b9fe93910a996b8e1"
+    },
+    {
+      "page": "AI Assistant",
+      "file": "visual-review-ai-assistant-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 102,
+      "sha256": "bc460ad6c18ca789c10d71fcd29222cac15d7bc0539572dc5dbdbf2a262387a3"
+    },
+    {
+      "page": "Settings",
+      "file": "visual-review-settings-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 682,
+      "sha256": "eb013a858887dd2a20b991ecf6afb93eb3b4e0b4ad253875783a500a31f5aab8"
+    },
+    {
+      "page": "More Tools",
+      "file": "visual-review-more-tools-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1080,
+      "viewport_width": 1080,
+      "vertical_scroll_maximum": 554,
+      "sha256": "84676af83320755cc3994fa7d59d1d3498d2d8928660638437c6f8d6412cdbbc"
+    }
+  ],
+  "workflow_run": "https://github.com/wrightausername/Game-Grave/actions/runs/41772920325",
+  "branch_head": "6b8c05ce8b8c9302449aed35cc0722bdc8ffa9b1",
+  "runtime_source": "47cc1ba26e31a8efb299f049060246e3d66ebeaa"
+}
