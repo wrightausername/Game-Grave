@@ -792,3 +792,58 @@ QPushButton#gameCoverOverride {border:1px solid #7B5871;background:#262031;}
 QPushButton#gameCoverOverride:hover {border-color:#F14C66;background:#482034;}
 QLabel#readyRoomSortStatus {color:#9DCCD3; font-size:12px;}
 """
+
+
+# Final owner-lock legibility and red-forest calibration.
+# The reference is a dense 1672x941 desktop, not a collection of miniature
+# enterprise tables. These overrides remain compatible with Qt scroll areas.
+STYLE += r"""
+QFrame#navRail { background:#071019;border-right:1px solid #2D3239; }
+QPushButton#navButton {
+    font-size:16px;font-weight:600;color:#EBEDF3;
+    padding:6px 25px;min-height:33px;border-radius:0;
+    text-align:left;border:0;
+}
+QPushButton#navButton[active="true"] {
+    color:white;font-weight:800;border:0;
+    border-left:4px solid #FF344F;
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #6B1529,stop:.56 #3C111E,stop:1 #11101A);
+}
+QPushButton#navButton:hover {background:#281521;color:white;}
+QLineEdit#globalSearch {
+    font-size:15px;min-height:34px;padding:6px 17px;
+    border:1px solid #48525F;background:#09111A;color:white;
+}
+QFrame#approvedGraveStat,QFrame#approvedUndoStat,QFrame#approvedDNAMetric {
+    border-right:1px solid #344353;
+}
+QTableWidget {
+    font-size:14px;color:#F0F3F7;
+    background:#070F17;border:1px solid #304253;
+    selection-background-color:#872034;
+}
+QTableWidget::item {
+    padding:8px 7px;border-bottom:1px solid #263744;
+}
+QHeaderView::section {
+    font-size:13px;font-weight:800;color:#F0F4F8;
+    padding:9px 6px;background:#111A26;border-bottom:1px solid #425260;
+}
+QLineEdit,QComboBox {font-size:14px;color:#F3F5F8;}
+QFrame#ggActionStrip {
+    background:#0C141D;border:1px solid #394451;border-radius:10px;
+}
+QFrame#approvedOverviewPanel {background:transparent;border:0;border-right:1px solid #26313E;}
+QFrame#approvedOverviewPanel QPushButton#approvedAction {
+    font-size:14px;color:#E5ECF4;
+}
+QPushButton#primary {
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
+        stop:0 #B42339,stop:1 #8A1527);
+    border:1px solid #F2455B;border-radius:8px;
+    color:white;font-size:14px;font-weight:800;min-height:39px;
+}
+QPushButton#danger {font-size:14px;min-height:38px;}
+QFrame#graveEvidenceBanner {border:0;background:transparent;}
+"""
