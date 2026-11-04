@@ -1447,6 +1447,18 @@ class ScreenMethods(LockedPagesMixin):
             game = games[index]
             game_title.setText(game["game"])
             associated = len(game["assets"])
+            # Artwork is strictly attached to the verified exact install,
+            # never fuzzy-matched by game name alone.
+            matching_record = next((
+                g for g in self.inventory.games
+                if str(g.install_path).casefold() ==
+                   str(game["install_path"]).casefold()
+                and str(g.name).casefold() == str(game["game"]).casefold()
+            ), None)
+            cover = ""
+            if matching_record is not None:
+                from gg_desktop.local_art import game_cover_path
+                cover = game_cover_path(matching_record)
             relationship.set_game(game["game"], {
                 "Install": "Verified record",
                 "Mods": f"{associated} linked",
@@ -1456,7 +1468,7 @@ class ScreenMethods(LockedPagesMixin):
                 "Configs": "Protected",
                 "Caches": "Unknown",
                 "Leftovers": "Unknown",
-            })
+            }, cover_path=cover)
             linked_text.setText(
                 (("\n\n").join(
                     str(asset["source"]) + "  •  " + str(asset["path"]) +
