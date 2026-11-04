@@ -359,7 +359,12 @@ class RelationshipMap(QWidget):
             if (dims.isValid() and 100 <= dims.width() <= 8192
                     and 100 <= dims.height() <= 8192
                     and dims.width() * dims.height() <= 32_000_000):
-                reader.setScaledSize(QSize(240, 360))
+                scale = min(1.0, max(240 / dims.width(),
+                                     360 / dims.height()))
+                if scale < 1.0:
+                    reader.setScaledSize(QSize(
+                        max(1, round(dims.width() * scale)),
+                        max(1, round(dims.height() * scale))))
                 image = reader.read()
                 if not image.isNull():
                     self.cover = QPixmap.fromImage(image)
