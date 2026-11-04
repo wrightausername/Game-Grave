@@ -16,6 +16,7 @@ from ai_bundle import is_ai_installed
 from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.widgets import button, label, panel, row
 from gg_desktop.cinematic_art import CinematicToolArtwork
+from gg_desktop.responsive import ResponsiveGrid
 
 
 def _label(text, *, color="#B6C6D7", font=11, strong=False, wrap=True):
@@ -47,10 +48,13 @@ def render_approved_ai(window):
         "Your private, opt-in gaming expert for help, analysis and cleanup guidance."))
     enabled = window.settings.get("ai_assistant_enabled") is True
     installed = is_ai_installed()
+    # Session state belongs to the window, not to widgets destroyed on navigation.
+    if not hasattr(window, "_ai_session"):
+        window._ai_session = {"messages": [], "busy": False, "status": ""}
+    session = window._ai_session
 
-    statuses = QWidget()
-    ss = row(spacing=8)
-    statuses.setLayout(ss)
+    statuses = ResponsiveGrid(columns=((0, 1), (500, 2), (1000, 5)))
+    ss = statuses
     for title, value, color in (
         ("AI Engine", "Enabled" if enabled else "Off", "#85DCAE" if enabled else "#F1B27F"),
         ("Local Model", "Installed" if installed else "Not installed",
@@ -58,13 +62,19 @@ def render_approved_ai(window):
         ("Privacy", "Local-only", "#9CB8EE"),
         ("Permissions", "Read-only", "#D6A9ED"),
     ):
-        ss.addWidget(_small_status(title, value, color), 1)
+        ss.addWidget(_small_status(title, value, color))
     ss.addWidget(button("Settings", lambda: window.navigate("Settings")))
     page.content.addWidget(statuses)
 
-    workspace = QWidget()
-    wrow = row(spacing=9)
-    workspace.setLayout(wrow)
+    workspace = ResponsiveGrid(
+        columns=((0, 1), (620, 2), (1000, 4)), spacing=9,
+        positions={
+            1: ((1, 0, 1, 1), (0, 0, 1, 1), (2, 0, 1, 1)),
+            2: ((1, 0, 1, 1), (0, 0, 1, 2), (1, 1, 1, 1)),
+            4: ((0, 0, 1, 1), (0, 1, 1, 2), (0, 3, 1, 1)),
+        })
+    workspace.setObjectName("approvedAIWorkspace")
+    wrow = workspace
 
     modes, ml = panel(padding=9, spacing=6)
     ml.addWidget(_label("WORKFLOWS", color="#FFFFFF", font=14, strong=True))
@@ -98,7 +108,7 @@ def render_approved_ai(window):
         action.setToolTip(tooltip)
         ml.addWidget(action)
     ml.addStretch()
-    wrow.addWidget(modes, 3)
+    wrow.addWidget(modes)
 
     hub, chat = panel(padding=10, spacing=9)
     chat.addWidget(_label("GAME GRAVE AI", color="#FFFFFF", font=15, strong=True))
@@ -148,17 +158,40 @@ def render_approved_ai(window):
     send.setEnabled(enabled and installed)
     entry.setEnabled(enabled and installed)
 
-    busy = {"value": False}
+    def refresh_session():
+        from shiboken6 import isValid
+        if not isValid(transcript):
+            return
+        text = "\n\n".join(session["messages"])
+        if transcript.toPlainText() != text:
+            transcript.setPlainText(text)
+            transcript.verticalScrollBar().setValue(
+                transcript.verticalScrollBar().maximum())
+        ready = (window.settings.get("ai_assistant_enabled") is True
+                 and installed and not session["busy"])
+        entry.setEnabled(ready)
+        send.setEnabled(ready)
+        if session["busy"]:
+            status_line.setText("Asking your local AI. No cleanup is permitted.")
+        elif session["status"]:
+            status_line.setText(session["status"])
+
+    window._refresh_ai_session = refresh_session
+    refresh_session()
+
+    def update_current_view():
+        if window.current_route == "AI Assistant":
+            window._refresh_ai_session()
+
     def submit():
         query = entry.text().strip()
-        if busy["value"] or not query or not enabled or not installed:
+        if (session["busy"] or not query or not installed
+                or window.settings.get("ai_assistant_enabled") is not True):
             return
-        transcript.appendPlainText("You: " + query + "\n")
+        session["messages"].append("You: " + query)
         entry.clear()
-        busy["value"] = True
-        send.setEnabled(False)
-        entry.setEnabled(False)
-        status_line.setText("Asking your local AI. No cleanup is permitted.")
+        session["busy"] = True
+        refresh_session()
         settings = dict(window.settings)
         inventory = window.inventory
 
@@ -171,23 +204,22 @@ def render_approved_ai(window):
 
         def finish(result):
             ok, message = result
-            transcript.appendPlainText(
+            session["messages"].append(
                 ("Game Grave AI: " if ok else "AI unavailable: ") +
-                str(message) + "\n")
-            status_line.setText("No files changed. Conversation stays in this session.")
-            busy["value"] = False
-            entry.setEnabled(True)
-            send.setEnabled(True)
-            entry.setFocus()
+                str(message))
+            session["status"] = "No files changed. Conversation stays in this session."
+            session["busy"] = False
+            update_current_view()
 
         def job_failure():
-            busy["value"] = False
-            entry.setEnabled(True)
-            send.setEnabled(True)
-        window.job(ask, finish, error_title="Local AI could not answer")
+            session["busy"] = False
+            session["status"] = "Local AI could not answer. You can try again."
+            update_current_view()
+        window.job(ask, finish, error_title="Local AI could not answer",
+                   on_failure=job_failure)
     send.clicked.connect(submit)
     entry.returnPressed.connect(submit)
-    wrow.addWidget(hub, 6)
+    wrow.addWidget(hub)
 
     side, scol = panel(padding=11, spacing=9)
     scol.addWidget(_label("ACTIVE CONTEXT", color="#FFFFFF", font=14, strong=True))
@@ -216,16 +248,13 @@ def render_approved_ai(window):
     scol.addWidget(button(
         "Open Save Vault", lambda: window.navigate("More Tools")))
     scol.addStretch()
-    wrow.addWidget(side, 3)
+    wrow.addWidget(side)
     page.content.addWidget(workspace)
 
     quick, qcol = panel(padding=9, spacing=6)
     qcol.addWidget(_label("QUICK WORKFLOWS", color="#FFFFFF",
                           font=13, strong=True))
-    cards = QWidget()
-    grid = QGridLayout(cards)
-    grid.setContentsMargins(0, 0, 0, 0)
-    grid.setSpacing(7)
+    cards = ResponsiveGrid(columns=((0, 1), (490, 2), (700, 3), (1200, 6)), spacing=7)
     for idx, (title, route) in enumerate((
         ("Clean My Games", "Graveyard"),
         ("Improve Storage", "Other Storage"),
@@ -239,11 +268,7 @@ def render_approved_ai(window):
         control.setObjectName("approvedAIQuickTile")
         control.setMinimumHeight(56)
         control.setAccessibleName("Open " + title + " workflow")
-        # Keep the approved six-across strip at normal scaling. At 125% or
-        # higher, two rows prevent Qt from expanding the entire page width.
-        high_dpi = window.devicePixelRatioF() >= 1.12
-        grid.addWidget(control, idx // 3 if high_dpi else 0,
-                       idx % 3 if high_dpi else idx)
+        cards.addWidget(control)
     qcol.addWidget(cards)
     page.content.addWidget(quick)
     return page

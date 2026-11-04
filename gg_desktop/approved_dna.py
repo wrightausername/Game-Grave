@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QVBoxLayou
 from gg_desktop.visuals import FeatureStrip, RelationshipMap
 from gg_desktop.widgets import row, label, button
 from gg_desktop.models import readable_bytes
+from gg_desktop.responsive import ResponsiveGrid
 
 
 def _metric(title, value, hint, color):
@@ -93,10 +94,8 @@ def render_approved_dna(window):
         window.inventory.steam, window.inventory.other,
         window.inventory.mods, window.inventory.saves)
     games = data.get("games", [])
-    bar = QWidget()
+    bar = ResponsiveGrid(columns=((0, 1), (490, 2), (760, 3), (1180, 6)), spacing=7)
     bar.setObjectName("approvedDNABand")
-    layout = row(spacing=7)
-    bar.setLayout(layout)
     metrics = (
         ("Installed games", str(len(games)), "Verified launcher records", "#E8EAF2"),
         ("Linked locations", "Unknown", "For selected game", "#77D9EE"),
@@ -112,7 +111,7 @@ def render_approved_dna(window):
     dynamic = {}
     for title, value, hint, color in metrics:
         card, widget = _metric(title, value, hint, color)
-        layout.addWidget(card, 1)
+        bar.addWidget(card)
         dynamic[title] = widget
     # Hero > live game selector > metrics > dominant map & inspector.
     page.content.insertWidget(2, bar)
@@ -144,9 +143,9 @@ def render_approved_dna(window):
     # than a second crowded introductory ribbon.
     from gg_desktop.game_dna_tools import run_ghost_watch
     from PySide6.QtWidgets import QHBoxLayout
-    lower = QWidget()
-    lower_row = row(spacing=9)
-    lower.setLayout(lower_row)
+    from gg_desktop.responsive import ResponsiveRow
+    lower = ResponsiveRow(breakpoint=1000, spacing=9)
+    lower_row = lower
 
     def info_card(title, desc, tone):
         tile = QFrame()
@@ -225,10 +224,10 @@ def render_approved_dna(window):
                 break
     page.content.addWidget(lower)
 
-    action_strip = QFrame()
+    action_strip = ResponsiveGrid(columns=((0, 1), (490, 2), (1000, 4)),
+                                  margins=(11, 9, 11, 9), spacing=9)
     action_strip.setObjectName("ggActionStrip")
-    actions = row(spacing=9, margins=(11, 9, 11, 9))
-    action_strip.setLayout(actions)
+    actions = action_strip
     actions.addWidget(button("Refresh local scan", window.start_scan, kind="primary"))
     actions.addWidget(button("Open Save Vault", lambda: window.navigate("More Tools")))
     actions.addWidget(button("View Mod Radar", lambda: window.navigate("Mods")))
@@ -242,7 +241,7 @@ def render_approved_dna(window):
         item = page.content.itemAt(idx)
         w = item.widget() if item else None
         if w is not None and w.findChildren(RelationshipMap):
-            w.setFixedHeight(408)
+            w.setMinimumHeight(408)
             break
 
     if selectors:

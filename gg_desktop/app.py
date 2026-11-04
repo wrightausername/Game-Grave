@@ -195,9 +195,11 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.global_search.setPlaceholderText(
             "⌕  Search games, mods, files, and more…           Ctrl + K")
         self.global_search.returnPressed.connect(self.open_global_search)
-        self.global_search.setMinimumWidth(540)
-        self.global_search.setMaximumWidth(590)
-        topbox.addWidget(self.global_search, 0)
+        self.global_search.setMinimumWidth(220)
+        self.global_search.setMaximumWidth(570)
+        from PySide6.QtWidgets import QSizePolicy
+        self.global_search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        topbox.addWidget(self.global_search, 6)
         topbox.addStretch(1)
         # The approved Nov 2 shell has quiet notification/help controls, not
         # a persistent SCAN PC toolbar on every route. Scanning remains in
@@ -346,7 +348,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         }
         methods[route]()
 
-    def job(self, fn, on_success, *, error_title="Operation not completed", progress=None):
+    def job(self, fn, on_success, *, error_title="Operation not completed", progress=None,
+            on_failure=None):
         job = Job(fn)
         key = id(job)
         self.workers[key] = job
@@ -368,6 +371,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
                 self.progress.hide()
             if self.cleaning:
                 self.cleaning = False
+            if on_failure:
+                on_failure()
         job.signals.done.connect(finish)
         job.signals.failed.connect(fail)
         if progress:

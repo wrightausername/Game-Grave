@@ -1320,9 +1320,9 @@ class ScreenMethods(LockedPagesMixin):
 
         # This screen is an interactive relationship map, NOT another stats
         # dashboard with invented percentages or fictional game disk sizes.
-        workspace = QWidget()
-        board_row = row(spacing=12)
-        workspace.setLayout(board_row)
+        from gg_desktop.responsive import ResponsiveRow
+        workspace = ResponsiveRow(breakpoint=980, spacing=12, horizontal_height=408)
+        board_row = workspace
         overview, overview_col = panel(padding=10)
         overview_col.addWidget(section_title(
             "GAME DNA  /  RELATIONSHIP MAP", "Tap any file group to inspect"))
@@ -2848,44 +2848,34 @@ class ScreenMethods(LockedPagesMixin):
         from core import get_activity
         from gg_desktop.widgets import ActionCard
         from PySide6.QtWidgets import QGridLayout
+        from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
 
         # Quick Access: all buttons open an actual working screen or verified
         # existing backend action. No unimplemented fake tool controls.
         access, access_col = panel(padding=14)
-        access_bar = QWidget()
-        access_row = row(spacing=11)
-        access_bar.setLayout(access_row)
+        access_bar = ResponsiveGrid(columns=((0, 1), (490, 2), (1120, 5)), spacing=11)
+        access_row = access_bar
         access_row.addWidget(label("QUICK ACCESS", "sectionTitle"))
-        high_dpi = self.devicePixelRatioF() >= 1.12 or self.width() < 1420
-        if not high_dpi:
-            access_row.addWidget(label(
-                "Your recovery and maintenance shortcuts", "caption"))
-        access_row.addStretch(1)
         for name, callback in (
             ("Resurrection Kit", self._create_kit),
             ("Save Vault", self._create_save_backup),
             ("Make Room", lambda: self.navigate("Other Storage")),
             ("Ghost Watch", lambda: self.navigate("Game DNA")),
         ):
-            visible = "Resurrection" if high_dpi and name == "Resurrection Kit" else name
-            shortcut = button(visible + "  ›", callback)
+            shortcut = button(name + "  ›", callback)
             shortcut.setToolTip("Open " + name)
             access_row.addWidget(shortcut)
         access_col.addWidget(access_bar)
         page.content.addWidget(access)
 
-        content = QWidget()
-        # At Windows 125%/150% scaling, place the recommendations beneath
-        # the two prominent tools instead of forcing a too-wide split view.
-        columns = column(spacing=13) if high_dpi else row(spacing=13)
-        content.setLayout(columns)
+        content = ResponsiveRow(breakpoint=1200, spacing=13)
+        columns = content
 
         main = QWidget()
         main_col = column(spacing=13)
         main.setLayout(main_col)
-        headline = QWidget()
-        feats = column(spacing=13) if high_dpi else row(spacing=13)
-        headline.setLayout(feats)
+        headline = ResponsiveRow(breakpoint=900, spacing=13)
+        feats = headline
         rescue, rescue_col = panel(kind="actionCardPrimary", padding=17)
         rescue_col.addWidget(label("♻  RESURRECTION KIT", "eyebrow"))
         rescue_col.addWidget(label("Bring your games back.", "sectionTitle"))
@@ -2913,10 +2903,7 @@ class ScreenMethods(LockedPagesMixin):
         feats.addWidget(vault, 1)
         main_col.addWidget(headline)
 
-        matrix = QWidget()
-        grid = QGridLayout(matrix)
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setSpacing(12)
+        matrix = ResponsiveGrid(columns=((0, 1), (490, 2), (900, 3)), spacing=12)
         tiles = (
             ("Make Room", "Review game-related storage; no automatic removal",
              lambda: self.navigate("Other Storage")),
@@ -2931,10 +2918,8 @@ class ScreenMethods(LockedPagesMixin):
             ("Diagnostics", "Investigate game/mod links and warnings",
              lambda: self.navigate("Game DNA")),
         )
-        columns_per_row = 2 if high_dpi else 3
         for i, (name, description, callback) in enumerate(tiles):
-            grid.addWidget(ActionCard("⌁", name, description, callback),
-                           i // columns_per_row, i % columns_per_row)
+            matrix.addWidget(ActionCard("⌁", name, description, callback))
         main_col.addWidget(matrix)
         main_col.addStretch()
         columns.addWidget(main, 7)

@@ -20,6 +20,7 @@ from recovery import get_records, check_restore, restore as restore_recycled
 from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.visuals import RecoveryRoute
 from gg_desktop.widgets import button, data_table, label, panel, row
+from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
 
 
 def _text(text, color="#C3CDD7", *, size=11, bold=False, wrap=True):
@@ -84,9 +85,7 @@ def render_approved_undo(window):
     known_available = sum(r.get("state") == "Available" for r in records)
     unknown = sum(r.get("state") in ("Not checked", None, "") for r in records)
 
-    metrics = QWidget()
-    m = row(spacing=7)
-    metrics.setLayout(m)
+    metrics = ResponsiveGrid(columns=((0, 1), (490, 2), (970, 5)), spacing=7)
     for title, value, tone in (
         ("Actions logged", str(len(records)), "#6DD9E9"),
         ("Files recorded", str(len(records)), "#D4B4EA"),
@@ -94,32 +93,30 @@ def render_approved_undo(window):
         ("Verified available", str(known_available), "#82D8B1"),
         ("Not yet checked", str(unknown), "#F6B078"),
     ):
-        m.addWidget(_stat(title, value, tone), 1)
+        metrics.addWidget(_stat(title, value, tone))
     page.content.addWidget(metrics)
 
-    filter_bar = QWidget()
-    filters = row(spacing=8)
-    filter_bar.setLayout(filters)
+    filter_bar = ResponsiveGrid(columns=((0, 1), (490, 2), (970, 4)))
+    filters = filter_bar
     status = QComboBox()
     status.addItems(["All states", "Available", "Not checked", "Not found",
                      "Needs review", "Restored"])
     status.setAccessibleName("Filter recovery state")
-    filters.addWidget(status, 1)
+    filters.addWidget(status)
     action = QComboBox()
     action.addItems(["All actions"] + sorted({str(r.get("action", "Unknown"))
                       for r in records}))
     action.setAccessibleName("Filter recovery action")
-    filters.addWidget(action, 1)
+    filters.addWidget(action)
     search = QLineEdit()
     search.setPlaceholderText("Search operations and original paths…")
     search.setAccessibleName("Search the recovery ledger")
-    filters.addWidget(search, 3)
+    filters.addWidget(search)
     filters.addWidget(button("Refresh", lambda: window.navigate("Undo Center")))
     page.content.addWidget(filter_bar)
 
-    workspace = QWidget()
-    wrow = row(spacing=9)
-    workspace.setLayout(wrow)
+    workspace = ResponsiveRow(breakpoint=980, spacing=9, horizontal_height=347)
+    wrow = workspace
 
     history, hcol = panel(padding=8, spacing=7)
     hcol.addWidget(_text("CLEANUP HISTORY", "#FAFAFB", size=14, bold=True))
@@ -138,6 +135,7 @@ def render_approved_undo(window):
     wrow.addWidget(history, 7)
 
     details, dcol = panel(padding=12, spacing=6)
+    details.setMinimumHeight(347)
     dcol.addWidget(_text("RESTORE DETAILS", "#F5F5FB", size=14, bold=True))
     heading = _text("Choose an operation", "#FFFFFF", size=13, bold=True)
     dcol.addWidget(heading)
@@ -152,7 +150,7 @@ def render_approved_undo(window):
     route.setMinimumHeight(150)
     dcol.addWidget(route)
     wrow.addWidget(details, 3)
-    workspace.setFixedHeight(347)
+    workspace.setMinimumHeight(347)
     page.content.addWidget(workspace)
 
     def chosen():
@@ -275,13 +273,11 @@ def render_approved_undo(window):
         window.job(lambda _progress: restore_recycled(item_id), finished,
                    error_title="Restore could not be verified")
 
-    actions = QWidget()
-    ar = row(spacing=8)
-    actions.setLayout(ar)
+    actions = ResponsiveGrid(columns=((0, 1), (490, 2), (970, 3)))
+    ar = actions
     ar.addWidget(button("Verify exact Windows match", verify))
     ar.addWidget(button("Restore selected…", restore, kind="primary"))
     ar.addWidget(button("Open Cleanup History", lambda: window.navigate("Undo Center")))
-    ar.addStretch()
     # Restore controls appear below the recovery-safety/insights modules, as
     # in the locked image, rather than interrupting the evidence inspector.
     safety, sc = panel(padding=13, spacing=7)
@@ -321,12 +317,11 @@ def render_approved_undo(window):
         "you need independently verified backups.",
         "#AFC0D0", size=11, wrap=True))
 
-    assurance = QWidget()
-    assurance_row = row(spacing=10)
-    assurance.setLayout(assurance_row)
+    assurance = ResponsiveRow(breakpoint=980, spacing=10)
+    assurance_row = assurance
     assurance_row.addWidget(safety, 1)
     assurance_row.addWidget(insight, 1)
-    assurance.setFixedHeight(141)
+    assurance.setMinimumHeight(141)
     page.content.addWidget(assurance)
 
     actions.setObjectName("ggActionStrip")

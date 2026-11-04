@@ -9,6 +9,7 @@ on:
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
       - 'tests/test_library_visuals.py'
+      - 'tests/test_locked_ui_layout.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - 'tools/windows_crimson_dpi_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
@@ -19,6 +20,7 @@ on:
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
       - 'tests/test_library_visuals.py'
+      - 'tests/test_locked_ui_layout.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - 'tools/windows_crimson_dpi_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
@@ -64,6 +66,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Real artwork and library sort tests failed.' }
           python -m unittest tests.test_graveyard_filters -v
           if ($LASTEXITCODE -ne 0) { throw 'Graveyard evidence filters and ordering failed.' }
+          $env:GG_LOCKED_UI_CAPTURE_DIR = (Resolve-Path '_ci_temp').Path
+          python -m unittest tests.test_locked_ui_layout -v
+          if ($LASTEXITCODE -ne 0) { throw 'Locked UI resize and navigation regression failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
       - name: Verify 125 percent and 150 percent Windows UI scaling
@@ -77,6 +82,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw '150% Windows layout smoke failed.' }
           Remove-Item Env:QT_SCALE_FACTOR
       - name: Upload actual Qt screen captures for design review
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: GameGrave-Crimson-Rendered-UI-Screenshots
@@ -84,7 +90,9 @@ jobs:
             _ci_temp/crimson-*-1440.png
             _ci_temp/crimson-*-1672.png
             _ci_temp/crimson-*-1366.png
+            _ci_temp/crimson-locked-*-1040.png
             _ci_temp/cinematic-screenshot-manifest.json
+            _ci_temp/locked-ui-evidence.json
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE

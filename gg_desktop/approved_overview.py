@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from core import human_size, get_activity, friendly_activity
 from recovery import get_records
 from gg_desktop.widgets import HeroBanner, button, label
+from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
 
 
 COLORS = ("#49CBED", "#BB97EF", "#F6AD63", "#73DCC7", "#A995F0")
@@ -169,6 +170,8 @@ def _metric(label_text, value, accent, route, handler, description):
     col.addWidget(_txt(label_text.upper(), size=11, color="#CAD2DB", bold=True))
     col.addWidget(_txt(value, size=28, color="#FFFFFF", bold=True))
     frame.addWidget(details, 1)
+    for child in tile.findChildren(QWidget):
+        child.setAttribute(Qt.WA_TransparentForMouseEvents)
     tile.clicked.connect(lambda _checked=False: handler(route))
     return tile
 
@@ -242,22 +245,13 @@ def render_approved_overview(window):
         "Overview. Your games. All their baggage. Under control.")
     page.content.addWidget(hero)
 
-    compact = window.devicePixelRatioF() >= 1.12 and window.width() <= 1400
     found = bool(window.inventory.scanned_at)
     games = window.inventory.games
     mods = window.inventory.mods
     files = window.inventory.files
     captures = len(window.inventory.screenshots) + len(window.inventory.recordings)
-    metrics = QWidget()
-    metrics.setMinimumHeight(80)
+    metrics = ResponsiveGrid(columns=((0, 1), (430, 2), (970, 5)))
     metrics.setObjectName("approvedMetrics")
-    if compact:
-        mrow = QGridLayout(metrics)
-        mrow.setContentsMargins(0, 0, 0, 0)
-        mrow.setHorizontalSpacing(8)
-        mrow.setVerticalSpacing(6)
-    else:
-        mrow = _line(metrics, gap=8)
     values = (
         ("Games", str(len(games)) if found else "Not scanned", "Games",
          "Verified installed game records", COLORS[0]),
@@ -273,15 +267,12 @@ def render_approved_overview(window):
     )
     for index, (text, val, route, description, accent) in enumerate(values):
         tile = _metric(text, val, accent, route, window.navigate, description)
-        if compact:
-            mrow.addWidget(tile, index // 2, index % 2)
-        else:
-            mrow.addWidget(tile, 1)
+        metrics.addWidget(tile)
     page.content.addWidget(metrics)
 
     recycled, move_count, recent = _monthly_moves()
-    center = QWidget()
-    c = _stack(center, gap=10) if compact else _line(center, gap=10)
+    center = ResponsiveRow(breakpoint=1000)
+    c = center
 
     activity_panel, activity = _panel("RECENT ACTIVITY")
     # Scans count as real activity even when no files were removed. Existing

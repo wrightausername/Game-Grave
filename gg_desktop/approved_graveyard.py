@@ -21,6 +21,7 @@ from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.widgets import button, data_table, label, panel, row
 from gg_desktop.cinematic_art import CinematicImpactTrack
 from gg_desktop.grave_evidence_art import GraveEvidenceBanner
+from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
 from gg_desktop.graveyard_filters import (
     SORT_OPTIONS, AGE_OPTIONS, available_drives, select_graveyard_entries,
 )
@@ -112,65 +113,62 @@ def render_approved_graveyard(window):
         return page
 
     entries = window.inventory.graveyard
-    counts = QWidget()
-    count_row = row(spacing=7)
-    counts.setLayout(count_row)
+    counts = ResponsiveGrid(columns=((0, 1), (490, 2), (970, 5)), spacing=7,
+                            stretches={5: (2, 2, 2, 2, 1)})
     for title, value, color in (
         ("Candidates", str(len(entries)), "#E8E8F3"),
         ("Potential size", human_size(sum(_size(e) for e in entries)), "#4ED0ED"),
         ("Reviewable", str(sum(bool(e.can_recycle) for e in entries)), "#E6A764"),
         ("Protected", str(sum(not e.can_recycle for e in entries)), "#83DAB0"),
     ):
-        count_row.addWidget(_stat(title, value, color), 1)
-    count_row.addWidget(button("Scan Graveyard", window.start_scan, kind="primary"))
+        counts.addWidget(_stat(title, value, color))
+    counts.addWidget(button("Scan Graveyard", window.start_scan, kind="primary"))
     page.content.addWidget(counts)
     page.content.addWidget(_label(
         "Potential size is the apparent size of candidates, not verified free space. "
         "Age by itself does not mean a file is safe to delete.", "#9EAFBF"))
 
-    filters = QWidget()
-    controls = row(spacing=7)
-    filters.setLayout(controls)
+    filters = ResponsiveGrid(columns=((0, 1), (490, 2), (900, 3), (1250, 6)), spacing=7)
+    controls = filters
     window.grave_search = QLineEdit()
     window.grave_search.setPlaceholderText(
         "Search item, path, launcher, source or detection evidence…")
     window.grave_search.setAccessibleName("Search Graveyard evidence")
     window.grave_search.setText(getattr(window, "_pending_grave_query", ""))
     window._pending_grave_query = ""
-    controls.addWidget(window.grave_search, 4)
+    controls.addWidget(window.grave_search)
 
     window.grave_type = QComboBox()
     window.grave_type.addItems(
         ["All types"] + sorted({e.category for e in entries}))
     window.grave_type.setAccessibleName("Filter by finding type")
-    controls.addWidget(window.grave_type, 2)
+    controls.addWidget(window.grave_type)
 
     window.grave_state = QComboBox()
     window.grave_state.addItems([
         "All findings", "Ready for review", "Protected / preview only"])
     window.grave_state.setAccessibleName("Filter by protection state")
-    controls.addWidget(window.grave_state, 2)
+    controls.addWidget(window.grave_state)
 
     window.grave_drive = QComboBox()
     window.grave_drive.addItems(
         ["All drives"] + available_drives(entries))
     window.grave_drive.setAccessibleName("Filter by drive")
-    controls.addWidget(window.grave_drive, 1)
+    controls.addWidget(window.grave_drive)
 
     window.grave_age = QComboBox()
     window.grave_age.addItems(list(AGE_OPTIONS))
     window.grave_age.setAccessibleName("Filter by last modified age")
-    controls.addWidget(window.grave_age, 1)
+    controls.addWidget(window.grave_age)
 
     window.grave_sort = QComboBox()
     window.grave_sort.addItems(list(SORT_OPTIONS))
     window.grave_sort.setAccessibleName("Sort Graveyard candidates")
-    controls.addWidget(window.grave_sort, 1)
+    controls.addWidget(window.grave_sort)
     page.content.addWidget(filters)
 
-    main = QWidget()
-    main_row = row(spacing=8)
-    main.setLayout(main_row)
+    main = ResponsiveRow(breakpoint=980, spacing=8, horizontal_height=383)
+    main_row = main
     browser, bcol = panel(padding=9, spacing=7)
     bcol.addWidget(_label("CANDIDATE FILES", "#F4F6F9", 17, True))
     window.grave_table = data_table([
@@ -190,6 +188,7 @@ def render_approved_graveyard(window):
     main_row.addWidget(browser, 7)
 
     inspector, icol = panel(padding=12, spacing=6)
+    inspector.setMinimumHeight(360)
     icol.addWidget(_label("ITEM DETAILS", "#F6F3F7", 17, True))
     window.grave_art = GraveEvidenceBanner()
     icol.addWidget(window.grave_art)
@@ -208,7 +207,7 @@ def render_approved_graveyard(window):
     icol.addWidget(details_scroll, 1)
     window.grave_detail = details_col
     main_row.addWidget(inspector, 3)
-    main.setFixedHeight(383)
+    main.setMinimumHeight(383)
     page.content.addWidget(main)
 
     def selected():
@@ -258,18 +257,18 @@ def render_approved_graveyard(window):
     # The locked action strip belongs immediately under the review table.
     # All three mutations still delegate to the existing confirmation/safety
     # code. A protection override never implicitly deletes anything.
-    actions = QFrame()
+    actions = ResponsiveGrid(columns=((0, 1), (490, 2), (900, 3), (1250, 6)),
+                             margins=(12, 9, 12, 9))
     actions.setObjectName("ggActionStrip")
-    action_layout = row(spacing=8, margins=(12, 9, 12, 9))
-    actions.setLayout(action_layout)
+    action_layout = actions
     window.grave_counter = _label("No items selected.", "#DBE4ED", 12, True)
-    action_layout.addWidget(window.grave_counter, 2)
+    action_layout.addWidget(window.grave_counter)
     action_layout.addWidget(button("Select reviewable", window._select_eligible))
     action_layout.addWidget(button("Protect", protect))
     action_layout.addWidget(button("Unprotect", unprotect))
     action_layout.addWidget(button("Open Path", open_path))
     action_layout.addWidget(button(
-        "Delete selected…", window._delete_grave_selected, kind="danger"), 1)
+        "Delete selected…", window._delete_grave_selected, kind="danger"))
     page.content.addWidget(actions)
 
     total_apparent = sum(_size(item) for item in entries)

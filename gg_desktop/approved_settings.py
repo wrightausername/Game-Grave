@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
 )
 from gg_desktop.widgets import button, label, row
 from gg_desktop.visuals import nav_icon
+from gg_desktop.models import unique_launcher_counts
+from gg_desktop.responsive import ResponsiveGrid
 
 
 def _status_page(heading, explanation, actions):
@@ -172,10 +174,9 @@ def render_approved_settings(window):
     if overview is not None:
         overview.hide()
 
-    tabs = QFrame()
+    tabs = ResponsiveGrid(columns=((0, 2), (680, 4), (1100, 7)),
+                          spacing=6, margins=(3, 2, 3, 2))
     tabs.setObjectName("approvedSettingsTabs")
-    controls = row(spacing=6, margins=(3, 2, 3, 2))
-    tabs.setLayout(controls)
     names = (
         ("General", 0), ("Libraries", 1), ("Safety", 2),
         ("Performance", perf_idx), ("AI Assistant", 4),
@@ -195,7 +196,7 @@ def render_approved_settings(window):
         action.setAccessibleName("Settings category " + name)
         action.setMinimumHeight(33)
         action.setProperty("categoryIndex", index)
-        controls.addWidget(action, 1)
+        tabs.addWidget(action)
         choices.append(action)
     page.content.insertWidget(1, tabs)
 
@@ -209,10 +210,14 @@ def render_approved_settings(window):
             advanced.layout().addWidget(
                 button(name, lambda _=False, target=index: select(target)))
 
-    dashboard = QWidget()
-    grid = QGridLayout(dashboard)
-    grid.setSpacing(10)
-    grid.setContentsMargins(1, 2, 1, 2)
+    dashboard = ResponsiveGrid(
+        columns=((0, 1), (650, 2), (1150, 4)), spacing=10,
+        margins=(1, 2, 1, 2),
+        stretches={4: (4, 4, 4, 3)},
+        positions={4: ((0, 0, 1, 1), (0, 1, 1, 1), (0, 2, 1, 1),
+                       (1, 0, 1, 1), (1, 1, 1, 1), (1, 2, 1, 1),
+                       (0, 3, 1, 1), (1, 3, 1, 1))})
+    dashboard.setObjectName("approvedSettingsDashboard")
     data = dict(window.settings)
     ai_on = data.get("ai_assistant_enabled") is True
     from ai_bundle import is_ai_installed
@@ -231,11 +236,10 @@ def render_approved_settings(window):
         "Steam", "Epic Games", "EA", "Battle.net",
         "Ubisoft Connect", "Xbox (PC)", "GOG",
     )
-    source_counts = {
-        name: sum(name.casefold() in str(game.launcher).casefold()
-                  for game in window.inventory.games)
-        for name in source_names
-    }
+    # Exact provider identity matters: "ea" is also a substring of "Steam".
+    # The common model also keeps ambiguous installations in their own bucket.
+    counts = unique_launcher_counts(window.inventory.games)
+    source_counts = {name: counts.get(name, 0) for name in source_names}
     source_facts = tuple(
         (name, (str(source_counts[name]) + " games" if window.inventory.scanned_at
                 else "Not scanned"),
@@ -303,59 +307,38 @@ def render_approved_settings(window):
               (("Scan now", window.start_scan),
                ("Backup & restore", lambda: select(6))), compact=True),
     ]
-    # The locked reference has THREE large functional columns and a narrow
-    # stack of compact status panels. Equal 4x2 cards were visibly wrong.
-    if window.devicePixelRatioF() >= 1.12:
-        # At 125/150% DPI use scrollable two-column layout with no clipping.
-        for i, card in enumerate(cards):
-            grid.addWidget(card, i // 2, i % 2)
-        for i in range(2):
-            grid.setColumnStretch(i, 1)
-    else:
-        # Main top row: libraries / protection / gaming performance.
-        for index in range(3):
-            cards[index].setMinimumHeight(285)
-            grid.addWidget(cards[index], 0, index)
-        # Bottom row: optional AI / notices / privacy.
-        for index in range(3):
-            cards[index + 4].setMinimumHeight(226)
-            grid.addWidget(cards[index + 4], 1, index)
-
-        sidebar_top = QWidget()
-        narrow_top = QVBoxLayout(sidebar_top)
-        narrow_top.setContentsMargins(0,0,0,0)
-        narrow_top.setSpacing(7)
-        narrow_top.addWidget(_mini_card(
-            "System Status",
-            (("Scan", "Complete" if window.inventory.scanned_at else "Not run"),
-             ("CPU/FPS", "Not sampled")),
-            "red", "Other Storage",
-            ("Review", window._show_notifications)))
-        narrow_top.addWidget(_mini_card(
-            "Storage Paths",
-            (("Extra roots", str(library_roots)),
-             ("Old Files", scan_label)),
-            "amber", "Old Files",
-            ("Manage", lambda: select(1))))
-        narrow_top.addWidget(_mini_card(
-            "Connected Services",
-            (("Steam / Epic / EA", "Scan evidence only"),
-             ("Publisher feeds", "Not connected")),
-            "cyan", "Games"))
-        grid.addWidget(sidebar_top, 0, 3)
-
-        sidebar_bottom = QWidget()
-        narrow_bottom = QVBoxLayout(sidebar_bottom)
-        narrow_bottom.setContentsMargins(0,0,0,0)
-        narrow_bottom.setSpacing(7)
-        narrow_bottom.addWidget(_mini_card(
-            "License / Edition",
-            (("Current", "Unsigned preview"),),
-            "amber", "Settings"))
-        narrow_bottom.addWidget(cards[7], 1)
-        grid.addWidget(sidebar_bottom, 1, 3)
-        for idx, stretch in enumerate((4, 4, 4, 3)):
-            grid.setColumnStretch(idx, stretch)
+    # The approved desktop composition keeps three main columns and a compact
+    # status column. Resize those SAME controls into two/one columns as needed.
+    for index in (0, 1, 2, 4, 5, 6):
+        dashboard.addWidget(cards[index])
+    cards[3].deleteLater()  # System status is represented by the compact column.
+    sidebar_top = QWidget()
+    narrow_top = QVBoxLayout(sidebar_top)
+    narrow_top.setContentsMargins(0, 0, 0, 0)
+    narrow_top.setSpacing(7)
+    narrow_top.addWidget(_mini_card(
+        "System Status",
+        (("Scan", "Complete" if window.inventory.scanned_at else "Not run"),
+         ("CPU/FPS", "Not sampled")), "red", "Other Storage",
+        ("Review", window._show_notifications)))
+    narrow_top.addWidget(_mini_card(
+        "Storage Paths", (("Extra roots", str(library_roots)),
+                          ("Old Files", scan_label)), "amber", "Old Files",
+        ("Manage", lambda: select(1))))
+    narrow_top.addWidget(_mini_card(
+        "Connected Services", (("Steam / Epic / EA", "Scan evidence only"),
+                               ("Publisher feeds", "Not connected")),
+        "cyan", "Games"))
+    dashboard.addWidget(sidebar_top)
+    sidebar_bottom = QWidget()
+    narrow_bottom = QVBoxLayout(sidebar_bottom)
+    narrow_bottom.setContentsMargins(0, 0, 0, 0)
+    narrow_bottom.setSpacing(7)
+    narrow_bottom.addWidget(_mini_card(
+        "License / Edition", (("Current", "Unsigned preview"),),
+        "amber", "Settings"))
+    narrow_bottom.addWidget(cards[7], 1)
+    dashboard.addWidget(sidebar_bottom)
     page.content.insertWidget(2, dashboard)
 
     def active(_index=None):
