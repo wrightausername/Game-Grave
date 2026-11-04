@@ -236,8 +236,8 @@ def render_approved_overview(window):
     hero = HeroBanner(title="Overview",
                       subtitle="Your games. All their baggage. Under control.",
                       detail="")
-    hero.setMinimumHeight(181)
-    hero.setMaximumHeight(181)
+    hero.setMinimumHeight(162)
+    hero.setMaximumHeight(162)
     hero.setAccessibleName(
         "Overview. Your games. All their baggage. Under control.")
     page.content.addWidget(hero)
