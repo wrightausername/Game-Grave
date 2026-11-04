@@ -2853,7 +2853,7 @@ class ScreenMethods(LockedPagesMixin):
         # Quick Access: all buttons open an actual working screen or verified
         # existing backend action. No unimplemented fake tool controls.
         access, access_col = panel(padding=14)
-        access_bar = ResponsiveGrid(columns=((0, 1), (490, 2), (1120, 5)), spacing=11)
+        access_bar = ResponsiveGrid(columns=((0, 1), (490, 2), (900, 5)), spacing=11)
         access_row = access_bar
         access_row.addWidget(label("QUICK ACCESS", "sectionTitle"))
         for name, callback in (

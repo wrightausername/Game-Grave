@@ -14,7 +14,7 @@ HAS_QT = importlib.util.find_spec("PySide6") is not None
 if HAS_QT:
     if os.name != "nt":
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtCore import QCoreApplication, QEvent
+    from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QRect
     from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPlainTextEdit, QPushButton
 
 
@@ -93,6 +93,11 @@ class LockedUILayoutTests(unittest.TestCase):
         self.assertLessEqual(page.body.width(), page.viewport().width() + 2,
                              self.window.current_route + " clips horizontally")
         self.assertTrue(self.window.global_search.isVisible())
+        for metric in page.findChildren(QPushButton, "approvedMetric"):
+            for label in metric.findChildren(QLabel):
+                bounds = QRect(label.mapTo(metric, QPoint(0, 0)), label.size())
+                self.assertTrue(metric.rect().contains(bounds),
+                                "Overview metric hides its label or value")
 
     def capture(self, route, size):
         folder = os.environ.get("GG_LOCKED_UI_CAPTURE_DIR")

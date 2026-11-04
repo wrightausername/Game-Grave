@@ -158,7 +158,7 @@ def _metric(label_text, value, accent, route, handler, description):
     tile.setStyleSheet(
         "QPushButton#approvedMetric{background:transparent;border:0;"
         "border-bottom:2px solid " + accent + ";border-radius:0;"
-        "text-align:left;padding:5px;}"
+        "text-align:left;padding:5px;min-height:72px;max-height:72px;}"
         "QPushButton#approvedMetric:hover{background:#18202B;}")
     frame = _line(tile, margin=(6, 7, 6, 7), gap=12)
     glyph = QLabel()
