@@ -92,7 +92,7 @@ def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
 def _mini_card(title, facts, tone, route_icon, action=None):
     """Compact reference-style status column with verified local values."""
     frame = QFrame()
-    frame.setObjectName("ggAccentPanel")
+    frame.setObjectName("approvedSettingsMiniCard")
     frame.setProperty("accent", tone)
     col = QVBoxLayout(frame)
     col.setContentsMargins(12, 8, 12, 8)
