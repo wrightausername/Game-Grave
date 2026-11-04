@@ -151,12 +151,12 @@ class HeroBanner(QFrame):
             painter.setPen(QColor("#F7F8FA"))
             painter.setFont(QFont("Segoe UI", 34, QFont.Bold))
             painter.setPen(QPen(QColor("#F0445A"), 5, Qt.SolidLine, Qt.RoundCap))
-            painter.drawLine(52, 29, 35, 108)
+            painter.drawLine(52, 40, 35, 120)
             painter.setPen(QColor("#F7F8FA"))
-            painter.drawText(73, 63, self.title)
+            painter.drawText(73, 75, self.title)
             painter.setPen(QColor("#C8CFDA"))
             painter.setFont(QFont("Segoe UI", 15, QFont.Normal))
-            painter.drawText(QRectF(75, 79, max(160, self.width() * .55), 70),
+            painter.drawText(QRectF(75, 88, max(160, self.width() * .55), 62),
                              Qt.AlignLeft | Qt.TextWordWrap, self.subtitle)
         else:
             painter.setPen(QColor("#F5F7FB"))
