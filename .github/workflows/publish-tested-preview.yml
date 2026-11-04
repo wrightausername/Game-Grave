@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-preview-5594aa9
+  group: publish-preview-f2d313a
   cancel-in-progress: false
 
 jobs:
@@ -22,9 +22,9 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_RUN: '41915931360'
-      SOURCE_SHA: 5594aa906a34da9a6590702652f4b1ffc536b466
-      PREVIEW_TAG: preview-5594aa9
+      SOURCE_RUN: '41931303835'
+      SOURCE_SHA: f2d313a838aba3ce0850f4227d143b82f22fcec5
+      PREVIEW_TAG: preview-f2d313a
     steps:
       - name: Verify the exact tested source run
         shell: bash
@@ -45,7 +45,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           repository: wrightausername/Game-Grave
-          run-id: '41915931360'
+          run-id: '41931303835'
           name: GameGrave-Cinematic-Windows-Installer-Unsigned
           path: original
       - name: Download actual native UI captures
@@ -53,7 +53,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           repository: wrightausername/Game-Grave
-          run-id: '41915931360'
+          run-id: '41931303835'
           name: GameGrave-Crimson-Rendered-UI-Screenshots
           path: visual-review
       - name: Verify and prepare the public download
@@ -61,7 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import hashlib, pathlib, shutil, zipfile
+          import hashlib, json, os, pathlib, shutil, zipfile
           root = pathlib.Path('original')
           installers = list(root.rglob('GameGrave-Crimson-Preview-Setup.exe'))
           assert len(installers) == 1, 'Expected exactly one tested installer'
@@ -71,23 +71,47 @@ jobs:
           assert actual == expected, 'Installer checksum mismatch'
           delivery = pathlib.Path('delivery')
           delivery.mkdir()
-          installer = delivery / 'GameGrave-Setup-5594aa9.exe'
+          installer = delivery / 'GameGrave-Setup-f2d313a.exe'
           shutil.copyfile(original, installer)
-          checksum = delivery / 'GameGrave-Setup-5594aa9.sha256'
+          checksum = delivery / 'GameGrave-Setup-f2d313a.sha256'
           checksum.write_text(actual + '  ' + installer.name + '\n')
           readme = delivery / 'README.txt'
           readme.write_text(
-              'Game Grave Windows UI preview — build 5594aa9\n\n'
-              'Close Game Grave, extract this ZIP, and run GameGrave-Setup-5594aa9.exe.\n'
+              'Game Grave Windows UI preview — build f2d313a\n\n'
+              'Close Game Grave, extract this ZIP, and run GameGrave-Setup-f2d313a.exe.\n'
+              'After installation, launch Game Grave Crimson Preview from the Start menu.\n'
+              'Updated interiors and context panels; expanded left/right Captures workspace.\n'
               'Inventory and manual mod scans run with games, overlays and fullscreen apps open.\n'
               'This is an unsigned engineering preview.\n')
-          with zipfile.ZipFile(delivery / 'GameGrave-Windows-Preview-5594aa9.zip', 'w',
+          with zipfile.ZipFile(delivery / 'GameGrave-Windows-Preview-f2d313a.zip', 'w',
                                compression=zipfile.ZIP_STORED) as archive:
               for path in (installer, checksum, readme):
                   archive.write(path, path.name)
           screenshots = list(pathlib.Path('visual-review').rglob('visual-review-captures-1672.png'))
           assert len(screenshots) == 1, 'Expected the actual native Captures screenshot'
-          shutil.copyfile(screenshots[0], delivery / 'Captures-preview.png')
+          shots = screenshots[0].parent
+          pages = sorted(shots.glob('visual-review-*.png'))
+          assert len(pages) == 26, 'Expected all 13 pages at two native Windows sizes'
+          provenance = shots / 'visual-review.json'
+          assert provenance.is_file(), 'Missing native capture provenance'
+          manifest = json.loads(provenance.read_text())
+          assert manifest['platform'] == 'win32', 'Screenshots are not native Windows captures'
+          hashes = {page.name: hashlib.file_digest(page.open('rb'), 'sha256').hexdigest()
+                    for page in pages}
+          review = delivery / 'UI-source-and-hashes.json'
+          review.write_text(json.dumps({'source_head': os.environ['SOURCE_SHA'],
+              'windows_workflow_run': os.environ['SOURCE_RUN'],
+              'native_capture_commit': manifest['commit'], 'sha256': hashes}, indent=2))
+          with zipfile.ZipFile(delivery / 'GameGrave-UI-Screenshots-f2d313a.zip', 'w',
+                               compression=zipfile.ZIP_DEFLATED) as archive:
+              for page in pages + [provenance, review]:
+                  archive.write(page, page.name)
+          for page in pages:
+              if page.stem.endswith('-1672'):
+                  slug = page.stem.removeprefix('visual-review-').removesuffix('-1672')
+                  title = '-'.join(part.upper() if part in ('ai', 'dna') else part.title()
+                                   for part in slug.split('-'))
+                  shutil.copyfile(page, delivery / (title + '-preview.png'))
           print('Verified installer SHA-256:', actual)
           PY
       - name: Publish clearly marked preview assets
@@ -95,29 +119,38 @@ jobs:
         run: |
           set -euo pipefail
           cat > release-notes.md <<'NOTES'
-          Windows UI preview with an expanded Captures workspace and genuine artwork states.
+          Windows UI preview with revised interiors and contextual side panels across the locked pages.
 
-          Captures now places the screenshot browser on the left and a larger, expanding selected-image preview on the right. Drag the divider to adjust the balance. The approved forest/GG photo family is used throughout all 13 workspace headers, replacing generated scene illustrations. Oversized empty-state scanner graphics are removed.
+          Graveyard now keeps item actions visible below scrollable evidence, and its table adapts so review status stays visible. Game DNA and Undo Center have aligned selected-item facts, source details and compact actions. AI Assistant uses the locked workflow/conversation/context proportions. Settings retains its seven sections and multi-column control center. More Tools has compact recent-use records and recovery links. Games and Mods use the same restrained context panels.
 
-          Procedural moon/forest cover stand-ins have been removed. Verified local publisher or owner-selected covers are retained, with a neutral state for missing artwork and Get Steam Covers available on Overview.
+          The shared stylesheet now uses consistent charcoal surfaces, subtle borders, compact controls and red action states. The original approved photo family remains throughout all 13 pages. Missing artwork does not occupy a large inspector placeholder. Overview has one aligned library header.
 
-          Inventory and manual mod scans still run while games, overlays or fullscreen applications are open. Cancellation and file protections remain active.
+          Captures keeps the screenshot browser on the left and a larger, expanding selected-image preview on the right. Inventory and manual mod scans continue while games, overlays and fullscreen apps are open.
 
-          ![Actual native Windows Captures view](https://github.com/wrightausername/Game-Grave/releases/download/preview-5594aa9/Captures-preview.png)
+          ![Actual native Windows Graveyard](https://github.com/wrightausername/Game-Grave/releases/download/preview-f2d313a/Graveyard-preview.png)
 
-          The displayed screenshot is an explicit review fixture, not private user content.
+          ![Actual native Windows Game DNA](https://github.com/wrightausername/Game-Grave/releases/download/preview-f2d313a/Game-DNA-preview.png)
 
-          Download the ZIP, extract it, and run the installer. The EXE is also available separately. These public release links require no GitHub sign-in.
+          ![Actual native Windows AI Assistant](https://github.com/wrightausername/Game-Grave/releases/download/preview-f2d313a/AI-Assistant-preview.png)
 
-          This is an unsigned engineering preview, not a stable 1.0 release or a claim of exact pixel parity. The installer bytes are unchanged from the successful Windows build and install/launch/uninstall tests in run 41915931360. Source commit: 5594aa906a34da9a6590702652f4b1ffc536b466. SHA-256 is included.
+          ![Actual native Windows Settings](https://github.com/wrightausername/Game-Grave/releases/download/preview-f2d313a/Settings-preview.png)
+
+          The screenshots use explicit disposable review fixtures, including synthetic game/mod/recovery records and a synthetic conversation; no user data or AI inference is involved. Game artwork appears only when verified locally or supplied by the owner. The screenshot ZIP contains actual native Windows captures of all 13 pages at 1672×941 and 1366×768, with source provenance and hashes.
+
+          Download **GameGrave-Windows-Preview-f2d313a.zip**, extract it, and run the installer. After installation, launch **Game Grave Crimson Preview** from the Start menu. The EXE is also available separately. Public release downloads require no GitHub sign-in.
+
+          Validation: 522 local tests, 3 platform-specific skips, including 13 Qt interaction/layout regressions; native Windows source UI, 125%/150% DPI, packaged EXE launch, and installer install/launch/uninstall checks. The installer is the unchanged tested artifact from run 41931303835. Source head: f2d313a838aba3ce0850f4227d143b82f22fcec5. SHA-256 is included.
+
+          This is an unsigned engineering preview, not a stable 1.0 release or a declaration of pixel-identical visual acceptance.
           NOTES
           gh release create "$PREVIEW_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$SOURCE_SHA" \
-            --title 'Game Grave Windows UI Preview — 5594aa9 (unsigned)' \
+            --title 'Game Grave Windows UI Preview — f2d313a (unsigned)' \
             --prerelease --latest=false \
             --notes-file release-notes.md \
-            delivery/GameGrave-Windows-Preview-5594aa9.zip \
-            delivery/GameGrave-Setup-5594aa9.exe \
-            delivery/GameGrave-Setup-5594aa9.sha256 \
-            delivery/Captures-preview.png
+            delivery/GameGrave-Windows-Preview-f2d313a.zip \
+            delivery/GameGrave-Setup-f2d313a.exe \
+            delivery/GameGrave-Setup-f2d313a.sha256 \
+            delivery/GameGrave-UI-Screenshots-f2d313a.zip \
+            delivery/*-preview.png
