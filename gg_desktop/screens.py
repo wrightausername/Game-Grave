@@ -128,26 +128,17 @@ class ScreenMethods(LockedPagesMixin):
     def _not_scanned(self, page):
         if self.inventory.scanned_at:
             return False
-        from gg_desktop.cinematic_art import CinematicToolArtwork
         placeholder = QFrame()
         placeholder.setObjectName("ggEmptyHero")
         layout = row(spacing=18, margins=(21, 18, 21, 18))
         placeholder.setLayout(layout)
-        illustration = CinematicToolArtwork("scanner")
-        illustration.setMinimumWidth(210)
-        illustration.setMaximumWidth(420)
-        illustration.setMinimumHeight(166)
-        illustration.setMaximumHeight(166)
-        layout.addWidget(illustration, 2)
         info = QWidget()
         details = column(spacing=12)
         info.setLayout(details)
-        heading = label("YOUR PC. YOUR DATA. YOUR CALL.", "sectionTitle")
+        heading = label("Scan your library", "sectionTitle")
         details.addWidget(heading)
         details.addWidget(label(
-            "Run a read-only discovery scan to populate the real installed "
-            "games, mods and storage findings on this page. Game Grave never "
-            "fills an empty library with fictional games or fake disk usage.",
+            "Find installed games, mod locations and capture files on your PC.",
             "subtle", wrap=True))
         actions = QWidget()
         action_row = row(spacing=10)
@@ -158,8 +149,7 @@ class ScreenMethods(LockedPagesMixin):
         action_row.addStretch()
         details.addWidget(actions)
         details.addWidget(label(
-            "No files will be changed by scanning. Protect, Delete and Restore "
-            "always require explicit review.", "caption", wrap=True))
+            "Scanning does not change your files.", "caption", wrap=True))
         details.addStretch()
         layout.addWidget(info, 3)
         page.content.addWidget(placeholder)

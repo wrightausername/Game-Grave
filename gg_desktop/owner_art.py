@@ -11,6 +11,11 @@ from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPixmap
 
 IMAGE_BY_ROUTE = {
     "overview": "owner_cinematic_overview.jpg",
+    "readyroom": "owner_cinematic_overview.jpg",
+    "games": "owner_cinematic_overview.jpg",
+    "mods": "owner_cinematic_overview.jpg",
+    "oldfiles": "owner_cinematic_overview.jpg",
+    "otherstorage": "owner_cinematic_overview.jpg",
     "captures": "owner_cinematic_overview.jpg",
     "graveyard": "owner_cinematic_graveyard.jpg",
     "dna": "owner_cinematic_dna.jpg",
@@ -30,7 +35,7 @@ def load_approved_hero(kind: str) -> QPixmap:
     # Exclude those edges from the decorative view; keep the original assets.
     if not photo.isNull() and route == "graveyard":
         return photo.copy(0, 0, photo.width(), max(1, photo.height() - 16))
-    if not photo.isNull() and route in ("overview", "captures"):
+    if not photo.isNull() and name == "owner_cinematic_overview.jpg":
         return photo.copy(0, 12, photo.width(), max(1, photo.height() - 12))
     return photo
 

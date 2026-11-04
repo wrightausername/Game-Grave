@@ -239,14 +239,6 @@ def mod_gallery(games, mods, on_selected, *, limit=9):
         "Game-linked cards require a verified install-path match. "
         "External mod-manager folders remain separate and protected.", "caption"))
     if not mods:
-        from gg_desktop.poster_art import missing_artwork
-        illustration = QLabel()
-        illustration.setObjectName("noModsArtwork")
-        illustration.setAlignment(Qt.AlignCenter)
-        illustration.setPixmap(
-            missing_artwork("MOD RADAR • SCAN READY", 630, 208))
-        illustration.setMinimumHeight(225)
-        column.addWidget(illustration)
         empty = _label("NO MOD LOCATIONS FOUND", "premiumTitle")
         empty.setAlignment(Qt.AlignCenter)
         column.addWidget(empty)

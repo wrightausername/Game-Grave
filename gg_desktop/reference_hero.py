@@ -28,9 +28,8 @@ class ReferenceHero(SceneHeader):
         self.setAccessibleName(title + ". " + subtitle)
         for child in self.findChildren(QLabel):
             child.hide()
-        # The seven owner-locked pages retain their exact approved art.
-        # Unlocked pages use unique original scenes rather than copying the
-        # Overview gravestone onto every screen.
+        # Use the owner's photo family throughout the shell. The vector art
+        # is only a fallback if an archived photo cannot be loaded.
         themed = kind in (
             "readyroom", "games", "mods", "oldfiles",
             "otherstorage", "captures")

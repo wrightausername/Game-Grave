@@ -68,6 +68,10 @@ def main():
             window.inventory.games = merge_games(games, [])
             window.inventory.files = files
             window.inventory.scanned_at = "SYNTHETIC visual-review inventory"
+            window.inventory.old_files_scan_status = "complete"
+            window.inventory.old_files_scan_message = "SYNTHETIC visual-review fixture"
+            window.inventory.old_files_scan_root = str(data / "Downloads")
+            window.settings["scan_folder"] = str(data / "Downloads")
             window.inventory.graveyard = build_graveyard(games, [], files, 365,
                 never_touch=window.settings["never_touch"])
             screenshot_records = []
@@ -108,8 +112,9 @@ def main():
                     "protected. Any removal needs your separate confirmation."]}
             import gg_desktop.approved_overview
             import gg_desktop.approved_undo
-            routes = ("Overview", "Graveyard", "Game DNA", "Undo Center",
-                      "AI Assistant", "Settings", "More Tools", "Captures")
+            routes = ("Overview", "Ready Room", "Games", "Mods", "Old Files",
+                      "Other Storage", "Captures", "Graveyard", "Game DNA",
+                      "Undo Center", "AI Assistant", "Settings", "More Tools")
             captures = []
             with patch("core.get_activity", side_effect=lambda limit=1500: events[:limit]), \
                     patch("gg_desktop.approved_overview.get_activity", side_effect=lambda limit=1500: events[:limit]), \

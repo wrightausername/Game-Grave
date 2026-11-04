@@ -21,6 +21,8 @@ controls. Its draggable divider allocates most of the workspace to the selected
 image. The local preview expands with the window and decodes up to 2560×1440,
 retaining original aspect ratio and all original file/pixel/identity checks.
 Late decode results cannot overwrite a newer selection or a cleared preview.
+The other workspace headers also use the approved photo family; generated
+scene headers and oversized empty-state scanner illustrations are retired.
 
 Procedural moon/forest placeholder posters have been removed. Verified local
 publisher or owner-selected artwork remains authoritative; missing covers use
