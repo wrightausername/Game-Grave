@@ -354,8 +354,8 @@ class ScreenMethods(LockedPagesMixin):
                     "button again or select a custom cover.")
             self.status.setText(
                 f"Steam cover lookup: {report['downloaded']} downloaded.")
-            if self.current_route == "Games":
-                self.navigate("Games")
+            if self.current_route in ("Games", "Ready Room"):
+                self.navigate(self.current_route)
             self.info("Steam artwork", message)
         self.job(download, finished, error_title="Cover retrieval failed")
 
@@ -408,8 +408,8 @@ class ScreenMethods(LockedPagesMixin):
                 msg += (
                     "\n\nGame Grave stopped further requests because "
                     "a game was detected.")
-            if self.current_route == "Games":
-                self.navigate("Games")
+            if self.current_route in ("Games", "Ready Room"):
+                self.navigate(self.current_route)
             self.info("Matched game covers", msg)
         self.job(worker, finished,
                  error_title="Could not retrieve matched covers")
