@@ -630,7 +630,7 @@ class RecoveryRoute(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setMinimumHeight(168)
+        self.setMinimumHeight(120)
         self.path = "Select a recovery record"
         self.state = "Not checked"
         self.setAccessibleName("Recovery route and verification status")
@@ -644,7 +644,7 @@ class RecoveryRoute(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
-        p.fillRect(self.rect(), QColor("#0A1420"))
+        p.fillRect(self.rect(), QColor("#10151C"))
         # A three-column route clipped the third step completely in the
         # approved Undo right inspector, which is only ~300px wide on 1366px
         # screens. Stack it vertically at narrow widths instead.
@@ -655,28 +655,28 @@ class RecoveryRoute(QWidget):
                 ("RESTORE", self.state, QColor("#70BAA6")),
             )
             for i, (heading, detail, color) in enumerate(steps):
-                y = 7 + i * 41
-                card = QRectF(8, y, max(80, w - 16), 35)
-                p.setBrush(QColor("#11232F"))
-                p.setPen(_pen("#3A5360", 1))
-                p.drawRoundedRect(card, 6, 6)
+                y = 4 + i * 28
+                card = QRectF(0, y, max(80, w), 26)
+                p.setBrush(QColor("#141C25"))
+                p.setPen(Qt.NoPen)
+                p.drawRoundedRect(card, 2, 2)
                 p.setPen(_pen(color, 2))
-                p.drawLine(QPointF(15, y + 6), QPointF(15, y + 29))
+                p.drawLine(QPointF(4, y + 5), QPointF(4, y + 21))
                 p.setPen(WHITE)
-                p.setFont(QFont("Segoe UI", 9, QFont.DemiBold))
-                p.drawText(QRectF(23, y + 7, min(93, w * .35), 20),
+                p.setFont(QFont("Segoe UI", 8, QFont.DemiBold))
+                p.drawText(QRectF(12, y + 3, min(93, w * .35), 20),
                            Qt.AlignVCenter, heading)
                 p.setPen(MUTED)
-                p.setFont(QFont("Segoe UI", 9))
+                p.setFont(QFont("Segoe UI", 8))
                 text_x = min(116, max(95, w * .38))
                 available = max(38, w - text_x - 18)
                 rendered = p.fontMetrics().elidedText(
                     str(detail), Qt.ElideMiddle, int(available))
-                p.drawText(QRectF(text_x, y + 7, available, 20),
+                p.drawText(QRectF(text_x, y + 3, available, 20),
                            Qt.AlignVCenter, rendered)
             p.setPen(MUTED)
-            p.setFont(QFont("Segoe UI", 9))
-            p.drawText(QRectF(8, 131, max(80, w - 16), 33),
+            p.setFont(QFont("Segoe UI", 8))
+            p.drawText(QRectF(0, 92, max(80, w), 28),
                        Qt.AlignLeft | Qt.TextWordWrap,
                        "Recovery requires an exact Windows Recycle Bin match; "
                        "no expiry is guaranteed.")

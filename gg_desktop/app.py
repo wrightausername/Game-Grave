@@ -82,16 +82,16 @@ def configure_crimson_dialog_palette(app: QApplication) -> None:
     app.setStyle("Fusion")
     palette = QPalette(app.palette())
     for role, hex_color in (
-        (QPalette.Window, "#111B27"),
+        (QPalette.Window, "#10151C"),
         (QPalette.WindowText, "#F5FAFF"),
-        (QPalette.Base, "#0D1722"),
-        (QPalette.AlternateBase, "#1D2C3A"),
+        (QPalette.Base, "#0C1118"),
+        (QPalette.AlternateBase, "#101820"),
         (QPalette.Text, "#F5FAFF"),
-        (QPalette.Button, "#243446"),
+        (QPalette.Button, "#181F28"),
         (QPalette.ButtonText, "#F5FAFF"),
-        (QPalette.Highlight, "#345E74"),
+        (QPalette.Highlight, "#542336"),
         (QPalette.HighlightedText, "#FFFFFF"),
-        (QPalette.ToolTipBase, "#111B27"),
+        (QPalette.ToolTipBase, "#18202A"),
         (QPalette.ToolTipText, "#F5FAFF"),
         (QPalette.PlaceholderText, "#ACBDCE"),
     ):

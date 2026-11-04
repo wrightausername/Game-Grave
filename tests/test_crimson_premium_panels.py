@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 try:
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QLabel
     from gg_desktop.premium_panels import (
         GameInspector, ModInspector, group_mod_locations, mod_gallery,
     )
@@ -48,7 +48,8 @@ class PremiumPanelsTests(unittest.TestCase):
                                   lambda: None, lambda: None)
             panel.set_game(game)
             self.assertIn("unavailable", panel.size.text().lower())
-            self.assertIn("Unknown", panel.last.text())
+            self.assertTrue(any(item.text() == "Unknown"
+                                for item in panel.findChildren(QLabel)))
             self.assertEqual(panel.game, game)
             self.assertTrue(panel.details_btn.isEnabled())
             panel.set_game(None)

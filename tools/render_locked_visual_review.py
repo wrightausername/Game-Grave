@@ -29,7 +29,7 @@ def main():
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QCoreApplication, QEvent
-    from core import SteamGame, OldFile, default_settings
+    from core import SteamGame, OldFile, ModFolder, default_settings
     from graveyard import build_graveyard
     from gg_desktop.models import merge_games
     from gg_desktop.app import CrimsonWindow, configure_crimson_dialog_palette
@@ -66,13 +66,28 @@ def main():
             window.settings["never_touch"] = [item.path for item in files[1:4]]
             window.inventory.steam = games
             window.inventory.games = merge_games(games, [])
+            mods = []
+            for game in games[:3]:
+                folder = Path(game.install_path) / "Data" / "Mods"
+                folder.mkdir(parents=True)
+                fixture = folder / "SYNTHETIC-REVIEW.txt"
+                fixture.write_text("Disposable UI review fixture, not a real mod.")
+                mods.append(ModFolder(game.name, str(folder), game.library,
+                    "Installed", ("SYNTHETIC fixture",), fixture.stat().st_size,
+                    1, False, source="Steam game folder"))
+            external = data / "Managers" / "MO2" / "mods"
+            external.mkdir(parents=True)
+            mods.append(ModFolder("External fixture", str(external), "",
+                "Unknown", ("SYNTHETIC fixture",), 0, 0, False,
+                source="Mod Organizer 2"))
+            window.inventory.mods = mods
             window.inventory.files = files
             window.inventory.scanned_at = "SYNTHETIC visual-review inventory"
             window.inventory.old_files_scan_status = "complete"
             window.inventory.old_files_scan_message = "SYNTHETIC visual-review fixture"
             window.inventory.old_files_scan_root = str(data / "Downloads")
             window.settings["scan_folder"] = str(data / "Downloads")
-            window.inventory.graveyard = build_graveyard(games, [], files, 365,
+            window.inventory.graveyard = build_graveyard(games, mods, files, 365,
                 never_touch=window.settings["never_touch"])
             screenshot_records = []
             for index, page_name in enumerate(("graveyard", "undo-center")):
@@ -103,7 +118,7 @@ def main():
             window._ai_session = {"busy":False, "status":"Synthetic conversation; no AI model was run.",
                 "messages":[
                     "You: DEMO — Explain these old archives before I remove anything.",
-                    "Game Grave AI: This visual-review inventory contains 12 candidate archives. "
+                    f"Game Grave AI: This visual-review inventory contains {len(window.inventory.graveyard)} candidates. "
                     "Three have a personal Never Touch rule. Their age is evidence for review, "
                     "not proof that they are unused.",
                     "You: What should I check next?",

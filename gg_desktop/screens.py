@@ -913,7 +913,11 @@ class ScreenMethods(LockedPagesMixin):
 
     def _grave_details(self):
         from gg_desktop.widgets import destroy_layout
+        from gg_desktop.inspector_widgets import InspectorFacts, detail_section
         destroy_layout(self.grave_detail)
+        action_col = getattr(self, "grave_detail_actions", self.grave_detail)
+        if action_col is not self.grave_detail:
+            destroy_layout(action_col)
         entries = self._selected_grave_entries()
         if not entries:
             self.grave_detail.addWidget(label("Select a finding", "sectionTitle"))
@@ -932,24 +936,35 @@ class ScreenMethods(LockedPagesMixin):
         action, reason = graveyard_protection_decision(
             e, self.settings.get("never_touch", []))
         self.grave_detail.addWidget(label(e.name, "sectionTitle", wrap=True))
-        for text in (e.category, human_size(e.apparent_bytes) + " apparent", e.path):
-            self.grave_detail.addWidget(label(text, "subtle", wrap=True))
-        self.grave_detail.addWidget(label(
-            "WHY IT WAS FOUND", "eyebrow"))
+        self.grave_detail.addWidget(label(e.category, "caption", wrap=True))
+        self.grave_detail.addWidget(InspectorFacts((
+            ("Apparent size", human_size(e.apparent_bytes)),
+            ("Last modified", str(e.age_days) + " days ago" if e.age_days is not None else "Unknown"),
+        )))
+        self.grave_detail.addWidget(detail_section("Original location"))
+        path = label(e.path, "caption", wrap=True)
+        path.setToolTip(e.path)
+        self.grave_detail.addWidget(path)
+        self.grave_detail.addWidget(detail_section("Why flagged"))
         self.grave_detail.addWidget(label(e.finding, "subtle", wrap=True))
-        self.grave_detail.addWidget(label(
-            "WHY THIS IS PROTECTED" if not e.can_recycle else "REVIEW STATUS",
-            "eyebrow"))
+        self.grave_detail.addWidget(detail_section(
+            "Protection" if not e.can_recycle else "Review status"))
         self.grave_detail.addWidget(label(reason if not e.can_recycle else
                                           "Reviewable only. Nothing is moved without confirmation.",
                                           "warning", wrap=True))
-        self.grave_detail.addSpacing(8)
+        from graveyard_protection import protection_action
+        personal_rule, _ = protection_action(e.path, list(self.settings.get("never_touch", [])))
+        if personal_rule == "Protect":
+            action_col.addWidget(button(
+                "Protect this item (Never Touch)",
+                lambda _=False, e=e: self._set_personal_protection(
+                    e.path, protect=True, return_route="Graveyard")))
         if action == "Unprotect this item":
-            self.grave_detail.addWidget(button(
+            action_col.addWidget(button(
                 "Unlock  •  Unprotect this item",
                 lambda _=False, e=e: self._unprotect_grave(e), kind="primary"))
         elif action == "Manage parent rule":
-            self.grave_detail.addWidget(button(
+            action_col.addWidget(button(
                 "Manage parent Never Touch rule",
                 lambda _=False, e=e: self._manage_parent_rule(e)))
         elif action == "Why protected?":
@@ -967,22 +982,26 @@ class ScreenMethods(LockedPagesMixin):
                 kind="danger")
             advanced.setEnabled(override_ok)
             advanced.setToolTip(override_reason)
-            self.grave_detail.addWidget(advanced)
+            action_col.addWidget(advanced)
             if not override_ok:
                 self.grave_detail.addWidget(label(override_reason, "subtle", wrap=True))
         if e.category == "Old game screenshot":
-            self.grave_detail.addWidget(button(
+            action_col.addWidget(button(
                 "Preview screenshot  ▧",
                 lambda _=False, e=e: self._preview_grave_image(e)))
         elif e.can_recycle and action != "Unprotect this item":
-            self.grave_detail.addWidget(button(
+            action_col.addWidget(button(
                 "Review moving this file to Recycle Bin…",
                 lambda _=False, e=e: self._approve_recycle([e]), kind="danger"))
-        self.grave_detail.addWidget(button(
-            "View complete details…", lambda _=False, e=e: self._inspect_grave_entry(e)))
-        self.grave_detail.addWidget(button(
+        links = QWidget()
+        links_row = row(spacing=6)
+        links.setLayout(links_row)
+        links_row.addWidget(button(
+            "Full evidence…", lambda _=False, e=e: self._inspect_grave_entry(e)))
+        links_row.addWidget(button(
             "Open containing folder",
             lambda _=False, e=e: self._open_folder(str(Path(e.path).parent))))
+        action_col.addWidget(links)
         self.grave_detail.addStretch()
 
     def _override_protected_grave_entry(self, entry):
@@ -1342,26 +1361,35 @@ class ScreenMethods(LockedPagesMixin):
         overview_col.addWidget(relationship)
         board_row.addWidget(overview, 7)
 
-        inspector, inspector_col = panel(padding=14)
+        from gg_desktop.inspector_widgets import InspectorFacts, detail_section
+        inspector, inspector_col = panel(padding=11, spacing=7)
+        inspector.setObjectName("contextPanel")
+        inspector.setAccessibleName("Game DNA selected node evidence")
         inspector_col.addWidget(section_title("EVIDENCE INSPECTOR"))
         game_title = label("Select a game", "sectionTitle", wrap=True)
         inspector_col.addWidget(game_title)
-        relation_title = label("INSTALLED GAME", "eyebrow", wrap=True)
+        selected_facts = InspectorFacts()
+        inspector_col.addWidget(selected_facts)
+        relation_title = detail_section("Installed game / evidence")
         inspector_col.addWidget(relation_title)
         meaning = label("", "subtle", wrap=True)
         inspector_col.addWidget(meaning)
         evidence = label("", "caption", wrap=True)
         inspector_col.addWidget(evidence)
         tools = QWidget()
-        tline = column(spacing=8)
+        tline = column(spacing=5)
         tools.setLayout(tline)
         open_install = button(
-            "Open verified install folder",
+            "Open install folder",
             lambda: self._open_folder(games[choose.currentIndex()]["install_path"])
             if 0 <= choose.currentIndex() < len(games) else None)
         tline.addWidget(open_install)
-        tline.addWidget(button("Review associated mods", lambda: self.navigate("Mods")))
-        tline.addWidget(button("Open Graveyard safeguards", lambda: self.navigate("Graveyard")))
+        related_tools = QWidget()
+        related_row = row(spacing=6)
+        related_tools.setLayout(related_row)
+        related_row.addWidget(button("Mod Radar", lambda: self.navigate("Mods")))
+        related_row.addWidget(button("Graveyard", lambda: self.navigate("Graveyard")))
+        tline.addWidget(related_tools)
         inspector_col.addWidget(tools)
         inspector_col.addStretch(1)
         board_row.addWidget(inspector, 3)
@@ -1448,6 +1476,7 @@ class ScreenMethods(LockedPagesMixin):
         def show(index):
             if not (0 <= index < len(games)):
                 game_title.setText("No Game DNA records found")
+                selected_facts.set_facts((("Installation", "Not scanned"),))
                 relationship.set_game("No game found", {})
                 meaning.setText(
                     "Run Scan PC and verify a supported launcher installation.")
@@ -1457,6 +1486,11 @@ class ScreenMethods(LockedPagesMixin):
             game = games[index]
             game_title.setText(game["game"])
             associated = len(game["assets"])
+            selected_facts.set_facts((
+                ("Launcher", game["launcher"]),
+                ("Linked locations", associated),
+                ("Manager profiles", len(game["manager_profiles"])),
+            ))
             # Artwork is strictly attached to the verified exact install,
             # never fuzzy-matched by game name alone.
             matching_record = next((
@@ -2877,7 +2911,7 @@ class ScreenMethods(LockedPagesMixin):
 
         # Quick Access: all buttons open an actual working screen or verified
         # existing backend action. No unimplemented fake tool controls.
-        access, access_col = panel(padding=14)
+        access, access_col = panel(padding=10)
         access_bar = ResponsiveGrid(columns=((0, 2), (800, 4), (1250, 8)), spacing=7)
         access_row = access_bar
         access_row.addWidget(label("QUICK ACCESS", "sectionTitle"))
@@ -2920,13 +2954,13 @@ class ScreenMethods(LockedPagesMixin):
         access_col.addWidget(access_bar)
         page.content.addWidget(access)
 
-        content = ResponsiveRow(breakpoint=1200, spacing=13)
+        content = ResponsiveRow(breakpoint=1000, spacing=9)
         columns = content
 
         main = QWidget()
-        main_col = column(spacing=13)
+        main_col = column(spacing=9)
         main.setLayout(main_col)
-        headline = ResponsiveRow(breakpoint=900, spacing=13)
+        headline = ResponsiveRow(breakpoint=850, spacing=9)
         feats = headline
         rescue, rescue_col = panel(kind="actionCardPrimary", padding=17)
         rescue_col.addWidget(label("♻  RESURRECTION KIT", "eyebrow"))
@@ -2976,10 +3010,11 @@ class ScreenMethods(LockedPagesMixin):
         columns.addWidget(main, 7)
 
         sidebar = QWidget()
-        sidebar_col = column(spacing=13)
+        sidebar_col = column(spacing=9)
         sidebar.setLayout(sidebar_col)
 
-        recent, recent_col = panel()
+        recent, recent_col = panel(padding=11, spacing=5)
+        recent.setObjectName("contextPanel")
         recent_col.addWidget(section_title("RECENTLY USED", "Local operations"))
         activities = get_activity(limit=6)
         if not activities:
@@ -2987,14 +3022,28 @@ class ScreenMethods(LockedPagesMixin):
                 "No recorded Game Grave actions yet. This list reflects local logs only.",
                 "subtle", wrap=True))
         else:
-            for event in activities[:3]:
-                name = str(event.get("kind", "Local action"))[:60]
-                stamp = str(event.get("date", ""))[:16]
-                recent_col.addWidget(label(name, "sectionTitle", wrap=True))
-                recent_col.addWidget(label(stamp or "Time unavailable", "caption"))
+            from core import friendly_activity
+            from datetime import datetime
+            for event in activities[:6]:
+                friendly = friendly_activity(event)
+                item = QFrame()
+                item.setObjectName("inspectorFactRow")
+                item_col = column(spacing=3, margins=(0, 6, 0, 6))
+                item.setLayout(item_col)
+                name = str(friendly.get("title", event.get("kind", "Local action")))
+                item_col.addWidget(label(name, "subtle", wrap=True))
+                stamp = str(event.get("date", ""))
+                try:
+                    stamp = datetime.fromisoformat(stamp).strftime("%b %d · %H:%M")
+                except ValueError:
+                    stamp = stamp[:16] or "Time unavailable"
+                item_col.addWidget(label(stamp, "caption"))
+                item.setToolTip(str(event.get("details", "")))
+                recent_col.addWidget(item)
         sidebar_col.addWidget(recent)
 
-        recommended, rec_col = panel()
+        recommended, rec_col = panel(padding=11, spacing=4)
+        recommended.setObjectName("contextPanel")
         rec_col.addWidget(section_title("RECOVERY & DIAGNOSTICS"))
         for name, action in (
             ("Rehearse recovery safely", self._rehearse_kit),
@@ -3002,7 +3051,9 @@ class ScreenMethods(LockedPagesMixin):
             ("Compare Kit snapshots", self._compare_kits),
             ("Review Undo Center", lambda: self.navigate("Undo Center")),
         ):
-            rec_col.addWidget(button(name + "  ›", action))
+            link = button(name + "  ›", action)
+            link.setObjectName("contextAction")
+            rec_col.addWidget(link)
         sidebar_col.addWidget(recommended)
         columns.addWidget(sidebar, 3)
 
@@ -3019,9 +3070,8 @@ class ScreenMethods(LockedPagesMixin):
         footer_tools.addWidget(button("Undo Center", lambda: self.navigate("Undo Center")))
         footer_col.addWidget(rowtools)
         footer_col.addWidget(label(
-            "All file modification and restoration still runs through the existing "
-            "identity, ownership, explicit confirmation and recovery checks. "
-            "No animated mockup numbers represent real storage savings.",
+            "Review backups, compare versions and rehearse recovery before restoring. "
+            "Every restore checks its source and asks for confirmation.",
             "caption", wrap=True))
         page.content.addWidget(footer)
 

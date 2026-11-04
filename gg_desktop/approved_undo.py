@@ -22,7 +22,8 @@ from gg_desktop.visuals import RecoveryRoute
 from gg_desktop.widgets import button, data_table, label, panel, row
 from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
 from gg_desktop.reference_icons import metric_icon
-from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE
+from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE, fit_evidence_columns
+from gg_desktop.inspector_widgets import InspectorFacts, detail_section
 
 
 def _text(text, color="#C3CDD7", *, size=11, bold=False, wrap=True):
@@ -62,7 +63,11 @@ def _stat(title, value, tone):
 
 
 def _timestamp(record):
-    return str(record.get("time", "Unknown"))[:19]
+    raw = str(record.get("time", "Unknown"))
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).strftime("%b %d, %Y  %H:%M")
+    except ValueError:
+        return raw[:19]
 
 
 def _bytes(record):
@@ -149,7 +154,8 @@ def render_approved_undo(window):
     filters.addWidget(button("Refresh", lambda: window.navigate("Undo Center")))
     page.content.addWidget(filter_bar)
 
-    workspace = ResponsiveRow(breakpoint=980, spacing=9, horizontal_height=347)
+    workspace = ResponsiveRow(breakpoint=980, spacing=9, horizontal_height=365)
+    workspace.setObjectName("undoWorkspace")
     wrow = workspace
 
     history, hcol = panel(padding=8, spacing=7)
@@ -163,7 +169,7 @@ def render_approved_undo(window):
     table.verticalHeader().setDefaultSectionSize(32)
     for idx, width in enumerate((255, 125, 95, 152, 115)):
         table.setColumnWidth(idx, width)
-    table.horizontalHeader().setStretchLastSection(True)
+    fit_evidence_columns(table, (32, 16, 11, 22, 19))
     table.setMinimumHeight(257)
     hcol.addWidget(table, 1)
     summary = _text("Select a record to check recoverability.", "#A7B7C4")
@@ -171,7 +177,8 @@ def render_approved_undo(window):
     wrow.addWidget(history, 7)
 
     details, details_outer = panel(padding=8, spacing=0)
-    details.setMinimumHeight(347)
+    details.setObjectName("contextPanel")
+    details.setMinimumHeight(365)
     details_scroll = QScrollArea()
     details_scroll.setFrameShape(QFrame.NoFrame)
     details_scroll.setWidgetResizable(True)
@@ -184,18 +191,19 @@ def render_approved_undo(window):
     dcol.addWidget(_text("RESTORE DETAILS", "#F5F5FB", size=14, bold=True))
     heading = _text("Choose an operation", "#FFFFFF", size=13, bold=True)
     dcol.addWidget(heading)
+    record_facts = InspectorFacts()
+    dcol.addWidget(record_facts)
+    dcol.addWidget(detail_section("Original location"))
     path_detail = _text("No record selected.", "#AFC6D6")
     dcol.addWidget(path_detail)
-    meta = _text("", "#A9B6C6")
-    dcol.addWidget(meta)
     recovery_state = _text("Availability has not been verified.",
                            "#F0B57E", bold=True)
     dcol.addWidget(recovery_state)
     route = RecoveryRoute()
-    route.setMinimumHeight(150)
+    route.setMinimumHeight(130)
     dcol.addWidget(route)
     wrow.addWidget(details, 3)
-    workspace.setMinimumHeight(347)
+    workspace.setMinimumHeight(365)
     page.content.addWidget(workspace)
 
     def chosen():
@@ -210,19 +218,22 @@ def render_approved_undo(window):
         if rec is None:
             heading.setText("Choose an operation")
             path_detail.setText("Select a record to inspect its original path.")
-            meta.setText("")
+            record_facts.set_facts(())
             recovery_state.setText("Not verified")
             route.set_record("Choose an operation", "Not checked")
             return
         path = str(rec.get("path", "Unknown"))
         heading.setText(Path(path).name or "Recorded operation")
         path_detail.setText(path)
-        meta.setText(
-            f"{rec.get('action', 'Manual')} • {_bytes(rec):,} bytes • {_timestamp(rec)}")
+        record_facts.set_facts((
+            ("Action", rec.get("action", "Manual")),
+            ("Recorded size", human_size(_bytes(rec))),
+            ("Recorded", _timestamp(rec)),
+        ))
         state = str(rec.get("state", "Not checked"))
         recovery_state.setText(
-            "Previous check: " + state +
-            "\nThis status may have changed in Windows since it was recorded.")
+            "Previous check: " + state)
+        recovery_state.setToolTip("Windows availability may have changed since this recorded check.")
         route.set_record(path, state)
 
     def refill():

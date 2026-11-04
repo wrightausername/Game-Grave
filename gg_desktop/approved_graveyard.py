@@ -20,10 +20,9 @@ from graveyard_protection import protection_action
 from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.widgets import button, data_table, label, panel, row
 from gg_desktop.cinematic_art import CinematicImpactTrack
-from gg_desktop.grave_evidence_art import GraveEvidenceBanner
 from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
 from gg_desktop.reference_icons import metric_icon
-from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE
+from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE, fit_evidence_columns
 from gg_desktop.graveyard_filters import (
     SORT_OPTIONS, AGE_OPTIONS, available_drives, select_graveyard_entries,
 )
@@ -57,8 +56,8 @@ def _stat(title, value, color):
     col = QVBoxLayout(text)
     col.setContentsMargins(0,0,0,0)
     col.setSpacing(1)
-    col.addWidget(_label(title.upper(), "#BBC8D5", 13, True))
-    col.addWidget(_label(value, color, 28, True))
+    col.addWidget(_label(title.upper(), "#BBC8D5", 11, True))
+    col.addWidget(_label(value, color, 24, True))
     line.addWidget(text,1)
     return frame
 
@@ -169,10 +168,11 @@ def render_approved_graveyard(window):
     controls.addWidget(window.grave_sort)
     page.content.addWidget(filters)
 
-    main = ResponsiveRow(breakpoint=980, spacing=8, horizontal_height=355)
+    main = ResponsiveRow(breakpoint=980, spacing=8, horizontal_height=386)
+    main.setObjectName("graveyardWorkspace")
     main_row = main
     browser, bcol = panel(padding=9, spacing=7)
-    bcol.addWidget(_label("CANDIDATE FILES", "#F4F6F9", 17, True))
+    bcol.addWidget(_label("CANDIDATE FILES", "#F4F6F9", 14, True))
     window.grave_table = data_table([
         "ITEM", "SOURCE / TYPE", "GAME / RELATIONSHIP",
         "SIZE", "MODIFIED", "REVIEW STATUS"])
@@ -180,9 +180,9 @@ def render_approved_graveyard(window):
     window.grave_table.setSelectionBehavior(QAbstractItemView.SelectRows)
     window.grave_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
     window.grave_table.setProperty("usesCheckSelection", True)
-    for idx, width in enumerate((270, 130, 150, 85, 80, 143)):
+    for idx, width in enumerate((240, 115, 155, 80, 75, 126)):
         window.grave_table.setColumnWidth(idx, width)
-    window.grave_table.horizontalHeader().setStretchLastSection(True)
+    fit_evidence_columns(window.grave_table, (27, 15, 19, 10, 10, 19))
     window.grave_table.setMinimumHeight(290)
     window.grave_table.verticalHeader().setDefaultSectionSize(34)
     window.grave_table.setAccessibleName("Graveyard discovered candidates table")
@@ -191,12 +191,11 @@ def render_approved_graveyard(window):
 
     main_row.addWidget(browser, 7)
 
-    inspector, icol = panel(padding=12, spacing=6)
-    inspector.setMinimumHeight(340)
-    icol.addWidget(_label("ITEM DETAILS", "#F6F3F7", 17, True))
-    window.grave_art = GraveEvidenceBanner()
-    window.grave_art.set_candidates(entries)
-    icol.addWidget(window.grave_art)
+    inspector, icol = panel(padding=11, spacing=8)
+    inspector.setObjectName("contextPanel")
+    inspector.setAccessibleName("Selected Graveyard item evidence and actions")
+    inspector.setMinimumHeight(370)
+    icol.addWidget(_label("ITEM DETAILS", "#F6F3F7", 14, True))
     # Paths and evidence can be arbitrarily long. Without a separate
     # inspector scroll area, Qt compresses the labels until they overlap.
     details_scroll = QScrollArea()
@@ -211,8 +210,14 @@ def render_approved_graveyard(window):
     details_scroll.setWidget(details_body)
     icol.addWidget(details_scroll, 1)
     window.grave_detail = details_col
+    detail_actions = QWidget()
+    detail_actions.setObjectName("graveyardDetailActions")
+    window.grave_detail_actions = QVBoxLayout(detail_actions)
+    window.grave_detail_actions.setContentsMargins(0, 0, 0, 0)
+    window.grave_detail_actions.setSpacing(5)
+    icol.addWidget(detail_actions)
     main_row.addWidget(inspector, 3)
-    main.setMinimumHeight(355)
+    main.setMinimumHeight(386)
     page.content.addWidget(main)
 
     def selected():
@@ -420,28 +425,12 @@ def render_approved_graveyard(window):
     def update_details():
         window._grave_details()
         entries = window._selected_grave_entries()
-        if len(entries) == 1:
-            window.grave_art.set_entry(entries[0])
-        else:
-            window.grave_art.set_entry(None)
         window.grave_counter.setText(
             (str(len(entries)) + " selected | " +
              human_size(sum(_size(e) for e in entries)) + " apparent bytes")
             if entries else
             (f"{len(window._shown_graves)} matching candidates. "
              "Select one to inspect why it was flagged."))
-        if not entries:
-            return
-        if len(entries) == 1:
-            entry = entries[0]
-            rule, _ = protection_action(
-                entry.path, list(window.settings.get("never_touch", [])))
-            if rule == "Protect":
-                window.grave_detail.insertWidget(
-                    1, button("Protect this item (Never Touch)",
-                              lambda _=False, e=entry:
-                              window._set_personal_protection(
-                                  e.path, protect=True, return_route="Graveyard")))
 
     for choice in (
         window.grave_search.textChanged,

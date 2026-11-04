@@ -1,6 +1,6 @@
 """Crimson Command game and mod inspectors. UI only; all facts come from scans.
 
-Cards show locally discovered art or an explicitly labeled generated title.
+Cards show verified local art when available and compact facts otherwise.
 No remote requests, fake covers, fabricated mod conflicts or destructive actions.
 """
 from __future__ import annotations
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from core import human_size, age_text
 from gg_desktop.local_art import game_cover_path, game_banner_path
+from gg_desktop.inspector_widgets import InspectorFacts, detail_section
 
 
 def _label(text, role="", wrap=True):
@@ -68,14 +69,14 @@ def _image(label, game, *, w=320, h=186):
     pixmap = _load_local_art(game, w, h)
     label.clear()
     if not pixmap.isNull():
-        label.setStyleSheet("background:#091522;border:1px solid #5E3045;border-radius:9px;")
+        label.setStyleSheet("background:#0C1118;border:1px solid #303945;border-radius:3px;")
+        label.show()
         label.setPixmap(pixmap)
         label.setToolTip("Local game art found on this PC")
+        return True
     else:
-        from gg_desktop.poster_art import missing_artwork
-        title = str(getattr(game, "name", "") or "MOD RADAR")
-        label.setPixmap(missing_artwork(title, min(w, 320), h))
-        label.setToolTip("Local artwork not available")
+        label.hide()
+        return False
 
 
 class GameInspector(QFrame):
@@ -92,8 +93,8 @@ class GameInspector(QFrame):
         self._mods = on_mods
         self._captures = on_captures
         self._cover = on_cover
-        layout = _col(self, spacing=10, margins=(13, 15, 13, 15))
-        layout.addWidget(_label("SELECTED GAME", "sceneKicker"))
+        layout = _col(self, spacing=7, margins=(11, 11, 11, 11))
+        layout.addWidget(_label("GAME DETAILS", "sectionTitle"))
         self.art = QLabel()
         layout.addWidget(self.art)
         self.name = _label("Select a game", "premiumTitle")
@@ -102,14 +103,12 @@ class GameInspector(QFrame):
         layout.addWidget(self.status)
         self.size = _label("", "premiumMetric")
         layout.addWidget(self.size)
-        self.platform = _label("", "caption")
-        layout.addWidget(self.platform)
-        self.last = _label("", "caption")
-        layout.addWidget(self.last)
-        layout.addWidget(_label("INSTALL LOCATION", "sceneKicker"))
+        self.facts = InspectorFacts()
+        layout.addWidget(self.facts)
+        layout.addWidget(detail_section("Install location"))
         self.path = _label("", "premiumPath")
         layout.addWidget(self.path)
-        layout.addWidget(_label("WHAT CAN I DO?", "sceneKicker"))
+        layout.addWidget(detail_section("Selected game actions"))
         self.details_btn = QPushButton("Inspect game details")
         self.details_btn.setObjectName("primary")
         self.details_btn.clicked.connect(lambda: self.game is not None and self._details(self.game))
@@ -128,10 +127,15 @@ class GameInspector(QFrame):
         layout.addWidget(self.cover_btn)
         self.mods_btn = QPushButton("View Mod Radar")
         self.mods_btn.clicked.connect(self._mods)
-        layout.addWidget(self.mods_btn)
         self.captures_btn = QPushButton("Browse game captures")
         self.captures_btn.clicked.connect(self._captures)
-        layout.addWidget(self.captures_btn)
+        related = QWidget()
+        related_row = QHBoxLayout(related)
+        related_row.setContentsMargins(0, 0, 0, 0)
+        related_row.setSpacing(6)
+        related_row.addWidget(self.mods_btn)
+        related_row.addWidget(self.captures_btn)
+        layout.addWidget(related)
         self.hint = _label(
             "Real local and Steam artwork is preferred. Use Set cover image to choose "
             "a custom poster for launchers without local art.",
@@ -153,12 +157,11 @@ class GameInspector(QFrame):
         self.size.setText(
             human_size(game.size_bytes) if active and game.size_bytes is not None
             else "Size unavailable")
-        self.platform.setText(
-            f"Launcher: {game.launcher}" if active else "")
-        self.last.setText(
-            "Last played: " + (age_text(game.last_played_at)
-                               if game.last_played_at is not None else "Unknown")
-            if active else "")
+        self.facts.set_facts((
+            ("Launcher", game.launcher),
+            ("Last played", age_text(game.last_played_at)
+             if game.last_played_at is not None else "Unknown"),
+        ) if active else ())
         self.path.setText(game.install_path if active else "No installation selected")
         self.path.setToolTip(game.install_path if active else "")
         _image(self.art, game)
@@ -210,10 +213,8 @@ class ModLocationCard(QFrame):
         self._choose = on_selected
         layout = _col(self, spacing=4, margins=(7, 7, 7, 8))
         art = QLabel()
-        _image(art, game, w=248, h=135)
-        if game is None:
-            from gg_desktop.poster_art import missing_artwork
-            art.setPixmap(missing_artwork(str(source or "MOD SOURCE"), 248, 135))
+        has_art = _image(art, game, w=248, h=135)
+        self.setFixedHeight(208 if has_art else 124)
         layout.addWidget(art)
         title = game.name if game else str(source or "Other locations")
         layout.addWidget(_label(title[:45], "findingTitle"))
@@ -288,8 +289,8 @@ class ModInspector(QFrame):
         self._on_review = on_review
         self._on_scan = on_scan
         self.locations = []
-        col = _col(self, spacing=11)
-        col.addWidget(_label("MOD RADAR", "sceneKicker"))
+        col = _col(self, spacing=7, margins=(11, 11, 11, 11))
+        col.addWidget(_label("MOD DETAILS", "sectionTitle"))
         self.art = QLabel()
         col.addWidget(self.art)
         self.title = _label("Select a mod source", "premiumTitle")
@@ -298,10 +299,10 @@ class ModInspector(QFrame):
         col.addWidget(self.count)
         self.provenance = _label("", "caption")
         col.addWidget(self.provenance)
-        col.addWidget(_label("DETECTED SOURCE BREAKDOWN", "sceneKicker"))
-        self.sources = _label("", "premiumPath")
+        col.addWidget(detail_section("Detected sources"))
+        self.sources = InspectorFacts()
         col.addWidget(self.sources)
-        col.addWidget(_label("SAFE ACTIONS", "sceneKicker"))
+        col.addWidget(detail_section("Review actions"))
         self.open_btn = QPushButton("Open selected mod folder")
         self.open_btn.clicked.connect(self.open_selected)
         col.addWidget(self.open_btn)
@@ -327,20 +328,17 @@ class ModInspector(QFrame):
         self.provenance.setText(
             "Inside a verified installed game folder" if game is not None
             else "Source group / no proven installed-game association")
-        self.sources.setText("\n".join(
-            f"{name}: {count} location(s)" for name, count in
+        self.sources.set_facts(tuple(
+            (name, f"{count} location(s)") for name, count in
             Counter(str(getattr(m, "source", "Unknown"))
                     for m in self.locations).most_common(6))
-            or "No mod locations selected")
+            or (("Selection", "No locations"),))
         self.open_btn.setEnabled(bool(self.locations))
         self.review_btn.setEnabled(bool(self.locations))
         self.review_btn.setText(
             "Review first location in Graveyard…"
             if len(self.locations) > 1 else "Send location to Graveyard review…")
         _image(self.art, game, w=320, h=158)
-        if game is None:
-            from gg_desktop.poster_art import missing_artwork
-            self.art.setPixmap(missing_artwork("MOD RADAR", 300, 158))
 
     def open_selected(self):
         if self.locations:

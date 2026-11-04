@@ -39,7 +39,7 @@ def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
     shell = QFrame()
     shell.setObjectName("ggAccentPanel")
     shell.setProperty("accent", tone)
-    shell.setMinimumHeight(155 if compact else 216)
+    shell.setMinimumHeight(148 if compact else 218)
     col = QVBoxLayout(shell)
     col.setContentsMargins(11, 9, 11, 9)
     col.setSpacing(5)
@@ -58,11 +58,12 @@ def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
     description = label(info, "caption", wrap=True)
     col.addWidget(description)
     for name, value, color in facts:
-        line = QWidget()
+        line = QFrame()
         line_layout = QHBoxLayout(line)
         line_layout.setContentsMargins(0, 0, 0, 0)
         line_layout.setSpacing(5)
-        line.setMinimumHeight(20)
+        line.setMinimumHeight(25)
+        line.setObjectName("inspectorFactRow")
         left = QLabel(str(name))
         left.setStyleSheet("background:transparent;color:#C9D4DF;font-size:12px;")
         left.setWordWrap(True)
@@ -74,18 +75,6 @@ def _card(heading, info, facts, tone, route_icon, actions, *, compact=False):
         right.setWordWrap(True)
         line_layout.addWidget(left, 2)
         line_layout.addWidget(right, 1)
-        if (heading == "Protection & Cleanup"
-                and name in ("Recycle Bin", "Delete confirmation")):
-            locked = QCheckBox()
-            locked.setChecked(True)
-            locked.setEnabled(False)
-            locked.setAccessibleName(name + " mandatory Game Grave safeguard")
-            locked.setToolTip("Required safeguard, not an editable preference")
-            locked.setStyleSheet(
-                "QCheckBox::indicator{width:31px;height:17px;"
-                "border:1px solid #F0445E;border-radius:8px;"
-                "background:#A91D37;}")
-            line_layout.addWidget(locked)
         col.addWidget(line)
     col.addStretch(1)
     for title, callback in actions:
@@ -197,7 +186,7 @@ def render_approved_settings(window):
         action = button(name, lambda _=False, target=index: select(target),
                         kind="approvedSettingsTab")
         action.setAccessibleName("Settings category " + name)
-        action.setMinimumHeight(33)
+        action.setMinimumHeight(27)
         action.setProperty("categoryIndex", index)
         tabs.addWidget(action)
         choices.append(action)
@@ -311,7 +300,7 @@ def render_approved_settings(window):
               "green", "Settings",
               (("Open privacy controls", lambda: select(5)),)),
         _card("Paths & Quick Actions",
-              "Open the existing tools; no fake switches.",
+              "Scan locations, startup scanning and recovery tools.",
               (("Scan locations", str(library_roots + (1 if scan_folder else 0)),
                 "#78D6E9"),),
               "cyan", "Old Files",

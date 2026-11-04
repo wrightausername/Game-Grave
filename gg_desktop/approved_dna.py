@@ -250,8 +250,8 @@ def render_approved_dna(window):
         item = page.content.itemAt(idx)
         w = item.widget() if item else None
         if w is not None and w.findChildren(RelationshipMap):
-            w.horizontal_height = 350
-            w.setMinimumHeight(350)
+            w.horizontal_height = 386
+            w.setMinimumHeight(386)
             break
 
     if selectors:

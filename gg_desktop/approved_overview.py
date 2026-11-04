@@ -426,8 +426,10 @@ def render_approved_overview(window):
     page.content.addWidget(center)
 
     library, libcol = _panel("YOUR LIBRARY")
-    heads = QWidget()
-    h = _line(heads, gap=9)
+    # Keep the section title and shelf controls on one aligned header row.
+    # A separate full-width action row left a large blank band above covers.
+    heads = libcol.itemAt(0).widget()
+    h = heads.layout()
     h.addStretch(1)
     def add_library():
         window._settings_category_index = 1
@@ -436,7 +438,6 @@ def render_approved_overview(window):
         h.addWidget(_compact_action("Get Steam Covers", window._download_game_covers))
     h.addWidget(_compact_action("Add library", add_library))
     h.addWidget(_compact_action("View all games", lambda: window.navigate("Games")))
-    libcol.addWidget(heads)
     if found and games:
         shelf = QScrollArea()
         shelf.setObjectName("approvedLibraryScroll")

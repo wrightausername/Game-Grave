@@ -132,6 +132,47 @@ class LockedUILayoutTests(unittest.TestCase):
                                   "Resize must preserve the live page and its controls")
                     self.capture(route, size)
 
+    def test_graveyard_actions_stay_outside_long_evidence_scroll(self):
+        from dataclasses import replace
+        from PySide6.QtWidgets import QWidget
+        self.populate()
+        self.window.inventory.graveyard = [replace(
+            entry, finding="Long source evidence requiring review. " * 100)
+            for entry in self.window.inventory.graveyard]
+        self.window.resize(1672, 941)
+        self.window.navigate("Graveyard")
+        self.flush()
+        actions = self.window.page.findChild(QWidget, "graveyardDetailActions")
+        self.assertIsNotNone(actions)
+        inspector = actions.parentWidget()
+        for size in ((1672, 941), (1366, 768), (1040, 720)):
+            self.window.resize(*size)
+            self.flush()
+            self.assertTrue(inspector.rect().contains(QRect(
+                actions.mapTo(inspector, QPoint(0, 0)), actions.size())))
+            for control in actions.findChildren(QPushButton):
+                self.assertTrue(actions.rect().contains(QRect(
+                    control.mapTo(actions, QPoint(0, 0)), control.size())))
+        protect = next(item for item in actions.findChildren(QPushButton)
+                       if item.text() == "Protect this item (Never Touch)")
+        with patch.object(self.window, "_set_personal_protection") as mutation:
+            protect.click()
+            mutation.assert_called_once_with(
+                self.window.inventory.graveyard[0].path,
+                protect=True, return_route="Graveyard")
+
+    def test_ai_keeps_reference_context_column_proportions(self):
+        from gg_desktop.responsive import ResponsiveGrid
+        self.populate()
+        self.window.resize(1672, 941)
+        self.window.navigate("AI Assistant")
+        self.flush()
+        workspace = self.window.page.findChild(ResponsiveGrid, "approvedAIWorkspace")
+        modes, conversation, context = workspace.widgets
+        self.assertLess(modes.width(), context.width())
+        self.assertGreater(conversation.width(), context.width() * 1.5)
+        self.assertLess(conversation.width(), context.width() * 2.2)
+
     def test_locked_empty_pages_fit_small_window(self):
         self.window.resize(1040, 720)
         for route in self.routes:
@@ -154,6 +195,9 @@ class LockedUILayoutTests(unittest.TestCase):
             self.assertIs(self.window.grave_search, search)
             self.assertIs(self.window.grave_table, table)
             self.assertEqual(search.text(), "old-game-mod")
+            self.assertLessEqual(table.horizontalHeader().length(),
+                                 table.viewport().width() + 1,
+                                 "Review status must remain visible next to the selected file")
             self.assertEqual(len(table.selectionModel().selectedRows()), 1)
             self.assertEqual(self.window._shown_graves[0].key, selected_key)
 

@@ -19,6 +19,7 @@ from gg_desktop.reference_hero import ReferenceHero
 from gg_desktop.widgets import button, label, panel, row
 from gg_desktop.cinematic_art import CinematicToolArtwork
 from gg_desktop.responsive import ResponsiveGrid
+from gg_desktop.inspector_widgets import InspectorFacts, detail_section
 
 
 def _label(text, *, color="#B6C6D7", font=11, strong=False, wrap=True):
@@ -72,16 +73,17 @@ def render_approved_ai(window):
     page.content.addWidget(statuses)
 
     workspace = ResponsiveGrid(
-        columns=((0, 1), (620, 2), (1000, 5)), spacing=9,
+        columns=((0, 1), (620, 2), (1000, 14)), spacing=9,
         positions={
             1: ((1, 0, 1, 1), (0, 0, 1, 1), (2, 0, 1, 1)),
             2: ((1, 0, 1, 1), (0, 0, 1, 2), (1, 1, 1, 1)),
-            5: ((0, 0, 1, 1), (0, 1, 1, 3), (0, 4, 1, 1)),
+            14: ((0, 0, 1, 3), (0, 3, 1, 7), (0, 10, 1, 4)),
         })
     workspace.setObjectName("approvedAIWorkspace")
     wrow = workspace
 
     modes, ml = panel(padding=9, spacing=6)
+    modes.setObjectName("contextPanel")
     ml.addWidget(_label("WORKFLOWS", color="#FFFFFF", font=14, strong=True))
     destinations = (
         ("Chat & Explain", "AI Assistant",
@@ -257,38 +259,36 @@ def render_approved_ai(window):
     entry.returnPressed.connect(submit)
     wrow.addWidget(hub)
 
-    side, scol = panel(padding=11, spacing=9)
+    side, scol = panel(padding=11, spacing=7)
+    side.setObjectName("contextPanel")
+    side.setAccessibleName("Local AI inventory context and investigation links")
     scol.addWidget(_label("ACTIVE CONTEXT", color="#FFFFFF", font=14, strong=True))
     if window.inventory.scanned_at:
-        for name, value, accent in (
-            ("Installed games", len(window.inventory.games), "#72D5E7"),
-            ("Mod locations", len(window.inventory.mods), "#CAA0E8"),
-            ("Graveyard candidates", len(window.inventory.graveyard), "#ECAF7C"),
-            ("Protected save locations", len(window.inventory.saves), "#73DAB0"),
+        scol.addWidget(InspectorFacts((
+            ("Installed games", len(window.inventory.games)),
+            ("Mod locations", len(window.inventory.mods)),
+            ("Graveyard candidates", len(window.inventory.graveyard)),
+            ("Protected save locations", len(window.inventory.saves)),
             ("Capture files", len(window.inventory.screenshots) +
-             len(window.inventory.recordings), "#ADA8EB"),
-        ):
-            item = QWidget()
-            facts = row(spacing=5)
-            item.setLayout(facts)
-            facts.addWidget(_label("●  " + name, color=accent, font=10), 1)
-            facts.addWidget(_label(value, color=accent, font=14, strong=True))
-            scol.addWidget(item)
+             len(window.inventory.recordings)),
+        )))
     else:
         scol.addWidget(_label(
             "No inventory scan yet. The assistant does not invent results."))
-    scol.addWidget(_label("SOURCE & PRIVACY", color="#EDB9C5",
-                          font=11, strong=True))
+    scol.addWidget(detail_section("Source & privacy"))
     scol.addWidget(_label(
         "Questions and aggregate context stay local. No automatic sharing "
         "of filenames, screenshots or save contents.", font=10))
-    scol.addWidget(_label("INVESTIGATE", color="#F2C46F", font=12, strong=True))
-    scol.addWidget(button(
-        "Open Game DNA", lambda: window.navigate("Game DNA")))
-    scol.addWidget(button(
-        "Review Mod Radar", lambda: window.navigate("Mods")))
-    scol.addWidget(button(
-        "Open Save Vault", lambda: window.navigate("More Tools")))
+    scol.addWidget(detail_section("Investigate"))
+    for title, route, detail in (
+        ("Game DNA", "Game DNA", "Inspect the selected game's storage relationships"),
+        ("Mod Radar", "Mods", "Review detected manager and mod locations"),
+        ("Save Vault", "More Tools", "Create a backup before making changes"),
+    ):
+        link = button(title + "   ›", lambda _=False, route=route: window.navigate(route))
+        link.setObjectName("contextAction")
+        link.setToolTip(detail)
+        scol.addWidget(link)
     scol.addStretch()
     wrow.addWidget(side)
     page.content.addWidget(workspace)
@@ -308,7 +308,7 @@ def render_approved_ai(window):
         control = button(title + "   ›",
                          lambda _=False, route=route: window.navigate(route))
         control.setObjectName("approvedAIQuickTile")
-        control.setMinimumHeight(56)
+        control.setMinimumHeight(40)
         control.setAccessibleName("Open " + title + " workflow")
         cards.addWidget(control)
     qcol.addWidget(cards)

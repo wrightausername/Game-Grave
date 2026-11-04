@@ -48,7 +48,7 @@ def render_approved_more_tools(window):
         horizontal.addWidget(left, 3)
         horizontal.addWidget(graphic, 2)
         original.addWidget(split)
-        panel.setMinimumHeight(168)
+        panel.setMinimumHeight(196)
 
     prominent = page.findChildren(QFrame, "actionCardPrimary")
     if prominent:
@@ -93,7 +93,7 @@ def render_approved_more_tools(window):
                 tile.setStyleSheet(
                     "QFrame#actionCard{background:#121720;"
                     "border:1px solid #2A2D37;"
-                    f"border-left:2px solid {accent};border-radius:7px;}}"
+                    f"border-left:2px solid {accent};border-radius:4px;}}"
                     "QFrame#actionCard:hover{"
                     "border:1px solid #794154;"
                     f"border-left:2px solid {accent};background:#1A1D2A;}}")
