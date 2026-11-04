@@ -2,7 +2,7 @@
   "fixture": "Explicit synthetic visual data; no user data or AI inference",
   "covers": "Labelled local demo illustrations; genuine publisher art loads from verified local cache",
   "platform": "linux",
-  "commit": "b6ba8c41021094874c38f27625f85980c960ce93",
+  "commit": "47cc1ba26e31a8efb299f049060246e3d66ebeaa",
   "source_reference": "Owner-supplied seven-page reference/running-UI comparison, left column",
   "pixel_fidelity": "No automated claim of 1:1 equivalence",
   "captures": [
@@ -174,5 +174,6 @@
       "vertical_scroll_maximum": 520,
       "sha256": "8ec723e8afc764c73b04500fe79d7fb4d9916e815c9ee23e93c51074243ff386"
     }
-  ]
+  ],
+  "capture_note": "Rendered final photo framing from the working tree; source revision identifies the committed implementation."
 }
