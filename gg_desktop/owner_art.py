@@ -50,7 +50,7 @@ def draw_approved_hero(painter, art: QPixmap, width: int, height: int) -> bool:
     # In the supplied comparison the GG stone is in the right third. The
     # narrow 700x96 crops have the stone near their left third: right-aligning
     # the entire crop incorrectly placed the stone behind the page title.
-    source_focus = .35 if natural > 6 else .50
+    source_focus = .35 if art.width() == 700 and art.height() <= 100 else .50
     left = round(w * .79 - artwork_width * source_focus)
     composite = QPixmap(artwork_width, h)
     composite.fill(Qt.transparent)
