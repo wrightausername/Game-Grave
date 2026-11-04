@@ -15,7 +15,7 @@ def main():
     os.environ.setdefault("QT_QPA_PLATFORM", "windows")
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root))
-    from PySide6.QtWidgets import QApplication, QTableWidget
+    from PySide6.QtWidgets import QApplication, QTableWidget, QWidget
     from core import SteamGame, OldFile
     from launchers import LauncherGame
     from graveyard import build_graveyard
