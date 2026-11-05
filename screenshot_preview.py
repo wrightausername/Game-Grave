@@ -42,8 +42,10 @@ def decode_screenshot_preview(record: OldFile):
                 if source.width * source.height > MAX_IMAGE_PIXELS:
                     raise ValueError("Image resolution exceeds the safe preview limit.")
                 frame = ImageOps.exif_transpose(source)
+                source_size = frame.size
                 frame.thumbnail(PREVIEW_SIZE, Image.Resampling.LANCZOS)
                 preview = frame.convert("RGB").copy()
+                preview.info["source_size"] = source_size
         if not is_unchanged(record):
             raise ValueError("Image changed during preview; scan again.")
         return preview

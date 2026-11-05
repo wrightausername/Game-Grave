@@ -33,6 +33,8 @@ class Inventory:
     graveyard: list = field(default_factory=list)
     scanned_at: str = ""
     warnings: list[str] = field(default_factory=list)
+    file_scan_root: str = ""
+    file_scan_days: int | None = None
 
 
 STAGES = ("Steam and launchers", "Mod Radar", "Old files", "Game captures", "Protected saves")
@@ -63,8 +65,9 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
     )
     stage(2, STAGES[2])
     try:
-        staged.files = scan_old_files(Path(settings.get("scan_folder", str(Path.home() / "Downloads"))),
-                                     int(settings.get("files_stale_days", 180)), cancel=canceled)
+        staged.file_scan_root = str(Path(settings.get("scan_folder", str(Path.home() / "Downloads"))))
+        staged.file_scan_days = int(settings.get("files_stale_days", 180))
+        staged.files = scan_old_files(Path(staged.file_scan_root), staged.file_scan_days, cancel=canceled)
     except (ValueError, OSError) as exc:
         staged.warnings.append("Old Files folder unavailable (" + type(exc).__name__ + ").")
     stage(3, STAGES[3])

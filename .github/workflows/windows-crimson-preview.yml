@@ -7,7 +7,7 @@ on:
     paths:
       - 'gg_desktop/**'
       - 'ui-preview-requirements.txt'
-      - 'tests/test_gg_desktop_models.py'
+      - 'tests/test_gg_desktop*.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
   pull_request:
@@ -15,7 +15,7 @@ on:
     paths:
       - 'gg_desktop/**'
       - 'ui-preview-requirements.txt'
-      - 'tests/test_gg_desktop_models.py'
+      - 'tests/test_gg_desktop*.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
 
@@ -52,7 +52,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models -v
+          python -m unittest discover -s tests -p 'test_gg_desktop*.py' -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }

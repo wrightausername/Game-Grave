@@ -21,7 +21,8 @@ remain available during physical Windows 10/11 and Qt redistribution review.
 Download the unsigned `GameGrave-Crimson-Preview.exe` artifact from
 [Crimson Command Windows preview workflow](https://github.com/wrightausername/Game-Grave/actions/workflows/windows-crimson-preview.yml).
 The same archive includes **actual Qt screenshots** of Overview, Games,
-Graveyard and Game DNA. An unsigned test executable must not be treated as
+Mods, Old Files, Other Storage, Captures, Graveyard, Game DNA and Undo Center.
+An unsigned test executable must not be treated as
 a public stable installer.
 
 To run from source on Windows:
@@ -35,6 +36,62 @@ py launcher.py --ui-preview
 The usual `py launcher.py` still opens the classic Tk application.
 Do not run both while carrying out Recycle Bin or restore operations;
 wait until the current operation finishes before changing interfaces.
+
+### Native reference layouts
+
+The November 5 owner-supplied images now guide eight native Qt pages:
+the GG logo and forest rail, cinematic headers, launcher/stat strips, red tabs,
+game cover grid, mod filter sidebar, scan filters, and right-hand detail panels.
+Artwork regions are rendered locally from the attached references. Counts,
+selection and controls come from the current scan. No page is a static image.
+
+Games supports search, sorting, launcher filters, grid/list views and saved
+favorites, including clickable cover stars. Steam shortcuts use verified numeric
+app IDs. Mods shows protected storage locations and verified path relationships;
+activity, versions, load order and conflicts remain **Unknown** when the scanner
+does not supply that evidence. Old Files has combined age/type/search filters,
+visible-row checkboxes, personal protection and the existing confirmed Recycle
+Bin worker. Image files require the separate individual preview workflow.
+Large mod and file inventories use the existing 160-row page windows; searching
+and sorting apply to every result, and Select All only checks the displayed page.
+
+Other Storage has category filters, a measured storage ring, source details,
+personal protection and protected watchlist review. Reported parent locations
+include their descendants once. Shared driver caches are not cleared here.
+
+Captures has game/source and age/size filters, a resizable tile gallery, individual
+checkboxes, details and per-image Preview. No image bytes load on navigation,
+selection or scanning. Explicit previews use the existing bounded decoder and a
+32-entry memory-only cache keyed by scan-time identity. Image removal still opens
+the separate individual preview and confirmation workflow. Duplicate/similar and
+saved-highlight status remain unknown until supported analysis supplies evidence.
+
+Graveyard has age, size, type and protection filters, visible-page checkboxes,
+inline exact-rule Unprotect, and evidence panels. All removal actions still use
+the original confirmed worker. Game DNA shows selected-game profiles, linked
+locations and a storage ring without adding nested mod bytes to the install twice;
+unverified saves, dates and ownership are not guessed.
+
+Undo Center combines recovery IDs with retained audit entries, deduplicates the
+matching recycle events, and offers filters and individual or selected restore.
+A fresh Windows availability check precedes every restore. Conflicts, ambiguous
+matches and missing recovery IDs are refused; the existing backend never overwrites
+an original path. No history deletion or unsupported custom-location restore is
+introduced, and recycled bytes are not labeled as reclaimed disk space.
+
+The remaining reference navigation links open existing local tools or scan
+evidence. The AI Assistant page states that no conversational AI is connected.
+
+Run the disposable integration checks and generate sample design previews:
+
+```powershell
+py -m unittest discover -s tests -p "test_gg_desktop*.py" -v
+py tools/render_reference_previews.py --output _ci_temp/reference-previews
+```
+
+Linux preview rendering uses `QT_QPA_PLATFORM=offscreen`. Rendered sample data is
+explicitly labeled and never loaded by the normal app. Native Windows visual,
+font/DPI, system window controls and physical recovery acceptance remain separate.
 
 ### What the new preview actually does
 
