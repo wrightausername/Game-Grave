@@ -1,6 +1,6 @@
 # Dashboard glow and Ready Room reference pass
 
-Actual Qt application captures at 1672×941 and 1366×768, rendered on Linux from [`8b91246`](https://github.com/wrightausername/Game-Grave/commit/8b91246b53fdf18f1b5c7632ea7967d8dccd0bd5). The Windows build independently renders all 13 routes before packaging.
+Actual Qt application captures at 1672×941 and 1366×768, rendered on Linux from [`90256b3`](https://github.com/wrightausername/Game-Grave/commit/90256b3e0ce1a27c667325372fa0ee68ee6823e6). The Windows build independently renders all 13 routes before packaging.
 
 [Implementation and exact artwork limits](../../OVERVIEW_READY_ROOM_REFERENCE_PASS.md) · [Capture provenance and hashes](visual-review.json)
 

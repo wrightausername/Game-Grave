@@ -3,7 +3,7 @@
   "covers": "Genuine local images when available; neutral missing-artwork states otherwise",
   "capture_images": "Existing actual application screenshots used as synthetic review fixtures",
   "platform": "linux",
-  "commit": "8b91246b53fdf18f1b5c7632ea7967d8dccd0bd5",
+  "commit": "90256b3e0ce1a27c667325372fa0ee68ee6823e6",
   "source_reference": "Owner-supplied seven-page reference/running-UI comparison, left column",
   "pixel_fidelity": "No automated claim of 1:1 equivalence",
   "captures": [
@@ -41,7 +41,7 @@
       "body_width": 1368,
       "viewport_width": 1368,
       "vertical_scroll_maximum": 135,
-      "sha256": "4d1188cf786969850b3b7e4590d99410a8dc37acc5620a7191ffa1170a697f62"
+      "sha256": "094503fd3b65a2ea0fa992ebc00ecb9fcad68d6923738e8a3db1a9eeefd21a5c"
     },
     {
       "page": "Mods",
@@ -65,7 +65,7 @@
       "body_width": 1368,
       "viewport_width": 1368,
       "vertical_scroll_maximum": 133,
-      "sha256": "296bb9da324eb806588187661633ebc04bf48b08cc40fc04e704b265605d3bd2"
+      "sha256": "ec04984fc87cf040910a00337802f4607a066e57cf896e11bef6c92bf2723017"
     },
     {
       "page": "Other Storage",
@@ -89,7 +89,7 @@
       "body_width": 1376,
       "viewport_width": 1376,
       "vertical_scroll_maximum": 0,
-      "sha256": "80e768212150308840e7d4e4c0856ed865f3122fdac4563ec7efa79ee289fa37"
+      "sha256": "f2ea8922378211cf07dd53c960f5431a2c33f7cdef16f5f878dc00ff7bbb9d33"
     },
     {
       "page": "Graveyard",
@@ -101,7 +101,7 @@
       "body_width": 1368,
       "viewport_width": 1368,
       "vertical_scroll_maximum": 19,
-      "sha256": "33eb933572e40253d2032b60a4a11bfdb03cccb5493815d183c40546eefcf704"
+      "sha256": "49cf2409a36d39dd9a7197abfb1dce0be03a6e7afb2360f6813d7747f8f4e7f5"
     },
     {
       "page": "Game DNA",
@@ -113,7 +113,7 @@
       "body_width": 1368,
       "viewport_width": 1368,
       "vertical_scroll_maximum": 50,
-      "sha256": "364b1cbb6f4f80e5278ad4c82cfc5bdac7bf173e2890daafbf0a2fbb39b3c2f2"
+      "sha256": "d4c8e5bb599177b483a0355ae13908d43fa202ae882f99e285a78040f9c46949"
     },
     {
       "page": "Undo Center",
@@ -125,7 +125,7 @@
       "body_width": 1368,
       "viewport_width": 1368,
       "vertical_scroll_maximum": 44,
-      "sha256": "2dca0c2ce9154a8a99f86e82890c28d322d0b9cab7152a4353f4a4d12b8a37f7"
+      "sha256": "f54ead41dded71ea7a1dea84af29745cfdae3f245c6294c5a54883ecb45f02cf"
     },
     {
       "page": "AI Assistant",
@@ -161,7 +161,7 @@
       "body_width": 1376,
       "viewport_width": 1376,
       "vertical_scroll_maximum": 0,
-      "sha256": "b7eaa6eeeba7a7d22cc2a15c9277f8f68f76dae44bd17c898cbb06cd82b196d4"
+      "sha256": "0455cfa41a49babdc47ff54cd83f83af85e098327099c1b0709325ace46a793d"
     },
     {
       "page": "Overview",
@@ -173,7 +173,7 @@
       "body_width": 1062,
       "viewport_width": 1062,
       "vertical_scroll_maximum": 166,
-      "sha256": "0ebac57e030e729d661ef193334e3664a0db81652dbcd2e8bd4b522db32e2717"
+      "sha256": "97618be1fc44b7411cd3b2fa2c2df8901bfb488a39ea2ec9b42180139d1a5761"
     },
     {
       "page": "Ready Room",
@@ -197,7 +197,7 @@
       "body_width": 1062,
       "viewport_width": 1062,
       "vertical_scroll_maximum": 308,
-      "sha256": "a57178f330a0f6e959f4fce02c289bf11e69bea7cf18381d1d178135809bfee2"
+      "sha256": "0b49ec719137fb47d574b57532fa5b63d5edf2a9be80e9113d4061b6ad24b36a"
     },
     {
       "page": "Mods",
@@ -221,7 +221,7 @@
       "body_width": 1062,
       "viewport_width": 1062,
       "vertical_scroll_maximum": 306,
-      "sha256": "cdbe1cee8b152415f84529b8e06f83fd42e14a57900459935d4e2d5822bdc052"
+      "sha256": "bde429ad1ecb2a155ddfc330777ae0d999a0108fa4f64ff1d625480594d3852e"
     },
     {
       "page": "Other Storage",
@@ -245,7 +245,7 @@
       "body_width": 1070,
       "viewport_width": 1070,
       "vertical_scroll_maximum": 0,
-      "sha256": "92a91005adc1c62b92839d76429756431c39a5ad66f45cd52ca163083dd3249e"
+      "sha256": "0d6aad4fd19173a1d75563e41f1d3645cb4d32032fbea12c215f3dd730ca2d53"
     },
     {
       "page": "Graveyard",
@@ -257,7 +257,7 @@
       "body_width": 1062,
       "viewport_width": 1062,
       "vertical_scroll_maximum": 312,
-      "sha256": "9b9eac3c1f07a4e64130ac3de85445ba276d38d693ad8428f2c8321a073f07da"
+      "sha256": "7c5a0c673696f346a5744a8fb5d6d357ffb14d0e06ded06a4de51297d48ed84a"
     },
     {
       "page": "Game DNA",
@@ -269,7 +269,7 @@
       "body_width": 1062,
       "viewport_width": 1062,
       "vertical_scroll_maximum": 321,
-      "sha256": "9a18f4636b3433a3392d25b85f4b40462f65a5d237782fda892d70994624232e"
+      "sha256": "e97ec9c68a188b220afcd0a93eb27f492b24a9ccca2e368d8df88d8911bffa56"
     },
     {
       "page": "Undo Center",
@@ -281,7 +281,7 @@
       "body_width": 1062,
       "viewport_width": 1062,
       "vertical_scroll_maximum": 217,
-      "sha256": "0adf9e5887cd849d0d0efa82d914cc8646f9e531fd6ca3d8187cd09dae80ba5e"
+      "sha256": "9c8b75c6dcec9c9efa26fa92b4041d79b9fe69d65508dd61e1660a015ecc2252"
     },
     {
       "page": "AI Assistant",
@@ -317,7 +317,7 @@
       "body_width": 1062,
       "viewport_width": 1062,
       "vertical_scroll_maximum": 327,
-      "sha256": "9b6608145484c37ea02a4f51fb17cd26a6031d38ac4865fd57f8e9bc6e0f28c0"
+      "sha256": "27dbe7599d7bb881374bd61f7193615d399979bc26043971b115fdc78ee6bede"
     }
   ],
   "reference_note": "Owner-supplied full-size Overview and Ready Room images. Workstation hero original is not mounted; existing photo fallback is explicitly documented."
