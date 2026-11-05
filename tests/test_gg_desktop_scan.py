@@ -195,12 +195,13 @@ class OverviewScanTests(ScanFixture, unittest.TestCase):
         self.app.processEvents()
 
     def wait_until(self, predicate):
-        from PySide6.QtTest import QTest
         deadline = time.monotonic() + 10
         while not predicate() and time.monotonic() < deadline:
             self.app.processEvents()
-            QTest.qWait(10)
-        self.assertTrue(predicate(), "Timed out waiting for native Qt worker")
+            # QTest.qWait can retain the Python GIL on native Windows and
+            # starve QRunnable's Python scanner. Release it as app.exec does.
+            time.sleep(.01)
+        self.assertTrue(predicate(), "Timed out waiting for native Qt worker: " + self.window.status.text())
 
     def test_overview_scan_button_and_metrics_are_visible_without_scrolling(self):
         from PySide6.QtCore import QPoint, QRect
