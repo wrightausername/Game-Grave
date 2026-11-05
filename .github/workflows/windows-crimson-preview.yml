@@ -144,6 +144,15 @@ jobs:
             release/GameGrave-Crimson-Preview-Setup.sha256
           if-no-files-found: error
           retention-days: 14
+      - name: Upload Windows installer download
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Windows-Installer
+          path: |
+            release/GameGrave-Crimson-Preview-Setup.exe
+            release/GameGrave-Crimson-Preview-Setup.sha256
+          if-no-files-found: error
+          retention-days: 14
 
 # NOT a signed 1.0 release; LGPL/Qt redistributable obligations,
 # full UI feature parity, physical Windows human tests and beta remain open.

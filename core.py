@@ -320,27 +320,58 @@ def read_vdf(path: Path) -> dict:
         return {}
 
 
+def windows_fixed_drives() -> list[Path]:
+    """Local fixed volumes only, for bounded known-library path probes."""
+    if os.name != "nt":
+        return []
+    try:
+        kernel = ctypes.windll.kernel32
+        length = kernel.GetLogicalDriveStringsW(0, None)
+        if not 1 <= length <= 4096:
+            return []
+        buffer = ctypes.create_unicode_buffer(length + 1)
+        kernel.GetLogicalDriveStringsW(length, buffer)
+        return [Path(value) for value in buffer[:length].split("\0")
+                if value and kernel.GetDriveTypeW(ctypes.c_wchar_p(value)) == 3]
+    except (AttributeError, OSError, ValueError):
+        return []
+
+
 def _steam_roots(extra: list[str] | None = None) -> list[Path]:
     roots = []
     if os.name == "nt":
         try:
             import winreg
-            for hive, reg_path, name in [
-                (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath"),
-                (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath"),
-            ]:
-                try:
-                    with winreg.OpenKey(hive, reg_path) as key:
-                        roots.append(Path(winreg.QueryValueEx(key, name)[0]))
-                except OSError:
-                    continue
+            views = {getattr(winreg, "KEY_WOW64_64KEY", 0), getattr(winreg, "KEY_WOW64_32KEY", 0)}
+            for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+                for view in views:
+                    try:
+                        with winreg.OpenKey(hive, r"Software\Valve\Steam", 0, winreg.KEY_READ | view) as key:
+                            for name in ("SteamPath", "InstallPath"):
+                                try:
+                                    value = winreg.QueryValueEx(key, name)[0]
+                                    if isinstance(value, str) and value.strip():
+                                        roots.append(Path(value))
+                                except OSError:
+                                    continue
+                    except OSError:
+                        continue
         except ImportError:
             pass
     for key in ("PROGRAMFILES(X86)", "PROGRAMFILES"):
         if os.environ.get(key):
             roots.append(Path(os.environ[key]) / "Steam")
+    # Do not crawl drives. Probe only conventional Steam library directories.
+    for drive in windows_fixed_drives():
+        roots.extend(drive / name for name in ("SteamLibrary", "Steam", "Games/Steam", "Program Files (x86)/Steam", "Program Files/Steam"))
     if extra:
-        roots.extend(Path(p) for p in extra)
+        for raw in extra:
+            if not isinstance(raw, str) or not raw.strip():
+                continue
+            path = Path(raw).expanduser()
+            if path.name.casefold() == "steamapps":
+                path = path.parent
+            roots.append(path)
     unique = {}
     for p in roots:
         try:
@@ -446,7 +477,7 @@ def find_games(extra_roots: list[str] | None = None,
         raise InterruptedError("Steam scan canceled")
     roots = _steam_roots(extra_roots)
     histories = local_play_history(roots, cancel=cancel)
-    result: dict[str, SteamGame] = {}
+    result: dict[tuple[str, str], SteamGame] = {}
     for lib in steam_libraries(roots):
         if cancel and cancel():
             raise InterruptedError("Steam scan canceled")
@@ -488,7 +519,8 @@ def find_games(extra_roots: list[str] | None = None,
             from_manifest = _valid_timestamp(info.get("lastplayed"))
             if from_manifest and (not last or from_manifest > last):
                 last, source = from_manifest, "Steam installation record"
-            result[app_id] = SteamGame(app_id, name, str(lib), str(directory), size, last, source)
+            identity = (app_id, os.path.normcase(os.path.abspath(directory)))
+            result[identity] = SteamGame(app_id, name, str(lib), str(directory), size, last, source)
     return sorted(result.values(), key=lambda item: item.name.lower())
 
 
@@ -732,10 +764,13 @@ def safe_scan_root(path: Path) -> bool:
 
 
 def scan_old_files(folder: Path, min_days: int = 180, cancel: Callable[[], bool] | None = None,
-                   allowed_extensions: set[str] | None = None, max_matches: int = 50000) -> list[OldFile]:
+                   allowed_extensions: set[str] | None = None, max_matches: int = 50000,
+                   *, include_recent: bool = False) -> list[OldFile]:
     if not safe_scan_root(folder):
         raise ValueError("Choose an existing folder that is not a system directory or drive root.")
-    cutoff = time.time() - max(1, min_days) * 86400
+    # Capture inventory can explicitly include recent files. Cleanup still uses
+    # its own reviewed age/scope checks; ordinary Old Files callers retain age filtering.
+    cutoff = float("inf") if include_recent else time.time() - max(1, min_days) * 86400
     found: list[OldFile] = []
     for parent, dirs, names in os.walk(folder, followlinks=False):
         if cancel and cancel():

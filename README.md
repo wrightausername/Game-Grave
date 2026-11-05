@@ -18,9 +18,10 @@ remain available during physical Windows 10/11 and Qt redistribution review.
 
 ### Windows user preview
 
-Download the unsigned `GameGrave-Crimson-Preview.exe` artifact from
+Download the **GameGrave-Windows-Installer** archive and run
+`GameGrave-Crimson-Preview-Setup.exe` from
 [Crimson Command Windows preview workflow](https://github.com/wrightausername/Game-Grave/actions/workflows/windows-crimson-preview.yml).
-The same archive includes **actual Qt screenshots** of Overview, Games,
+The separate engineering archive includes **actual Qt screenshots** of Overview, Games,
 Mods, Old Files, Other Storage, Captures, Graveyard, Game DNA and Undo Center.
 An unsigned test executable must not be treated as
 a public stable installer.
@@ -39,7 +40,7 @@ wait until the current operation finishes before changing interfaces.
 
 ### Native reference layouts
 
-The November 5 owner-supplied images now guide eight native Qt pages:
+The owner-supplied references now guide nine native Qt pages:
 the GG logo and forest rail, cinematic headers, launcher/stat strips, red tabs,
 game cover grid, mod filter sidebar, scan filters, and right-hand detail panels.
 Artwork regions are rendered locally from the attached references. Counts,
@@ -79,6 +80,19 @@ matches and missing recovery IDs are refused; the existing backend never overwri
 an original path. No history deletion or unsupported custom-location restore is
 introduced, and recycled bytes are not labeled as reclaimed disk space.
 
+Overview follows the archived dashboard composition: the forest/tombstone hero,
+five metrics, Recent Activity, storage ring, Quick Actions and horizontal library.
+**Scan PC** is labeled in both the header and Overview and reports progress beside
+**Scan Results & Locations**. That dialog lists source counts and coverage and
+lets you add Steam, other launcher/Xbox, mod and capture folders and rescan.
+The scanner checks additional conventional Steam libraries on local fixed drives,
+both Windows registry views, modern EA and Rockstar records, and Xbox installs
+with local MicrosoftGame.config and an existing registered executable. Other
+protected Microsoft Store packages remain outside that verified Xbox coverage.
+An unavailable source does not discard the successfully discovered games.
+Captures includes recent images and recordings; Old Files and Graveyard retain
+their age thresholds. Scanning reads metadata without opening capture content.
+
 The remaining reference navigation links open existing local tools or scan
 evidence. The AI Assistant page states that no conversational AI is connected.
 
@@ -95,9 +109,8 @@ font/DPI, system window controls and physical recovery acceptance remain separat
 
 ### What the new preview actually does
 
-- **Overview:** locally rendered crimson-moon ruins art, real Windows drive
-  capacity, launcher counts, actual findings and manual scan/cancel. No
-  fabricated reclaimed-space numbers.
+- **Overview:** local reference artwork, real scan counts, audit activity,
+  logged Recycle Bin bytes, a complete library shelf and visible scan/cancel.
 - **Games:** Steam, Epic, GOG, EA, verified Battle.net/Blizzard publisher
   entries, Ubisoft, Riot and user-identified launchers appear in **one
   filterable list** whenever local installation evidence exists. Unsupported

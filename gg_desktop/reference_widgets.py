@@ -141,7 +141,8 @@ class Brand(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.SmoothPixmapTransform)
-        draw_crop(p, QRectF(27, 12, 183, 44), "games", (26, 14, 184, 45), fill=False)
+        size = min(self.width() - 34, 248)
+        draw_crop(p, QRectF(27, 12, size, size * 44 / 183), "games", (26, 14, 184, 45), fill=False)
 
 
 class NavRail(QFrame):

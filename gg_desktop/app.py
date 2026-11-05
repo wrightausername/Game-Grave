@@ -9,12 +9,13 @@ import sys
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot, Qt, QTimer, QSize
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QFrame, QMainWindow, QMessageBox, QProgressBar, QWidget, QLineEdit,
 )
-from core import load_settings
+from core import load_settings, log_event
+from gg_desktop import __version__
 from gg_desktop.backend import Inventory, scan_inventory
 from gg_desktop.theme import STYLE
 from gg_desktop.widgets import label, button, row, column, ScrollPage
@@ -67,6 +68,28 @@ class Job(QRunnable):
             self.signals.failed.emit(type(exc).__name__ + ": " + str(exc)[:300])
 
 
+class JobReceiver(QObject):
+    """Deliver all worker callbacks on the window's Qt thread."""
+    def __init__(self, parent, done, failed, progress):
+        super().__init__(parent)
+        self.done_callback, self.failed_callback, self.progress_callback = done, failed, progress
+
+    @Slot(object)
+    def done(self, value):
+        self.done_callback(value)
+        self.deleteLater()
+
+    @Slot(str)
+    def failed(self, message):
+        self.failed_callback(message)
+        self.deleteLater()
+
+    @Slot(int, str)
+    def progress(self, percent, stage):
+        if self.progress_callback:
+            self.progress_callback(percent, stage)
+
+
 class CrimsonWindow(ScreenMethods, QMainWindow):
     def __init__(self):
         super().__init__()
@@ -79,7 +102,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.pool = QThreadPool.globalInstance()
         self.current_route = "Overview"
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-        self.setWindowTitle("Game Grave  |  Crimson Command preview")
+        self.setWindowTitle("Game Grave  |  Crimson Command " + __version__)
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg")))
         self.setMinimumSize(960, 650)
         self.resize(1280, 720)
@@ -97,9 +120,11 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.setCentralWidget(root)
 
         rail = NavRail()
+        self.nav_rail = rail
         r = column(spacing=0, margins=(0, 0, 0, 10))
         rail.setLayout(r)
-        r.addWidget(Brand())
+        self.brand = Brand()
+        r.addWidget(self.brand)
         r.addSpacing(15)
         self.nav_buttons = {}
         for route, symbol in ROUTES:
@@ -122,6 +147,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         base = column(spacing=0, margins=(0, 0, 0, 0))
         main.setLayout(base)
         top = TitleBar()
+        self.top_bar = top
         top.setFixedHeight(46)
         topbox = row(spacing=7, margins=(20, 8, 7, 6))
         top.setLayout(topbox)
@@ -147,14 +173,15 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         topbox.addStretch(0)
         self.status = label("No scan yet. Scan PC (F5) to begin.", "caption", wrap=True)
         self.status.setMaximumWidth(195)
+        self.status.setMaximumHeight(44)
         r.addWidget(self.status)
         self.cancel_button = button("Cancel scan", self.cancel_scan)
         self.cancel_button.setEnabled(False)
         self.cancel_button.hide()
         topbox.addWidget(self.cancel_button)
-        self.scan_button = tool("", "refresh", self.start_scan, kind="chromeButton", tip="Scan PC (F5)")
+        self.scan_button = tool("Scan PC", "search", self.start_scan, kind="primary", tip="Scan PC (F5)")
         self.scan_button.setAccessibleName("Scan PC")
-        self.scan_button.setFixedWidth(28)
+        self.scan_button.setFixedSize(105, 30)
         topbox.addWidget(self.scan_button)
         topbox.addWidget(tool("", "bell", lambda: self.info("Scan Status", self.status.text() +
             ("\n\n" + "\n".join(self.inventory.warnings) if self.inventory.warnings else "")), kind="chromeButton", tip="Scan status and warnings"))
@@ -193,8 +220,23 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self._sync_shell_layout()
         if self.current_route == "Old Files" and hasattr(self, "old_filters"):
             self.old_filters.setFixedWidth(190 if self.width() >= 1100 else 176)
+
+    def _sync_shell_layout(self):
+        if not hasattr(self, "nav_rail"):
+            return
+        wide_overview = self.current_route == "Overview" and self.width() >= 1360
+        self.nav_rail.setFixedWidth(296 if wide_overview else 219)
+        self.top_bar.setFixedHeight(56 if wide_overview else 46)
+        self.brand.setFixedHeight(80 if wide_overview else 65)
+        for control in self.nav_buttons.values():
+            control.setFixedHeight(40 if wide_overview and self.height() >= 740 else 35)
+            if control.property("overview") != wide_overview:
+                control.setProperty("overview", wide_overview)
+                control.style().unpolish(control)
+                control.style().polish(control)
 
     def _search_current_page(self, text):
         attr = {"Games": "game_search", "Mods": "mod_search", "Old Files": "old_search",
@@ -230,6 +272,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.page = ScrollPage()
         self.stack_layout.addWidget(self.page, 1)
         self.current_route = title
+        self._sync_shell_layout()
         self.global_search.blockSignals(True)
         self.global_search.clear()
         self.search_shell.setMaximumWidth({"Games":455, "Mods":550, "Old Files":475}.get(title, 550))
@@ -273,7 +316,6 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
     def job(self, fn, on_success, *, error_title="Operation not completed", progress=None):
         job = Job(fn)
         key = id(job)
-        self.workers[key] = job
         def finish(data):
             self.workers.pop(key, None)
             on_success(data)
@@ -283,32 +325,44 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
                 self.status.setText("Scan canceled. Previous inventory retained.")
             else:
                 self.status.setText("Could not finish: " + message[:110])
-                QMessageBox.warning(self, error_title, message)
             if self.scanning:
                 self.scanning = False
-                self.scan_button.setEnabled(True)
-                self.cancel_button.setEnabled(False)
-                self.cancel_button.hide()
                 self.progress.hide()
             if self.cleaning:
                 self.cleaning = False
-        job.signals.done.connect(finish)
-        job.signals.failed.connect(fail)
-        if progress:
-            job.signals.progress.connect(progress)
+            self._sync_scan_controls()
+            if not message.startswith("ScanCanceled:"):
+                QMessageBox.warning(self, error_title, message)
+        receiver = JobReceiver(self, finish, fail, progress)
+        self.workers[key] = (job, receiver)
+        job.signals.done.connect(receiver.done)
+        job.signals.failed.connect(receiver.failed)
+        job.signals.progress.connect(receiver.progress)
         self.pool.start(job)
+
+    def _sync_scan_controls(self):
+        self.status.setToolTip(self.status.text())
+        self.scan_button.setEnabled(not self.scanning and not self.cleaning)
+        self.scan_button.setText("Scanning…" if self.scanning else "Scan PC")
+        self.cancel_button.setVisible(self.scanning)
+        self.cancel_button.setEnabled(self.scanning and not self.cancel.is_set())
+        if self.current_route == "Overview" and hasattr(self, "overview_hero"):
+            for control in (self.overview_hero.scan, self.overview_quick_scan):
+                control.setEnabled(not self.scanning and not self.cleaning)
+            self.overview_hero.scan.setText("Scanning…" if self.scanning else "Scan PC")
+            self.overview_scan_status.setText(self.status.text())
+            self.overview_cancel.setVisible(self.scanning)
+            self.overview_cancel.setEnabled(self.scanning and not self.cancel.is_set())
 
     def start_scan(self):
         if self.scanning or self.cleaning:
             return
         self.scanning = True
         self.cancel.clear()
-        self.scan_button.setEnabled(False)
-        self.cancel_button.setEnabled(True)
-        self.cancel_button.show()
         self.progress.show()
         self.progress.setValue(0)
         self.status.setText("Scanning local gaming records. No files are being changed.")
+        self._sync_scan_controls()
         settings = dict(self.settings)
         rules = tuple(settings.get("never_touch", []))
         settings["never_touch"] = list(rules)
@@ -316,21 +370,22 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         def progress(percent, stage):
             self.progress.setValue(percent)
             self.status.setText("Scanning: " + stage + " (" + str(percent) + "%)")
+            self._sync_scan_controls()
         def finish(inventory):
             self.scanning = False
-            self.scan_button.setEnabled(True)
-            self.cancel_button.setEnabled(False)
-            self.cancel_button.hide()
             self.progress.setValue(100)
             self.progress.hide()
             if self.cancel.is_set():
                 self.status.setText("Scan canceled. The earlier inventory was not replaced.")
+                self._sync_scan_controls()
                 return
             self.inventory = inventory
             self.status.setText(
                 f"Scanned {inventory.scanned_at}  •  {len(inventory.games)} game installs, "
                 f"{len(inventory.mods)} mod locations, {len(inventory.graveyard)} Graveyard findings."
                 + ("  •  Some sources unavailable." if inventory.warnings else ""))
+            log_event("Scan completed", self.status.text(), source="Crimson Overview")
+            self._sync_scan_controls()
             self.navigate(self.current_route)
         self.job(lambda emitter: scan_inventory(settings, self.cancel.is_set, emitter),
                  finish, error_title="Local scan incomplete", progress=progress)
@@ -339,6 +394,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         if self.scanning:
             self.cancel.set()
             self.status.setText("Stopping the read-only scan…")
+            self._sync_scan_controls()
 
     def confirm(self, title: str, message: str, *, destructive: bool = False) -> bool:
         box = QMessageBox(self)

@@ -113,6 +113,10 @@ def main():
         with patch.dict(os.environ, {"LOCALAPPDATA": str(root / "Local"), "APPDATA": str(root / "Roaming")}), \
              patch("gg_desktop.app.load_settings", return_value=settings), \
              patch("gg_desktop.recovery_screens.get_records", return_value=undo_rows), \
+             patch("gg_desktop.overview.get_records", return_value=undo_rows), \
+             patch("gg_desktop.overview.get_activity", return_value=[
+                 {"kind": name, "details": "Synthetic design fixture", "date": datetime.now().astimezone().isoformat()}
+                 for name in ("Scan completed", "Manual recycled", "Mod inventory completed", "Cleanup reviewed")]), \
              patch("gg_desktop.recovery_screens.get_activity", return_value=[]):
             window = CrimsonWindow()
             try:
@@ -128,7 +132,7 @@ def main():
                 window.status.setText("DESIGN PREVIEW · Synthetic sample data")
                 window.resize(args.width, args.height)
                 window.show()
-                for route in ("Games", "Mods", "Old Files", "Other Storage", "Captures", "Graveyard", "Game DNA", "Undo Center"):
+                for route in ("Overview", "Games", "Mods", "Old Files", "Other Storage", "Captures", "Graveyard", "Game DNA", "Undo Center"):
                     if route == "Game DNA":
                         window._pending_dna_game_key = next(g.key for g in window.inventory.games if g.name == "Cyberpunk 2077")
                     window.navigate(route)

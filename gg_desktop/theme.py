@@ -198,4 +198,15 @@ QCheckBox::indicator, QRadioButton::indicator {
 }
 QCheckBox::indicator:checked, QRadioButton::indicator:checked { border-color:#ff2d49; background:#c40e2e; }
 QSplitter::handle { background:transparent; }
+QLabel#overviewMetricCaption { color:#d9dee5; font-size:13px; }
+QPushButton#navButton[overview="true"] { font-size:17px; padding-left:42px; }
+QLabel#overviewMetricValue { font-size:25px; font-weight:700; color:#f6f7fa; }
+QFrame#overviewSection { background:transparent; border:0; }
+QLabel#overviewSectionTitle { font-size:20px; font-weight:600; }
+QPushButton#overviewQuick, QPushButton#overviewActivity {
+    text-align:left; background:transparent; border:0; border-bottom:1px solid #25232c;
+    border-radius:0; padding:9px 2px; font-size:13px;
+}
+QPushButton#overviewQuick:hover, QPushButton#overviewActivity:hover { background:#20101a; color:white; }
+QPushButton#overviewQuick:disabled { color:#778594; }
 """
