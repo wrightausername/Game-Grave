@@ -158,5 +158,89 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  publish-test-download:
+    name: Publish the verified v0.1.3 test installer
+    needs: desktop
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/windows-reference-preview-20261105'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: wrightausername/Game-Grave
+      PREVIEW_TAG: crimson-preview-v0.1.3
+      VERIFIED_SHA: ${{ github.event.pull_request.head.sha }}
+      VERIFIED_RUN: ${{ github.run_id }}
+    steps:
+      - name: Retrieve the installer that passed native Windows QA
+        uses: actions/download-artifact@v4
+        with:
+          name: GameGrave-Windows-Installer
+          path: release
+      - name: Verify the installer and prepare test-build notes
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          exe = Path('release/GameGrave-Crimson-Preview-Setup.exe')
+          checksum = Path('release/GameGrave-Crimson-Preview-Setup.sha256')
+          expected, filename = checksum.read_text(encoding='utf-8-sig').strip().split()
+          assert filename == exe.name
+          actual = hashlib.sha256(exe.read_bytes()).hexdigest()
+          assert actual == expected.lower() and exe.stat().st_size > 1_000_000
+          assert exe.read_bytes()[:2] == b'MZ'
+          root = Path(os.environ['RUNNER_TEMP'])
+          (root / 'installer-sha256.txt').write_text(actual)
+          (root / 'preview-notes.md').write_text(
+              'Windows test build v0.1.3 (unsigned preview).\n\n'
+              'Redesigned the storage charts with beveled illuminated segments, '
+              'metallic rims, a recessed glass center, the GG mark and radial indexes. '
+              'Category proportions, colors and measured byte totals remain data-driven. '
+              'Hover a segment to see its size and percentage. '
+              'Includes the existing Steam artwork/offline cache and scan improvements.\n\n'
+              'Source: ' + os.environ['VERIFIED_SHA'] + '\n'
+              'Native Windows QA: https://github.com/' + os.environ['GH_REPO'] +
+              '/actions/runs/' + os.environ['VERIFIED_RUN'] + '\n\n'
+              'Qt/model tests, live Steam artwork and offline reuse, EXE launch and '
+              'isolated installer install/launch/uninstall passed. '
+              'This is a test build, not a stable release.\n')
+          print('Verified installer SHA-256:', actual)
+          PY
+      - name: Upload and verify the test download before making it available
+        shell: bash
+        run: |
+          gh release create "$PREVIEW_TAG" \
+            release/GameGrave-Crimson-Preview-Setup.exe \
+            release/GameGrave-Crimson-Preview-Setup.sha256 \
+            --target "$VERIFIED_SHA" --draft --prerelease --latest=false \
+            --title 'Game Grave Windows Test Build v0.1.3' \
+            --notes-file "$RUNNER_TEMP/preview-notes.md"
+          gh api "repos/$GH_REPO/releases?per_page=100" > "$RUNNER_TEMP/preview-releases.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          releases = json.loads((root / 'preview-releases.json').read_text())
+          release = next(r for r in releases if r['tag_name'] == os.environ['PREVIEW_TAG'])
+          assert release['draft'] and release['prerelease']
+          assert release['target_commitish'] == os.environ['VERIFIED_SHA']
+          asset = next(a for a in release['assets'] if a['name'] == 'GameGrave-Crimson-Preview-Setup.exe')
+          assert asset['size'] == Path('release', asset['name']).stat().st_size
+          assert asset.get('digest') in (None, 'sha256:' + (root / 'installer-sha256.txt').read_text())
+          print('Verified uploaded installer.')
+          PY
+          gh release edit "$PREVIEW_TAG" --draft=false --prerelease --latest=false
+      - name: Verify the public download works without a GitHub login
+        shell: bash
+        run: |
+          url="https://github.com/$GH_REPO/releases/download/$PREVIEW_TAG/GameGrave-Crimson-Preview-Setup.exe"
+          curl --fail --silent --show-error --head --location --retry 3 --max-time 60 "$url" > "$RUNNER_TEMP/public-download-headers.txt"
+          printf '%s\n' "$url" >> "$GITHUB_STEP_SUMMARY"
+
 # NOT a signed 1.0 release; LGPL/Qt redistributable obligations,
 # full UI feature parity, physical Windows human tests and beta remain open.

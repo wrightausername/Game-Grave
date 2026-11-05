@@ -173,14 +173,17 @@ class ArtworkTests(unittest.TestCase):
         self.addCleanup(ring.close)
         ring.resize(190, 190); ring.show(); self.app.processEvents()
         image = ring.grab().toImage()
-        # FootprintRing draws its center at (95,95), radius 77 at this size.
+        # Sample each proportional arc's midpoint. Bevel lighting may change
+        # brightness, but its category hue must remain distinct and correct.
         fraction = 0
         for i, color in enumerate(colors):
             share = (i + 1) / 10
             angle = math.radians(90 - (fraction + share / 2) * 360)
             pixel = image.pixelColor(round(95 + 77 * math.cos(angle)), round(95 - 77 * math.sin(angle)))
             expected = QColor(color)
-            self.assertLess(sum(abs(a - b) for a, b in zip(pixel.getRgb()[:3], expected.getRgb()[:3])), 18)
+            difference = abs(pixel.hueF() - expected.hueF())
+            self.assertLess(min(difference, 1 - difference) * 360, 12)
+            self.assertGreater(pixel.saturationF(), .12)
             fraction += share
         self.assertEqual(sum(v for _, v, _ in ring.segments), 10)
 

@@ -18,10 +18,10 @@ remain available during physical Windows 10/11 and Qt redistribution review.
 
 ### Windows user preview
 
-Download the **GameGrave-Windows-Installer** archive and run
-`GameGrave-Crimson-Preview-Setup.exe` from
-[Crimson Command Windows preview workflow](https://github.com/wrightausername/Game-Grave/actions/workflows/windows-crimson-preview.yml).
-The separate engineering archive includes **actual Qt screenshots** of Overview, Games,
+Download the [Windows v0.1.3 test installer](https://github.com/wrightausername/Game-Grave/releases/download/crimson-preview-v0.1.3/GameGrave-Crimson-Preview-Setup.exe),
+run `GameGrave-Crimson-Preview-Setup.exe` and open **Game Grave Crimson Preview**.
+The [Crimson Command Windows preview workflow](https://github.com/wrightausername/Game-Grave/actions/workflows/windows-crimson-preview.yml)
+retains build logs and a separate engineering archive with **actual Qt screenshots** of Overview, Games,
 Mods, Old Files, Other Storage, Captures, Graveyard, Game DNA and Undo Center.
 An unsigned test executable must not be treated as
 a public stable installer.
@@ -100,6 +100,10 @@ Overview's storage pie now divides actual reported bytes into Old Files, Other
 Storage, Mods and Captures, using the same colors and percentages as its legend.
 Duplicate paths and nested locations count once. Recycle history is shown
 separately and does not determine the pie's slices.
+The shared chart now uses illuminated beveled segments, a recessed glass center,
+metallic rims, the GG mark and fine radial indexes. Hovering a segment highlights
+its boundary and shows its measured size and percentage. This styling also
+applies to Other Storage and Game DNA without changing their data.
 
 Steam covers load automatically in Games, Overview's library and game details.
 Game Grave reads both current hashed and older Steam artwork caches and custom

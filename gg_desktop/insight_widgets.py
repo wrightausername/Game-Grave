@@ -1,8 +1,10 @@
 """Live rings, reference artwork and opt-in capture tiles for the desktop."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QRect, QRectF, QSize, Signal
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
+from math import atan2, cos, degrees, hypot, radians, sin
+
+from PySide6.QtCore import Qt, QPointF, QRect, QRectF, QSize, Signal
+from PySide6.QtGui import QColor, QBrush, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
 from PySide6.QtWidgets import QFrame, QLayout, QListWidget, QStyledItemDelegate, QStyle, QWidget
 from core import human_size
 from gg_desktop.reference_widgets import CoverGrid, draw_crop, icon, pixel_font
@@ -93,6 +95,9 @@ class FootprintRing(QWidget):
         self.caption = caption
         self.title = "No data"
         self.setMinimumSize(135, 140)
+        self.setMouseTracking(True)
+        self._hovered = -1
+        self._base_tip = ""
 
     def set_segments(self, segments, title=None):
         self.segments = [(name, max(0, int(value)), color) for name, value, color in segments if value is not None]
@@ -100,33 +105,182 @@ class FootprintRing(QWidget):
         self.title = title if title is not None else human_size(total)
         self.setAccessibleName(self.caption + ": " + self.title + ". " + "; ".join(
             f"{name}: {human_size(value)}" for name, value, _ in self.segments))
+        self._hovered = -1
+        self.setToolTip(self.accessibleName())
+        self._base_tip = self.toolTip()
         self.update()
 
     def paintEvent(self, event):
+        """A machined, backlit dial; only the main colored arcs encode bytes."""
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        side = min(self.width(), self.height()) - 20
-        rect = QRectF((self.width() - side) / 2 + 8, (self.height() - side) / 2 + 8, side - 16, side - 16)
-        for delta, color, width in ((-7, "#4a1021", 2), (0, "#18212a", 15), (10, "#3b2029", 1)):
-            p.setPen(QPen(QColor(color), width))
-            p.drawEllipse(rect.adjusted(delta, delta, -delta, -delta))
+        p.setRenderHint(QPainter.SmoothPixmapTransform)
+        side = min(self.width(), self.height())
+        p.translate(self.width() / 2, self.height() / 2)
+        p.scale(side / 220, side / 220)
+
+        def circle(radius):
+            return QRectF(-radius, -radius, radius * 2, radius * 2)
+
+        def arc(radius, start, span, width, color):
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(QBrush(color), width, Qt.SolidLine, Qt.FlatCap))
+            p.drawArc(circle(radius), round(start * 16), round(span * 16))
+
+        def polar(radius, angle):
+            theta = radians(angle)
+            return radius * cos(theta), -radius * sin(theta)
+
+        halo = QRadialGradient(0, 0, 109)
+        halo.setColorAt(0, QColor(4, 8, 13, 0))
+        halo.setColorAt(.59, QColor(255, 28, 69, 3))
+        halo.setColorAt(.83, QColor(255, 28, 69, 15))
+        halo.setColorAt(1, QColor(255, 28, 69, 0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(halo)
+        p.drawEllipse(circle(109))
+
+        # Outer index marks and interrupted laser rails frame the data band.
+        for index in range(72):
+            angle = 90 - index * 5
+            major = index % 6 == 0
+            p.setPen(QPen(QColor("#687d91" if major else "#263b4c"), .95 if major else .6))
+            x1, y1 = polar(103 if major else 105, angle)
+            x2, y2 = polar(108, angle)
+            p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+        for angle, span in ((122, 27), (212, 19), (302, 27), (32, 19)):
+            glow = QColor("#ff2146")
+            glow.setAlpha(30)
+            arc(109, angle, span, 5, glow)
+            arc(109, angle, span, 1.2, QColor("#ed2649"))
+
+        metal = QLinearGradient(-90, -100, 85, 100)
+        for stop, color in ((0, "#7490a5"), (.18, "#182532"), (.34, "#485967"),
+                            (.55, "#050a10"), (.82, "#455969"), (1, "#101a23")):
+            metal.setColorAt(stop, QColor(color))
+        arc(100.4, 0, 360, 3.2, metal)
+        arc(98, 0, 360, 1, QColor("#071017"))
+        arc(89, 0, 360, 21, QColor("#0c1722"))
+
         total = sum(v for _, v, _ in self.segments)
-        start = 90 * 16
+        start = 90.0
         if total:
-            for _, value, color in self.segments:
-                span = -round(value / total * 360 * 16)
-                p.setPen(QPen(QColor(color), 15))
-                p.drawArc(rect, start, span + (16 if span < -32 else 0))
+            for index, (_, value, color) in enumerate(self.segments):
+                if value <= 0:
+                    continue
+                span = -value / total * 360
+                gap = min(1.1, abs(span) * .045)
+                visible_start, visible_span = start - gap / 2, span + gap
+                base = QColor(color)
+                active = index == self._hovered
+                for width, opacity in ((34, 10), (28, 18), (23, 33)):
+                    glow = QColor(base)
+                    glow.setAlpha(opacity + (12 if active else 0))
+                    arc(89, visible_start, visible_span, width, glow)
+
+                bevel = QLinearGradient(-50, -100, 45, 105)
+                for stop, shade in ((0, base.lighter(155)), (.22, base.lighter(118)),
+                                     (.47, base), (.7, base.darker(135)), (1, base.darker(205))):
+                    bevel.setColorAt(stop, shade)
+                arc(89, visible_start, visible_span, 18.5, bevel)
+                arc(97.5, visible_start, visible_span, 1.2, base.lighter(150))
+                arc(80.6, visible_start, visible_span, 1.6, base.darker(180))
+
+                # Fine grooves add depth, with a continuous color stripe for
+                # reading the original category hue even under the bevel.
+                first = int((90 - start) / 4) + 1
+                last = int((90 - start - span) / 4)
+                p.setPen(QPen(QColor(2, 7, 12, 65), .7))
+                for mark in range(first, last + 1):
+                    angle = 90 - mark * 4
+                    x1, y1 = polar(82, angle)
+                    x2, y2 = polar(96, angle)
+                    p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+                arc(89, visible_start, visible_span, 2.2, base)
+                if active:
+                    arc(99.1, visible_start, visible_span, 1.3, QColor("#e9faff"))
                 start += span
-        p.setFont(pixel_font(22, True))
-        p.setPen(QColor("#ff2446"))
-        p.drawText(rect.adjusted(0, -43, 0, 0), Qt.AlignCenter, "GG")
-        p.setPen(QColor("#f3f3f7"))
-        p.setFont(pixel_font(21, True))
-        p.drawText(rect, Qt.AlignCenter, self.title)
-        p.setFont(pixel_font(8, True))
-        p.setPen(QColor("#c2cbd5"))
-        p.drawText(rect.adjusted(0, 36, 0, 0), Qt.AlignCenter, self.caption)
+
+        # Recessed center, steel lip and glass reflection.
+        arc(76, 0, 360, 2.8, metal)
+        core = QRadialGradient(-24, -35, 113)
+        core.setColorAt(0, QColor("#172c3e"))
+        core.setColorAt(.42, QColor("#09131f"))
+        core.setColorAt(.75, QColor("#02060b"))
+        core.setColorAt(1, QColor("#101a26"))
+        p.setPen(QPen(QColor("#070d14"), 2.2))
+        p.setBrush(core)
+        p.drawEllipse(circle(72.5))
+        arc(71.4, 37, 133, .9, QColor("#496375"))
+        arc(71.4, 213, 95, .8, QColor("#5b1b31"))
+        arc(67.8, 4, 40, .65, QColor("#254454"))
+
+        glass = QPainterPath()
+        glass.addEllipse(circle(70))
+        p.save()
+        p.setClipPath(glass)
+        highlight = QLinearGradient(-50, -75, 25, 18)
+        highlight.setColorAt(0, QColor(175, 221, 255, 19))
+        highlight.setColorAt(1, QColor(175, 221, 255, 0))
+        p.fillRect(QRectF(-80, -80, 160, 76), highlight)
+        p.restore()
+
+        logo_glow = QRadialGradient(0, -30, 36)
+        logo_glow.setColorAt(0, QColor(255, 25, 65, 31))
+        logo_glow.setColorAt(1, QColor(255, 25, 65, 0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(logo_glow)
+        p.drawEllipse(QRectF(-36, -65, 72, 72))
+        p.setCompositionMode(QPainter.CompositionMode_Screen)
+        draw_crop(p, QRectF(-22, -49, 44, 37), "games", (26, 14, 53, 46), fill=False)
+        p.setCompositionMode(QPainter.CompositionMode_SourceOver)
+
+        font = pixel_font(26 if len(self.title) < 10 else 21, True)
+        font.setLetterSpacing(QFont.AbsoluteSpacing, -.4)
+        p.setFont(font)
+        p.setPen(QColor("#020408"))
+        p.drawText(QRectF(-75, -5, 150, 42), Qt.AlignCenter, self.title)
+        p.setPen(QColor("#f0f7ff"))
+        p.drawText(QRectF(-75, -7, 150, 42), Qt.AlignCenter, self.title)
+        font = pixel_font(8, True)
+        font.setLetterSpacing(QFont.AbsoluteSpacing, .7)
+        p.setFont(font)
+        p.setPen(QColor("#8ca6bb"))
+        p.drawText(QRectF(-73, 30, 146, 15), Qt.AlignCenter, self.caption)
+        arc(55, 247, 46, .9, QColor("#91213c"))
+
+    def mouseMoveEvent(self, event):
+        point = event.position()
+        dx, dy = point.x() - self.width() / 2, point.y() - self.height() / 2
+        scale = min(self.width(), self.height()) / 220
+        total = sum(value for _, value, _ in self.segments)
+        hovered = -1
+        if total and 78 <= hypot(dx, dy) / max(scale, .01) <= 101:
+            angle = degrees(atan2(dx, -dy)) % 360
+            cumulative = 0
+            for index, (_, value, _) in enumerate(self.segments):
+                cumulative += value / total * 360
+                if value and angle < cumulative:
+                    hovered = index
+                    break
+        if hovered != self._hovered:
+            if self._hovered < 0:
+                self._base_tip = self.toolTip()
+            self._hovered = hovered
+            if hovered >= 0:
+                name, value, _ = self.segments[hovered]
+                self.setToolTip(f"{name}\n{human_size(value)} · {value / total:.1%}")
+            else:
+                self.setToolTip(self._base_tip)
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        if self._hovered >= 0:
+            self._hovered = -1
+            self.setToolTip(self._base_tip)
+            self.update()
+        super().leaveEvent(event)
 
 
 class CaptureDelegate(QStyledItemDelegate):
