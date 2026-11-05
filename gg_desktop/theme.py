@@ -170,3 +170,19 @@ QLabel#detailSection {font-size:10px;font-weight:700;color:#A3AFBF;letter-spacin
 QFrame#detailRule {background:#2B333D;min-height:1px;max-height:1px;}
 """
 STYLE = STYLE.replace("ASSET_ROOT", (Path(__file__).resolve().parent / "assets").as_posix())
+
+STYLE += r'''
+QWidget#referencePageBody, QScrollArea#referencePage {background:transparent;border:0;}
+QFrame#referenceSearch {background:rgba(13,17,21,210);border:1px solid #4A5058;border-radius:12px;}
+QFrame#referenceSearch QLineEdit#globalSearch {background:transparent;border:0;padding:0;min-height:25px;font-size:16px;color:#EEF0F3;}
+QLabel#referenceKeycap {font-size:14px;background:rgba(106,111,117,55);border:1px solid #42474C;border-radius:6px;color:#F0F0F2;}
+QPushButton#chromeButton {border:0;border-radius:5px;padding:0;background:transparent;}
+QPushButton#chromeButton:hover {background:rgba(105,56,69,95);}
+QFrame#referenceGlassPanel {background:transparent;border:0;}
+'''
+STYLE += r'''
+QPushButton#navButton {min-height:46px;max-height:46px;padding:0;border:0;background:transparent;}
+'''
+STYLE += r'''
+QWidget#navBody, QScrollArea#navScroll {border:0;}
+'''

@@ -9,8 +9,8 @@ import sys
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
-from PySide6.QtGui import QColor, QIcon, QPalette, QKeySequence, QShortcut
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize, QEvent
+from PySide6.QtGui import QColor, QIcon, QPalette, QKeySequence, QShortcut, QFont
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QProgressBar, QVBoxLayout, QWidget, QScrollArea, QLineEdit,
@@ -80,6 +80,9 @@ def configure_crimson_dialog_palette(app: QApplication) -> None:
     combination for Yes/No, file and typed override prompts.
     """
     app.setStyle("Fusion")
+    font = app.font()
+    font.setStyleStrategy(QFont.PreferAntialias | QFont.NoSubpixelAntialias)
+    app.setFont(font)
     palette = QPalette(app.palette())
     for role, hex_color in (
         (QPalette.Window, "#10151C"),
@@ -111,10 +114,14 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.pool = QThreadPool.globalInstance()
         self.current_route = "Overview"
         self._ai_companion = None
+        self.setWindowFlag(Qt.FramelessWindowHint, True)
         self.setWindowTitle("Game Grave  |  Cinematic UI preview")
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg")))
         self.setMinimumSize(1040, 690)
-        self.resize(1672, 941)
+        screen = QApplication.primaryScreen()
+        available = screen.availableGeometry() if screen is not None else None
+        self.resize(min(1672, available.width()) if available else 1672,
+                    min(941, available.height()) if available else 941)
         self.setStyleSheet(STYLE)
         self._create_shell()
         self.navigate("Overview")
@@ -122,6 +129,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             QTimer.singleShot(0, self.start_scan)
 
     def _create_shell(self):
+        from gg_desktop.reference_chrome import (
+            ReferenceSurface, NavigationButton, ChromeBar, SearchFrame, outline_icon)
         root = QWidget()
         root.setObjectName("appRoot")
         outer = row(spacing=0)
@@ -130,23 +139,23 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
 
         rail = QFrame()
         rail.setObjectName("navRail")
-        rail.setFixedWidth(276)
-        r = column(spacing=4, margins=(0, 12, 0, 0))
+        rail.setFixedWidth(296)
+        r = column(spacing=0, margins=(0, 0, 0, 0))
         rail.setLayout(r)
         brand_holder = QWidget()
-        brand_layout = row(spacing=9, margins=(29, 0, 13, 0))
+        brand_holder.setFixedHeight(110)
+        brand_layout = row(spacing=9, margins=(40, 0, 2, 0))
         brand_holder.setLayout(brand_layout)
         glyph = QLabel()
-        glyph.setPixmap(QIcon(str(Path(__file__).parent / "assets" / "app_icon.svg"))
-                        .pixmap(64, 56))
-        glyph.setFixedSize(64, 56)
+        glyph.setPixmap(QIcon(str(Path(__file__).parent / "assets" / "reference_brand.svg"))
+                        .pixmap(70, 56))
+        glyph.setFixedSize(70, 56)
         glyph.setAccessibleName("Game Grave red GG monogram")
         brand_layout.addWidget(glyph)
         name = label("GAME GRAVE®", "brand")
-        name.setStyleSheet("color:#F5F7FB;font-size:21px;font-weight:850;letter-spacing:.2px;")
+        name.setStyleSheet("color:#F5F7FB;font-size:21px;font-weight:750;letter-spacing:-.3px;")
         brand_layout.addWidget(name, 1)
         r.addWidget(brand_holder)
-        r.addSpacing(12)
         rail_scroll = QScrollArea()
         rail_scroll.setObjectName("navScroll")
         rail_scroll.setFrameShape(QFrame.NoFrame)
@@ -154,14 +163,12 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         rail_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         nav_body = QWidget()
         nav_body.setObjectName("navBody")
-        nav_stack = column(spacing=2, margins=(0, 0, 0, 0))
+        nav_stack = column(spacing=0, margins=(0, 0, 0, 0))
         nav_body.setLayout(nav_stack)
         self.nav_buttons = {}
         for route, _legacy_icon in ROUTES:
-            control = button(route,
-                             lambda _checked=False, route=route: self.navigate(route),
-                             kind="navButton")
-            control.setIcon(nav_icon(route))
+            control = NavigationButton(route)
+            control.clicked.connect(lambda _checked=False, route=route: self.navigate(route))
             control.setIconSize(QSize(24, 24))
             control.setProperty("active", route == self.current_route)
             control.setAccessibleName(route + " page")
@@ -173,7 +180,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         r.addWidget(rail_scroll, 1)
         # Decorative local artwork remains separate from scan findings and
         # disappears on shorter screens so every navigation control stays usable.
-        self.sidebar_art = LandscapeArt(229, scene="footer")
+        self.sidebar_art = LandscapeArt(233, scene="footer")
         footer_layout = column(margins=(14, 22, 12, 4))
         self.sidebar_art.setLayout(footer_layout)
         # Approved sidebar forest should remain atmospheric, not print
@@ -183,23 +190,42 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         r.addWidget(self.sidebar_art)
         outer.addWidget(rail)
 
-        main = QWidget()
-        base = column(spacing=6, margins=(0, 0, 0, 0))
+        main = ReferenceSurface()
+        self.main_surface = main
+        base = column(spacing=0, margins=(0, 0, 0, 0))
         main.setLayout(base)
-        top = QWidget()
-        topbox = row(spacing=8, margins=(18, 5, 18, 4))
+        top = ChromeBar()
+        self.chrome_bar = top
+        top.setFixedHeight(86)
+        topbox = row(spacing=18, margins=(37, 15, 20, 17))
         top.setLayout(topbox)
+        search_frame = SearchFrame()
+        search_frame.setObjectName("referenceSearch")
+        search_frame.setMaximumWidth(565)
+        search_frame.setFixedHeight(42)
+        search_row = row(spacing=10, margins=(13, 4, 9, 4))
+        search_frame.setLayout(search_row)
+        search_glyph = QLabel()
+        search_glyph.setFixedSize(26, 26)
+        search_glyph.setPixmap(outline_icon("search").pixmap(26, 26))
+        search_row.addWidget(search_glyph)
         self.global_search = QLineEdit()
         self.global_search.setObjectName("globalSearch")
         self.global_search.setAccessibleName("Search scanned games, mods and paths")
         self.global_search.setPlaceholderText(
-            "⌕  Search games, mods, files, and more…           Ctrl + K")
+            "Search games, mods, files, and more...")
         self.global_search.returnPressed.connect(self.open_global_search)
-        self.global_search.setMinimumWidth(220)
-        self.global_search.setMaximumWidth(570)
+        self.global_search.setMinimumWidth(160)
         from PySide6.QtWidgets import QSizePolicy
         self.global_search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        topbox.addWidget(self.global_search, 6)
+        search_frame.setFocusProxy(self.global_search)
+        search_row.addWidget(self.global_search, 1)
+        keycap = label("Ctrl + K")
+        keycap.setObjectName("referenceKeycap")
+        keycap.setAlignment(Qt.AlignCenter)
+        keycap.setFixedSize(64, 26)
+        search_row.addWidget(keycap)
+        topbox.addWidget(search_frame, 6)
         topbox.addStretch(1)
         # The approved Nov 2 shell has quiet notification/help controls, not
         # a persistent SCAN PC toolbar on every route. Scanning remains in
@@ -214,15 +240,40 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.scan_button.hide()
         topbox.addWidget(self.scan_button)
         self.notification_button = button("", self._show_notifications, kind="chromeButton")
-        self.notification_button.setIcon(nav_icon("Notifications"))
-        self.notification_button.setIconSize(QSize(20, 20))
+        self.notification_button.setIcon(outline_icon("Notifications"))
+        self.notification_button.setIconSize(QSize(28, 28))
+        self.notification_button.setFixedSize(36, 38)
         self.notification_button.setToolTip("Notifications and scan status")
         self.notification_button.setAccessibleName("Notifications and scan status")
+        self.notification_indicator = QLabel(self.notification_button)
+        self.notification_indicator.setFixedSize(8, 8)
+        self.notification_indicator.move(25, 4)
+        self.notification_indicator.setStyleSheet("background:#F32943;border:0;border-radius:4px;")
+        self.notification_indicator.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.notification_indicator.hide()
         topbox.addWidget(self.notification_button)
-        self.help_button = button("?", self._show_help, kind="chromeButton")
+        self.help_button = button("", self._show_help, kind="chromeButton")
+        self.help_button.setIcon(outline_icon("help"))
+        self.help_button.setIconSize(QSize(26, 26))
+        self.help_button.setFixedSize(36, 38)
         self.help_button.setToolTip("Help and safety information")
         self.help_button.setAccessibleName("Help")
         topbox.addWidget(self.help_button)
+        divider = QFrame()
+        divider.setFixedSize(1, 30)
+        divider.setStyleSheet("background:#41474F;")
+        topbox.addWidget(divider)
+        def maximize():
+            self.showNormal() if self.isMaximized() else self.showMaximized()
+        for name, action in (("minimize", self.showMinimized),
+                             ("maximize", maximize), ("close", self.close)):
+            control = button("", action, kind="chromeButton")
+            control.setIcon(outline_icon(name))
+            control.setIconSize(QSize(25, 25))
+            control.setFixedSize(32, 38)
+            control.setAccessibleName(name.title() + " window")
+            control.setToolTip(name.title())
+            topbox.addWidget(control)
         base.addWidget(top)
         self.status = label(
             "Not scanned. Scan PC reads local records; no files are changed.",
@@ -245,6 +296,22 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.page = None
         base.addWidget(self.stack_holder, 1)
         outer.addWidget(main, 1)
+        QApplication.instance().installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        # Keep native edge resizing available with the reference's own titlebar.
+        if (event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton
+                and isinstance(watched, QWidget) and watched.window() is self
+                and not self.isMaximized() and self.windowHandle()):
+            point = self.mapFromGlobal(event.globalPosition().toPoint())
+            edges = Qt.Edges()
+            if point.x() < 4: edges |= Qt.LeftEdge
+            if point.x() >= self.width()-4: edges |= Qt.RightEdge
+            if point.y() < 4: edges |= Qt.TopEdge
+            if point.y() >= self.height()-4: edges |= Qt.BottomEdge
+            if edges and self.windowHandle().startSystemResize(edges):
+                return True
+        return super().eventFilter(watched, event)
 
     def _show_notifications(self):
         """Show actual local status; do not fabricate notifications."""
@@ -286,6 +353,21 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             "AI Assistant", "Settings", "More Tools", "Captures"))
         self.stack_layout.addWidget(self.page, 1)
         self.current_route = title
+        self.notification_indicator.setVisible(bool(self.inventory.warnings))
+        self.main_surface.route = title
+        self.main_surface.update()
+        self.chrome_bar.setFixedHeight(70 if title == "Ready Room" else 86)
+        if title in ("Overview", "Ready Room"):
+            from gg_desktop.reference_chrome import ReferenceSurface
+            body = ReferenceSurface()
+            body.route = title
+            body.offset_y = self.chrome_bar.height()
+            body.setLayout(self.page.content)
+            self.page.body = body
+            self.page.setWidget(body)
+            self.page.setObjectName("referencePage")
+            self.page.body.setObjectName("referencePageBody")
+            self.page.viewport().setAutoFillBackground(False)
         for route, control in self.nav_buttons.items():
             control.setProperty("active", route == title)
             control.style().unpolish(control)
@@ -309,6 +391,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         if route == "Overview":
             from gg_desktop.approved_overview import render_approved_overview
             render_approved_overview(self)
+            return
+        if route == "Ready Room":
+            from gg_desktop.approved_readyroom import render_approved_readyroom
+            render_approved_readyroom(self)
             return
         if route == "Graveyard":
             from gg_desktop.approved_graveyard import render_approved_graveyard

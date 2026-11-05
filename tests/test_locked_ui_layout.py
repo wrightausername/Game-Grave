@@ -21,7 +21,7 @@ if HAS_QT:
 @unittest.skipUnless(HAS_QT, "Optional Qt preview dependencies are not installed")
 class LockedUILayoutTests(unittest.TestCase):
     routes = ("Overview", "Graveyard", "Game DNA", "Undo Center",
-              "AI Assistant", "Settings", "More Tools", "Captures")
+              "AI Assistant", "Settings", "More Tools", "Captures", "Ready Room")
 
     @classmethod
     def setUpClass(cls):
@@ -172,6 +172,65 @@ class LockedUILayoutTests(unittest.TestCase):
         self.assertLess(modes.width(), context.width())
         self.assertGreater(conversation.width(), context.width() * 1.5)
         self.assertLess(conversation.width(), context.width() * 2.2)
+
+    def test_overview_carousel_pages_real_games_and_opens_selected_record(self):
+        from dataclasses import replace
+        from gg_desktop.approved_overview import CoverShelf
+        self.populate()
+        sample = self.window.inventory.games[0]
+        self.window.inventory.games = [replace(
+            sample, key=f"fixture:{i}", name=f"Carousel fixture {i}") for i in range(18)]
+        self.window.resize(1672, 941)
+        self.window.navigate("Overview")
+        self.flush()
+        shelf = self.window.page.findChild(CoverShelf)
+        self.assertEqual(len(shelf.cards), 18)
+        self.assertEqual(shelf.scroll.horizontalScrollBar().value(), 0)
+        control = next(button for button in shelf.findChildren(QPushButton)
+                       if button.accessibleName() == "Next library page")
+        control.click()
+        self.flush()
+        self.assertGreater(shelf.scroll.horizontalScrollBar().value(), 0)
+        self.assertLessEqual(abs(shelf.cards[shelf.visible_count].mapTo(
+            shelf.scroll.viewport(), QPoint(0, 0)).x()), 1)
+        shelf.goto(0)
+        shelf.cards[2].click()
+        self.flush()
+        self.assertEqual(self.window.current_route, "Games")
+        self.assertEqual(self.window._shown_games[0].name, "Carousel fixture 2")
+
+    def test_ready_room_reference_lists_follow_the_retained_search(self):
+        from gg_desktop.approved_readyroom import RoomGameRow
+        self.populate()
+        self.window.resize(1672, 941)
+        self.window.navigate("Ready Room")
+        self.flush()
+        search = self.window.page.findChild(QLineEdit, "readyRoomSearch")
+        search.setText("Example EA game")
+        self.flush()
+        rows = self.window.page.findChildren(RoomGameRow)
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(item.game.name == "Example EA game" for item in rows))
+        self.assertEqual(sum(item.patch for item in rows), 1)
+        self.assertIn("not connected", next(item for item in rows if item.patch).accessibleName().lower())
+        with patch.object(self.window, "navigate") as navigate:
+            rows[0].click()
+            navigate.assert_called_once_with("Games")
+            self.assertEqual(self.window._pending_game_query, "Example EA game")
+
+    def test_reference_window_controls_preserve_the_active_page(self):
+        self.window.navigate("Ready Room")
+        self.flush()
+        page = self.window.page
+        actions = {item.accessibleName(): item for item in self.window.chrome_bar.findChildren(QPushButton)}
+        actions["Maximize window"].click()
+        self.flush()
+        self.assertTrue(self.window.isMaximized())
+        actions["Maximize window"].click()
+        self.flush()
+        self.assertFalse(self.window.isMaximized())
+        self.assertIs(self.window.page, page)
+        self.assertEqual(self.window.current_route, "Ready Room")
 
     def test_locked_empty_pages_fit_small_window(self):
         self.window.resize(1040, 720)
