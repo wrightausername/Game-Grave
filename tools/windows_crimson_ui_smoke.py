@@ -20,7 +20,7 @@ def main():
     from launchers import LauncherGame
     from graveyard import build_graveyard
     from gg_desktop.models import merge_games
-    from gg_desktop.app import CrimsonWindow
+    from gg_desktop.app import CrimsonWindow, ROUTES
 
     app = QApplication.instance() or QApplication(sys.argv)
     from PySide6.QtGui import QFontDatabase
@@ -53,6 +53,7 @@ def main():
                          "ea11", None, "Registry installation record"),
         ]
         window = CrimsonWindow()
+        window.artwork.allow_downloads = False
         window.show()
         app.processEvents()
         try:
@@ -63,8 +64,7 @@ def main():
             window.inventory.files = [old]
             window.inventory.scanned_at = "Synthetic test date"
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
-            for route in ("Overview", "Games", "Graveyard", "Game DNA",
-                          "Mods", "Old Files", "Undo Center", "Settings", "More Tools"):
+            for route, _symbol in ROUTES:
                 window.navigate(route)
                 window.resize(1366, 768)
                 app.processEvents()
@@ -110,8 +110,13 @@ def main():
             for route, filename in (
                 ("Overview", "crimson-desktop-1440.png"),
                 ("Games", "crimson-games-1440.png"),
+                ("Mods", "crimson-mods-1440.png"),
+                ("Old Files", "crimson-old-files-1440.png"),
+                ("Other Storage", "crimson-other-storage-1440.png"),
+                ("Captures", "crimson-captures-1440.png"),
                 ("Graveyard", "crimson-graveyard-1440.png"),
                 ("Game DNA", "crimson-dna-1440.png"),
+                ("Undo Center", "crimson-undo-center-1440.png"),
             ):
                 window.navigate(route)
                 window.resize(1440, 900)
@@ -119,9 +124,9 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
-            print("PASS: Qt Crimson Overview and 9 interactive pages, mixed-launcher "
+            print("PASS: Qt Crimson 13 navigation pages, mixed-launcher "
                   "Games, inline exact-rule Unprotect without deletion, "
-                  "four screenshots and original hero asset.")
+                  "nine screenshots including the reference layouts and local artwork.")
         finally:
             window.close()
             app.processEvents()

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from itertools import product
 from pathlib import Path
 from typing import Callable
 
@@ -102,6 +103,9 @@ def gog_registry(cancel: Cancel = None) -> list[LauncherGame]:
                 try:
                     identifier = winreg.EnumKey(base, i)
                     i += 1
+                except OSError:
+                    break
+                try:
                     with winreg.OpenKey(base, identifier) as sub:
                         folder = _ordinary_install(winreg.QueryValueEx(sub, 'path')[0])
                         if folder is None:
@@ -114,7 +118,7 @@ def gog_registry(cancel: Cancel = None) -> list[LauncherGame]:
                                                     str(identifier), None,
                                                     'GOG registry entry; installation found'))
                 except OSError:
-                    break
+                    continue
     unique = {(g.launcher, g.install_path.casefold()): g for g in results}
     return list(unique.values())
 
@@ -139,11 +143,50 @@ def custom_library_folders(roots: list[str], cancel: Cancel = None) -> list[Laun
     return found
 
 
-def find_launcher_games(custom_roots=None, cancel: Cancel = None, programdata: Path | None = None):
-    found = (epic_games(programdata, cancel) + gog_registry(cancel) +
-             riot_games(programdata, cancel) + vendor_registry_games(cancel) +
-             blizzard_uninstall_records(cancel) +
-             custom_library_folders(custom_roots or [], cancel))
+def find_launcher_games(custom_roots=None, cancel: Cancel = None, programdata: Path | None = None,
+                        report=None):
+    """Keep working launcher inventories when another source is unavailable."""
+    from core import windows_fixed_drives
+    base = Path(programdata or os.environ.get('PROGRAMDATA', 'C:/ProgramData'))
+    selected = list(custom_roots or [])
+    providers = (
+        ("Epic Games", lambda: epic_games(programdata, cancel),
+         [str(base / 'Epic/EpicGamesLauncher/Data/Manifests')], "Epic installation manifests"),
+        ("GOG", lambda: gog_registry(cancel),
+         [r'HKLM\SOFTWARE\GOG.com\Games (32/64-bit)'], "GOG game installation registry records"),
+        ("Riot Games", lambda: riot_games(programdata, cancel),
+         [str(base / 'Riot Games/Metadata')], "Riot product settings"),
+        ("EA / Ubisoft / Rockstar", lambda: vendor_registry_games(cancel),
+         [r'HKLM/HKCU\SOFTWARE\EA Games; Electronic Arts\EA Games; Ubisoft\Launcher\Installs; Rockstar Games (32/64-bit)'],
+         "Known launcher game registry records"),
+        ("Battle.net", lambda: blizzard_uninstall_records(cancel),
+         [r'HKLM/HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall (32/64-bit)'],
+         "Recognized Blizzard games with publisher and existing install folder"),
+        ("Xbox (PC)", lambda: xbox_games(selected, cancel),
+         [str(drive / 'XboxGames') for drive in windows_fixed_drives()] + selected,
+         "XboxGames or selected folders with MicrosoftGame.config and an executable. Protected WindowsApps packages are outside this coverage."),
+        ("Custom libraries", lambda: custom_library_folders(selected, cancel),
+         selected, "Immediate subfolders in selected libraries; game installation unverified"),
+    )
+    found = []
+    for name, read, paths, detail in providers:
+        if cancel and cancel():
+            raise InterruptedError("Launcher scan canceled")
+        try:
+            rows = read()
+        except InterruptedError:
+            raise
+        except (OSError, ValueError, RuntimeError) as exc:
+            if report:
+                report(name, "Unavailable", 0, type(exc).__name__ + ": " + str(exc)[:180], paths)
+            continue
+        if name == "Custom libraries":
+            xbox_folders = {str(Path(g.install_path).parent).casefold()
+                            for g in found if g.launcher == "Xbox (PC)"}
+            rows = [g for g in rows if g.install_path.casefold() not in xbox_folders]
+        found.extend(rows)
+        if report:
+            report(name, "Checked", len(rows), detail, paths)
     unique = {(x.launcher, x.install_path.casefold()): x for x in found}
     return sorted(unique.values(), key=lambda g: (g.launcher, g.name.casefold()))
 
@@ -182,7 +225,7 @@ def riot_games(programdata: Path | None = None, cancel: Cancel = None) -> list[L
 
 
 def vendor_registry_games(cancel: Cancel = None) -> list[LauncherGame]:
-    """Known Ubisoft and EA Games registry keys, NOT blanket Windows uninstall entries."""
+    """Known Ubisoft, EA and Rockstar keys, not blanket Windows program entries."""
     if os.name != 'nt':
         return []
     try:
@@ -190,15 +233,17 @@ def vendor_registry_games(cancel: Cancel = None) -> list[LauncherGame]:
     except ImportError:
         return []
     roots = (
-        ('Ubisoft Connect', winreg.HKEY_LOCAL_MACHINE,
-         r'SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs', ('InstallDir', 'InstallLocation')),
-        ('EA', winreg.HKEY_LOCAL_MACHINE,
-         r'SOFTWARE\Electronic Arts\EA Games', ('Install Dir', 'InstallDir', 'InstallLocation')),
+        ('Ubisoft Connect', r'SOFTWARE\Ubisoft\Launcher\Installs', ('InstallDir', 'InstallLocation')),
+        ('EA', r'SOFTWARE\Electronic Arts\EA Games', ('Install Dir', 'InstallDir', 'InstallLocation')),
+        ('EA', r'SOFTWARE\EA Games', ('Install Dir', 'InstallDir', 'InstallLocation')),
+        ('Rockstar Games', r'SOFTWARE\Rockstar Games', ('InstallFolder', 'InstallPath', 'InstallLocation')),
     )
     results = []
-    for launcher, hive, key_path, fields in roots:
+    views = {getattr(winreg, 'KEY_WOW64_64KEY', 0), getattr(winreg, 'KEY_WOW64_32KEY', 0)}
+    for (launcher, key_path, fields), hive, view in product(
+            roots, (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER), views):
         try:
-            parent = winreg.OpenKey(hive, key_path, 0, winreg.KEY_READ)
+            parent = winreg.OpenKey(hive, key_path, 0, winreg.KEY_READ | view)
         except OSError:
             continue
         with parent:
@@ -209,6 +254,8 @@ def vendor_registry_games(cancel: Cancel = None) -> list[LauncherGame]:
                     name = winreg.EnumKey(parent, i)
                 except OSError:
                     break
+                if str(name).casefold() in {"launcher", "social club", "rockstar games social club"}:
+                    continue
                 try:
                     with winreg.OpenKey(parent, name) as sub:
                         install = None
@@ -223,11 +270,86 @@ def vendor_registry_games(cancel: Cancel = None) -> list[LauncherGame]:
                         path = _ordinary_install(install)
                         if path is None:
                             continue
-                        results.append(LauncherGame(name, launcher, str(path), name, None,
+                        display = path.name if str(name).isdecimal() else name
+                        for field in ('DisplayName', 'GameName', 'Name'):
+                            try:
+                                value = winreg.QueryValueEx(sub, field)[0]
+                                if isinstance(value, str) and value.strip():
+                                    display = value[:170]
+                                    break
+                            except OSError:
+                                continue
+                        results.append(LauncherGame(display, launcher, str(path), name, None,
                                         'Launcher registry record; game name may need verification'))
                 except OSError:
                     continue
     return results
+
+
+def xbox_games(custom_roots=(), cancel: Cancel = None) -> list[LauncherGame]:
+    """Modern Xbox PC installs require local MicrosoftGame.config + executable.
+
+    No WindowsApps permission changes, package-name guesses or broad disk walks.
+    Other protected Microsoft Store installations remain an explicit coverage gap.
+    """
+    import xml.etree.ElementTree as ET
+    from core import windows_fixed_drives, _has_reparse_component
+    roots = [drive / 'XboxGames' for drive in windows_fixed_drives()]
+    for raw in custom_roots:
+        if isinstance(raw, str) and raw.strip():
+            root = Path(raw).expanduser()
+            roots.extend((root, root / 'XboxGames'))
+    found, seen = [], set()
+    for root in roots:
+        if cancel and cancel():
+            raise InterruptedError('Xbox scan canceled')
+        if _ordinary_install(str(root)) is None:
+            continue
+        try:
+            folders = [root] if (root / 'Content' / 'MicrosoftGame.config').is_file() else sorted(root.iterdir())[:500]
+        except OSError:
+            continue
+        for folder in folders:
+            if cancel and cancel():
+                raise InterruptedError('Xbox scan canceled')
+            content = folder / 'Content'
+            config = content / 'MicrosoftGame.config'
+            if str(content).casefold() in seen or _ordinary_install(str(content)) is None:
+                continue
+            try:
+                if not config.is_file() or _has_reparse_component(config) or config.stat().st_size > 1024 * 1024:
+                    continue
+                data = config.read_bytes()
+                if b'<!DOCTYPE' in data.upper() or b'<!ENTITY' in data.upper():
+                    continue
+                game = ET.fromstring(data)
+                tags = {node.tag.rsplit('}', 1)[-1]: node for node in game.iter()}
+                identity = tags.get('Identity')
+                if game.tag.rsplit('}', 1)[-1] != 'Game' or identity is None or not identity.get('Name'):
+                    continue
+                valid_executable = False
+                for node in game.iter():
+                    if node.tag.rsplit('}', 1)[-1] != 'Executable':
+                        continue
+                    raw = node.get('Name', '').replace('\\', '/')
+                    relative = Path(raw)
+                    if not raw or relative.is_absolute() or '..' in relative.parts or ':' in raw:
+                        continue
+                    executable = content / relative
+                    if executable.suffix.casefold() == '.exe' and executable.is_file() and not _has_reparse_component(executable):
+                        valid_executable = True
+                        break
+                if not valid_executable:
+                    continue
+                visuals = tags.get('ShellVisuals')
+                display = visuals.get('DefaultDisplayName', '') if visuals is not None else ''
+                name = display if display and not display.startswith('ms-resource:') else folder.name
+                found.append(LauncherGame(name[:170], 'Xbox (PC)', str(content), identity.get('Name'), None,
+                    'MicrosoftGame.config identity and registered executable found'))
+                seen.add(str(content).casefold())
+            except (OSError, ValueError, ET.ParseError):
+                continue
+    return found
 
 
 def is_blizzard_install_metadata(name: str, publisher: str) -> bool:

@@ -14,6 +14,7 @@ from gg_desktop.theme import COLORS
 
 def label(text: str = "", role: str = "", wrap: bool = False) -> QLabel:
     widget = QLabel(text)
+    widget.setTextFormat(Qt.PlainText)
     if role:
         widget.setObjectName(role)
     widget.setWordWrap(wrap)
@@ -84,6 +85,7 @@ class ScrollPage(QScrollArea):
         while self.content.count():
             item = self.content.takeAt(0)
             if item.widget() is not None:
+                item.widget().hide()
                 item.widget().deleteLater()
             elif item.layout() is not None:
                 destroy_layout(item.layout())
@@ -93,6 +95,7 @@ def destroy_layout(layout):
     while layout.count():
         child = layout.takeAt(0)
         if child.widget():
+            child.widget().hide()
             child.widget().deleteLater()
         elif child.layout():
             destroy_layout(child.layout())

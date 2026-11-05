@@ -58,7 +58,7 @@ def looks_like_recording(path: Path, root: Path, *, user_selected: bool = False)
 
 def find_old_recordings(days: int = 180, custom_roots: list[str] | None = None,
                         *, home: Path | None = None, cancel: Callable[[], bool] | None = None,
-                        max_matches: int = 2500) -> list[OldFile]:
+                        max_matches: int = 2500, include_recent: bool = False) -> list[OldFile]:
     """Read file metadata only. Avoid junctions, duplicate roots and live game data."""
     if days < 1 or max_matches < 1:
         raise ValueError("Days and max_matches must be positive")
@@ -84,7 +84,7 @@ def find_old_recordings(days: int = 180, custom_roots: list[str] | None = None,
         # The scan itself never modifies files.
         candidates = scan_old_files(root, days, cancel=cancel,
                                     allowed_extensions=set(RECORDING_EXTENSIONS),
-                                    max_matches=max(remaining * 4, remaining))
+                                    max_matches=max(remaining * 4, remaining), include_recent=include_recent)
         for file in candidates:
             path = Path(file.path)
             identity = os.path.normcase(os.path.abspath(file.path)).casefold()

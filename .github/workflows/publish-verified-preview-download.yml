@@ -1,0 +1,120 @@
+name: Publish verified Windows preview download
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/windows-reference-preview-20261105]
+    paths: [.github/workflows/publish-verified-preview-download.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-crimson-preview-v0.1.2
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Host the already-tested Windows installer
+    if: github.repository == 'wrightausername/Game-Grave'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: wrightausername/Game-Grave
+      PREVIEW_TAG: crimson-preview-v0.1.2
+      VERIFIED_SHA: 9d92c34a3daa6173b035e3a5fc2f957ef21edb67
+    steps:
+      - name: Require the exact successful Windows build
+        shell: bash
+        run: |
+          gh api "repos/$GH_REPO/actions/runs/42116195122" > "$RUNNER_TEMP/verified-run.json"
+          gh api "repos/$GH_REPO/actions/artifacts/13456671947" > "$RUNNER_TEMP/verified-artifact.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          run = json.loads((Path(os.environ['RUNNER_TEMP']) / 'verified-run.json').read_text())
+          assert run['head_sha'] == os.environ['VERIFIED_SHA'], 'Different source revision'
+          assert run['conclusion'] == 'success', 'Windows QA did not pass'
+          assert run['repository']['full_name'] == os.environ['GH_REPO'], 'Different repository'
+          artifact = json.loads((Path(os.environ['RUNNER_TEMP']) / 'verified-artifact.json').read_text())
+          assert artifact['name'] == 'GameGrave-Windows-Installer' and not artifact['expired']
+          assert artifact['digest'] == 'sha256:d7a1a884529e1f0b29e726ce3610c71034a12947be57ad81857db3fb633e3bc3', 'Different artifact bytes'
+          print('Verified Windows source, scan, artwork, EXE and installer QA run.')
+          PY
+      - name: Retrieve the existing tested installer and checksum
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: wrightausername/Game-Grave
+          run-id: 42116195122
+          artifact-ids: 13456671947
+          merge-multiple: true
+          path: release
+      - name: Verify installer bytes before hosting
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path('release')
+          exe = root / 'GameGrave-Crimson-Preview-Setup.exe'
+          checksum = root / 'GameGrave-Crimson-Preview-Setup.sha256'
+          expected, filename = checksum.read_text(encoding='utf-8-sig').strip().split()
+          assert filename == exe.name, 'Checksum names a different installer'
+          actual = hashlib.sha256(exe.read_bytes()).hexdigest()
+          assert actual == expected.lower(), 'Installer checksum failed'
+          assert exe.stat().st_size > 1_000_000, 'Truncated installer'
+          assert exe.read_bytes()[:2] == b'MZ', 'Not a Windows executable'
+          (Path(os.environ['RUNNER_TEMP']) / 'installer-sha256.txt').write_text(actual)
+          print('Verified SHA-256:', actual)
+          PY
+      - name: Create a test-build download without expiring links
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/preview-notes.md" <<'NOTES'
+          Windows test build v0.1.2 (unsigned preview).
+
+          Includes the visible Overview Scan PC controls, broader launcher discovery,
+          proportional storage pie with category colors, and real Steam artwork with
+          offline caching. Extracting a ZIP or signing into GitHub is not required
+          for the installer download.
+
+          Source: 9d92c34a3daa6173b035e3a5fc2f957ef21edb67
+          Native Windows QA: https://github.com/wrightausername/Game-Grave/actions/runs/42116195122
+          All 66 Qt/model checks, live Steam artwork download/offline reuse, EXE launch,
+          and isolated installer install/launch/uninstall passed. This is a test build,
+          not a stable release. Existing classic installations remain separate.
+          NOTES
+          gh release create "$PREVIEW_TAG" \
+            release/GameGrave-Crimson-Preview-Setup.exe \
+            release/GameGrave-Crimson-Preview-Setup.sha256 \
+            --target "$VERIFIED_SHA" --draft --prerelease --latest=false \
+            --title 'Game Grave Windows Test Build v0.1.2' \
+            --notes-file "$RUNNER_TEMP/preview-notes.md"
+          gh api "repos/$GH_REPO/releases?per_page=100" > "$RUNNER_TEMP/preview-releases.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          releases = json.loads((root / 'preview-releases.json').read_text())
+          release = next(r for r in releases if r['tag_name'] == os.environ['PREVIEW_TAG'])
+          assert release['draft'] and release['prerelease'], 'Unexpected release state'
+          assert release['target_commitish'] == os.environ['VERIFIED_SHA'], 'Different release source'
+          asset = next(a for a in release['assets'] if a['name'] == 'GameGrave-Crimson-Preview-Setup.exe')
+          assert asset['size'] == Path('release', asset['name']).stat().st_size, 'Incomplete upload'
+          digest = asset.get('digest')
+          if digest:
+              assert digest == 'sha256:' + (root / 'installer-sha256.txt').read_text(), 'Uploaded digest mismatch'
+          print('Verified release upload before making the test download available.')
+          PY
+          gh release edit "$PREVIEW_TAG" --draft=false --prerelease --latest=false
+      - name: Check the public installer download without authentication
+        shell: bash
+        run: |
+          url="https://github.com/$GH_REPO/releases/download/$PREVIEW_TAG/GameGrave-Crimson-Preview-Setup.exe"
+          curl --fail --silent --show-error --head --location --retry 3 --max-time 60 "$url" > "$RUNNER_TEMP/public-download-headers.txt"
+          printf '%s\n' "$url" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'PASS: public Windows installer download responds without a login or expiring chat URL.'

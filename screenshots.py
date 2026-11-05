@@ -92,13 +92,13 @@ def _steam_screenshot_root(root: Path, steam_roots: list[Path]) -> bool:
 
 
 def _read_direct_steam_images(root: Path, days: int, cancel: Cancel,
-                              max_matches: int) -> list[OldFile]:
+                              max_matches: int, *, include_recent=False) -> list[OldFile]:
     """Known Steam screenshots can be under Program Files; no generic OS scan.
 
     Only direct ordinary image files within a validated account/game directory,
     never thumbnails or other game/Steam data.
     """
-    cutoff = time.time() - days * 86400
+    cutoff = float("inf") if include_recent else time.time() - days * 86400
     found = []
     inspected = 0
     with os.scandir(root) as listing:
@@ -136,6 +136,7 @@ def find_old_screenshots(
     extra_steam_roots: list[str] | None = None,
     cancel: Cancel = None,
     max_matches: int = MAX_SCREENSHOTS,
+    include_recent: bool = False,
 ) -> list[OldFile]:
     """Read image file metadata from known or explicitly user-added locations.
 
@@ -167,12 +168,13 @@ def find_old_screenshots(
         remaining = max_matches - len(result)
         if remaining <= 0:
             break
-        candidates = (_read_direct_steam_images(root, days, cancel, remaining * 2)
+        candidates = (_read_direct_steam_images(root, days, cancel, remaining * 2, include_recent=include_recent)
                       if steam_trusted else
                       scan_old_files(
                           root, days, cancel=cancel,
                           allowed_extensions=set(SCREENSHOT_EXTENSIONS),
                           max_matches=remaining * 2,
+                          include_recent=include_recent,
                       ))
         for record in candidates:
             if cancel and cancel():

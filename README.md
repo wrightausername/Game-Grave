@@ -18,10 +18,12 @@ remain available during physical Windows 10/11 and Qt redistribution review.
 
 ### Windows user preview
 
-Download the unsigned `GameGrave-Crimson-Preview.exe` artifact from
-[Crimson Command Windows preview workflow](https://github.com/wrightausername/Game-Grave/actions/workflows/windows-crimson-preview.yml).
-The same archive includes **actual Qt screenshots** of Overview, Games,
-Graveyard and Game DNA. An unsigned test executable must not be treated as
+Download the [Windows v0.1.3 test installer](https://github.com/wrightausername/Game-Grave/releases/download/crimson-preview-v0.1.3/GameGrave-Crimson-Preview-Setup.exe),
+run `GameGrave-Crimson-Preview-Setup.exe` and open **Game Grave Crimson Preview**.
+The [Crimson Command Windows preview workflow](https://github.com/wrightausername/Game-Grave/actions/workflows/windows-crimson-preview.yml)
+retains build logs and a separate engineering archive with **actual Qt screenshots** of Overview, Games,
+Mods, Old Files, Other Storage, Captures, Graveyard, Game DNA and Undo Center.
+An unsigned test executable must not be treated as
 a public stable installer.
 
 To run from source on Windows:
@@ -36,11 +38,95 @@ The usual `py launcher.py` still opens the classic Tk application.
 Do not run both while carrying out Recycle Bin or restore operations;
 wait until the current operation finishes before changing interfaces.
 
+### Native reference layouts
+
+The owner-supplied references now guide nine native Qt pages:
+the GG logo and forest rail, cinematic headers, launcher/stat strips, red tabs,
+game cover grid, mod filter sidebar, scan filters, and right-hand detail panels.
+Artwork regions are rendered locally from the attached references. Counts,
+selection and controls come from the current scan. No page is a static image.
+
+Games supports search, sorting, launcher filters, grid/list views and saved
+favorites, including clickable cover stars. Steam shortcuts use verified numeric
+app IDs. Mods shows protected storage locations and verified path relationships;
+activity, versions, load order and conflicts remain **Unknown** when the scanner
+does not supply that evidence. Old Files has combined age/type/search filters,
+visible-row checkboxes, personal protection and the existing confirmed Recycle
+Bin worker. Image files require the separate individual preview workflow.
+Large mod and file inventories use the existing 160-row page windows; searching
+and sorting apply to every result, and Select All only checks the displayed page.
+
+Other Storage has category filters, a measured storage ring, source details,
+personal protection and protected watchlist review. Reported parent locations
+include their descendants once. Shared driver caches are not cleared here.
+
+Captures has game/source and age/size filters, a resizable tile gallery, individual
+checkboxes, details and per-image Preview. No image bytes load on navigation,
+selection or scanning. Explicit previews use the existing bounded decoder and a
+32-entry memory-only cache keyed by scan-time identity. Image removal still opens
+the separate individual preview and confirmation workflow. Duplicate/similar and
+saved-highlight status remain unknown until supported analysis supplies evidence.
+
+Graveyard has age, size, type and protection filters, visible-page checkboxes,
+inline exact-rule Unprotect, and evidence panels. All removal actions still use
+the original confirmed worker. Game DNA shows selected-game profiles, linked
+locations and a storage ring without adding nested mod bytes to the install twice;
+unverified saves, dates and ownership are not guessed.
+
+Undo Center combines recovery IDs with retained audit entries, deduplicates the
+matching recycle events, and offers filters and individual or selected restore.
+A fresh Windows availability check precedes every restore. Conflicts, ambiguous
+matches and missing recovery IDs are refused; the existing backend never overwrites
+an original path. No history deletion or unsupported custom-location restore is
+introduced, and recycled bytes are not labeled as reclaimed disk space.
+
+Overview follows the archived dashboard composition: the forest/tombstone hero,
+five metrics, Recent Activity, storage ring, Quick Actions and horizontal library.
+**Scan PC** is labeled in both the header and Overview and reports progress beside
+**Scan Results & Locations**. That dialog lists source counts and coverage and
+lets you add Steam, other launcher/Xbox, mod and capture folders and rescan.
+The scanner checks additional conventional Steam libraries on local fixed drives,
+both Windows registry views, modern EA and Rockstar records, and Xbox installs
+with local MicrosoftGame.config and an existing registered executable. Other
+protected Microsoft Store packages remain outside that verified Xbox coverage.
+An unavailable source does not discard the successfully discovered games.
+Captures includes recent images and recordings; Old Files and Graveyard retain
+their age thresholds. Scanning reads metadata without opening capture content.
+
+The remaining reference navigation links open existing local tools or scan
+evidence. The AI Assistant page states that no conversational AI is connected.
+
+Overview's storage pie now divides actual reported bytes into Old Files, Other
+Storage, Mods and Captures, using the same colors and percentages as its legend.
+Duplicate paths and nested locations count once. Recycle history is shown
+separately and does not determine the pie's slices.
+The shared chart now uses illuminated beveled segments, a recessed glass center,
+metallic rims, the GG mark and fine radial indexes. Hovering a segment highlights
+its boundary and shows its measured size and percentage. This styling also
+applies to Other Storage and Game DNA without changing their data.
+
+Steam covers load automatically in Games, Overview's library and game details.
+Game Grave reads both current hashed and older Steam artwork caches and custom
+Steam grid images. Missing covers download from the public Steam image CDN in a
+separate background pool and are cached for offline use. Requests contain numeric
+Steam app IDs; game files and account credentials are not uploaded. Settings can
+disable artwork downloads, and Games has a Reload Artwork control to retry.
+
+Run the disposable integration checks and generate sample design previews:
+
+```powershell
+py -m unittest discover -s tests -p "test_gg_desktop*.py" -v
+py tools/render_reference_previews.py --output _ci_temp/reference-previews
+```
+
+Linux preview rendering uses `QT_QPA_PLATFORM=offscreen`. Rendered sample data is
+explicitly labeled and never loaded by the normal app. Native Windows visual,
+font/DPI, system window controls and physical recovery acceptance remain separate.
+
 ### What the new preview actually does
 
-- **Overview:** locally rendered crimson-moon ruins art, real Windows drive
-  capacity, launcher counts, actual findings and manual scan/cancel. No
-  fabricated reclaimed-space numbers.
+- **Overview:** local reference artwork, real scan counts, audit activity,
+  logged Recycle Bin bytes, a complete library shelf and visible scan/cancel.
 - **Games:** Steam, Epic, GOG, EA, verified Battle.net/Blizzard publisher
   entries, Ubisoft, Riot and user-identified launchers appear in **one
   filterable list** whenever local installation evidence exists. Unsupported
