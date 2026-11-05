@@ -85,6 +85,8 @@ class ScanTests(ScanFixture, unittest.TestCase):
         self.assertEqual(result.files, [])
         steam_report = next(r for r in result.source_reports if r["source"] == "Steam")
         self.assertEqual(set(steam_report["paths"]), {str(self.steam), str(self.second)})
+        epic_report = next(r for r in result.source_reports if r["source"] == "Epic Games")
+        self.assertIn("Manifests", epic_report["paths"][0])
         self.assertEqual(stages[-1][0], 100)
         self.assertTrue(self.xbox.joinpath("game.exe").is_file())
 

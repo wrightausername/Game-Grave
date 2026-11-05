@@ -146,17 +146,30 @@ def custom_library_folders(roots: list[str], cancel: Cancel = None) -> list[Laun
 def find_launcher_games(custom_roots=None, cancel: Cancel = None, programdata: Path | None = None,
                         report=None):
     """Keep working launcher inventories when another source is unavailable."""
+    from core import windows_fixed_drives
+    base = Path(programdata or os.environ.get('PROGRAMDATA', 'C:/ProgramData'))
+    selected = list(custom_roots or [])
     providers = (
-        ("Epic Games", lambda: epic_games(programdata, cancel)),
-        ("GOG", lambda: gog_registry(cancel)),
-        ("Riot Games", lambda: riot_games(programdata, cancel)),
-        ("EA / Ubisoft / Rockstar", lambda: vendor_registry_games(cancel)),
-        ("Battle.net", lambda: blizzard_uninstall_records(cancel)),
-        ("Xbox (PC)", lambda: xbox_games(custom_roots or [], cancel)),
-        ("Custom libraries", lambda: custom_library_folders(custom_roots or [], cancel)),
+        ("Epic Games", lambda: epic_games(programdata, cancel),
+         [str(base / 'Epic/EpicGamesLauncher/Data/Manifests')], "Epic installation manifests"),
+        ("GOG", lambda: gog_registry(cancel),
+         [r'HKLM\SOFTWARE\GOG.com\Games (32/64-bit)'], "GOG game installation registry records"),
+        ("Riot Games", lambda: riot_games(programdata, cancel),
+         [str(base / 'Riot Games/Metadata')], "Riot product settings"),
+        ("EA / Ubisoft / Rockstar", lambda: vendor_registry_games(cancel),
+         [r'HKLM/HKCU\SOFTWARE\EA Games; Electronic Arts\EA Games; Ubisoft\Launcher\Installs; Rockstar Games (32/64-bit)'],
+         "Known launcher game registry records"),
+        ("Battle.net", lambda: blizzard_uninstall_records(cancel),
+         [r'HKLM/HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall (32/64-bit)'],
+         "Recognized Blizzard games with publisher and existing install folder"),
+        ("Xbox (PC)", lambda: xbox_games(selected, cancel),
+         [str(drive / 'XboxGames') for drive in windows_fixed_drives()] + selected,
+         "XboxGames or selected folders with MicrosoftGame.config and an executable. Protected WindowsApps packages are outside this coverage."),
+        ("Custom libraries", lambda: custom_library_folders(selected, cancel),
+         selected, "Immediate subfolders in selected libraries; game installation unverified"),
     )
     found = []
-    for name, read in providers:
+    for name, read, paths, detail in providers:
         if cancel and cancel():
             raise InterruptedError("Launcher scan canceled")
         try:
@@ -165,7 +178,7 @@ def find_launcher_games(custom_roots=None, cancel: Cancel = None, programdata: P
             raise
         except (OSError, ValueError, RuntimeError) as exc:
             if report:
-                report(name, "Unavailable", 0, type(exc).__name__ + ": " + str(exc)[:180])
+                report(name, "Unavailable", 0, type(exc).__name__ + ": " + str(exc)[:180], paths)
             continue
         if name == "Custom libraries":
             xbox_folders = {str(Path(g.install_path).parent).casefold()
@@ -173,7 +186,7 @@ def find_launcher_games(custom_roots=None, cancel: Cancel = None, programdata: P
             rows = [g for g in rows if g.install_path.casefold() not in xbox_folders]
         found.extend(rows)
         if report:
-            report(name, "Checked", len(rows), "Supported local installation metadata")
+            report(name, "Checked", len(rows), detail, paths)
     unique = {(x.launcher, x.install_path.casefold()): x for x in found}
     return sorted(unique.values(), key=lambda g: (g.launcher, g.name.casefold()))
 

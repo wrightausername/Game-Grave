@@ -368,6 +368,7 @@ class OverviewScreens:
             for c, value in enumerate((result["source"], result["status"], str(result["count"]),
                                        "; ".join(result.get("paths", [])) or result["detail"])):
                 _text(table, i, c, value)
+            table.item(i, 3).setToolTip(result["detail"] + "\n" + "\n".join(result.get("paths", [])))
         table.setColumnWidth(0, 130)
         table.setColumnWidth(1, 90)
         table.setColumnWidth(2, 55)
