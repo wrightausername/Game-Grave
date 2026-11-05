@@ -1,0 +1,324 @@
+{
+  "fixture": "Explicit synthetic visual data; no user data or AI inference",
+  "covers": "Genuine local images when available; neutral missing-artwork states otherwise",
+  "capture_images": "Existing actual application screenshots used as synthetic review fixtures",
+  "platform": "linux",
+  "commit": "8b91246b53fdf18f1b5c7632ea7967d8dccd0bd5",
+  "source_reference": "Owner-supplied seven-page reference/running-UI comparison, left column",
+  "pixel_fidelity": "No automated claim of 1:1 equivalence",
+  "captures": [
+    {
+      "page": "Overview",
+      "file": "visual-review-overview-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1376,
+      "viewport_width": 1376,
+      "vertical_scroll_maximum": 0,
+      "sha256": "8684a00e89e289a7f81f2d96a5834029e5cb16478f647c46b99ba0ead9fa4433"
+    },
+    {
+      "page": "Ready Room",
+      "file": "visual-review-ready-room-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1376,
+      "viewport_width": 1376,
+      "vertical_scroll_maximum": 0,
+      "sha256": "63b619fed16e0d2a7adda51fb5a1c2bb47e0cb32cabb19b81053c6ba213ba77b"
+    },
+    {
+      "page": "Games",
+      "file": "visual-review-games-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1368,
+      "viewport_width": 1368,
+      "vertical_scroll_maximum": 135,
+      "sha256": "4d1188cf786969850b3b7e4590d99410a8dc37acc5620a7191ffa1170a697f62"
+    },
+    {
+      "page": "Mods",
+      "file": "visual-review-mods-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1368,
+      "viewport_width": 1368,
+      "vertical_scroll_maximum": 41,
+      "sha256": "dd91e48a93aaf6400bdc9635e84a1670f1ea021b3c34fc87f013092f5d39dc75"
+    },
+    {
+      "page": "Old Files",
+      "file": "visual-review-old-files-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1368,
+      "viewport_width": 1368,
+      "vertical_scroll_maximum": 133,
+      "sha256": "296bb9da324eb806588187661633ebc04bf48b08cc40fc04e704b265605d3bd2"
+    },
+    {
+      "page": "Other Storage",
+      "file": "visual-review-other-storage-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1368,
+      "viewport_width": 1368,
+      "vertical_scroll_maximum": 224,
+      "sha256": "079c743b15dc7d67c11af68c439c831f0b7f4257754d5186f6f18414d88af1f5"
+    },
+    {
+      "page": "Captures",
+      "file": "visual-review-captures-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1376,
+      "viewport_width": 1376,
+      "vertical_scroll_maximum": 0,
+      "sha256": "80e768212150308840e7d4e4c0856ed865f3122fdac4563ec7efa79ee289fa37"
+    },
+    {
+      "page": "Graveyard",
+      "file": "visual-review-graveyard-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1368,
+      "viewport_width": 1368,
+      "vertical_scroll_maximum": 19,
+      "sha256": "33eb933572e40253d2032b60a4a11bfdb03cccb5493815d183c40546eefcf704"
+    },
+    {
+      "page": "Game DNA",
+      "file": "visual-review-game-dna-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1368,
+      "viewport_width": 1368,
+      "vertical_scroll_maximum": 50,
+      "sha256": "364b1cbb6f4f80e5278ad4c82cfc5bdac7bf173e2890daafbf0a2fbb39b3c2f2"
+    },
+    {
+      "page": "Undo Center",
+      "file": "visual-review-undo-center-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1368,
+      "viewport_width": 1368,
+      "vertical_scroll_maximum": 44,
+      "sha256": "2dca0c2ce9154a8a99f86e82890c28d322d0b9cab7152a4353f4a4d12b8a37f7"
+    },
+    {
+      "page": "AI Assistant",
+      "file": "visual-review-ai-assistant-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1376,
+      "viewport_width": 1376,
+      "vertical_scroll_maximum": 0,
+      "sha256": "e844c68341a30cd3495dcf62e9893a230b0c28f782b70462f85eb07ee08b0796"
+    },
+    {
+      "page": "Settings",
+      "file": "visual-review-settings-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1368,
+      "viewport_width": 1368,
+      "vertical_scroll_maximum": 2,
+      "sha256": "302e2805fc402e960bd94fe6b8f259b31cfc6b718f72578067ad3ad002d412c5"
+    },
+    {
+      "page": "More Tools",
+      "file": "visual-review-more-tools-1672.png",
+      "size": [
+        1672,
+        941
+      ],
+      "body_width": 1376,
+      "viewport_width": 1376,
+      "vertical_scroll_maximum": 0,
+      "sha256": "b7eaa6eeeba7a7d22cc2a15c9277f8f68f76dae44bd17c898cbb06cd82b196d4"
+    },
+    {
+      "page": "Overview",
+      "file": "visual-review-overview-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 166,
+      "sha256": "0ebac57e030e729d661ef193334e3664a0db81652dbcd2e8bd4b522db32e2717"
+    },
+    {
+      "page": "Ready Room",
+      "file": "visual-review-ready-room-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 928,
+      "sha256": "e8b6bed572665e59950639aa50938301535c91c3ab66ea99528d74a6cf2e6663"
+    },
+    {
+      "page": "Games",
+      "file": "visual-review-games-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 308,
+      "sha256": "a57178f330a0f6e959f4fce02c289bf11e69bea7cf18381d1d178135809bfee2"
+    },
+    {
+      "page": "Mods",
+      "file": "visual-review-mods-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 214,
+      "sha256": "f96aee116e06ac07b8ca5a39351bc6e4902aff55137c479338c8713ec32bcbe0"
+    },
+    {
+      "page": "Old Files",
+      "file": "visual-review-old-files-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 306,
+      "sha256": "cdbe1cee8b152415f84529b8e06f83fd42e14a57900459935d4e2d5822bdc052"
+    },
+    {
+      "page": "Other Storage",
+      "file": "visual-review-other-storage-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 426,
+      "sha256": "05c1e8a266c604cff87f5a988160fa8c6cae20d9c9182f9de7d9b3d4898402af"
+    },
+    {
+      "page": "Captures",
+      "file": "visual-review-captures-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1070,
+      "viewport_width": 1070,
+      "vertical_scroll_maximum": 0,
+      "sha256": "92a91005adc1c62b92839d76429756431c39a5ad66f45cd52ca163083dd3249e"
+    },
+    {
+      "page": "Graveyard",
+      "file": "visual-review-graveyard-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 312,
+      "sha256": "9b9eac3c1f07a4e64130ac3de85445ba276d38d693ad8428f2c8321a073f07da"
+    },
+    {
+      "page": "Game DNA",
+      "file": "visual-review-game-dna-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 321,
+      "sha256": "9a18f4636b3433a3392d25b85f4b40462f65a5d237782fda892d70994624232e"
+    },
+    {
+      "page": "Undo Center",
+      "file": "visual-review-undo-center-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 217,
+      "sha256": "0adf9e5887cd849d0d0efa82d914cc8646f9e531fd6ca3d8187cd09dae80ba5e"
+    },
+    {
+      "page": "AI Assistant",
+      "file": "visual-review-ai-assistant-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 78,
+      "sha256": "a76cc88bd0cef161486db0f5468d712cd6f3b81bb673511fbf2d9b91b6fbb375"
+    },
+    {
+      "page": "Settings",
+      "file": "visual-review-settings-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 775,
+      "sha256": "5689c74ff7487b87a5e07413a4e3e527f86e890722e730e9a69b39a45617aa33"
+    },
+    {
+      "page": "More Tools",
+      "file": "visual-review-more-tools-1366.png",
+      "size": [
+        1366,
+        768
+      ],
+      "body_width": 1062,
+      "viewport_width": 1062,
+      "vertical_scroll_maximum": 327,
+      "sha256": "9b6608145484c37ea02a4f51fb17cd26a6031d38ac4865fd57f8e9bc6e0f28c0"
+    }
+  ],
+  "reference_note": "Owner-supplied full-size Overview and Ready Room images. Workstation hero original is not mounted; existing photo fallback is explicitly documented."
+}
