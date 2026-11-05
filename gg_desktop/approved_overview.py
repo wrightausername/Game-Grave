@@ -19,7 +19,7 @@ from core import human_size, get_activity, friendly_activity
 from recovery import get_records
 from gg_desktop.widgets import HeroBanner, button, label
 from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
-from gg_desktop.reference_chrome import icon_pixmap, outline_icon
+from gg_desktop.reference_chrome import icon_pixmap, outline_icon, paint_focus
 
 COLORS = ('#54DCEC', '#D59BEA', '#F2B970', '#4EE4DC', '#D5A5EC')
 STORAGE_RED = '#F32742'
@@ -109,12 +109,14 @@ class MetricButton(QPushButton):
             p.setOpacity(alpha); p.fillRect(QRectF(0,y,w,2),glow)
         p.setOpacity(1); p.setPen(QPen(QColor('#41474E'),1))
         p.drawLine(w-1,17,w-1,59)
+        paint_focus(p,self)
 
 
 class EdgeAction(QPushButton):
     def __init__(self,title,handler,icon=None,height=44):
         super().__init__(title); self.icon_name=icon or title
         self.setAccessibleName(title); self.clicked.connect(handler)
+        self.setToolTip(title)
         self.setObjectName('referenceEdgeAction'); self.setFixedHeight(height)
         self.setStyleSheet(f'QPushButton#referenceEdgeAction{{background:transparent;border:0;padding:0;min-height:{height}px;max-height:{height}px;}}')
 
@@ -123,10 +125,11 @@ class EdgeAction(QPushButton):
         if self.underMouse(): p.fillRect(self.rect(),QColor(91,39,51,45))
         p.setPen(QPen(QColor('#2C3239'),1)); p.drawLine(0,self.height()-1,self.width(),self.height()-1)
         p.drawPixmap(5,(self.height()-28)//2,28,28,icon_pixmap(self.icon_name,'#EFF0F2',28))
-        p.setFont(_font(16)); p.setPen(QColor('#E8E9EC'))
+        p.setFont(_font(14 if self.width()<240 else 16)); p.setPen(QColor('#E8E9EC'))
         text=p.fontMetrics().elidedText(self.text(),Qt.ElideRight,max(40,self.width()-78))
         p.drawText(QRectF(53,0,self.width()-77,self.height()),Qt.AlignVCenter,text)
         p.drawPixmap(self.width()-24,(self.height()-17)//2,17,17,icon_pixmap('chevron','#DFE2E6',17))
+        paint_focus(p,self)
 
 
 class CleanupButton(QPushButton):
@@ -255,6 +258,7 @@ class ActivityRow(QPushButton):
         p.setFont(_font(12)); p.setPen(QColor('#C5CBD3'))
         p.drawText(QRectF(self.width()-96,0,65,56),Qt.AlignRight|Qt.AlignVCenter,self.stamp)
         p.drawPixmap(self.width()-24,17,22,22,icon_pixmap(self.state_icon,self.state_color,22))
+        paint_focus(p,self)
 
 
 class LibraryCover(QPushButton):

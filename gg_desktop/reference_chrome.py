@@ -77,6 +77,13 @@ def outline_icon(name, color='#E9EBEE'):
     return QIcon(icon_pixmap(name, color))
 
 
+def paint_focus(painter,widget):
+    if widget.hasFocus():
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(QPen(QColor('#DA7D8E'),1,Qt.DotLine))
+        painter.drawRoundedRect(QRectF(widget.rect()).adjusted(2,2,-2,-2),3,3)
+
+
 class NavigationButton(QPushButton):
     def __init__(self, route):
         super().__init__(route)

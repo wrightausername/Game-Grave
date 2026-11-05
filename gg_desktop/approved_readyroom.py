@@ -14,7 +14,7 @@ from gg_desktop.approved_overview import (
     DashboardHero,MetricButton,CleanupButton,EdgeAction,load_cover,
     _font,_line,_stack,_txt,_link)
 from gg_desktop.reference_hero import ReferenceHero
-from gg_desktop.reference_chrome import GlassPanel,icon_pixmap
+from gg_desktop.reference_chrome import GlassPanel,icon_pixmap,paint_focus
 from gg_desktop.responsive import ResponsiveRow,ResponsiveGrid
 
 
@@ -62,6 +62,7 @@ class RoomGameRow(QPushButton):
         p.drawRoundedRect(badge,7,7); p.setPen(QColor('#DEBA78' if self.patch else '#72D7AC')); p.setFont(_font(13))
         status='Installed' if str(self.game.status).lower().startswith('installed') else 'Review record'
         p.drawText(badge,Qt.AlignCenter,'Not connected' if self.patch else status)
+        paint_focus(p,self)
 
 
 def _room_panel(title,subtitle,icon,accent='#A13C4C',trailing=None):
@@ -99,7 +100,12 @@ def render_approved_readyroom(window):
         item=page.content.takeAt(i); widget=item.widget()
         if widget is None: continue
         if widget.findChildren(QTableWidget,'readyRoomTable'):
-            retained=widget; widget.hide()
+            # The old workspace also contained a second Patch Watch column.
+            # Keep its working library alone so the disclosed view fits
+            # narrow windows and doesn't duplicate the new summary panels.
+            retained=widget.findChild(QWidget,'readyRoomLineup')
+            retained.hide(); retained.setParent(None)
+            widget.hide(); widget.setParent(None); widget.deleteLater()
         else:
             widget.hide(); widget.setParent(None); widget.deleteLater()
     page.content.setContentsMargins(18,0,12,10); page.content.setSpacing(0)
