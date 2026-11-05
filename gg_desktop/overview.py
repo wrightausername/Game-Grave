@@ -5,14 +5,16 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QRectF, QSize
-from PySide6.QtGui import QColor, QConicalGradient, QLinearGradient, QPainter, QPen
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
     QGridLayout, QLabel, QLayout, QListWidget, QPushButton, QSizePolicy, QWidget,
 )
 from core import get_activity, friendly_activity, human_size, save_settings
 from recovery import get_records
-from gg_desktop.insight_models import storage_items
+from gg_desktop.insight_models import storage_items, overview_storage_segments
+from gg_desktop.insight_widgets import FootprintRing
+from gg_desktop.artwork import game_app_id
 from gg_desktop.library_screens import _table, _text, _widget
 from gg_desktop.reference_widgets import (
     CARD_ROLE, CoverGrid, draw_crop, icon, pixel_font, tool,
@@ -118,31 +120,15 @@ class OverviewMetric(QPushButton):
             p.drawRect(self.rect().adjusted(2, 2, -3, -3))
 
 
-class OverviewRing(QWidget):
-    def __init__(self, amount):
-        super().__init__()
-        self.amount = amount
+class OverviewRing(FootprintRing):
+    def __init__(self, segments, *, scanned=False):
+        super().__init__(caption="DETECTED STORAGE")
         self.setMinimumSize(170, 178)
         self.setMaximumWidth(190)
-        self.setAccessibleName(human_size(amount) + " logged Recycle Bin moves this month, not measured free space")
-        self.setToolTip("Decorative ring around logged Recycle Bin bytes; not a percentage or verified reclaimed space.")
-
-    def paintEvent(self, event):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        side = min(self.width(), self.height()) - 30
-        circle = QRectF((self.width() - side) / 2, (self.height() - side) / 2, side, side)
-        gradient = QConicalGradient(circle.center(), 90)
-        for stop, color in ((0, "#ff3353"), (.35, "#bb0e30"), (.72, "#f3274c"), (.85, "#31323f"), (1, "#4c2434")):
-            gradient.setColorAt(stop, QColor(color))
-        p.setPen(QPen(gradient, 21))
-        p.drawEllipse(circle)
-        p.setPen(QColor("#f3f5f8"))
-        p.setFont(pixel_font(22, True))
-        p.drawText(circle.adjusted(0, -8, 0, 0), Qt.AlignCenter, human_size(self.amount))
-        p.setFont(pixel_font(10))
-        p.setPen(QColor("#c8cbd3"))
-        p.drawText(circle.adjusted(0, 32, 0, 0), Qt.AlignCenter, "Logged moves")
+        total = sum(size for _, size, _ in segments)
+        self.set_segments(segments, human_size(total) if total else "No size data" if scanned else "Not scanned")
+        self.setToolTip("Detected storage by reported bytes; nested locations count once.\n" +
+            "\n".join(f"{name}: {human_size(size)} ({size / total:.1%})" for name, size, _ in segments if total))
 
 
 def section(title, symbol, trailing=None):
@@ -282,20 +268,25 @@ class OverviewScreens:
             except (ValueError, TypeError):
                 continue
         chart = row(spacing=9)
-        chart.addWidget(OverviewRing(amount))
+        segments = overview_storage_segments(self.inventory)
+        total = sum(size for _, size, _ in segments)
+        self.overview_ring = OverviewRing(segments, scanned=found)
+        chart.addWidget(self.overview_ring)
         legend = column(spacing=12)
-        for name, value, color in (("Old Files", values[2][1], "#f0bc78"),
-            ("Other Storage", values[3][1], "#40d8d3"), ("Mod Locations", values[1][1], "#ce8fe5"),
-            ("Captures", human_size(sum(r.size for r in self.inventory.screenshots + self.inventory.recordings)), "#778dff")):
+        for name, size, color in segments:
             line = row(spacing=6)
-            line.addWidget(label("●  " + name, "caption"), 1)
-            value_label = label(value if found else "Not scanned", "subtle")
-            value_label.setStyleSheet("color:" + color + ";font-size:12px;")
+            swatch = label("●")
+            swatch.setStyleSheet("color:" + color + ";font-size:14px;")
+            line.addWidget(swatch)
+            line.addWidget(label(name, "caption"), 1)
+            percent = "<0.1%" if total and 0 < size / total < .001 else f"{size / total:.1%}" if total else "0%"
+            value_label = label((human_size(size) + " · " + percent) if found else "Not scanned", "subtle")
+            value_label.setStyleSheet("color:" + color + ";font-size:11px;")
             line.addWidget(value_label)
             legend.addWidget(_widget(line))
         chart.addLayout(legend, 1)
         contents.addWidget(_widget(chart), 1)
-        contents.addWidget(label("Logged Recycle Bin moves are not confirmed free space.", "caption", wrap=True))
+        contents.addWidget(label("Logged moves this month: " + human_size(amount) + ". Not confirmed free space.", "caption", wrap=True))
         contents.addWidget(tool("Review Cleanup", "sparkles", lambda: self.navigate("Graveyard"), kind="primary"))
 
         actions, quick = section("Quick Actions", "sparkles")
@@ -311,13 +302,14 @@ class OverviewScreens:
 
         library, shelf = section("Your Library", "game", button("View All Games →", lambda: self.navigate("Games"), kind="link"))
         self.overview_library = OverviewLibrary()
+        self.overview_library.set_artwork(self.artwork)
         self.overview_library.setAccessibleName("Your detected game library")
         games = list(self.inventory.games)
         for game in games:
             from PySide6.QtWidgets import QListWidgetItem
             item = QListWidgetItem(game.name)
             item.setToolTip(game.name + " · " + game.launcher)
-            item.setData(CARD_ROLE, {"name": game.name, "source": game.launcher,
+            item.setData(CARD_ROLE, {"name": game.name, "source": game.launcher, "steam_app_id": game_app_id(game),
                 "size": human_size(game.size_bytes) if game.size_bytes is not None else "Unknown"})
             self.overview_library.addItem(item)
         self.overview_library.itemActivated.connect(self._overview_inspect_game)

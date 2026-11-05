@@ -63,6 +63,7 @@ def default_settings() -> dict:
         "never_touch": [],
         "scan_on_launch": False,
         "desktop_favorites": [],  # presentation only; never grants file permissions
+        "steam_artwork_downloads": True,
         "save_review_paths": [],
         "graveyard_watchlist": [],
         "recording_roots": [],  # Optional user-chosen capture folders, read-only scan

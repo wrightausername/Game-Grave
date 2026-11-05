@@ -53,6 +53,7 @@ def main():
                          "ea11", None, "Registry installation record"),
         ]
         window = CrimsonWindow()
+        window.artwork.allow_downloads = False
         window.show()
         app.processEvents()
         try:

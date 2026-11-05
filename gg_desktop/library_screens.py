@@ -18,6 +18,7 @@ from cleanup_actions import recycle_old_files
 from screenshots import looks_like_screenshot
 from ui_paging import page_window
 from gg_desktop.backend import refresh_graveyard
+from gg_desktop.artwork import game_app_id
 from gg_desktop.library_models import launcher_bucket, file_kind, mod_view, old_file_rows
 from gg_desktop.models import readable_bytes, _path_key
 from gg_desktop.reference_widgets import (
@@ -172,6 +173,7 @@ class LibraryScreens:
         self.game_sort.setFixedWidth(120)
         searchbar.addWidget(self.game_sort)
         self.game_grid = CoverGrid()
+        self.game_grid.set_artwork(self.artwork)
         self.game_grid.setAccessibleName("Game library covers")
         searchbar.addWidget(label("View:", "caption"))
         searchbar.addWidget(_view_switch(self.game_grid.set_mode))
@@ -200,6 +202,11 @@ class LibraryScreens:
         contents.addWidget(self.game_grid, 1)
         self.game_count = label("", "caption")
         contents.addWidget(self.game_count)
+        art_controls = row(spacing=6)
+        self.game_artwork_status = label("Steam artwork loads automatically from cache or Steam.", "caption", wrap=True)
+        art_controls.addWidget(self.game_artwork_status, 1)
+        art_controls.addWidget(tool("Reload Artwork", "refresh", self._reload_game_artwork))
+        contents.addWidget(_widget(art_controls))
         self.game_details = DetailPanel()
         self.game_details_col = self.game_details.content
         page.content.addWidget(_split(library, _detail_scroll(self.game_details), [740, 282]), 1)
@@ -260,7 +267,7 @@ class LibraryScreens:
                 item = QListWidgetItem(g.name)
                 item.setToolTip(g.name + "\n" + g.launcher + " · " + g.status)
                 item.setData(CARD_ROLE, {"name": g.name, "size": readable_bytes(g.size_bytes),
-                                        "source": g.launcher, "favorite": g.key in favorites,
+                                        "source": g.launcher, "steam_app_id": game_app_id(g), "favorite": g.key in favorites,
                                         "status_icon": "check" if g.status.startswith("Installed") else "shield"})
                 self.game_grid.addItem(item)
             selected = next((i for i, g in enumerate(rows) if current and g.key == current.key), 0)
@@ -274,6 +281,20 @@ class LibraryScreens:
         self.game_count.setText(f"{len(rows):,} games shown · Local library" if self.inventory.scanned_at else "No scan yet · Nothing has been changed")
         self._game_details()
         self.game_grid.doItemsLayout()
+        self._update_game_artwork_status()
+
+    def _reload_game_artwork(self):
+        self.artwork.retry()
+        self.game_grid.viewport().update()
+        self._game_details()
+
+    def _update_game_artwork_status(self):
+        ids = {app_id for g in self._shown_games if (app_id := game_app_id(g))}
+        ready = sum((app_id, "cover") in self.artwork.images for app_id in ids)
+        missing = sum((app_id, "cover") in self.artwork.failed for app_id in ids)
+        pending = sum((app_id, "cover") in self.artwork.pending for app_id in ids)
+        self.game_artwork_status.setText(f"Steam artwork: {ready} ready · {pending} loading" +
+            (f" · {missing} unavailable — Reload Artwork to retry" if missing else "") if ids else "Steam artwork loads automatically for detected Steam games.")
 
     def _current_game(self):
         index = self.game_grid.currentRow() if hasattr(self, "game_grid") else -1
@@ -291,7 +312,7 @@ class LibraryScreens:
             contents.addWidget(label("Select a game to see its installation, launcher, source evidence and available actions.", "subtle", wrap=True))
             contents.addStretch()
             return
-        contents.addWidget(CoverArt(game.name, height=101))
+        contents.addWidget(CoverArt(game.name, height=101, artwork=self.artwork, app_id=game_app_id(game)))
         heading = row(spacing=4)
         heading.addWidget(label(game.name, "detailTitle", wrap=True), 1)
         favorite = game.key in self.settings.get("desktop_favorites", [])

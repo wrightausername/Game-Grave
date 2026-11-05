@@ -3,7 +3,7 @@
 ; UNSIGNED and NOT publicly released. Production Qt LGPL/redistribution, signing,
 ; payment and consumer Windows release acceptance remain open.
 #define AppName "Game Grave Crimson Preview"
-#define AppVersion "0.1.1"
+#define AppVersion "0.1.2"
 #define AppExe "GameGrave-Crimson-Preview.exe"
 
 [Setup]

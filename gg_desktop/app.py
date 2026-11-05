@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from core import load_settings, log_event
 from gg_desktop import __version__
 from gg_desktop.backend import Inventory, scan_inventory
+from gg_desktop.artwork import SteamArtwork, game_app_id
 from gg_desktop.theme import STYLE
 from gg_desktop.widgets import label, button, row, column, ScrollPage
 from gg_desktop.screens import ScreenMethods
@@ -100,6 +101,8 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         self.cancel = threading.Event()
         self.workers = {}
         self.pool = QThreadPool.globalInstance()
+        self.artwork = SteamArtwork(self, allow_downloads=self.settings.get("steam_artwork_downloads", True))
+        self.artwork.changed.connect(self._artwork_updated)
         self.current_route = "Overview"
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.setWindowTitle("Game Grave  |  Crimson Command " + __version__)
@@ -265,6 +268,10 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
         super().mousePressEvent(event)
 
     def page_for(self, title: str) -> ScrollPage:
+        roots = [g.library for g in self.inventory.steam]
+        roots += [p for r in self.inventory.source_reports if r["source"] == "Steam" for p in r.get("paths", [])]
+        roots += list(self.settings.get("steam_extra_roots", []))
+        self.artwork.set_library(self.inventory.games, roots)
         if self.page is not None:
             self.stack_layout.removeWidget(self.page)
             self.page.hide()
@@ -291,6 +298,17 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
             control.style().unpolish(control)
             control.style().polish(control)
         return self.page
+
+    @Slot(str, str)
+    def _artwork_updated(self, app_id, kind):
+        if self.current_route == "Games" and hasattr(self, "game_artwork_status"):
+            self._update_game_artwork_status()
+        if self.current_route == "Game DNA" and kind == "cover":
+            for i, game in enumerate(getattr(self, "_shown_dna_games", [])):
+                if game_app_id(game) == app_id:
+                    pixmap = self.artwork.pixmap(app_id)
+                    if pixmap is not None:
+                        self.dna_games.item(i).setIcon(QIcon(pixmap))
 
     def navigate(self, route: str):
         route = ROUTE_ALIASES.get(route, route)
@@ -417,6 +435,7 @@ class CrimsonWindow(ScreenMethods, QMainWindow):
                        "Cancel the scan or finish the approved recovery operation before closing.")
             event.ignore()
             return
+        self.artwork.close()
         super().closeEvent(event)
 
 

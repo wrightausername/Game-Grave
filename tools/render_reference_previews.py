@@ -38,6 +38,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="GG-Design-Fixtures-") as temp:
         root = Path(temp)
         settings = default_settings()
+        settings["steam_artwork_downloads"] = False
         settings["scan_folder"] = str(root / "Downloads")
         Path(settings["scan_folder"]).mkdir()
         titles = [

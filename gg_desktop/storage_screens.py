@@ -618,7 +618,8 @@ class StorageScreens:
                                    age_text(game.last_played_at) if game.last_played_at is not None else "Unknown", "Linked" if match else "Unverified")):
             self.dna_metrics.set_value(i, value)
         intro = row(spacing=10)
-        art = CoverArt(game.name, height=80)
+        from gg_desktop.artwork import game_app_id
+        art = CoverArt(game.name, height=80, artwork=self.artwork, app_id=game_app_id(game))
         art.setMaximumWidth(270)
         intro.addWidget(art, 1)
         text = column(spacing=4)

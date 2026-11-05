@@ -8,7 +8,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QRect, QRectF, QSize, Signal
+from PySide6.QtCore import Qt, QRect, QRectF, QSize, Signal, Slot
 from PySide6.QtGui import (
     QColor, QFont, QIcon, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
 )
@@ -399,8 +399,13 @@ def cover_crop(name):
                  if any(part in name.casefold() for part in names)), None)
 
 
-def draw_cover(painter, area, name, *, wide=False):
+def draw_cover(painter, area, name, *, wide=False, pixmap=None):
     painter.fillRect(area, QColor("#101b25"))
+    if pixmap is not None and not pixmap.isNull():
+        scaled = pixmap.scaled(area.size().toSize(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        painter.drawPixmap(area.toRect(), scaled, QRect((scaled.width() - int(area.width())) // 2,
+            (scaled.height() - int(area.height())) // 2, int(area.width()), int(area.height())))
+        return
     crop = cover_crop(name)
     if crop:
         if wide and "cyberpunk" in name.casefold():
@@ -432,12 +437,20 @@ def cover_icon(name):
 
 
 class CoverArt(QWidget):
-    def __init__(self, name, *, height=96):
+    def __init__(self, name, *, height=96, artwork=None, app_id=None):
         super().__init__()
         self.name = name
+        self.artwork, self.app_id = artwork, app_id
+        if artwork is not None:
+            artwork.changed.connect(self._artwork_changed)
         self.setFixedHeight(height)
         self.setMinimumWidth(0)
-        self.setAccessibleName("Artwork for " + name if cover_crop(name) else "Game Grave artwork")
+        self.setAccessibleName("Artwork for " + name if app_id or cover_crop(name) else "Game Grave artwork")
+
+    @Slot(str, str)
+    def _artwork_changed(self, app_id, kind):
+        if app_id in ("", self.app_id):
+            self.update()
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -445,7 +458,10 @@ class CoverArt(QWidget):
         path = QPainterPath()
         path.addRoundedRect(QRectF(self.rect()), 5, 5)
         p.setClipPath(path)
-        draw_cover(p, QRectF(self.rect()), self.name, wide=True)
+        pixmap = self.artwork.pixmap(self.app_id, "header") if self.artwork and self.app_id else None
+        if pixmap is None and self.artwork and self.app_id:
+            pixmap = self.artwork.images.get((self.app_id, "cover"))
+        draw_cover(p, QRectF(self.rect()), self.name, wide=True, pixmap=pixmap)
 
 
 CARD_ROLE = int(Qt.UserRole) + 1
@@ -475,7 +491,9 @@ class CoverDelegate(QStyledItemDelegate):
             art = QRectF(area.left(), area.top(), 66, area.height())
         else:
             art = area.adjusted(1, 1, -1, -22)
-        draw_cover(painter, art, data.get("art_name", name))
+        service = getattr(self.parent(), "artwork", None)
+        pixmap = service.pixmap(data.get("steam_app_id")) if service and data.get("steam_app_id") else None
+        draw_cover(painter, art, data.get("art_name", name), pixmap=pixmap)
         if self.list_mode:
             painter.setPen(QColor("#f1f3f6"))
             painter.setFont(pixel_font(13, True))
@@ -499,7 +517,7 @@ class CoverDelegate(QStyledItemDelegate):
                 painter, QRect(int(area.left() + 7), int(area.top() + 5), 17, 17))
             icon("star", "#ffcc1f" if data.get("favorite") else "#d1b757", 17).paint(
                 painter, QRect(int(area.right() - 23), int(area.top() + 5), 17, 17))
-            if not cover_crop(data.get("art_name", name)) or data.get("art_name", name) != name:
+            if pixmap is not None or not cover_crop(data.get("art_name", name)) or data.get("art_name", name) != name:
                 painter.setFont(pixel_font(14, True))
                 painter.setPen(QColor("#f5f5f8"))
                 painter.drawText(area.adjusted(9, 32, -8, -29), Qt.AlignBottom | Qt.TextWordWrap, name)
@@ -546,6 +564,14 @@ class CoverGrid(QListWidget):
         self.setItemDelegate(self.delegate)
         self.set_mode("grid")
         self.setMinimumSize(180, 180)
+
+    def set_artwork(self, artwork):
+        self.artwork = artwork
+        artwork.changed.connect(self._artwork_changed)
+
+    @Slot(str, str)
+    def _artwork_changed(self, app_id, kind):
+        self.viewport().update()
 
     def set_mode(self, mode):
         self.delegate.list_mode = mode == "list"

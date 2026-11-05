@@ -40,6 +40,7 @@ class ReferenceDesktopTests(unittest.TestCase):
         self.profile.start()
         self.addCleanup(self.profile.stop)
         settings = default_settings()
+        settings["steam_artwork_downloads"] = False
         settings["scan_folder"] = str(self.root / "Downloads")
         Path(settings["scan_folder"]).mkdir()
         with patch("gg_desktop.app.load_settings", return_value=settings):

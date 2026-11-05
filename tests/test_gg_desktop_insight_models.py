@@ -5,10 +5,22 @@ import unittest
 
 from core import ModFolder, OldFile
 from gg_desktop.backend import Inventory
-from gg_desktop.insight_models import capture_items, capture_owner, dna_footprint, history_items, storage_items
+from gg_desktop.insight_models import capture_items, capture_owner, dna_footprint, history_items, storage_items, overview_storage_segments
 
 
 class InsightModelTests(unittest.TestCase):
+    def test_overview_pie_uses_disjoint_byte_totals_and_matching_colors(self):
+        cache = ModFolder("Shaders", "/Steam/shadercache", "", "Shader cache", (), 200, 2, False, "Steam shader cache")
+        mod = replace(cache, path="/Mods/Test", status="Installed: possible mods", source="Vortex", apparent_bytes=300)
+        capture = OldFile("/Captures/test.png", 400, 0)
+        inv = Inventory(mods=[cache, mod], files=[OldFile("/Downloads/old.zip", 100, 0),
+            capture, OldFile("/Mods/Test/already-in-parent.log", 50, 0)], screenshots=[capture])
+        segments = overview_storage_segments(inv)
+        self.assertEqual([(name, size) for name, size, _ in segments],
+            [("Old Files", 100), ("Other Storage", 200), ("Mods", 300), ("Captures", 400)])
+        self.assertEqual(len({color for _, _, color in segments}), 4)
+        self.assertEqual(sum(size for _, size, _ in segments), 1000)
+
     def test_storage_does_not_double_count_nested_cache_records(self):
         parent = ModFolder("Shaders", "/library/shadercache/42", "", "Shader cache", (), 1000, 10, False, "Steam shader cache")
         child = replace(parent, name="Nested", path="/library/shadercache/42/subfolder", apparent_bytes=600)

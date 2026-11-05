@@ -96,6 +96,18 @@ their age thresholds. Scanning reads metadata without opening capture content.
 The remaining reference navigation links open existing local tools or scan
 evidence. The AI Assistant page states that no conversational AI is connected.
 
+Overview's storage pie now divides actual reported bytes into Old Files, Other
+Storage, Mods and Captures, using the same colors and percentages as its legend.
+Duplicate paths and nested locations count once. Recycle history is shown
+separately and does not determine the pie's slices.
+
+Steam covers load automatically in Games, Overview's library and game details.
+Game Grave reads both current hashed and older Steam artwork caches and custom
+Steam grid images. Missing covers download from the public Steam image CDN in a
+separate background pool and are cached for offline use. Requests contain numeric
+Steam app IDs; game files and account credentials are not uploaded. Settings can
+disable artwork downloads, and Games has a Reload Artwork control to retry.
+
 Run the disposable integration checks and generate sample design previews:
 
 ```powershell

@@ -52,6 +52,7 @@ class ScanFixture:
         for provider in ("gog_registry", "vendor_registry_games", "blizzard_uninstall_records"):
             self.stack.enter_context(patch("launchers." + provider, return_value=[]))
         self.settings = core.default_settings()
+        self.settings["steam_artwork_downloads"] = False
         self.settings.update(scan_on_launch=False, scan_folder=str(self.root / "Downloads"),
                              screenshot_roots=[str(self.root / "Captures")], recording_roots=[str(self.root / "Captures")])
         Path(self.settings["scan_folder"]).mkdir()

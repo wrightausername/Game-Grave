@@ -14,7 +14,7 @@ import uuid
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
+    QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMessageBox, QProgressBar, QPushButton, QSizePolicy, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
@@ -335,6 +335,21 @@ class ScreenMethods(OverviewScreens, RecoveryScreens, StorageScreens, LibraryScr
             "subtle", wrap=True))
         contents.addWidget(button("Choose Old Files folder…", self._choose_scan_folder))
         contents.addWidget(button("Game Libraries & Scan Locations…", self.open_scan_locations))
+        artwork_downloads = QCheckBox("Download missing Steam artwork automatically")
+        artwork_downloads.setChecked(self.settings.get("steam_artwork_downloads", True))
+        artwork_downloads.setToolTip("Uses public Steam cover images and keeps a local cache for offline use.")
+        def set_artwork_downloads(enabled):
+            updated = dict(self.settings, steam_artwork_downloads=enabled)
+            try:
+                save_settings(updated)
+            except (OSError, ValueError) as exc:
+                self.error("Artwork preference not saved", str(exc))
+                return
+            self.settings = updated
+            self.artwork.allow_downloads = enabled
+            self.artwork.retry()
+        artwork_downloads.toggled.connect(set_artwork_downloads)
+        contents.addWidget(artwork_downloads)
         contents.addWidget(label(
             "Automatic cleanup remains OFF. Every actual Recycle Bin move "
             "requires separate approval.", "warning", wrap=True))

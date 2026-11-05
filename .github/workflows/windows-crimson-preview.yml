@@ -9,6 +9,7 @@ on:
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop*.py'
       - 'tools/windows_crimson_ui_smoke.py'
+      - 'tools/windows_steam_artwork_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
   pull_request:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop*.py'
       - 'tools/windows_crimson_ui_smoke.py'
+      - 'tools/windows_steam_artwork_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
 
 concurrency:
@@ -56,6 +58,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
+          python tools/windows_steam_artwork_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw 'Native Steam artwork download and offline reuse failed.' }
       - name: Upload actual Qt screen captures for design review
         uses: actions/upload-artifact@v4
         with:

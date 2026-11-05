@@ -14,6 +14,8 @@ from gg_desktop.models import _path_key
 
 STORAGE_TYPES = ("Caches", "Shader Cache", "Config / Settings", "Logs / Reports", "Temporary Files", "Other")
 STORAGE_COLORS = ("#16bdf5", "#ffc326", "#ef47ac", "#568aff", "#bd5bdf", "#a8b5c6")
+OVERVIEW_CATEGORIES = (("Old Files", "#f0bc78"), ("Other Storage", "#40d8d3"),
+                       ("Mods", "#ce8fe5"), ("Captures", "#778dff"))
 
 
 @dataclass(frozen=True)
@@ -55,6 +57,31 @@ def storage_items(inventory):
         if not any(item.key == p.key or item.key.startswith(p.key.rstrip("\\") + "\\") for p in output):
             output.append(item)
     return output
+
+
+def overview_storage_segments(inventory):
+    """Disjoint reported bytes, with the same categories in the pie and legend.
+
+    Capture and cache records take precedence over generic file/mod records at
+    the same path. A measured parent already includes its descendants; unknown
+    sizes, game install totals and recycle history are not pie slices.
+    """
+    rows = [(r.record.path, r.record.size, "Captures", 0) for r in capture_items(inventory)]
+    rows += [(r.path, r.size, "Other Storage", 1) for r in storage_items(inventory)]
+    rows += [(r.path, r.apparent_bytes, "Mods", 2) for r in inventory.mods]
+    rows += [(r.path, r.size, "Old Files", 3) for r in inventory.files]
+    candidates = [(_path_key(path), size, category, priority) for path, size, category, priority in rows
+                  if path and type(size) is int and size > 0]
+    accepted, totals = set(), dict.fromkeys((name for name, _ in OVERVIEW_CATEGORIES), 0)
+    for key, size, category, priority in sorted(candidates, key=lambda r: (r[0].count("\\"), r[0], r[3])):
+        if key in accepted:
+            continue
+        parts = key.split("\\")
+        if any("\\".join(parts[:i]) in accepted for i in range(1, len(parts))):
+            continue
+        accepted.add(key)
+        totals[category] += size
+    return [(name, totals[name], color) for name, color in OVERVIEW_CATEGORIES]
 
 
 def capture_identity(record):
