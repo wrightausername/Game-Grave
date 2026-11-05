@@ -1,0 +1,454 @@
+"""Approved Graveyard workspace: evidence, filtering, protection and explicit consent.
+
+This is an alternative view over the existing verified scanner and cleanup
+backend, not a second deletion implementation. All mutation flows delegate to
+ScreenMethods, which requires exact-item checks, Recycle Bin and Undo.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from PySide6.QtCore import Qt, QSize, QRectF
+from PySide6.QtGui import QColor, QBrush, QIcon, QPixmap, QPainter, QPen
+from PySide6.QtWidgets import (
+    QAbstractItemView, QCheckBox, QComboBox, QFrame,
+    QHBoxLayout, QLabel, QLineEdit, QScrollArea, QTableWidgetItem, QVBoxLayout, QWidget,
+)
+
+from core import human_size
+from graveyard_protection import protection_action
+from gg_desktop.reference_hero import ReferenceHero
+from gg_desktop.widgets import button, data_table, label, panel, row
+from gg_desktop.cinematic_art import CinematicImpactTrack
+from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
+from gg_desktop.reference_icons import metric_icon
+from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE, fit_evidence_columns
+from gg_desktop.graveyard_filters import (
+    SORT_OPTIONS, AGE_OPTIONS, available_drives, select_graveyard_entries,
+)
+
+
+def _label(text, color="#BDCAD7", size=11, bold=False):
+    result = label(str(text), "caption", wrap=True)
+    result.setStyleSheet(
+        "color:" + color + f";font-size:{size}px;"
+        + ("font-weight:800;" if bold else "")
+        + "background:transparent;")
+    return result
+
+
+def _stat(title, value, color):
+    from gg_desktop.visuals import nav_icon
+    frame = QFrame()
+    frame.setObjectName("approvedGraveStat")
+    line = QHBoxLayout(frame)
+    line.setContentsMargins(11, 6, 11, 6)
+    line.setSpacing(10)
+    icons = {
+        "Candidates": "Graveyard", "Potential size": "Other Storage",
+        "Reviewable": "Undo Center", "Protected": "Settings",
+    }
+    image = label("", "caption")
+    image.setPixmap(metric_icon(icons.get(title, "Graveyard"), color, 32))
+    image.setFixedSize(34,34)
+    line.addWidget(image)
+    text = QWidget()
+    col = QVBoxLayout(text)
+    col.setContentsMargins(0,0,0,0)
+    col.setSpacing(1)
+    col.addWidget(_label(title.upper(), "#BBC8D5", 11, True))
+    col.addWidget(_label(value, color, 24, True))
+    line.addWidget(text,1)
+    return frame
+
+
+def _size(entry):
+    return max(0, int(entry.apparent_bytes))
+
+
+def _age(entry):
+    return (str(entry.age_days) + " days"
+            if entry.age_days is not None else "Unknown")
+
+
+def _candidate_icon(category: str) -> QIcon:
+    """Crisp original red folder/file icon, never a guessed game logo."""
+    px = QPixmap(36, 36)
+    px.fill(Qt.transparent)
+    paint = QPainter(px)
+    paint.setRenderHint(QPainter.Antialiasing)
+    is_file = "screenshot" in category.casefold() or "recording" in category.casefold()
+    if is_file:
+        paint.setBrush(QColor("#A92239"))
+        paint.setPen(QPen(QColor("#FB5C6B"), 1.4))
+        paint.drawRoundedRect(QRectF(9, 5, 20, 27), 3, 3)
+        paint.setPen(QPen(QColor("#FFB2AF"), 1.2))
+        paint.drawLine(13, 14, 25, 14)
+        paint.drawLine(13, 19, 25, 19)
+        paint.drawLine(13, 24, 22, 24)
+    else:
+        paint.setPen(QPen(QColor("#FC6270"), 1.3))
+        paint.setBrush(QColor("#DB354C"))
+        paint.drawRoundedRect(QRectF(3, 11, 30, 21), 3, 3)
+        paint.setBrush(QColor("#F46B74"))
+        paint.drawRoundedRect(QRectF(4, 7, 13, 8), 2, 2)
+        paint.setBrush(QColor("#B91E36"))
+        paint.drawRoundedRect(QRectF(3, 14, 30, 18), 3, 3)
+    paint.end()
+    return QIcon(px)
+
+
+def render_approved_graveyard(window):
+    """Use the exact original safety logic with an improved review workspace."""
+    page = window.page_for("Graveyard")
+    page.content.setContentsMargins(11, 7, 11, 16)
+    page.content.setSpacing(10)
+    hero = ReferenceHero(
+        "graveyard", "Graveyard",
+        "Find and review old gaming files. You decide what gets removed.")
+    hero.setMinimumHeight(132)
+    hero.setMaximumHeight(132)
+    page.content.addWidget(hero)
+    if not window.inventory.scanned_at:
+        window._not_scanned(page)
+        return page
+
+    entries = window.inventory.graveyard
+    counts = ResponsiveGrid(columns=((0, 1), (490, 2), (970, 5)), spacing=7,
+                            stretches={5: (2, 2, 2, 2, 1)})
+    for title, value, color in (
+        ("Candidates", str(len(entries)), "#E8E8F3"),
+        ("Potential size", human_size(sum(_size(e) for e in entries)), "#4ED0ED"),
+        ("Reviewable", str(sum(bool(e.can_recycle) for e in entries)), "#E6A764"),
+        ("Protected", str(sum(not e.can_recycle for e in entries)), "#83DAB0"),
+    ):
+        counts.addWidget(_stat(title, value, color))
+    counts.addWidget(button("Scan Graveyard", window.start_scan, kind="primary"))
+    page.content.addWidget(counts)
+    page.content.addWidget(_label(
+        "Potential size is the apparent size of candidates, not verified free space. "
+        "Age by itself does not mean a file is safe to delete.", "#9EAFBF"))
+
+    filters = ResponsiveGrid(columns=((0, 1), (490, 2), (900, 3), (1250, 6)), spacing=7)
+    controls = filters
+    window.grave_search = QLineEdit()
+    window.grave_search.setPlaceholderText(
+        "Search item, path, launcher, source or detection evidence…")
+    window.grave_search.setAccessibleName("Search Graveyard evidence")
+    window.grave_search.setText(getattr(window, "_pending_grave_query", ""))
+    window._pending_grave_query = ""
+    controls.addWidget(window.grave_search)
+
+    window.grave_type = QComboBox()
+    window.grave_type.addItems(
+        ["All types"] + sorted({e.category for e in entries}))
+    window.grave_type.setAccessibleName("Filter by finding type")
+    controls.addWidget(window.grave_type)
+
+    window.grave_state = QComboBox()
+    window.grave_state.addItems([
+        "All findings", "Ready for review", "Protected / preview only"])
+    window.grave_state.setAccessibleName("Filter by protection state")
+    controls.addWidget(window.grave_state)
+
+    window.grave_drive = QComboBox()
+    window.grave_drive.addItems(
+        ["All drives"] + available_drives(entries))
+    window.grave_drive.setAccessibleName("Filter by drive")
+    controls.addWidget(window.grave_drive)
+
+    window.grave_age = QComboBox()
+    window.grave_age.addItems(list(AGE_OPTIONS))
+    window.grave_age.setAccessibleName("Filter by last modified age")
+    controls.addWidget(window.grave_age)
+
+    window.grave_sort = QComboBox()
+    window.grave_sort.addItems(list(SORT_OPTIONS))
+    window.grave_sort.setAccessibleName("Sort Graveyard candidates")
+    controls.addWidget(window.grave_sort)
+    page.content.addWidget(filters)
+
+    main = ResponsiveRow(breakpoint=980, spacing=8, horizontal_height=386)
+    main.setObjectName("graveyardWorkspace")
+    main_row = main
+    browser, bcol = panel(padding=9, spacing=7)
+    bcol.addWidget(_label("CANDIDATE FILES", "#F4F6F9", 14, True))
+    window.grave_table = data_table([
+        "ITEM", "SOURCE / TYPE", "GAME / RELATIONSHIP",
+        "SIZE", "MODIFIED", "REVIEW STATUS"])
+    window.grave_table.setItemDelegateForColumn(0, EvidenceNameDelegate(window.grave_table))
+    window.grave_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    window.grave_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+    window.grave_table.setProperty("usesCheckSelection", True)
+    for idx, width in enumerate((240, 115, 155, 80, 75, 126)):
+        window.grave_table.setColumnWidth(idx, width)
+    fit_evidence_columns(window.grave_table, (27, 15, 19, 10, 10, 19))
+    window.grave_table.setMinimumHeight(290)
+    window.grave_table.verticalHeader().setDefaultSectionSize(34)
+    window.grave_table.setAccessibleName("Graveyard discovered candidates table")
+    window.grave_table.setIconSize(QSize(29, 29))
+    bcol.addWidget(window.grave_table, 1)
+
+    main_row.addWidget(browser, 7)
+
+    inspector, icol = panel(padding=11, spacing=8)
+    inspector.setObjectName("contextPanel")
+    inspector.setAccessibleName("Selected Graveyard item evidence and actions")
+    inspector.setMinimumHeight(370)
+    icol.addWidget(_label("ITEM DETAILS", "#F6F3F7", 14, True))
+    # Paths and evidence can be arbitrarily long. Without a separate
+    # inspector scroll area, Qt compresses the labels until they overlap.
+    details_scroll = QScrollArea()
+    details_scroll.setObjectName("approvedGraveInspectorScroll")
+    details_scroll.setWidgetResizable(True)
+    details_scroll.setFrameShape(QFrame.NoFrame)
+    details_body = QWidget()
+    details_body.setObjectName("approvedGraveInspectorBody")
+    details_col = QVBoxLayout(details_body)
+    details_col.setContentsMargins(2, 2, 2, 2)
+    details_col.setSpacing(7)
+    details_scroll.setWidget(details_body)
+    icol.addWidget(details_scroll, 1)
+    window.grave_detail = details_col
+    detail_actions = QWidget()
+    detail_actions.setObjectName("graveyardDetailActions")
+    window.grave_detail_actions = QVBoxLayout(detail_actions)
+    window.grave_detail_actions.setContentsMargins(0, 0, 0, 0)
+    window.grave_detail_actions.setSpacing(5)
+    icol.addWidget(detail_actions)
+    main_row.addWidget(inspector, 3)
+    main.setMinimumHeight(386)
+    page.content.addWidget(main)
+
+    def selected():
+        entries = window._selected_grave_entries()
+        return entries[0] if len(entries) == 1 else None
+
+    def _personal_rule():
+        entry = selected()
+        if entry is None:
+            window.info("Choose one item", "Select exactly one Graveyard item.")
+            return None, None
+        action, reason = protection_action(
+            entry.path, list(window.settings.get("never_touch", [])))
+        return entry, action
+
+    def protect():
+        entry, action = _personal_rule()
+        if entry is None:
+            return
+        if action != "Protect":
+            window.info("Protection", "This entry cannot have a new personal "
+                        "rule from here. Check its existing protection first.")
+            return
+        window._set_personal_protection(
+            entry.path, protect=True, return_route="Graveyard")
+
+    def unprotect():
+        entry, action = _personal_rule()
+        if entry is None:
+            return
+        if action != "Unprotect":
+            window.info("Protection", "Only an exact personal Never Touch "
+                        "rule can be removed. Built-in game and save safeguards remain.")
+            return
+        window._unprotect_grave(entry)
+
+    def open_path():
+        entry = selected()
+        if entry:
+            window._open_folder(str(Path(entry.path).parent))
+        else:
+            window.info("Choose one item", "Select a file or folder first.")
+
+    # The locked action strip belongs immediately under the review table.
+    # All three mutations still delegate to the existing confirmation/safety
+    # code. A protection override never implicitly deletes anything.
+    actions = ResponsiveGrid(columns=((0, 1), (490, 2), (900, 3), (1250, 7)),
+                             margins=(9, 5, 9, 5))
+    actions.setObjectName("ggActionStrip")
+    action_layout = actions
+    window.grave_counter = _label("No items selected.", "#DBE4ED", 12, True)
+    action_layout.addWidget(window.grave_counter)
+    action_layout.addWidget(button("Select reviewable", window._select_eligible))
+    def clear_selection():
+        table = window.grave_table
+        table.blockSignals(True)
+        for i in range(table.rowCount()):
+            table.item(i, 0).setCheckState(Qt.Unchecked)
+        table.clearSelection()
+        table.blockSignals(False)
+        update_details()
+    action_layout.addWidget(button("Clear", clear_selection))
+    action_layout.addWidget(button("Protect", protect))
+    action_layout.addWidget(button("Unprotect", unprotect))
+    action_layout.addWidget(button("Open Path", open_path))
+    action_layout.addWidget(button(
+        "Delete selected…", window._delete_grave_selected, kind="danger"))
+    page.content.addWidget(actions)
+
+    total_apparent = sum(_size(item) for item in entries)
+    can_review = sum(_size(item) for item in entries if item.can_recycle)
+    protected = total_apparent - can_review
+    impact = QFrame()
+    impact.setObjectName("ggAccentPanel")
+    impact.setProperty("accent", "red")
+    impact_row = row(spacing=12, margins=(12, 7, 12, 7))
+    impact.setLayout(impact_row)
+    impact_left = QWidget()
+    left_col = QVBoxLayout(impact_left)
+    left_col.setContentsMargins(0, 0, 0, 0)
+    left_col.setSpacing(4)
+    left_col.addWidget(_label("STORAGE IMPACT  /  CANDIDATE SIZES",
+                              "#F4F7FB", 12, True))
+    left_col.addWidget(CinematicImpactTrack(can_review, protected))
+    left_col.addWidget(_label(
+        human_size(can_review) + " reviewable   •   " +
+        human_size(protected) + " protected   •   " +
+        "not confirmed reclaimed space", "#A8C0CE", 11))
+    impact_row.addWidget(impact_left, 5)
+    def impact_stat(title, value, color):
+        col = QWidget()
+        body = QVBoxLayout(col)
+        body.setContentsMargins(4, 1, 4, 1)
+        body.setSpacing(4)
+        body.addWidget(_label(title.upper(), "#ACBDCA", 10, True))
+        body.addWidget(_label(value, color, 17, True))
+        return col
+    impact_row.addWidget(impact_stat(
+        "Games", str(len(window.inventory.games)), "#64D5EC"), 1)
+    impact_row.addWidget(impact_stat(
+        "Mod locations", str(len(window.inventory.mods)), "#CC9BF3"), 1)
+    impact_row.addWidget(impact_stat(
+        "Captures", str(len(window.inventory.screenshots) +
+                        len(window.inventory.recordings)), "#D0A4EA"), 1)
+    impact_row.addWidget(impact_stat(
+        "Potential", human_size(total_apparent), "#EFBB7A"), 1)
+    page.content.addWidget(impact)
+
+    recovery_row = QWidget()
+    recovery = row(spacing=8)
+    recovery_row.setLayout(recovery)
+    recovery.addWidget(_label(
+        "Manual review only  •  Recycle Bin + Undo  •  Saved games protected",
+        "#A2CDBE", 11), 1)
+    recovery.addWidget(button(
+        "Test Recycle Bin recovery", window._test_recycle_bin_safely))
+    recovery.addWidget(button(
+        "Open Old Files", lambda: window.navigate("Old Files")))
+    page.content.addWidget(recovery_row)
+
+    def refresh():
+        checked_keys = set()
+        for index, entry in enumerate(getattr(window, "_shown_graves", [])):
+            item = window.grave_table.item(index, 0)
+            if item is not None and item.checkState() == Qt.Checked:
+                checked_keys.add(entry.key)
+        selected_rows = window.grave_table.selectionModel().selectedRows()
+        previous_key = None
+        if len(selected_rows) == 1 and hasattr(window, "_shown_graves"):
+            index = selected_rows[0].row()
+            if index < len(window._shown_graves):
+                previous_key = window._shown_graves[index].key
+        result = select_graveyard_entries(
+            window.inventory.graveyard,
+            query=window.grave_search.text(),
+            category=window.grave_type.currentText(),
+            state=window.grave_state.currentText(),
+            drive=window.grave_drive.currentText(),
+            min_age_days=AGE_OPTIONS[window.grave_age.currentText()],
+            sort_by=window.grave_sort.currentText())
+
+        window._shown_graves = result[:500]
+        table = window.grave_table
+        table.blockSignals(True)
+        table.setRowCount(0)
+        table.setRowCount(len(window._shown_graves))
+        for idx, entry in enumerate(window._shown_graves):
+            rule, _reason = protection_action(
+                entry.path, list(window.settings.get("never_touch", [])))
+            status = ("Personal rule: unprotect" if rule == "Unprotect"
+                      else "Reviewable" if entry.can_recycle
+                      else "Preview required" if entry.category == "Old game screenshot"
+                      else "Protected")
+            cols = (entry.name, entry.category, entry.relationship,
+                    human_size(_size(entry)), _age(entry), status)
+            for col, value in enumerate(cols):
+                cell = QTableWidgetItem(str(value))
+                cell.setToolTip(entry.path if col == 0 else
+                                entry.finding if col in (1, 2) else str(value))
+                if col == 5:
+                    cell.setForeground(QBrush(QColor(
+                        "#88D9B1" if entry.can_recycle else
+                        "#EFAB6D" if rule == "Unprotect" else "#D7B7BC")))
+                if col == 0:
+                    cell.setData(PATH_ROLE, entry.path)
+                    cell.setIcon(_candidate_icon(entry.category))
+                    cell.setFlags(cell.flags() | Qt.ItemIsUserCheckable)
+                    cell.setCheckState(Qt.Checked if entry.key in checked_keys else Qt.Unchecked)
+                table.setItem(idx, col, cell)
+            if rule == "Unprotect":
+                unlock = button(
+                    "Unprotect", lambda _=False, e=entry: window._unprotect_grave(e))
+                unlock.setAccessibleName("Unprotect your personal rule for " + entry.name)
+                unlock.setToolTip("Remove only your own Never Touch rule. No deletion.")
+                table.setCellWidget(idx, 5, unlock)
+                table.setRowHeight(idx, 34)
+            else:
+                # Decorative status chip; selection and action authority are
+                # still controlled exclusively by the scan-backed entry.
+                chip = QLabel(status)
+                chip.setAlignment(Qt.AlignCenter)
+                chip.setAttribute(Qt.WA_TransparentForMouseEvents)
+                chip.setStyleSheet(
+                    "QLabel{border-radius:4px;padding:2px 6px;"
+                    "font-size:10px;font-weight:700;"
+                    + ("color:#77E7B5;background:#113D31;border:1px solid #268F69;"
+                       if entry.can_recycle else
+                       "color:#EAB1BD;background:#351923;border:1px solid #693044;")
+                    + "}")
+                table.setCellWidget(idx, 5, chip)
+                table.setRowHeight(idx, 34)
+        pending = getattr(window, "_pending_grave_key", None) or previous_key
+        if pending:
+            for i, e in enumerate(window._shown_graves):
+                if e.key == pending:
+                    table.selectRow(i)
+                    table.scrollToItem(table.item(i, 0))
+                    break
+        window._pending_grave_key = None
+        if window._shown_graves and not table.selectionModel().selectedRows():
+            table.selectRow(0)
+        table.blockSignals(False)
+        update_details()
+
+    def update_details():
+        window._grave_details()
+        entries = window._selected_grave_entries()
+        window.grave_counter.setText(
+            (str(len(entries)) + " selected | " +
+             human_size(sum(_size(e) for e in entries)) + " apparent bytes")
+            if entries else
+            (f"{len(window._shown_graves)} matching candidates. "
+             "Select one to inspect why it was flagged."))
+
+    for choice in (
+        window.grave_search.textChanged,
+        window.grave_type.currentTextChanged,
+        window.grave_state.currentTextChanged,
+        window.grave_drive.currentTextChanged,
+        window.grave_age.currentTextChanged,
+        window.grave_sort.currentTextChanged,
+    ):
+        choice.connect(refresh)
+    window.grave_table.itemSelectionChanged.connect(update_details)
+    window.grave_table.itemChanged.connect(
+        lambda item: update_details() if item.column() == 0 else None)
+    window.grave_table.cellDoubleClicked.connect(
+        lambda i, _c: window._inspect_grave_entry(window._shown_graves[i])
+        if 0 <= i < len(window._shown_graves) else None)
+    window.grave_table.setContextMenuPolicy(Qt.CustomContextMenu)
+    window.grave_table.customContextMenuRequested.connect(
+        window._graveyard_context_menu)
+    refresh()
+    return page

@@ -244,6 +244,26 @@ class ScreenshotReviewTests(unittest.TestCase):
 
 
 class RealSmallPreviewTests(unittest.TestCase):
+    def test_expanded_capture_preview_is_bounded_and_preserves_the_original(self):
+        from core import OldFile
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("Optional Pillow dependency")
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "Captures" / "game-screenshot.png"
+            path.parent.mkdir()
+            Image.new("RGB", (3840, 2160), (65, 78, 96)).save(path)
+            original = path.read_bytes()
+            state = path.stat()
+            record = OldFile(str(path), state.st_size, state.st_mtime,
+                state.st_dev, state.st_ino, state.st_mtime_ns, state.st_nlink)
+            preview = decode_screenshot_preview(record, preview_size=(2560, 1440))
+            self.assertEqual(preview.size, (2560, 1440))
+            self.assertEqual(path.read_bytes(), original)
+            with self.assertRaises(ValueError):
+                decode_screenshot_preview(record, preview_size=(10000, 10000))
+
     def test_bounded_png_preview_preserves_file(self):
         try:
             from PIL import Image

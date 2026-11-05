@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from PySide6.QtCore import Qt, QSize, QRectF
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QHBoxLayout, QVBoxLayout, QPushButton,
     QScrollArea, QGridLayout, QProgressBar, QTableWidget, QHeaderView,
@@ -36,7 +36,9 @@ def column(*, spacing: int = 10, margins=(0, 0, 0, 0)) -> QVBoxLayout:
 
 
 def button(text: str, action=None, *, kind: str = "", tip: str = "") -> QPushButton:
-    control = QPushButton(text)
+    # Qt interprets a bare '&' as a mnemonic underline, causing labels like
+    # 'Chat & Explain' to visibly lose their ampersand. Escape it in captions.
+    control = QPushButton(text.replace("&", "&&"))
     if kind:
         control.setObjectName(kind)
     if tip:
@@ -109,13 +111,18 @@ class HeroBanner(QFrame):
                  detail="A lighter PC. A safer way to manage gaming storage."):
         super().__init__()
         self.setObjectName("hero")
-        self.setMinimumHeight(157)
+        self.setMinimumHeight(187)
+        self.setMaximumHeight(220)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.title = title
         self.subtitle = subtitle
         self.detail = detail
         from PySide6.QtSvg import QSvgRenderer
-        self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "crimson_ruins.svg"))
+        self.art = QSvgRenderer(str(Path(__file__).parent / "assets" / "gg_cinematic_hero.svg"))
+        from gg_desktop.owner_art import load_approved_hero
+        self.owner_art = load_approved_hero("overview") if title == "Overview" else QPixmap()
+        # Vector original, rendered at display resolution to stay crisp on
+        # 1440p, 4K and high-DPI monitors. Avoid the low-resolution JPG atlas.
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -126,111 +133,195 @@ class HeroBanner(QFrame):
         painter.drawRoundedRect(target, 11, 11)
         painter.save()
         painter.setClipRect(target)
-        if self.art.isValid():
-            # Crop art into the banner rather than stretching its full dimensions.
-            self.art.render(painter, QRectF(0, -22, self.width(), self.height() + 47))
+        if self.art.isValid() and self.owner_art.isNull():
+            self.art.render(painter, QRectF(0, -6, self.width(), self.height() + 16))
+        if self.title == "Overview":
+            from gg_desktop.owner_art import draw_approved_hero
+            draw_approved_hero(painter, self.owner_art,
+                               self.width(), self.height())
         from PySide6.QtGui import QLinearGradient
         grad = QLinearGradient(0, 0, self.width() * .79, 0)
-        grad.setColorAt(0, QColor(4, 9, 16, 250))
-        grad.setColorAt(.46, QColor(5, 10, 17, 183))
-        grad.setColorAt(1, QColor(10, 15, 22, 15))
+        grad.setColorAt(0, QColor(4, 9, 16, 220))
+        grad.setColorAt(.46, QColor(5, 10, 17, 93))
+        grad.setColorAt(1, QColor(10, 15, 22, 0))
         painter.fillRect(target, grad)
-        painter.setPen(QColor("#F5F7FB"))
-        painter.setFont(QFont("Segoe UI", 20, QFont.Black))
-        painter.drawText(22, 46, self.title)
-        painter.setPen(QColor(COLORS["red"]))
-        painter.setFont(QFont("Segoe UI", 20, QFont.Black))
-        painter.drawText(22, 79, self.subtitle)
-        painter.setPen(QColor("#BBCAD7"))
-        painter.setFont(QFont("Segoe UI", 10))
-        painter.drawText(QRectF(23, 92, max(120, self.width() * .58), 52),
-                         Qt.AlignLeft | Qt.TextWordWrap, self.detail)
+        if self.title == "Overview":
+            # Owner's exact Overview headline hierarchy: one large white
+            # title, one restrained white subtitle, no secondary red slogan.
+            painter.setPen(QColor("#F7F8FA"))
+            title_font = QFont("Segoe UI")
+            title_font.setPixelSize(38)
+            title_font.setBold(True)
+            painter.setFont(title_font)
+            painter.setPen(QPen(QColor("#F0445A"), 5, Qt.SolidLine, Qt.RoundCap))
+            painter.drawLine(24, 31, 12, 103)
+            painter.setPen(QColor("#F7F8FA"))
+            painter.drawText(38, 59, self.title)
+            painter.setPen(QColor("#C8CFDA"))
+            subtitle_font = QFont("Segoe UI")
+            subtitle_font.setPixelSize(14)
+            painter.setFont(subtitle_font)
+            painter.drawText(QRectF(39, 72, max(160, self.width() * .65), 48),
+                             Qt.AlignLeft | Qt.TextWordWrap, self.subtitle)
+        else:
+            painter.setPen(QColor("#F5F7FB"))
+            painter.setFont(QFont("Segoe UI", 23, QFont.Black))
+            painter.drawText(24, 55, self.title)
+            painter.setPen(QColor(COLORS["red"]))
+            painter.setFont(QFont("Segoe UI", 23, QFont.Black))
+            painter.drawText(24, 91, self.subtitle)
+            painter.setPen(QColor("#BBCAD7"))
+            painter.setFont(QFont("Segoe UI", 10))
+            painter.drawText(QRectF(25, 108, max(140, self.width() * .64), 65),
+                             Qt.AlignLeft | Qt.TextWordWrap, self.detail)
         painter.restore()
-        painter.setPen(QPen(QColor("#334552"), 1))
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRoundedRect(target.adjusted(.5, .5, -.5, -.5), 11, 11)
+        # The approved Overview is edge-to-edge: no floating outlined card.
+        if self.title != "Overview":
+            painter.setPen(QPen(QColor("#334552"), 1))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(target.adjusted(.5, .5, -.5, -.5), 11, 11)
 
 
 class LandscapeArt(QFrame):
-    """Original local placeholder artwork, NOT the user's actual game screenshot."""
-    def __init__(self, height=154):
+    """Original themed art, not a game screenshot. Paints only local SVG files."""
+    SCENES = {
+        "sunset": "crimson_sunset.svg",
+        "fog": "crimson_fog.svg",
+        "footer": "crimson_footer.svg",
+        "hero": "gg_cinematic_hero.svg",
+    }
+
+    def __init__(self, height=154, *, scene="sunset", note=""):
         super().__init__()
         self.setMinimumHeight(height)
         self.setMaximumHeight(height)
-        self.setAccessibleName("Original decorative Game Grave landscape artwork. Screenshot not loaded.")
+        self.setObjectName("landscapeArt")
+        self.scene = scene if scene in self.SCENES else "sunset"
+        self.note = note
+        self.setAccessibleName("Original decorative Game Grave " + self.scene +
+                               " illustration, not a personal screenshot.")
         from PySide6.QtSvg import QSvgRenderer
-        self.renderer = QSvgRenderer(
-            str(Path(__file__).parent / "assets" / "crimson_ruins.svg"))
+        self.renderer = QSvgRenderer(str(
+            Path(__file__).parent / "assets" / self.SCENES[self.scene]))
+        self.atlas = QPixmap(str(Path(__file__).parent / "assets" / "crimson_atlas.jpg"))
+        # Cropped directly from the owner's locked Overview design: decorative
+        # forest only, with no mockup data, controls, or painted text.
+        self.locked_sidebar = QPixmap(str(
+            Path(__file__).parent / "assets" / "owner_locked_sidebar.jpg"))
+        self.crop_regions = {
+            "sunset": QRectF(2, 211, 352, 181),
+            "fog": QRectF(393, 235, 325, 119),
+            "footer": QRectF(790, 24, 219, 232),
+            "hero": QRectF(0, 0, 788, 190),
+        }
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         area = QRectF(0, 0, self.width(), self.height())
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor("#111922"))
-        painter.drawRoundedRect(area, 10, 10)
+        painter.setBrush(QColor("#0A1521"))
+        painter.drawRoundedRect(area, 9, 9)
+        painter.save()
         painter.setClipRect(area)
-        if self.renderer.isValid():
-            self.renderer.render(painter, QRectF(
-                -self.width() * .3, -42, self.width() * 1.6,
-                self.height() + 125))
-        painter.fillRect(QRectF(0, self.height() - 41, self.width(), 41),
-                         QColor(6, 10, 17, 212))
-        painter.setPen(QColor("#C4D4E1"))
-        painter.setFont(QFont("Segoe UI", 9))
-        painter.drawText(QRectF(12, self.height() - 35, self.width() - 24, 25),
-                         Qt.AlignLeft | Qt.AlignVCenter,
-                         "Local illustration  •  Click Preview to inspect your actual image")
+        # Owner-approved fidelity requirement: always prefer resolution-
+        # independent SVG over the old pre-rendered JPEG atlas. The atlas
+        # remains only a last-resort fallback for missing vector artwork.
+        if self.scene == "footer" and not self.locked_sidebar.isNull():
+            painter.drawPixmap(area, self.locked_sidebar,
+                               QRectF(0, 0, self.locked_sidebar.width(),
+                                      self.locked_sidebar.height()))
+        elif self.renderer.isValid():
+            size = self.renderer.defaultSize()
+            if size.width() and size.height():
+                scale = max(self.width() / size.width(),
+                            self.height() / size.height())
+                w, h = size.width() * scale, size.height() * scale
+                self.renderer.render(painter, QRectF(
+                    (self.width() - w) / 2, (self.height() - h) / 2, w, h))
+        elif not self.atlas.isNull():
+            painter.drawPixmap(area, self.atlas,
+                               self.crop_regions.get(self.scene,
+                                                     self.crop_regions["sunset"]))
+        if self.note:
+            painter.fillRect(QRectF(0, self.height() - 38, self.width(), 38),
+                             QColor(4, 9, 15, 221))
+            painter.setPen(QColor("#ECF3FA"))
+            painter.setFont(QFont("Segoe UI", 9))
+            painter.drawText(QRectF(10, self.height() - 34, self.width() - 20, 30),
+                             Qt.AlignLeft | Qt.TextWordWrap, self.note)
+        painter.restore()
+        # The locked sidebar forest is atmospheric artwork, not a boxed card.
+        if self.scene != "footer":
+            painter.setPen(QPen(QColor("#29465A"), 1))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(area.adjusted(.5, .5, -.5, -.5), 9, 9)
 
 
 class StorageRing(QWidget):
-    """Only real OS-reported used/free disk usage; no fake reclaimed segment."""
+    """Crimson/cyan/gray segmented disk chart using actual observed capacity.
+
+    Game reported sizes can overlap. Their capped display is never an exact
+    independent measurement of physical disk usage.
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
         self.capacity = 0
         self.free = 0
-        self.setMinimumSize(145, 155)
+        self.known_games = 0
+        self.setMinimumSize(146, 158)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setAccessibleName("Storage usage chart. Capacity unknown.")
+        self.setAccessibleName("Storage usage chart. Scan the PC to load details.")
 
-    def update_amounts(self, capacity: int, free: int):
-        self.capacity = max(0, capacity)
-        self.free = max(0, min(free, capacity))
+    def update_amounts(self, capacity: int, free: int, known_games: int = 0):
+        self.capacity = max(0, int(capacity))
+        self.free = max(0, min(int(free), self.capacity))
+        self.known_games = max(0, min(int(known_games), self.capacity - self.free))
         used = self.capacity - self.free
-        self.setAccessibleName(f"Disk used: {used} bytes. Free: {self.free} bytes.")
+        self.setAccessibleName(
+            f"Disk capacity {self.capacity} bytes; used {used}; free {self.free}. "
+            f"Up to {self.known_games} bytes reported by games, not independently verified.")
         self.update()
 
     def paintEvent(self, event):
         from core import human_size
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        side = max(70, min(self.width(), self.height()) - 22)
-        rect = QRectF((self.width() - side) / 2 + 12,
-                      (self.height() - side) / 2 + 12, side - 24, side - 24)
-        pen = QPen(QColor("#283948"), 17)
-        pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(pen)
+        side = max(100, min(self.width(), self.height()) - 16)
+        size = side - 28
+        rect = QRectF((self.width() - size) / 2,
+                      (self.height() - size) / 2, size, size)
+        painter.setPen(QPen(QColor("#3A4552"), 19, Qt.SolidLine, Qt.FlatCap))
         painter.drawArc(rect, 0, 360 * 16)
         if self.capacity:
-            used_ratio = (self.capacity - self.free) / self.capacity
-            used = QPen(QColor(COLORS["red"]), 17)
-            used.setCapStyle(Qt.RoundCap)
-            painter.setPen(used)
-            painter.drawArc(rect, 90 * 16, -int(used_ratio * 360 * 16))
+            fractions = (
+                (self.known_games / self.capacity, QColor(COLORS["red"])),
+                ((self.capacity - self.free - self.known_games) / self.capacity,
+                 QColor(COLORS["cyan"])),
+            )
+            start = 90 * 16
+            for fraction, color in fractions:
+                extent = -int(fraction * 360 * 16)
+                if extent:
+                    painter.setPen(QPen(color, 19, Qt.SolidLine, Qt.FlatCap))
+                    painter.drawArc(rect, start, extent)
+                    start += extent
         painter.setPen(QColor(COLORS["text"]))
-        painter.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        painter.setFont(QFont("Segoe UI", 17, QFont.Bold))
         painter.drawText(rect.adjusted(0, -12, 0, 0), Qt.AlignCenter,
-                         human_size(self.capacity - self.free) if self.capacity else "No data")
-        painter.setFont(QFont("Segoe UI", 9))
+                         human_size(self.capacity) if self.capacity else "No data")
+        painter.setFont(QFont("Segoe UI", 10))
         painter.setPen(QColor(COLORS["muted"]))
-        painter.drawText(rect.adjusted(0, 20, 0, 15), Qt.AlignCenter, "used")
+        painter.drawText(rect.adjusted(0, 26, 0, 12), Qt.AlignCenter, "Total")
 
 
 class MetricCard(QFrame):
     def __init__(self, caption: str, value: str, hint: str = "", *, tone="text"):
         super().__init__()
         self.setObjectName("metricCard")
-        contents = column(spacing=5, margins=(16, 14, 16, 14))
+        self.setProperty("tone", tone)
+        self.setMinimumHeight(99)
+        contents = column(spacing=5, margins=(15, 10, 15, 10))
         self.setLayout(contents)
         self.caption = label(caption.upper(), "caption")
         self.value = label(value, "metricValue")

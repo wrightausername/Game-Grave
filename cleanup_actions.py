@@ -19,6 +19,7 @@ from recordings import RECORDING_EXTENSIONS
 from screenshots import looks_like_screenshot
 from screenshot_preview import MAX_IMAGE_BYTES
 from recovery import register_recycle
+from old_files_scope import is_fixed_drive_root, drive_file_allowed
 
 
 def recycle_reviewed_entries(
@@ -26,6 +27,10 @@ def recycle_reviewed_entries(
     never_touch: Iterable[str],
     session: str,
     progress: Callable[[int, int], None] | None = None,
+    *,
+    review_root: str | Path | None = None,
+    min_age_days: int = 0,
+    managed_roots: Iterable[str] | None = None,
 ) -> dict:
     """Move only approved individual files to Windows Recycle Bin.
 
@@ -51,7 +56,35 @@ def recycle_reviewed_entries(
             path = Path(file.path)
             if is_protected_path(path, protected):
                 raise ValueError("Protected by Game Grave or your Never Touch list")
-            if entry.category == "Old game screenshot":
+            if entry.category == "Old file from reviewed folder":
+                # Generic older files come ONLY from the manually scoped Old
+                # Files scan. Recheck both original root and age at action time.
+                # No automatic cleanup and no generic image-file bypass.
+                if review_root is None or min_age_days < 1:
+                    raise ValueError("Original reviewed folder and age are required")
+                root = Path(review_root).absolute()
+                drive_mode = is_fixed_drive_root(root)
+                if not drive_mode and not safe_scan_root(root):
+                    raise ValueError("The original Old Files folder is unsafe or unavailable")
+                if _has_reparse_component(root):
+                    raise ValueError("Reviewed location is redirected or missing")
+                try:
+                    path.absolute().relative_to(root)
+                except ValueError:
+                    raise ValueError("File is outside the reviewed Old Files folder")
+                if drive_mode and not drive_file_allowed(root, path):
+                    raise ValueError("Outside the permitted C-drive review area")
+                if file.modified > time.time() - min_age_days * 86400:
+                    raise ValueError("File no longer meets the reviewed age requirement")
+                if managed_roots is None:
+                    raise ValueError("Game/mod ownership context is missing; scan again")
+                if is_protected_path(path, [r for r in managed_roots
+                                            if isinstance(r, str) and r.strip()]):
+                    raise ValueError("Inside a known game or mod directory; use its manager")
+                if looks_like_screenshot(path):
+                    raise ValueError("Pictures require an individual screenshot preview")
+                allowed = True
+            elif entry.category == "Old game screenshot":
                 # Screenshot cleanup is strictly one-by-one after the user
                 # displayed its actual image in the preview window. A bulk
                 # selection, plain image extension, or old timestamp is NOT
@@ -102,6 +135,7 @@ def recycle_old_files(
     *,
     review_root: str | Path | None = None,
     min_age_days: int = 0,
+    managed_roots: Iterable[str] | None = None,
 ) -> dict:
     """Perform a confirmed Old Files deletion using only reversible Windows Shell.
 
@@ -125,14 +159,24 @@ def recycle_old_files(
         path = Path(file.path)
         try:
             if root is not None:
-                if not safe_scan_root(root) or _has_reparse_component(root):
-                    raise ValueError("Original reviewed folder is unavailable or redirected")
-                if _has_reparse_component(path):
+                drive_mode = is_fixed_drive_root(root)
+                if not drive_mode and not safe_scan_root(root):
+                    raise ValueError("Original reviewed folder is unavailable")
+                if _has_reparse_component(root) or _has_reparse_component(path):
                     raise ValueError("A linked or redirected file is not eligible")
                 try:
                     path.absolute().relative_to(root)
                 except ValueError:
                     raise ValueError("File lies outside the reviewed Old Files folder")
+                if drive_mode and not drive_file_allowed(root, path):
+                    raise ValueError("File lies inside protected C-drive area")
+                if drive_mode and managed_roots is None:
+                    raise ValueError("Current game ownership scan is required")
+            if managed_roots is not None and is_protected_path(
+                path, [r for r in managed_roots
+                       if isinstance(r, str) and r.strip()]
+            ):
+                raise ValueError("Inside a detected game or mod location")
             if min_age_days and file.modified > time.time() - min_age_days * 86400:
                 raise ValueError("File no longer meets the reviewed age threshold")
             if not is_unchanged(file):

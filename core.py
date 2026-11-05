@@ -62,9 +62,13 @@ def default_settings() -> dict:
         "ui_layout": "simple",
         "never_touch": [],
         "scan_on_launch": False,
+        "ai_assistant_enabled": False,  # explicit opt-in; no model requests on startup
+        "ai_model": "qwen2.5:1.5b",  # user-installed localhost Ollama model
         "save_review_paths": [],
         "graveyard_watchlist": [],
         "recording_roots": [],  # Optional user-chosen capture folders, read-only scan
+        "pinned_tools": ["Resurrection Kit", "Save Vault", "Make Room",
+                         "Storage Explorer", "Capture Studio", "Diagnostics"],
         "screenshot_roots": [],  # Explicit user-selected game screenshot folders
     }
 
@@ -746,6 +750,8 @@ def scan_old_files(folder: Path, min_days: int = 180, cancel: Callable[[], bool]
         dirs[:] = [d for d in dirs if d.lower() not in SCAN_EXCLUDED and not
                    _has_reparse_component(Path(parent) / d)]
         for name in names:
+            if cancel and cancel():
+                raise InterruptedError("Scan canceled")
             path = Path(parent) / name
             if allowed_extensions is not None and path.suffix.lower() not in allowed_extensions:
                 continue
@@ -976,6 +982,14 @@ def recycle_file(path: Path) -> None:
 
 
 def run_auto_cleanup() -> tuple[int, int, str]:
+    # No disk work, preference reads, or automatic deletion while gaming.
+    try:
+        from performance_guard import GameActivityDetector
+        game_guard = GameActivityDetector(refresh_seconds=1.5)
+        if game_guard.active():
+            return 0, 0, "Automatic cleanup deferred while gaming."
+    except (ImportError, OSError, RuntimeError):
+        return 0, 0, "Automatic cleanup deferred: game check unavailable."
     cfg = load_settings()
     if not cfg["auto_enabled"]:
         return 0, 0, "Automatic cleanup is disabled."
@@ -991,6 +1005,10 @@ def run_auto_cleanup() -> tuple[int, int, str]:
     log_event("Cleanup started", f"Automatic cleanup: {len(items)} candidates reviewed", session_id=session_id)
     done, total_bytes, failed = 0, 0, 0
     for item in items:
+        if game_guard.active():
+            note = f"Automatic cleanup deferred while gaming after {done} items."
+            log_event("Automatic cleanup deferred", note, session_id=session_id)
+            return done, total_bytes, note
         try:
             if is_protected_path(Path(item.path), cfg.get("never_touch", [])):
                 raise ValueError("Protected by Never Touch list")

@@ -1,0 +1,409 @@
+"""Approved Undo Center: genuine recovery ledger, verified restore and inspector.
+
+No automatic restore, no file overwrite, no invented retention periods, and no
+assumption that a logged move is free disk space or a recoverable file.
+"""
+from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QColor, QBrush, QPainter, QPen, QFont
+from PySide6.QtWidgets import (
+    QAbstractItemView, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QTableWidgetItem, QVBoxLayout, QWidget, QProgressBar, QScrollArea,
+)
+
+from core import human_size
+from recovery import get_records, check_restore, restore as restore_recycled
+from gg_desktop.reference_hero import ReferenceHero
+from gg_desktop.visuals import RecoveryRoute
+from gg_desktop.widgets import button, data_table, label, panel, row
+from gg_desktop.responsive import ResponsiveGrid, ResponsiveRow
+from gg_desktop.reference_icons import metric_icon
+from gg_desktop.evidence_delegate import EvidenceNameDelegate, PATH_ROLE, fit_evidence_columns
+from gg_desktop.inspector_widgets import InspectorFacts, detail_section
+
+
+def _text(text, color="#C3CDD7", *, size=11, bold=False, wrap=True):
+    w = label(str(text), "caption", wrap=wrap)
+    w.setStyleSheet(f"background:transparent;color:{color};font-size:{size}px;"
+                    + ("font-weight:800;" if bold else ""))
+    w.setTextInteractionFlags(Qt.TextSelectableByMouse)
+    return w
+
+
+def _stat(title, value, tone):
+    from gg_desktop.visuals import nav_icon
+    frame = QFrame()
+    frame.setObjectName("approvedUndoStat")
+    layout = QHBoxLayout(frame)
+    layout.setContentsMargins(10, 6, 10, 7)
+    layout.setSpacing(9)
+    icon_route = {
+        "Actions logged": "Undo Center",
+        "Files recorded": "Old Files",
+        "Logged moves": "Other Storage",
+        "Verified available": "Settings",
+        "Not yet checked": "Graveyard",
+    }.get(title, "Undo Center")
+    icon = QLabel()
+    icon.setPixmap(metric_icon(icon_route, tone, 30))
+    icon.setFixedSize(31,31)
+    layout.addWidget(icon)
+    text = QWidget()
+    col = QVBoxLayout(text)
+    col.setContentsMargins(0, 0, 0, 0)
+    col.setSpacing(2)
+    col.addWidget(_text(title.upper(), "#BEC7D3", size=11, bold=True))
+    col.addWidget(_text(value, tone, size=23, bold=True))
+    layout.addWidget(text, 1)
+    return frame
+
+
+def _timestamp(record):
+    raw = str(record.get("time", "Unknown"))
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).strftime("%b %d, %Y  %H:%M")
+    except ValueError:
+        return raw[:19]
+
+
+def _bytes(record):
+    size = record.get("size")
+    return size if type(size) is int and size >= 0 else 0
+
+
+class RecoveryAvailabilityDial(QWidget):
+    """Recorded availability counts, never a recovery guarantee or health score."""
+    def __init__(self, available, total):
+        super().__init__()
+        self.available, self.total = available, total
+        self.setFixedSize(103, 103)
+        self.setAccessibleName(f"{available} of {total} records available at last verification")
+        self.setToolTip("Recorded state only. Verify the exact Windows match before restoring.")
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        ring = QRectF(9, 7, 84, 84)
+        p.setPen(QPen(QColor("#17392F"), 9))
+        p.drawArc(ring, 0, 360*16)
+        if self.total and self.available:
+            p.setPen(QPen(QColor("#64DCAC"), 9, Qt.SolidLine, Qt.RoundCap))
+            p.drawArc(ring, 90*16, -round(360*16*self.available/self.total))
+        p.setPen(QColor("#AEF1CF"))
+        font = QFont("Segoe UI")
+        font.setPixelSize(26)
+        font.setBold(True)
+        p.setFont(font)
+        p.drawText(ring.adjusted(0,-5,0,0), Qt.AlignCenter,
+                   str(self.available) if self.total else "—")
+        font.setPixelSize(8)
+        font.setBold(False)
+        p.setFont(font)
+        p.setPen(QColor("#A1BDB1"))
+        p.drawText(ring.adjusted(0,36,0,0), Qt.AlignCenter, "LAST VERIFIED")
+
+
+def render_approved_undo(window):
+    page = window.page_for("Undo Center")
+    page.content.setContentsMargins(11, 7, 11, 17)
+    page.content.setSpacing(9)
+    hero = ReferenceHero(
+        "undo", "Undo Center",
+        "Review previous cleanup actions and restore items safely.")
+    hero.setMinimumHeight(132)
+    hero.setMaximumHeight(132)
+    page.content.addWidget(hero)
+
+    records = list(reversed(get_records()))[:500]
+    moved = sum(_bytes(r) for r in records)
+    restored = sum(r.get("state") == "Restored" for r in records)
+    known_available = sum(r.get("state") == "Available" for r in records)
+    unknown = sum(r.get("state") in ("Not checked", None, "") for r in records)
+
+    metrics = ResponsiveGrid(columns=((0, 1), (490, 2), (970, 5)), spacing=7)
+    for title, value, tone in (
+        ("Actions logged", str(len(records)), "#6DD9E9"),
+        ("Files recorded", str(len(records)), "#D4B4EA"),
+        ("Logged moves", human_size(moved), "#ECC18B"),
+        ("Verified available", str(known_available), "#82D8B1"),
+        ("Not yet checked", str(unknown), "#F6B078"),
+    ):
+        metrics.addWidget(_stat(title, value, tone))
+    page.content.addWidget(metrics)
+
+    filter_bar = ResponsiveGrid(columns=((0, 1), (490, 2), (970, 4)))
+    filters = filter_bar
+    status = QComboBox()
+    status.addItems(["All states", "Available", "Not checked", "Not found",
+                     "Needs review", "Restored"])
+    status.setAccessibleName("Filter recovery state")
+    filters.addWidget(status)
+    action = QComboBox()
+    action.addItems(["All actions"] + sorted({str(r.get("action", "Unknown"))
+                      for r in records}))
+    action.setAccessibleName("Filter recovery action")
+    filters.addWidget(action)
+    search = QLineEdit()
+    search.setPlaceholderText("Search operations and original paths…")
+    search.setAccessibleName("Search the recovery ledger")
+    filters.addWidget(search)
+    filters.addWidget(button("Refresh", lambda: window.navigate("Undo Center")))
+    page.content.addWidget(filter_bar)
+
+    workspace = ResponsiveRow(breakpoint=980, spacing=9, horizontal_height=365)
+    workspace.setObjectName("undoWorkspace")
+    wrow = workspace
+
+    history, hcol = panel(padding=8, spacing=7)
+    hcol.addWidget(_text("CLEANUP HISTORY", "#FAFAFB", size=14, bold=True))
+    table = data_table([
+        "ORIGINAL LOCATION", "ACTION", "SIZE", "RECORDED", "WINDOWS STATUS"])
+    table.setAccessibleName("Real Game Grave recovery ledger")
+    table.setItemDelegateForColumn(0, EvidenceNameDelegate(table))
+    table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    table.setSelectionMode(QAbstractItemView.SingleSelection)
+    table.verticalHeader().setDefaultSectionSize(32)
+    for idx, width in enumerate((255, 125, 95, 152, 115)):
+        table.setColumnWidth(idx, width)
+    fit_evidence_columns(table, (32, 16, 11, 22, 19))
+    table.setMinimumHeight(257)
+    hcol.addWidget(table, 1)
+    summary = _text("Select a record to check recoverability.", "#A7B7C4")
+    hcol.addWidget(summary)
+    wrow.addWidget(history, 7)
+
+    details, details_outer = panel(padding=8, spacing=0)
+    details.setObjectName("contextPanel")
+    details.setMinimumHeight(365)
+    details_scroll = QScrollArea()
+    details_scroll.setFrameShape(QFrame.NoFrame)
+    details_scroll.setWidgetResizable(True)
+    details_body = QWidget()
+    dcol = QVBoxLayout(details_body)
+    dcol.setContentsMargins(4, 4, 4, 4)
+    dcol.setSpacing(6)
+    details_scroll.setWidget(details_body)
+    details_outer.addWidget(details_scroll)
+    dcol.addWidget(_text("RESTORE DETAILS", "#F5F5FB", size=14, bold=True))
+    heading = _text("Choose an operation", "#FFFFFF", size=13, bold=True)
+    dcol.addWidget(heading)
+    record_facts = InspectorFacts()
+    dcol.addWidget(record_facts)
+    dcol.addWidget(detail_section("Original location"))
+    path_detail = _text("No record selected.", "#AFC6D6")
+    dcol.addWidget(path_detail)
+    recovery_state = _text("Availability has not been verified.",
+                           "#F0B57E", bold=True)
+    dcol.addWidget(recovery_state)
+    route = RecoveryRoute()
+    route.setMinimumHeight(130)
+    dcol.addWidget(route)
+    wrow.addWidget(details, 3)
+    workspace.setMinimumHeight(365)
+    page.content.addWidget(workspace)
+
+    def chosen():
+        selected = table.selectionModel().selectedRows()
+        if not selected:
+            return None
+        index = selected[0].row()
+        return current[index] if 0 <= index < len(current) else None
+
+    def refresh_details():
+        rec = chosen()
+        if rec is None:
+            heading.setText("Choose an operation")
+            path_detail.setText("Select a record to inspect its original path.")
+            record_facts.set_facts(())
+            recovery_state.setText("Not verified")
+            route.set_record("Choose an operation", "Not checked")
+            return
+        path = str(rec.get("path", "Unknown"))
+        heading.setText(Path(path).name or "Recorded operation")
+        path_detail.setText(path)
+        record_facts.set_facts((
+            ("Action", rec.get("action", "Manual")),
+            ("Recorded size", human_size(_bytes(rec))),
+            ("Recorded", _timestamp(rec)),
+        ))
+        state = str(rec.get("state", "Not checked"))
+        recovery_state.setText(
+            "Previous check: " + state)
+        recovery_state.setToolTip("Windows availability may have changed since this recorded check.")
+        route.set_record(path, state)
+
+    def refill():
+        nonlocal current
+        query = search.text().strip().casefold()
+        state = status.currentText()
+        kind = action.currentText()
+        current = [
+            record for record in records
+            if (state == "All states" or record.get("state", "Not checked") == state)
+            and (kind == "All actions" or record.get("action", "Unknown") == kind)
+            and (not query or query in (
+                str(record.get("path", "")) + " " +
+                str(record.get("action", "")) + " " +
+                str(record.get("state", ""))).casefold())
+        ]
+        table.blockSignals(True)
+        table.clearContents()
+        table.setRowCount(len(current))
+        for idx, rec in enumerate(current):
+            state_text = str(rec.get("state", "Not checked"))
+            cols = (
+                Path(str(rec.get("path", ""))).name or "Unknown",
+                rec.get("action", "Manual"), human_size(_bytes(rec)),
+                _timestamp(rec), state_text,
+            )
+            for col, value in enumerate(cols):
+                item = QTableWidgetItem(str(value))
+                if col == 0:
+                    item.setData(PATH_ROLE, str(rec.get("path", "")))
+                item.setToolTip(str(rec.get("path", "")) if col == 0 else str(value))
+                if col == 4:
+                    item.setForeground(QBrush(QColor(
+                        "#81D6AB" if state_text == "Available" else
+                        "#E5AB75" if state_text == "Not checked" else
+                        "#CCB2BF")))
+                table.setItem(idx, col, item)
+        if current:
+            table.selectRow(0)
+        table.blockSignals(False)
+        summary.setText(
+            f"{len(current)} matching recorded actions. "
+            "Unverified entries may no longer exist in Windows Recycle Bin.")
+        refresh_details()
+
+    current = []
+    table.itemSelectionChanged.connect(refresh_details)
+    status.currentTextChanged.connect(refill)
+    action.currentTextChanged.connect(refill)
+    search.textChanged.connect(refill)
+    refill()
+
+    def verify():
+        rec = chosen()
+        if not rec:
+            window.info("Select an action", "Select one recorded item first.")
+            return
+        item_id = rec.get("id")
+        if not isinstance(item_id, str) or not item_id:
+            window.error("Recovery record incomplete",
+                         "This record has no valid ID and cannot be verified.")
+            return
+        window.job(lambda _progress: check_restore(item_id),
+                   lambda outcome: (window.info(
+                       "Windows Recycle Bin verification", str(outcome) +
+                       "\n\nThe next restore still requires revalidation."),
+                       window.navigate("Undo Center")),
+                   error_title="Cannot verify Windows recovery")
+
+    def restore():
+        if window.cleaning or window.scanning:
+            window.info("Game Grave is busy", "Finish the current operation first.")
+            return
+        rec = chosen()
+        if not rec:
+            window.info("Select an action", "Select an individual record first.")
+            return
+        item_id = rec.get("id")
+        if not isinstance(item_id, str) or not item_id:
+            window.error("Recovery record incomplete",
+                         "This record has no valid ID and cannot be restored.")
+            return
+        if not window.confirm(
+            "Restore this exact item from Windows Recycle Bin?",
+            "Restore to its original location?\n" +
+            str(rec.get("path", "Unknown")) +
+            "\n\nAn existing file will never be overwritten. A unique matching "
+            "Windows Recycle Bin item must still be present."):
+            return
+        window.cleaning = True
+        def finished(result):
+            window.cleaning = False
+            window.info("Restore result", str(result))
+            window.navigate("Undo Center")
+        window.job(lambda _progress: restore_recycled(item_id), finished,
+                   error_title="Restore could not be verified")
+
+    actions = ResponsiveGrid(columns=((0, 1), (490, 2), (970, 3)))
+    ar = actions
+    ar.addWidget(button("Verify exact Windows match", verify))
+    ar.addWidget(button("Restore selected…", restore, kind="primary"))
+    ar.addWidget(button("Open Cleanup History", lambda: window.navigate("Undo Center")))
+    # Restore controls appear below the recovery-safety/insights modules, as
+    # in the locked image, rather than interrupting the evidence inspector.
+    safety, sc = panel(padding=13, spacing=7)
+    sc.addWidget(_text("RECOVERY SAFETY  •  CHECK BEFORE RESTORING",
+                       "#97D4AF", size=12, bold=True))
+    safeguards = QWidget()
+    safeguards_row = row(spacing=12)
+    safeguards.setLayout(safeguards_row)
+    safeguards_row.addWidget(RecoveryAvailabilityDial(known_available, len(records)))
+    rules = QWidget()
+    rule_col = QVBoxLayout(rules)
+    rule_col.setContentsMargins(0, 0, 0, 0)
+    rule_col.setSpacing(5)
+    for rule in ("Exact Windows Recycle Bin match required",
+                 "Existing files are never overwritten",
+                 "Each restore requires your confirmation"):
+        rule_col.addWidget(_text("✓  " + rule, "#A5D8BF", size=11))
+    rule_col.addWidget(_text("Recorded availability can change in Windows.",
+                             "#94A89E", size=10))
+    safeguards_row.addWidget(rules, 1)
+    sc.addWidget(safeguards)
+    safety.setObjectName("ggAccentPanel")
+    safety.setProperty("accent", "green")
+
+    insight, ic = panel(padding=13, spacing=6)
+    insight.setObjectName("ggAccentPanel")
+    insight.setProperty("accent", "amber")
+    ic.addWidget(_text("UNDO INSIGHTS  /  RECORDED STATE",
+                       "#F1CA80", size=14, bold=True))
+    for heading, value, tone in (
+        ("Available at last verification", known_available, "#75DCB3"),
+        ("Not yet checked", unknown, "#EFB979"),
+        ("Already restored", restored, "#8BCCE8"),
+    ):
+        metric = QWidget()
+        line = row(spacing=8)
+        metric.setLayout(line)
+        line.addWidget(_text(heading, "#BFC9D5", size=12), 1)
+        line.addWidget(_text(str(value), tone, size=16, bold=True))
+        ic.addWidget(metric)
+        track = QProgressBar()
+        track.setRange(0, max(1, len(records)))
+        track.setValue(value)
+        track.setTextVisible(False)
+        track.setAccessibleName(heading + ": " + str(value) + " recorded items")
+        track.setStyleSheet("QProgressBar{min-height:4px;max-height:4px;border:0;"
+                           "background:#1B2530;border-radius:2px;}"
+                           "QProgressBar::chunk{background:" + tone + ";border-radius:2px;}")
+        ic.addWidget(track)
+    ic.addWidget(_text(
+        "Windows Recycle Bin items have no predictable expiration that "
+        "Game Grave can promise. Use Save Vault or Resurrection Kit when "
+        "you need independently verified backups.",
+        "#AFC0D0", size=11, wrap=True))
+
+    assurance = ResponsiveRow(breakpoint=980, spacing=10)
+    assurance_row = assurance
+    assurance_row.addWidget(safety, 1)
+    assurance_row.addWidget(insight, 1)
+    assurance.setMinimumHeight(141)
+    page.content.addWidget(assurance)
+
+    actions.setObjectName("ggActionStrip")
+    actions.layout().setContentsMargins(11, 9, 11, 9)
+    page.content.addWidget(actions)
+
+    if not records:
+        path_detail.setText(
+            "No recovery operations have been logged. "
+            "Game Grave will record future approved Recycle Bin moves.")
+    return page

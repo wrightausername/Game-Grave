@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="380" viewBox="0 0 260 380">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A0D12"/>
+      <stop offset=".39" stop-color="#0C0D13"/>
+      <stop offset=".76" stop-color="#33121D"/>
+      <stop offset="1" stop-color="#711C2C"/>
+    </linearGradient>
+    <radialGradient id="embers" cx=".5" cy=".87" r=".65">
+      <stop offset="0" stop-color="#F14958" stop-opacity=".77"/>
+      <stop offset=".53" stop-color="#B7253C" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#751126" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A0D12" stop-opacity="1"/>
+      <stop offset=".42" stop-color="#0A0D12" stop-opacity="0"/>
+    </linearGradient>
+    <g id="pine">
+      <path d="M0 -110 -18 -68 -10 -68 -30 -24 -20 -24 -43 28 -12 20 -12 50 12 50 12 20 43 28 20 -24 30 -24 10 -68 18 -68Z"/>
+    </g>
+  </defs>
+  <rect width="260" height="380" fill="url(#sky)"/>
+  <rect width="260" height="380" fill="url(#embers)"/>
+  <path d="M0 321Q80 301 145 321T260 308V380H0Z" fill="#300D19" opacity=".72"/>
+  <g fill="#200B16" opacity=".76">
+    <use href="#pine" transform="translate(23 327) scale(.58)"/>
+    <use href="#pine" transform="translate(67 345) scale(.42)"/>
+    <use href="#pine" transform="translate(104 329) scale(.70)"/>
+    <use href="#pine" transform="translate(148 347) scale(.51)"/>
+    <use href="#pine" transform="translate(191 323) scale(.80)"/>
+    <use href="#pine" transform="translate(246 339) scale(.55)"/>
+  </g>
+  <g fill="#090C12">
+    <use href="#pine" transform="translate(3 359) scale(.93)"/>
+    <use href="#pine" transform="translate(48 364) scale(.76)"/>
+    <use href="#pine" transform="translate(90 379) scale(.63)"/>
+    <use href="#pine" transform="translate(136 364) scale(1.11)"/>
+    <use href="#pine" transform="translate(196 366) scale(.83)"/>
+    <use href="#pine" transform="translate(257 373) scale(1.05)"/>
+  </g>
+  <rect width="260" height="380" fill="url(#fade)"/>
+</svg>

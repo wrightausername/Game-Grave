@@ -20,6 +20,7 @@ SKIP_IMAGE_PARTS = frozenset({"thumbnails", "thumbnail", "thumbs", "cache", ".ca
 MAX_SCREENSHOTS = 1500
 MAX_ACCOUNTS = 60
 MAX_GAMES_PER_ACCOUNT = 400
+MAX_GAME_SCREENSHOT_ROOTS = 140
 
 
 def looks_like_screenshot(path: Path) -> bool:
@@ -34,6 +35,7 @@ def looks_like_screenshot(path: Path) -> bool:
 def default_screenshot_roots(
     home: Path | None = None,
     steam_roots: list[Path] | None = None,
+    games: list | None = None,
 ) -> list[Path]:
     """Known local capture dirs, not broad personal Photos/Pictures/Videos roots.
 
@@ -46,7 +48,26 @@ def default_screenshot_roots(
         home / "OneDrive" / "Videos" / "Captures",
         home / "Pictures" / "Game Screenshots",
         home / "Pictures" / "Steam Screenshots",
+        # Ubisoft officially stores its own in-game captures here by default.
+        home / "Pictures" / "UbisoftConnect",
+        home / "OneDrive" / "Pictures" / "UbisoftConnect",
+        home / "Videos" / "NVIDIA",
+        home / "Videos" / "Radeon ReLive",
     ]
+    # Games may save photo-mode images to a dedicated per-game Screenshots
+    # folder. Examine only these explicit candidate directories for games
+    # already discovered by Game Grave. Never sweep Documents or Pictures.
+    for game in (games or [])[:MAX_GAME_SCREENSHOT_ROOTS]:
+        name = str(getattr(game, "name", "")).strip()
+        if (not name or len(name) > 90 or name in {".", ".."}
+                or any(char in name for char in '/\\:*?"<>|')):
+            continue
+        for base in (home / "Pictures", home / "Documents",
+                     home / "OneDrive" / "Pictures",
+                     home / "OneDrive" / "Documents"):
+            candidates.append(base / name / "Screenshots")
+            candidates.append(base / name / "ScreenShots")
+        candidates.append(home / "Documents" / "My Games" / name / "Screenshots")
     for steam in (steam_roots or []):
         base = Path(steam) / "userdata"
         if _has_reparse_component(base) or not base.is_dir():
@@ -127,6 +148,48 @@ def _read_direct_steam_images(root: Path, days: int, cancel: Cancel,
     return found
 
 
+def _read_scoped_capture_images(root: Path, cancel: Cancel,
+                                max_matches: int) -> list[OldFile]:
+    """Discover recent *and* older captures without loading image contents.
+
+    Called only for a known-game-specific screenshot root, recognized launcher
+    capture folder, or explicitly approved custom root. No generic home crawl.
+    """
+    output: list[OldFile] = []
+    inspected = 0
+    for parent, dirs, names in os.walk(root, followlinks=False):
+        if cancel and cancel():
+            raise InterruptedError("Screenshot scan canceled")
+        current = Path(parent)
+        if _has_reparse_component(current):
+            dirs[:] = []
+            continue
+        depth = len(current.relative_to(root).parts)
+        if depth >= 3:
+            dirs[:] = []
+        else:
+            dirs[:] = [d for d in dirs if d.casefold() not in SKIP_IMAGE_PARTS
+                       and not _has_reparse_component(current / d)][:40]
+        for name in names:
+            inspected += 1
+            if inspected > 16000 or len(output) >= max_matches:
+                return output
+            file = current / name
+            if not looks_like_screenshot(file) or _has_reparse_component(file):
+                continue
+            try:
+                info = file.lstat()
+            except OSError:
+                continue
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                continue
+            output.append(OldFile(
+                str(file), info.st_size, info.st_mtime,
+                info.st_dev, info.st_ino, info.st_mtime_ns, info.st_nlink,
+            ))
+    return output
+
+
 def find_old_screenshots(
     days: int = 365,
     custom_roots: list[str] | None = None,
@@ -134,6 +197,8 @@ def find_old_screenshots(
     home: Path | None = None,
     steam_roots: list[Path] | None = None,
     extra_steam_roots: list[str] | None = None,
+    games: list | None = None,
+    include_recent: bool = False,
     cancel: Cancel = None,
     max_matches: int = MAX_SCREENSHOTS,
 ) -> list[OldFile]:
@@ -146,7 +211,8 @@ def find_old_screenshots(
     if not isinstance(days, int) or days < 1 or not 1 <= max_matches <= MAX_SCREENSHOTS:
         raise ValueError("Choose a valid screenshot age and scan limit.")
     steam = _steam_roots(extra_steam_roots) if steam_roots is None else steam_roots
-    roots = default_screenshot_roots(home, steam)
+    roots = default_screenshot_roots(home, steam, games)
+    scan_days = 0 if include_recent else days
     roots.extend(
         Path(p).expanduser()
         for p in (custom_roots or [])[:30]
@@ -167,10 +233,12 @@ def find_old_screenshots(
         remaining = max_matches - len(result)
         if remaining <= 0:
             break
-        candidates = (_read_direct_steam_images(root, days, cancel, remaining * 2)
+        candidates = (_read_direct_steam_images(root, scan_days, cancel, remaining * 2)
                       if steam_trusted else
+                      _read_scoped_capture_images(root, cancel, remaining * 2)
+                      if include_recent else
                       scan_old_files(
-                          root, days, cancel=cancel,
+                          root, scan_days, cancel=cancel,
                           allowed_extensions=set(SCREENSHOT_EXTENSIONS),
                           max_matches=remaining * 2,
                       ))

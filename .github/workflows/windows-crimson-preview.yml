@@ -6,17 +6,29 @@ on:
     branches: [main]
     paths:
       - 'gg_desktop/**'
+      - 'performance_guard.py'
+      - 'tests/test_gameplay_performance_guard.py'
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
+      - 'tests/test_library_visuals.py'
+      - 'tests/test_locked_ui_layout.py'
       - 'tools/windows_crimson_ui_smoke.py'
+      - 'tools/windows_crimson_dpi_smoke.py'
+      - 'tools/render_locked_visual_review.py'
       - '.github/workflows/windows-crimson-preview.yml'
   pull_request:
     branches: [main]
     paths:
       - 'gg_desktop/**'
+      - 'performance_guard.py'
+      - 'tests/test_gameplay_performance_guard.py'
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
+      - 'tests/test_library_visuals.py'
+      - 'tests/test_locked_ui_layout.py'
       - 'tools/windows_crimson_ui_smoke.py'
+      - 'tools/windows_crimson_dpi_smoke.py'
+      - 'tools/render_locked_visual_review.py'
       - '.github/workflows/windows-crimson-preview.yml'
 
 concurrency:
@@ -52,15 +64,46 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
+          python -m unittest tests.test_gameplay_performance_guard -v
+          if ($LASTEXITCODE -ne 0) { throw 'Gameplay detection regression tests failed.' }
           python -m unittest tests.test_gg_desktop_models -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
+          python -m unittest tests.test_crimson_premium_panels -v
+          if ($LASTEXITCODE -ne 0) { throw 'Crimson premium panels regression tests failed.' }
+          python -m unittest tests.test_library_visuals -v
+          if ($LASTEXITCODE -ne 0) { throw 'Real artwork and library sort tests failed.' }
+          python -m unittest tests.test_graveyard_filters -v
+          if ($LASTEXITCODE -ne 0) { throw 'Graveyard evidence filters and ordering failed.' }
+          $env:GG_LOCKED_UI_CAPTURE_DIR = (Resolve-Path '_ci_temp').Path
+          python -m unittest tests.test_locked_ui_layout -v
+          if ($LASTEXITCODE -ne 0) { throw 'Locked UI resize and navigation regression failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
+      - name: Verify 125 percent and 150 percent Windows UI scaling
+        shell: pwsh
+        run: |
+          $env:QT_SCALE_FACTOR = '1.25'
+          python tools/windows_crimson_dpi_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw '125% Windows layout smoke failed.' }
+          $env:QT_SCALE_FACTOR = '1.5'
+          python tools/windows_crimson_dpi_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw '150% Windows layout smoke failed.' }
+          Remove-Item Env:QT_SCALE_FACTOR
+      - name: Render populated owner-reference review pages
+        run: python tools/render_locked_visual_review.py --output _ci_temp/visual-review
       - name: Upload actual Qt screen captures for design review
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: GameGrave-Crimson-Rendered-UI-Screenshots
-          path: _ci_temp/crimson-*-1440.png
+          path: |
+            _ci_temp/crimson-*-1440.png
+            _ci_temp/crimson-*-1672.png
+            _ci_temp/crimson-*-1366.png
+            _ci_temp/crimson-locked-*-1040.png
+            _ci_temp/cinematic-screenshot-manifest.json
+            _ci_temp/locked-ui-evidence.json
+            _ci_temp/visual-review/
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -133,15 +176,20 @@ jobs:
           if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
           if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
           Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
-      - name: Upload Crimson screenshot and Windows engineering EXE
+      - name: Upload verified Windows installer only for direct testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Cinematic-Windows-Installer-Unsigned
+          path: |
+            release/GameGrave-Crimson-Preview-Setup.exe
+            release/GameGrave-Crimson-Preview-Setup.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload standalone engineering EXE separately
         uses: actions/upload-artifact@v4
         with:
           name: GameGrave-Crimson-Qt-Preview-Unsigned
-          path: |
-            dist/GameGrave-Crimson-Preview.exe
-            _ci_temp/crimson-*-1440.png
-            release/GameGrave-Crimson-Preview-Setup.exe
-            release/GameGrave-Crimson-Preview-Setup.sha256
+          path: dist/GameGrave-Crimson-Preview.exe
           if-no-files-found: error
           retention-days: 14
 
