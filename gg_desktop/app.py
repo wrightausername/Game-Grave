@@ -249,6 +249,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
     def page_for(self, title: str, *, page=None) -> ScrollPage:
         self.artwork.set_library(self.inventory.games, [g.library for g in self.inventory.steam])
         if self.page is not None:
+            if self.current_route == "Ready Room":
+                self.page.release_ready_shell()
             self.stack_layout.removeWidget(self.page)
             self.page.deleteLater()
         self.page = page if page is not None else ScrollPage()
