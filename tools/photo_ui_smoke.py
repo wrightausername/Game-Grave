@@ -77,10 +77,11 @@ def main():
                   ("553850", "Helldivers 2"), ("1845910", "Dragon Age: The Veilguard")]
         steam = []
         for index, (ident, name) in enumerate(titles):
-            install = steam_root / "steamapps" / "common" / name
+            # App IDs are valid Windows folders, including titles containing ':'.
+            install = steam_root / "steamapps" / "common" / ident
             install.mkdir(parents=True)
             (steam_root / "steamapps" / ("appmanifest_" + ident + ".acf")).write_text(
-                '"AppState" { "appid" "' + ident + '" "installdir" "' + name + '" "StateFlags" "4" }')
+                '"AppState" { "appid" "' + ident + '" "installdir" "' + ident + '" "StateFlags" "4" }')
             steam.append(SteamGame(ident, name, str(steam_root), str(install), 1000000 + index,
                                    time.time() - index * 86400, "Disposable photo fixture"))
         ini.write_text(ini.read_text().replace(mod_inventory.games[0].install_path, steam[0].install_path))
