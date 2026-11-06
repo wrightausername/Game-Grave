@@ -36,6 +36,45 @@ The usual `py launcher.py` still opens the classic Tk application.
 Do not run both while carrying out Recycle Bin or restore operations;
 wait until the current operation finishes before changing interfaces.
 
+### Mods functionality and hover details
+
+Mods preserves its existing table, three-button layout and theme. After Scan PC,
+it reads bounded local metadata inside the accepted mod locations and checks
+saved manager profiles in the background. It never edits game files, manager
+settings, activation flags, saves or load order.
+
+- Hover any row for its description, author, version, source, saved-profile
+  state and available conflict findings. Missing descriptions stay explicitly
+  unknown. Double-click, press **F1**, or choose **Explain selected source** for
+  full details, related mods, profile sources and overlapping file paths.
+- Individual unpacked MO2/Vortex mods, Workshop items, supported Steam mod
+  directories and user-added storage appear alongside the original locations.
+  Metadata comes from JSON manifests (including SMAPI/Fabric/Thunderstore),
+  MO2 `meta.ini`, FOMOD descriptions, addon descriptors or local README text.
+  Packed content is not unpacked or executed.
+- **Open Mod Radar tools** works inside the packaged application. Search the
+  complete catalog, filter by saved profile, inspect selected mods, open their
+  folders, refresh details, run/cancel checks or export a JSON evidence report
+  to a new file outside game/manager/save locations. Previous/Next exposes
+  entries beyond the first 400. **Ctrl+F** opens these tools.
+- Checks flag missing enabled folders, required dependencies not recorded
+  enabled, simple numeric version mismatches, declared incompatibilities and
+  relative file overlaps between enabled mods **in the same saved profile**.
+  An overlap may be intentional; load-order winners and runtime compatibility
+  remain unverified. Optional and game/loader requirements are distinguished.
+- MO2 uses its recorded instance paths and `modlist.txt`. Vortex uses optional
+  JSON backup snapshots, never the live `State.v2` database. Old snapshots,
+  changed profiles, unknown state, unreadable/linked files and inspection limits
+  produce coverage notes. Failed/canceled inspections retain the previous
+  completed result. Disabled mods are never labeled unused or disposable.
+- Details offer folder access, a validated source-page link when available,
+  copy path and **Game DNA** for an exact, verified installation association.
+  Unverified ownership explains what is missing instead of picking another game.
+
+`tools/mods_live_smoke.py` exercises the actual controls using disposable manager
+data. `tests/test_mods_functionality.py` checks metadata, saved-profile isolation,
+conflict evidence and inspection limits. No network request is needed for Mods.
+
 ### Games functionality and artwork
 
 Games retains its table layout, filters, counters and theme. Artwork appears
@@ -160,13 +199,14 @@ py tools/ready_room_live_smoke.py --output _ci_temp
 py tools/ready_room_scope_smoke.py --output _ci_temp
 ```
 
-The current scope check uses approved baseline `5f5d57d`, including completed
-Overview and Ready Room functionality. It permits changes only in the Games
-page's construction, filling and details methods. Overview is compared at three
-window sizes, and all nine pages outside Games are compared with empty and
-populated data. Shared artwork, styles, widgets, backends and prior controllers
-remain unchanged. The Windows workflow runs the scope and interaction checks
-before packaging the EXE.
+The current scope check uses approved baseline `d7c12e7`, including completed
+Games, Overview and Ready Room functionality. It permits changes only in the
+Mods page's construction method and its new, isolated controllers/read models.
+Overview is compared at three window sizes, and all nine pages outside Mods are
+compared with empty and populated data. Shared artwork, styles, widgets, backends
+and prior controllers remain unchanged. The earlier scope command names forward
+to `tools/mods_scope_smoke.py`. The Windows workflow runs the scope and interaction
+checks before packaging the EXE.
 
 ### What the new preview actually does
 
