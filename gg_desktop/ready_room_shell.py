@@ -266,7 +266,8 @@ class ReadyRoomPage(QGraphicsView):
         return self.viewport().mapTo(self.owner, self.mapFromScene(local))
 
     def _fit_reference(self):
-        scale = max(.1, self.viewport().width() / REFERENCE_WIDTH)
+        scale = max(.1, min(self.viewport().width() / REFERENCE_WIDTH,
+                            self.viewport().height() / REFERENCE_HEIGHT))
         self.setTransform(QTransform.fromScale(scale, scale))
         self.horizontalScrollBar().setValue(0)
 

@@ -16,8 +16,9 @@ The eight source photo files, all other desktop artwork and every other tab's
 source remain unchanged. The only shared app change releases Ready Room's
 temporary shell before building the next page.
 
-The Ready Room UI smoke validates geometry at 1280×720, 1536×864, 1440×810 and
-960×650, actual mouse targets through the scaled view, search, shortcuts, metric
+The Ready Room UI smoke validates geometry at 1280×720, 1536×864, 1440×810,
+960×650 and a short 1600×720 window, actual mouse targets through the scaled
+view, search, shortcuts, metric
 and row actions, scan/backup routing, window controls and shell restoration.
 The live smoke checks real disposable ZIP creation/verification, backup history,
 explicit news refreshes, follows and exact game selection.

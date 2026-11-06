@@ -45,17 +45,18 @@ def main():
         settle()
         assert isinstance(window.page,ReadyRoomPage)
         initial=asdict(window.inventory)
-        for width,height in ((1280,720),(1536,864),(1440,810),(960,650)):
+        for width,height in ((1280,720),(1536,864),(1440,810),(960,650),(1600,720)):
             window.resize(width,height)
             settle()
             page=window.page
-            assert abs(page.transform().m11()-width/1280)<.001
+            scale=min(width/1280,height/720)
+            assert abs(page.transform().m11()-scale)<.001
             assert page.horizontalScrollBar().maximum()==0
             assert page.verticalScrollBar().maximum()==0
             point=page.reference_point(page.patches)
-            assert abs(point.x()-230*width/1280)<=1 and abs(point.y()-215*width/1280)<=1,(point,width)
+            assert abs(point.x()-230*scale)<=1 and abs(point.y()-215*scale)<=1,(point,width)
             point=page.reference_point(page.mod_panel)
-            assert abs(point.x()-230*width/1280)<=1 and abs(point.y()-498*width/1280)<=1,(point,width)
+            assert abs(point.x()-230*scale)<=1 and abs(point.y()-498*scale)<=1,(point,width)
             assert len(page.visible_patches)==len(page.visible_games)==5
             assert not window.nav_rail.isVisible() and not window.top_bar.isVisible()
             assert window.grab().save(str(args.output/f"ready-room-reference-{width}.png"))
@@ -98,7 +99,7 @@ def main():
         assert window.current_route=="More Tools"
         assert asdict(window.inventory)==initial
         QMainWindow.close(window)
-    print("PASS: Ready Room reference rectangles at four sizes, actual scaled mouse targets, search/keyboard, metric and row actions, mod scan, backup, native window controls and shell restoration. No live scan or source-file changes.")
+    print("PASS: Ready Room reference rectangles at five sizes, actual scaled mouse targets, search/keyboard, metric and row actions, mod scan, backup, native window controls and shell restoration. No live scan or source-file changes.")
     return 0
 
 
