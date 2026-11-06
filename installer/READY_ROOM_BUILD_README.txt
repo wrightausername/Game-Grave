@@ -1,37 +1,38 @@
-GAME GRAVE - MODS WINDOWS PREVIEW 0.2.5
+GAME GRAVE - OLD FILES WINDOWS PREVIEW 0.2.6
 
-Extract the entire ZIP first, then run GameGrave-Crimson-Preview.exe.
-Choose Scan PC and open Mods for your actual mod and manager storage.
-Mods keeps the existing table, three-button layout and theme. All nine other
-pages, including Games with artwork, Overview and Ready Room, are preserved.
+Extract the entire ZIP, then run GameGrave-Crimson-Preview.exe.
+Open Old Files. These scan controls work before Scan PC.
+All other pages, including Mods, Games, Overview and Ready Room, are preserved.
 
-Hover a mod for its local description, version, author, source, saved-profile
-state and available conflict findings. Double-click, press F1, or choose
-Explain selected source for full details and overlapping file paths.
-Descriptions that are absent from local metadata are marked unknown.
+Use Scan location to choose your selected folder or an available drive.
+Refresh drives updates the list after a drive is connected/disconnected.
+Leave Full scan of selected drive (optional) unchecked for Downloads, Documents
+and the selected folder on that drive. Check it to inspect the chosen drive
+outside those quick locations. Press Rescan to start. Change scan folder saves
+and selects an ordinary folder here without sending you to Settings.
 
-Open Mod Radar tools runs inside this packaged application. Search the entire
-catalog, filter by saved profile, inspect a mod, open its folder, refresh details,
-check/cancel conflicts or export a JSON evidence report to a new file.
-Previous/Next reaches entries beyond the first 400. Ctrl+F opens the tools.
-Details also offer a validated mod-page link when available, copy path,
-manager folder and Game DNA for an exact verified installation association.
+Scanning reads file metadata and lists files meeting the existing old-file age
+threshold. It excludes system locations, known games/mods/saves, Never Touch,
+links, offline placeholders, hardlinks and nested volumes. Inaccessible content
+and inspection limits are reported as a partial scan. No file content is loaded.
 
-Checks compare enabled mods within each saved MO2/Vortex profile. Findings
-include unavailable enabled folders, declared dependency/incompatibility rules,
-simple numeric version requirements and relative file overlaps. An overlap can
-be an intentional override. Runtime compatibility and load-order winners remain
-unverified. No game, mod, save, manager setting or load order is changed.
-Vortex inspection uses optional JSON backup snapshots, never live State.v2.
-Stale/changed profiles, unknown activation and inspection limits are reported.
-Canceled/failed checks retain the previous completed result.
+Progress shows real entry/file counts. Cancel scan, Escape or the toolbar cancel
+retains the last completed results. Navigation stays available while scanning.
+The heading separates your pending selection from the completed scan on display.
+Search covers all results; Previous/Next reaches files beyond the first 500.
+Double-click an entry for its path, protection and current identity status.
+Ctrl+F focuses search; F5 rescans; Ctrl+PageUp/PageDown changes result pages.
 
-Games still supports local/official/chosen artwork, full-library search and
-paging, launcher handoffs, and verified Steam uninstall confirmations.
+Select 1-200 individual files and use Move reviewed individual files to Recycle
+Bin to review the exact paths. After confirmation, the existing Windows recovery
+worker rechecks scope, age, identity and current protections. Drive-root files
+are inspection-only. Windows fixed-disk/session/recovery restrictions remain.
+Failed recovery checks leave the source file in place. There is no permanent
+removal fallback. Age does not prove disuse; Recycle Bin may still occupy space.
+
 Run GameGrave-Crimson-Preview-Setup.exe to install this preview.
 Start_Ready_Room_Reference.bat opens the labeled sample-data reference view.
-
 This is an unsigned engineering preview. Python is bundled.
-Included Qt screenshots use disposable QA data; normal operation uses your PC.
-Build-Info.txt records the source commit and Windows build run.
+Included screenshots use disposable QA drives and files; normal scans use your PC.
+Build-Info.txt identifies the source commit and Windows build run.
 SHA256SUMS.txt contains checksums for the EXE and installer.

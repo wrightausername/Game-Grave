@@ -36,6 +36,45 @@ The usual `py launcher.py` still opens the classic Tk application.
 Do not run both while carrying out Recycle Bin or restore operations;
 wait until the current operation finishes before changing interfaces.
 
+### Old Files drive selection and optional full scan
+
+Old Files keeps its file table, existing folder/rescan/recycle buttons and theme.
+Its scan controls work before Scan PC and stay inside this page.
+
+- **Scan location** lists the selected folder and available local/removable
+  drives. **Refresh drives** updates the list after a drive is attached or removed.
+- Leave **Full scan of selected drive (optional)** unchecked for a quick scan
+  of Downloads, Documents and the selected folder on that drive. Enable it to
+  inspect the selected drive outside those quick locations. **Rescan** starts
+  the chosen scope; changing the selection does not silently start a scan.
+- Scanning reads metadata and lists files meeting the existing old-file age
+  threshold. It excludes system locations, known game/mod/save roots, Never
+  Touch rules, linked/cloud-offline content, hardlinks and nested volumes.
+  Access failures and inspection limits are reported as a partial scan.
+- Progress shows actual entries checked and files found. **Cancel scan**,
+  **Escape**, and the existing toolbar cancel retain the last completed result.
+  Scanning can continue while navigating other tabs; it does not replace their
+  accepted PC-scan inventory. The heading distinguishes the pending selection
+  from the scope and time of the results currently displayed.
+- **Change scan folder** validates/saves the preference here. It stays on Old
+  Files and retains the previous results until a successful Rescan. Search covers
+  the complete result set, and Previous/Next reaches files beyond the first 500.
+  Double-click a file for its path, protection and current identity status.
+- **Move reviewed individual files to Recycle Bin…** reviews 1–200 specific
+  selected files. After confirmation it uses the existing Windows recovery
+  worker and rechecks scope, identity, age and current protections. Drive-root
+  files remain inspection-only; the ordinary-parent-folder guard is unchanged.
+  Windows fixed-disk/session/recovery restrictions still apply. Failed recovery
+  checks leave the source file in place. Nothing is permanently deleted.
+
+`Ctrl+F` focuses Old Files search, `F5` rescans, and `Ctrl+PageUp/PageDown`
+switch result pages. The scan result never claims that age proves disuse or
+that moving a file to Recycle Bin immediately frees disk space.
+
+`tools/old_files_live_smoke.py` covers the native controls using disposable drives
+and a mocked Shell transport. `tests/test_old_files_functionality.py` tests scope,
+metadata-only scanning, cancellation, partial coverage and recovery safeguards.
+
 ### Mods functionality and hover details
 
 Mods preserves its existing table, three-button layout and theme. After Scan PC,
@@ -199,13 +238,13 @@ py tools/ready_room_live_smoke.py --output _ci_temp
 py tools/ready_room_scope_smoke.py --output _ci_temp
 ```
 
-The current scope check uses approved baseline `d7c12e7`, including completed
-Games, Overview and Ready Room functionality. It permits changes only in the
-Mods page's construction method and its new, isolated controllers/read models.
-Overview is compared at three window sizes, and all nine pages outside Mods are
+The current scope check uses approved baseline `cc64c75`, including completed
+Mods, Games, Overview and Ready Room functionality. It permits changes only in
+the Old Files page's construction method and its isolated controller/read model.
+Overview is compared at three window sizes, and all nine pages outside Old Files are
 compared with empty and populated data. Shared artwork, styles, widgets, backends
 and prior controllers remain unchanged. The earlier scope command names forward
-to `tools/mods_scope_smoke.py`. The Windows workflow runs the scope and interaction
+to `tools/old_files_scope_smoke.py`. The Windows workflow runs the scope and interaction
 checks before packaging the EXE.
 
 ### What the new preview actually does

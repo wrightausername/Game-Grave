@@ -13,6 +13,9 @@ on:
       - 'tests/test_overview_data.py'
       - 'tests/test_games_functionality.py'
       - 'tests/test_mods_functionality.py'
+      - 'tests/test_old_files_functionality.py'
+      - 'tools/old_files_live_smoke.py'
+      - 'tools/old_files_scope_smoke.py'
       - 'tools/mods_live_smoke.py'
       - 'tools/mods_scope_smoke.py'
       - 'tools/games_live_smoke.py'
@@ -38,6 +41,9 @@ on:
       - 'tests/test_overview_data.py'
       - 'tests/test_games_functionality.py'
       - 'tests/test_mods_functionality.py'
+      - 'tests/test_old_files_functionality.py'
+      - 'tools/old_files_live_smoke.py'
+      - 'tools/old_files_scope_smoke.py'
       - 'tools/mods_live_smoke.py'
       - 'tools/mods_scope_smoke.py'
       - 'tools/games_live_smoke.py'
@@ -86,7 +92,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_games_functionality tests.test_mods_functionality -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_games_functionality tests.test_mods_functionality tests.test_old_files_functionality -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -100,8 +106,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Games functionality and artwork checks failed.' }
           python tools/mods_live_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Mods controls, descriptions or conflict checks failed.' }
-          python tools/mods_scope_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'A page or shared component changed outside Mods.' }
+          python tools/old_files_live_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Old Files buttons, drive scans or review controls failed.' }
+          python tools/old_files_scope_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'A page or shared component changed outside Old Files.' }
       - name: Upload actual Qt screen captures for design review
         uses: actions/upload-artifact@v4
         with:
@@ -113,6 +121,7 @@ jobs:
             _ci_temp/overview-*.png
             _ci_temp/games-*.png
             _ci_temp/mods-*.png
+            _ci_temp/old-files-*.png
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -193,7 +202,7 @@ jobs:
           if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
           if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
           Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
-      - name: Assemble Mods Windows download
+      - name: Assemble Old Files Windows download
         shell: pwsh
         run: |
           $taskBundle = Join-Path (Resolve-Path '_ci_temp').Path 'ReadyRoomWindows'
@@ -212,21 +221,22 @@ jobs:
           Copy-Item '_ci_temp/mods-functional-1450.png' (Join-Path $taskBundle 'Mods-Preview.png')
           Copy-Item '_ci_temp/mods-description-and-conflicts-1450.png' (Join-Path $taskBundle 'Mods-Description-and-Conflicts.png')
           Copy-Item '_ci_temp/mods-tools-1450.png' (Join-Path $taskBundle 'Mod-Radar-Tools.png')
+          Copy-Item '_ci_temp/old-files-functional-1450.png' (Join-Path $taskBundle 'Old-Files-Preview.png')
           $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
             $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$digest  $($_.Name)"
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Mods Windows preview 0.2.5',
+            'Game Grave Old Files Windows preview 0.2.6',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
           ) | Set-Content (Join-Path $taskBundle 'Build-Info.txt') -Encoding ascii
-      - name: Upload Mods Windows build
+      - name: Upload Old Files Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: GameGrave-Mods-Windows-Preview
+          name: GameGrave-Old-Files-Windows-Preview
           path: _ci_temp/ReadyRoomWindows/*
           if-no-files-found: error
           retention-days: 14

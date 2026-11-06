@@ -780,81 +780,12 @@ class ScreenMethods:
             "cannot establish whether a mod is unused.", "warning", wrap=True))
 
     def old_files_page(self):
+        from gg_desktop.old_files import OldFilesController
+
         page = self._new("Old Files",
                          "Review older ordinary files in the folder you selected. Never removes a folder automatically.")
         p, contents = panel()
-        root = str(self.settings.get("scan_folder", ""))
-        heading = label("Reviewed folder: " + root, "subtle", wrap=True)
-        contents.addWidget(heading)
-        actions = QWidget()
-        top = row()
-        actions.setLayout(top)
-        top.addWidget(button("Change scan folder", self._choose_scan_folder))
-        top.addWidget(button("Rescan", self.start_scan))
-        top.addStretch()
-        contents.addWidget(actions)
-        if self._not_scanned(page):
-            page.content.addWidget(p)
-            return
-        table = data_table(["FILE", "SIZE", "MODIFIED", "PROTECTION"])
-        table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        table.setRowCount(min(len(self.inventory.files), 500))
-        table.setColumnWidth(0, 350)
-        table.setColumnWidth(1, 120)
-        table.setColumnWidth(2, 140)
-        rows = self.inventory.files[:500]
-        for i, old in enumerate(rows):
-            fields = (str(Path(old.path).name), human_size(old.size),
-                      datetime.fromtimestamp(old.modified).strftime("%Y-%m-%d"),
-                      "Protected" if is_protected_path(Path(old.path),
-                                                      self.settings.get("never_touch", []))
-                      else "Reviewable (not proven unused)")
-            for j, value in enumerate(fields):
-                _table_text(table, i, j, value)
-        contents.addWidget(table)
-        def remove():
-            if self.scanning or self.cleaning:
-                self.info("Game Grave is busy", "Finish the current operation first.")
-                return
-            indexes = _selected_indices(table)
-            selected = [rows[i] for i in indexes if i < len(rows)]
-            if not selected or len(selected) > 200:
-                self.info("Choose files", "Select between 1 and 200 individual files.")
-                return
-            if any(is_protected_path(Path(f.path),
-                                     self.settings.get("never_touch", [])) for f in selected):
-                self.error("Protected items selected",
-                           "The Old Files view cannot override Never Touch. "
-                           "Review a personal rule in Settings first.")
-                return
-            if not self.confirm("Move selected Old Files to Recycle Bin?",
-                f"Reviewing {len(selected)} specific files in:\n{root}\n\n"
-                "Every identity, age, folder scope and Windows recovery safety check "
-                "runs again. No permanent deletion; no immediate disk space reclaimed.",
-                destructive=True):
-                return
-            self.cleaning = True
-            rules = tuple(self.settings.get("never_touch", []))
-            reviewed_root = root
-            days = int(self.settings.get("files_stale_days", 180))
-            session = "crimson-old-" + uuid.uuid4().hex[:10]
-            def complete(outcome):
-                self.cleaning = False
-                self.status.setText(f"{outcome['completed']} old file(s) moved to Recycle Bin. "
-                                    "They may still occupy disk space.")
-                self._remove_missing_inventory()
-                refresh_graveyard(self.inventory, self.settings)
-                self.navigate("Old Files")
-                self.info("Old Files review completed",
-                          f"{outcome['completed']} moved to Recycle Bin, "
-                          f"{len(outcome['skipped'])} skipped." +
-                          ("\n" + "\n".join(outcome["skipped"][:8])
-                           if outcome["skipped"] else ""))
-            self.job(lambda _progress: recycle_old_files(
-                selected, rules, session, review_root=reviewed_root,
-                min_age_days=days), complete, error_title="Old Files cleanup blocked")
-        contents.addWidget(button("Move reviewed individual files to Recycle Bin…",
-                                  remove, kind="danger"))
+        page.old_files = OldFilesController(self, page, contents)
         page.content.addWidget(p)
         page.content.addWidget(label(
             "File age does not prove disuse. Old Files never removes installed games or "
