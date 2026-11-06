@@ -22,7 +22,7 @@ def main():
     if sys.platform.startswith("linux"):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from PySide6.QtCore import QCoreApplication, QEvent, Qt
+    from PySide6.QtCore import QCoreApplication, QEvent, QPoint, Qt
     from PySide6.QtGui import QPixmap
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication, QPushButton
@@ -45,6 +45,18 @@ def main():
         assert window.grab().save(str(target)), target
         assert target.stat().st_size > 20_000, "Blank screenshot: " + name
 
+    def check_page_reachable(window):
+        # The original native window may be fitted to the Windows work area.
+        # Its Ready Room must allow the footer to be reached by scrolling.
+        page = window.page
+        assert page.horizontalScrollBar().maximum() == 0
+        page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
+        settle()
+        bottom = page.health_panel.mapTo(page.viewport(), QPoint(0, page.health_panel.height() - 1)).y()
+        assert 0 <= bottom < page.viewport().height(), "Ready Room footer cannot be reached"
+        page.verticalScrollBar().setValue(0)
+        settle()
+
     # Patch before construction so every signal points at a safe test double.
     with patch("gg_desktop.app.load_settings", side_effect=default_settings), \
             patch.object(CrimsonWindow, "start_scan") as scan, \
@@ -62,12 +74,12 @@ def main():
         original_inventory = asdict(window.inventory)
         for path in ASSETS.glob("*.png"):
             assert not QPixmap(str(path)).isNull(), "Undecodable local asset: " + str(path)
-        assert window.page.verticalScrollBar().maximum() == 0
-        assert window.page.horizontalScrollBar().maximum() == 0
+        check_page_reachable(window)
         assert window.nav_buttons["Ready Room"].property("active")
         # Compare primary reference rectangles, not fragile raster/font hashes.
         assert window.page.patches.mapTo(window.page.body, window.page.patches.rect().topLeft()).y() == 215
-        assert abs(window.page.patches.width() - 626) <= 3
+        expected_width = (window.page.body.width() - 32) * 626 / 1030
+        assert abs(window.page.patches.width() - expected_width) <= 3
 
         window.page.search.setText("WITCHER")
         settle()
@@ -106,7 +118,7 @@ def main():
         for width, height in ((1440, 900), (960, 650)):
             window.resize(width, height)
             settle()
-            assert window.page.horizontalScrollBar().maximum() == 0
+            check_page_reachable(window)
             if width == 960:
                 assert window.page.verticalScrollBar().maximum() > 0
                 assert window.page.metrics.height() == 116
@@ -116,7 +128,7 @@ def main():
         # Re-expanding must restore the exact reference layout and clear scrolling.
         window.resize(1280, 900)
         settle()
-        assert window.page.verticalScrollBar().maximum() == 0
+        check_page_reachable(window)
         assert window.page.metrics.height() == 58
 
         for route, _glyph in ROUTES:

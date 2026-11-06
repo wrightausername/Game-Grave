@@ -36,11 +36,11 @@ def main():
         subprocess.run(["git", "fetch", "--no-tags", "--depth=1", "origin", BASELINE], cwd=root, check=True)
     for path in ("gg_desktop/theme.py", "gg_desktop/screens.py", "gg_desktop/widgets.py",
                  "gg_desktop/backend.py", "gg_desktop/models.py"):
-        assert (root / path).read_text() == original(path).decode().replace("\r\n", "\n"), \
+        assert (root / path).read_text(encoding="utf-8") == original(path).decode().replace("\r\n", "\n"), \
             "Changed outside Ready Room: " + path
 
     baseline_source = original("gg_desktop/app.py").decode()
-    current_source = (root / "gg_desktop/app.py").read_text()
+    current_source = (root / "gg_desktop/app.py").read_text(encoding="utf-8")
 
     def method(source, name):
         return next(ast.dump(node, include_attributes=False) for cls in ast.parse(source).body
