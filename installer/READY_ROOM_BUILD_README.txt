@@ -1,6 +1,10 @@
-GAME GRAVE - READY ROOM WINDOWS PREVIEW 0.2.0
+GAME GRAVE - READY ROOM WINDOWS PREVIEW 0.2.1
 
 Extract the entire ZIP first.
+
+This correction restores the original application shell, global styling, native
+window frame, Overview startup and all other pages. The redesign is confined to
+the Ready Room page. Restored-Overview.png shows the preserved Overview screen.
 
 To inspect the supplied design with its sample games and counters:
   Double-click Start_Ready_Room_Reference.bat

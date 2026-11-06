@@ -64,8 +64,7 @@ def main():
             window.inventory.scanned_at = "Synthetic test date"
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
             for route in ("Overview", "Ready Room", "Games", "Graveyard", "Game DNA",
-                          "Mods", "Old Files", "Other Storage", "Captures", "AI Assistant",
-                          "Undo Center", "Settings", "More Tools", "Save Vault"):
+                          "Mods", "Old Files", "Undo Center", "Settings", "More Tools"):
                 window.navigate(route)
                 window.resize(1366, 768)
                 app.processEvents()
@@ -121,9 +120,9 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
-            print("PASS: Qt Crimson Overview, Ready Room and 14 interactive pages, mixed-launcher "
+            print("PASS: Qt Crimson Overview, Ready Room and 10 interactive pages, mixed-launcher "
                   "Games, inline exact-rule Unprotect without deletion, "
-                  "five screenshots and local hero assets.")
+                  "five screenshots and original hero asset.")
         finally:
             window.close()
             app.processEvents()

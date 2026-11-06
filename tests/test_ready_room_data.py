@@ -15,7 +15,7 @@ class ReadyRoomEvidenceTests(unittest.TestCase):
         self.assertFalse(state.patches)
         self.assertFalse(state.games)
         self.assertIsNone(state.health_score)
-        self.assertEqual(state.backup_title, "No backups this session")
+        self.assertEqual(state.backup_title, "Backup history unavailable")
         self.assertTrue(all(tone == "muted" for _, tone in state.health))
 
     def test_install_and_last_play_date_do_not_prove_playtime_or_up_to_date(self):
@@ -38,7 +38,7 @@ class ReadyRoomEvidenceTests(unittest.TestCase):
         self.assertEqual(state.mod_stats[0], ("2", "Mod locations"))
         self.assertEqual(state.mod_stats[1][0], "—")
         self.assertNotEqual(state.mod_state, "All Clear")
-        self.assertEqual(state.backup_title, "No backups this session")
+        self.assertEqual(state.backup_title, "Backup history unavailable")
 
     def test_disk_reading_does_not_verify_files_conflicts_or_manager_online_status(self):
         state = live_ready_room(Inventory(), disk_free_percent=25)

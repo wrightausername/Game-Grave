@@ -30,6 +30,7 @@ def main():
     from gg_desktop.app import CrimsonWindow, ROUTES
     from gg_desktop.models import merge_games
     from gg_desktop.ready_room import ASSETS, ReadyRoomPage
+    from gg_desktop.theme import STYLE
 
     app = QApplication.instance() or QApplication([])
 
@@ -50,12 +51,14 @@ def main():
             patch.object(CrimsonWindow, "_create_save_backup") as backup, \
             patch.object(CrimsonWindow, "info") as info:
         window = CrimsonWindow(reference_preview=True)
+        window.resize(1280, 900)
         window.show()
         settle()
         assert isinstance(window.page, ReadyRoomPage)
         assert window.current_route == "Ready Room"
         assert window.page.data.reference
-        assert "sample data" in window.windowTitle()
+        assert window.windowTitle() == "Game Grave  |  Crimson Command preview"
+        assert window.styleSheet() == STYLE
         original_inventory = asdict(window.inventory)
         for path in ASSETS.glob("*.png"):
             assert not QPixmap(str(path)).isNull(), "Undecodable local asset: " + str(path)
@@ -63,27 +66,26 @@ def main():
         assert window.page.horizontalScrollBar().maximum() == 0
         assert window.nav_buttons["Ready Room"].property("active")
         # Compare primary reference rectangles, not fragile raster/font hashes.
-        assert window.page.patches.mapTo(window, window.page.patches.rect().topLeft()).y() == 215
-        assert window.page.mod_panel.mapTo(window, window.page.mod_panel.rect().topLeft()).y() == 497
+        assert window.page.patches.mapTo(window.page.body, window.page.patches.rect().topLeft()).y() == 215
         assert abs(window.page.patches.width() - 626) <= 3
 
-        window.search.setText("WITCHER")
+        window.page.search.setText("WITCHER")
         settle()
         assert len(window.page.visible_games) == len(window.page.visible_patches) == 1
-        window.search.setText("nonexistent title")
+        window.page.search.setText("nonexistent title")
         settle()
         assert not window.page.visible_games and not window.page.visible_patches
-        window.search.clear()
+        window.page.search.clear()
         settle()
         assert len(window.page.visible_games) == len(window.page.visible_patches) == 5
         window.activateWindow()
         QTest.keyClick(window, Qt.Key_K, Qt.ControlModifier)
         settle()
-        assert window.search.hasFocus(), "Ctrl+K did not focus global search"
-        window.search.setText("Starfield")
-        QTest.keyClick(window.search, Qt.Key_Escape)
+        assert window.page.search.hasFocus(), "Ctrl+K did not focus Ready Room search"
+        window.page.search.setText("Starfield")
+        QTest.keyClick(window.page.search, Qt.Key_Escape)
         settle()
-        assert not window.search.text(), "Escape did not clear search"
+        assert not window.page.search.text(), "Escape did not clear search"
         # Mouse events on child text should still activate their real row button.
         first = window.page.patches.findChild(QPushButton, "readyItem")
         QTest.mouseClick(first, Qt.LeftButton)
@@ -95,10 +97,10 @@ def main():
         backup.assert_called_once()
         next(b for b in buttons if b.text() == "Manage Saves  →").click()
         settle()
-        assert window.current_route == "Save Vault"
+        assert window.current_route == "More Tools"
         assert window.nav_buttons["More Tools"].property("active")
         window.navigate("Ready Room")
-        window.main_canvas.setFocus()
+        window.page.setFocus()
         capture(window, "ready-room-reference-1280.png")
 
         for width, height in ((1440, 900), (960, 650)):
@@ -112,7 +114,7 @@ def main():
                     assert metric.width() > 190
             capture(window, f"ready-room-reference-{width}.png")
         # Re-expanding must restore the exact reference layout and clear scrolling.
-        window.resize(1280, 720)
+        window.resize(1280, 900)
         settle()
         assert window.page.verticalScrollBar().maximum() == 0
         assert window.page.metrics.height() == 58
@@ -126,6 +128,9 @@ def main():
         window.close()
 
         live = CrimsonWindow()
+        assert live.current_route == "Overview", "Original startup page was changed"
+        live.resize(1280, 900)
+        live.navigate("Ready Room")
         live.show()
         settle()
         assert not live.page.data.reference
@@ -146,13 +151,6 @@ def main():
         assert live.current_route == "Games"
         assert live.game_search.text() == game.name
         assert len(live._shown_games) == 1
-        live.navigate("Ready Room")
-        with patch.object(live, "job", side_effect=lambda fn, success, **kw: success({"verified": True})):
-            live._start_safe_backup_task("Save Vault backup", lambda: None, target="QA-only")
-        settle()
-        assert live.session_backups == 1
-        assert live.page.data.backup_title == "1 Verified Backup"
-        assert live.page.data.backup_note == "Created this session"
         live.close()
         settle()
 

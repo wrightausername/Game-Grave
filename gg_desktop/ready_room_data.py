@@ -52,7 +52,7 @@ class ReadyRoomData:
     mod_note: str = "Scan your local mod locations."
     mod_stats: tuple[tuple[str, str], ...] = (
         ("—", "Mod locations"), ("—", "Updates available"), ("—", "Compatibility checks"))
-    backup_title: str = "No backups this session"
+    backup_title: str = "Backup history unavailable"
     backup_note: str = "Choose a save folder to back up."
     health_score: int | None = None
     health: tuple[tuple[str, str], ...] = (
@@ -80,7 +80,7 @@ def live_ready_room(inventory, *, disk_free_percent: float | None = None,
         mod_stats=((mod_count, "Mod locations"), ("—", "Updates available"),
                    ("—", "Compatibility checks")),
         backup_title=(f"{session_backups} Verified Backup" + ("s" if session_backups != 1 else "")
-                      if session_backups else "No backups this session"),
+                      if session_backups else "Backup history unavailable"),
         backup_note="Created this session" if session_backups else "Choose a save folder to back up.",
         health=(storage, ("Game files not verified", "muted"),
                 ("Partial scan: review warnings", "amber") if inventory.warnings else

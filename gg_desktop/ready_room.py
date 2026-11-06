@@ -10,14 +10,14 @@ import shutil
 
 from PySide6.QtCore import QRectF, QSize, Qt
 from PySide6.QtGui import (
-    QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
+    QColor, QFont, QFontDatabase, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QShortcut,
 )
 from PySide6.QtWidgets import (
-    QBoxLayout, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
+    QBoxLayout, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy,
     QWidget,
 )
 
-from gg_desktop.icons import icon, icon_label
+from gg_desktop.ready_room_icons import icon, icon_label
 from gg_desktop.ready_room_data import live_ready_room, reference_ready_room
 from gg_desktop.widgets import ScrollPage, button, column, label, row
 
@@ -44,9 +44,6 @@ QLabel#readyState { font-size: 23px; font-weight: 600; }
 QLabel#readyBackupTitle { font-size: 20px; font-weight: 500; }
 QLabel#readyEmptyTitle { font-size: 19px; font-weight: 600; }
 QLabel#readyEmptyDetail { font-size: 14px; color: #AAB4BE; }
-QPushButton#referenceNav {
-    background: transparent; border: none; padding: 0; min-height: 35px; max-height: 35px;
-}
 QPushButton#readyMetric { background: transparent; border: none; border-radius: 0; padding: 0; min-height: 0; }
 QPushButton#readyMetric:hover { background: rgba(255,255,255,5); }
 QPushButton#readyMetric:focus { border: 1px solid #4DD8E2; }
@@ -82,19 +79,16 @@ def fitted_text(text, role, *, wrap=False):
     return result
 
 
-class MainCanvas(QWidget):
+class ReadyRoomBackground(QWidget):
     """Gaming-room illustration behind the title and the real search controls."""
     def __init__(self):
         super().__init__()
         self.setObjectName("mainCanvas")
         self.art = QPixmap(str(ASSETS / "gaming_room.png"))
-        self.ready = True
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor("#05090C"))
-        if not self.ready:
-            return
         art_width = max(660, self.width() * .63)
         target = QRectF(self.width() - art_width, 0, art_width, 150)
         # The reference's search and window chrome are excluded from the art.
@@ -120,79 +114,6 @@ class MainCanvas(QWidget):
         bottom.setColorAt(0, QColor(5, 9, 12, 0))
         bottom.setColorAt(1, QColor("#05090C"))
         painter.fillRect(QRectF(0, 126, self.width(), 34), bottom)
-
-
-class NavigationRail(QFrame):
-    def __init__(self):
-        super().__init__()
-        self.setObjectName("navRail")
-        self.setFixedWidth(218)
-        self.art = QPixmap(str(ASSETS / "sidebar_forest.png"))
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        background = QLinearGradient(0, 0, self.width(), self.height())
-        background.setColorAt(0, QColor("#060C10"))
-        background.setColorAt(1, QColor("#070B0E"))
-        painter.fillRect(self.rect(), background)
-        height = max(183, self.height() * .255)
-        target = QRectF(0, self.height() - height, 217, height)
-        painter.drawPixmap(target, self.art, QRectF(self.art.rect()))
-        painter.setPen(QColor("#20282E"))
-        painter.drawLine(self.width() - 1, 0, self.width() - 1, self.height())
-
-
-class NavigationButton(QPushButton):
-    def __init__(self, title, glyph, action):
-        super().__init__()
-        self.title = title
-        self.glyph = glyph
-        self.setObjectName("referenceNav")
-        self.setFixedHeight(35)
-        self.setAccessibleName(title + " page")
-        self.setToolTip(title)
-        self.setFocusPolicy(Qt.StrongFocus)
-        self.setCursor(Qt.PointingHandCursor)
-        self.clicked.connect(action)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        active = self.property("active")
-        if active or self.underMouse():
-            glow = QLinearGradient(0, 0, self.width(), 0)
-            glow.setColorAt(0, QColor(106, 4, 18, 30))
-            glow.setColorAt(.38, QColor(171, 12, 29, 185 if active else 65))
-            glow.setColorAt(1, QColor(83, 3, 14, 0))
-            painter.fillRect(self.rect(), glow)
-            if active:
-                for y in (0, self.height() - 1):
-                    painter.setPen(QPen(glow, 1))
-                    painter.drawLine(0, y, self.width(), y)
-        icon(self.glyph, "#F1EDF0" if active else "#C4C7C9", 23).paint(
-            painter, 34, 6, 23, 23)
-        painter.setFont(QFont("Roboto Condensed", 12))
-        painter.setPen(QColor("#F4F1F3" if active else "#D6D6D9"))
-        painter.drawText(QRectF(80, 0, self.width() - 90, 35), Qt.AlignVCenter, self.title)
-        if self.title == "More Tools":
-            icon("chevron", "#CDD1D6", 16).paint(painter, 190, 10, 16, 16)
-        if self.hasFocus():
-            painter.setPen(QPen(QColor(TONES["cyan"]), 1))
-            painter.drawRoundedRect(self.rect().adjusted(2, 1, -3, -2), 3, 3)
-
-
-class WindowHeader(QWidget):
-    """Native move/maximize behavior for the reference's custom title bar."""
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and self.window().windowHandle():
-            self.window().windowHandle().startSystemMove()
-        super().mousePressEvent(event)
-
-    def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            window = self.window()
-            window.showNormal() if window.isMaximized() else window.showMaximized()
-        super().mouseDoubleClickEvent(event)
 
 
 class ReadyPanel(QFrame):
@@ -400,13 +321,59 @@ class ReadyRoomPage(ScrollPage):
     def __init__(self, window, data):
         super().__init__()
         self.setObjectName("readyRoom")
+        font_id = QFontDatabase.addApplicationFont(str(ASSETS / "RobotoCondensed.ttf"))
+        if font_id >= 0:
+            self.destroyed.connect(lambda: QFontDatabase.removeApplicationFont(font_id))
+        self.setStyleSheet('QWidget { font-family: "Roboto Condensed"; }' + READY_STYLE)
+        old_body = self.takeWidget()
+        old_body.deleteLater()
+        self.body = ReadyRoomBackground()
         self.body.setObjectName("readyBody")
+        self.content = column(spacing=0)
+        self.body.setLayout(self.content)
+        self.setWidget(self.body)
         self.viewport().setAutoFillBackground(False)
         self.body.setAutoFillBackground(False)
         self.window_owner = window
         self.data = data
         self.content.setContentsMargins(12, 0, 8, 30)
         self.content.setSpacing(0)
+        header = QWidget()
+        header.setFixedHeight(52)
+        header_row = row(spacing=12, margins=(10, 12, 10, 8))
+        header.setLayout(header_row)
+        search_box = QFrame()
+        search_box.setObjectName("readySearchBox")
+        search_box.setFixedHeight(31)
+        search_box.setMaximumWidth(452)
+        search_box.setStyleSheet(
+            'QFrame#readySearchBox {background:rgba(5,9,12,215);border:1px solid #3B424B;border-radius:8px;}'
+            'QLineEdit {background:transparent;border:none;padding:0;font-size:14px;}'
+            'QLabel {background:transparent;}')
+        search_row = row(spacing=12, margins=(10, 2, 6, 2))
+        search_box.setLayout(search_row)
+        search_row.addWidget(icon_label("search", "#E0E1E5", 18))
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Search Ready Room…")
+        self.search.setAccessibleName("Search Ready Room")
+        self.search.textChanged.connect(self.filter_rows)
+        search_row.addWidget(self.search, 1)
+        hint = label("Ctrl + K")
+        hint.setStyleSheet("font-size:12px;color:#D0D3D9;background:#181E24;border-radius:4px;padding:2px 6px;")
+        search_row.addWidget(hint)
+        header_row.addWidget(search_box, 1)
+        if data.reference:
+            tag = label("REFERENCE PREVIEW · SAMPLE DATA")
+            tag.setStyleSheet("font-size:10px;color:#AAB1BA;")
+            header_row.addWidget(tag)
+        header_row.addStretch()
+        self.content.addWidget(header)
+        self.search_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
+        self.search_shortcut.activated.connect(self.search.setFocus)
+        self.clear_search_shortcut = QShortcut(QKeySequence("Escape"), self)
+        self.clear_search_shortcut.activated.connect(self.search.clear)
+        self.scan_shortcut = QShortcut(QKeySequence("F5"), self)
+        self.scan_shortcut.activated.connect(window.start_scan)
         hero = QWidget()
         hero.setFixedHeight(94)
         hero_row = row(spacing=12, margins=(13, 5, 0, 0))
@@ -611,7 +578,7 @@ class ReadyRoomPage(ScrollPage):
         summary.addLayout(words, 1)
         card.body_layout.addLayout(summary, 1)
         controls = row(spacing=11)
-        controls.addWidget(action_button("Manage Saves  →", self.window_owner.save_vault_page), 1)
+        controls.addWidget(action_button("Manage Saves  →", lambda: self.window_owner.navigate("Save Vault")), 1)
         controls.addWidget(action_button("Backup Now", self.window_owner._create_save_backup, "cloud", primary=True), 1)
         card.body_layout.addLayout(controls)
         return card
@@ -662,10 +629,10 @@ class ReadyRoomMethods:
         except OSError:
             free_percent = None
         data = reference_ready_room() if self.reference_preview else live_ready_room(
-            self.inventory, disk_free_percent=free_percent,
-            session_backups=getattr(self, "session_backups", 0))
+            self.inventory, disk_free_percent=free_percent)
         self.page_for("Ready Room", page=ReadyRoomPage(self, data))
-        self.page.filter_rows(self.search.text())
+        self.page.setFocusPolicy(Qt.StrongFocus)
+        self.page.setFocus()
 
     def ready_updates(self):
         if self.reference_preview:
@@ -696,72 +663,3 @@ class ReadyRoomMethods:
         else:
             self.navigate("Games")
             self.game_search.setText(game.name)
-
-    def save_vault_page(self):
-        from gg_desktop.widgets import page_heading, panel
-        page = self.page_for("Save Vault")
-        page_heading(page, "Save Vault", "Protect and manage your game saves.")
-        frame, stack = panel()
-        stack.addWidget(label("Your saves stay on your PC", "sectionTitle"))
-        stack.addWidget(label("Create a verified ZIP of one save or profile folder. "
-                              "Close the game first for a consistent backup.", "subtle", wrap=True))
-        stack.addWidget(button("Back up a save folder…", self._create_save_backup, kind="primary"))
-        if self.inventory.saves:
-            for save in self.inventory.saves[:25]:
-                stack.addWidget(label(str(getattr(save, "game", "Save folder")), "sectionTitle"))
-                stack.addWidget(label(str(getattr(save, "path", "")), "subtle", wrap=True))
-        else:
-            stack.addWidget(label("Scan PC to discover local save locations.", "subtle"))
-            stack.addWidget(button("Scan PC", self.start_scan))
-        page.content.addWidget(frame)
-        page.content.addStretch()
-
-    def other_storage_page(self):
-        from gg_desktop.widgets import page_heading, panel
-        page = self.page_for("Other Storage")
-        page_heading(page, "Other Storage", "Review the storage recorded by your last local scan.")
-        for title, records, destination in (
-                ("Mod locations", self.inventory.mods, "Mods"),
-                ("Old downloads", self.inventory.files, "Old Files"),
-                ("Game captures", [*self.inventory.screenshots, *self.inventory.recordings], "Captures")):
-            frame, stack = panel()
-            stack.addWidget(label(title, "sectionTitle"))
-            stack.addWidget(label(str(len(records)) + " recorded locations or files" if self.inventory.scanned_at
-                                  else "Not scanned yet", "subtle"))
-            stack.addWidget(button("Review " + title.lower(), lambda _=False, r=destination: self.navigate(r)))
-            page.content.addWidget(frame)
-        page.content.addStretch()
-
-    def captures_page(self):
-        from gg_desktop.widgets import page_heading, panel
-        page = self.page_for("Captures")
-        page_heading(page, "Captures", "Game screenshots and recordings recorded by the age-filtered local scan.")
-        frame, stack = panel()
-        if not self.inventory.scanned_at:
-            stack.addWidget(label("Scan PC to discover game capture folders.", "subtle"))
-            stack.addWidget(button("Scan PC", self.start_scan, kind="primary"))
-        else:
-            for capture in self.inventory.screenshots[:100]:
-                stack.addWidget(button(Path(capture.path).name + "  ·  Preview",
-                    lambda _=False, c=capture: self._preview_capture(c)))
-            for capture in self.inventory.recordings[:100]:
-                stack.addWidget(label(Path(capture.path).name + "  ·  Recording", "subtle"))
-            if not self.inventory.screenshots and not self.inventory.recordings:
-                stack.addWidget(label("No captures matched your scan settings.", "subtle"))
-        stack.addWidget(button("Manage game capture folders", lambda: self.navigate("Settings")))
-        page.content.addWidget(frame)
-        page.content.addStretch()
-
-    def assistant_page(self):
-        from gg_desktop.widgets import page_heading, panel
-        page = self.page_for("AI Assistant")
-        page_heading(page, "AI Assistant", "Help understanding your local gaming setup.")
-        frame, stack = panel()
-        stack.addWidget(label("Explore your scan evidence", "sectionTitle"))
-        stack.addWidget(label("An AI service is not connected. You can inspect the local evidence "
-                              "in Game DNA and Mod Radar, or review your findings in the Graveyard.",
-                              "subtle", wrap=True))
-        for title in ("Game DNA", "Mods", "Graveyard"):
-            stack.addWidget(button("Open " + title, lambda _=False, r=title: self.navigate(r)))
-        page.content.addWidget(frame)
-        page.content.addStretch()

@@ -10,6 +10,7 @@ on:
       - 'tests/test_gg_desktop_models.py'
       - 'tests/test_ready_room_data.py'
       - 'tools/ready_room_ui_smoke.py'
+      - 'tools/ready_room_scope_smoke.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
       - 'installer/GameGraveCrimsonPreview.iss'
@@ -23,6 +24,7 @@ on:
       - 'tests/test_gg_desktop_models.py'
       - 'tests/test_ready_room_data.py'
       - 'tools/ready_room_ui_smoke.py'
+      - 'tools/ready_room_scope_smoke.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
       - 'installer/GameGraveCrimsonPreview.iss'
@@ -68,6 +70,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
           python tools/ready_room_ui_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room layout and interaction checks failed.' }
+          python tools/ready_room_scope_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'A screen or shared shell changed outside Ready Room.' }
       - name: Upload actual Qt screen captures for design review
         uses: actions/upload-artifact@v4
         with:
@@ -75,6 +79,7 @@ jobs:
           path: |
             _ci_temp/crimson-*-1440.png
             _ci_temp/ready-room-*.png
+            _ci_temp/restored-overview.png
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -167,13 +172,14 @@ jobs:
             'installer/READY_ROOM_BUILD_README.txt'
           ) -Destination $taskBundle
           Copy-Item '_ci_temp/ready-room-reference-1280.png' (Join-Path $taskBundle 'Ready-Room-Preview.png')
+          Copy-Item '_ci_temp/restored-overview.png' (Join-Path $taskBundle 'Restored-Overview.png')
           $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
             $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$digest  $($_.Name)"
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Ready Room Windows preview 0.2.0',
+            'Game Grave Ready Room Windows preview 0.2.1',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
