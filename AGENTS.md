@@ -1,6 +1,13 @@
 # Approved UI foundation
 
-The current UI is the product owner's approved foundation. Before editing UI,
+The owner's locked photos are the visual specification, not the current code or
+prior preview screenshots. The unmodified originals are in
+`gg_desktop/assets/references/`; the Ready Room original is also in the owner's
+conversation. Do not replace their shell, artwork, proportions, cover grid,
+filter columns, metrics, tabs or right-side inspectors with generic tables.
+Prior code-baseline pixel checks do not establish fidelity to the photos.
+
+Before editing UI,
 acknowledge the exact requested sections in chat. Confine changes to those
 sections and preserve all other screens, the shell, navigation, styling and
 behavior. An overall redesign requires an explicit request from the owner.

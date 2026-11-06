@@ -91,14 +91,12 @@ class ReadyRoomBackground(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor("#05090C"))
-        art_width = max(660, self.width() * .63)
-        target = QRectF(self.width() - art_width, 0, art_width, 150)
+        art_width = max(self.art.width(), self.width() * .59)
+        target = QRectF(self.width() - art_width, -46, art_width, 150)
         # The reference's search and window chrome are excluded from the art.
         painter.save()
         clip = QPainterPath()
-        clip.addRect(QRectF(0, 44, self.width(), 106))
-        clip.addRect(QRectF(self.width() - art_width + 78, 0,
-                            max(0, art_width - 280), 44))
+        clip.addRect(QRectF(0, 0, self.width(), 104))
         painter.setClipPath(clip)
         painter.drawPixmap(target, self.art, QRectF(self.art.rect()))
         painter.restore()
@@ -111,11 +109,11 @@ class ReadyRoomBackground(QWidget):
             shade.setColorAt(0, QColor(5, 9, 12, 250))
             shade.setColorAt(.7, QColor(5, 9, 12, 205))
             shade.setColorAt(1, QColor(5, 9, 12, 0))
-            painter.fillRect(QRectF(0, 0, self.width(), 150), shade)
-        bottom = QLinearGradient(0, 126, 0, 159)
+            painter.fillRect(QRectF(0, 0, self.width(), 104), shade)
+        bottom = QLinearGradient(0, 80, 0, 113)
         bottom.setColorAt(0, QColor(5, 9, 12, 0))
         bottom.setColorAt(1, QColor("#05090C"))
-        painter.fillRect(QRectF(0, 126, self.width(), 34), bottom)
+        painter.fillRect(QRectF(0, 80, self.width(), 34), bottom)
 
 
 class ReadyPanel(QFrame):
@@ -356,7 +354,7 @@ class ReadyRoomPage(ScrollPage):
         self.body.setAutoFillBackground(False)
         self.window_owner = window
         self.data = data
-        self.content.setContentsMargins(12, 0, 8, 30)
+        self.content.setContentsMargins(12, 6 if hasattr(window, "global_search") else 0, 8, 30)
         self.content.setSpacing(0)
         header = QWidget()
         header.setFixedHeight(52)
@@ -388,12 +386,18 @@ class ReadyRoomPage(ScrollPage):
             header_row.addWidget(tag)
         header_row.addStretch()
         self.content.addWidget(header)
-        self.search_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
-        self.search_shortcut.activated.connect(self.search.setFocus)
+        if hasattr(window, "global_search"):
+            header.hide()
+            window.global_search.textChanged.connect(self.filter_rows)
+        self.search_shortcut = QShortcut(QKeySequence("Ctrl+K"), self.search)
+        self.search_shortcut.activated.connect(window.global_search.setFocus if hasattr(window, "global_search") else self.search.setFocus)
         self.clear_search_shortcut = QShortcut(QKeySequence("Escape"), self)
         self.clear_search_shortcut.activated.connect(self.search.clear)
         self.scan_shortcut = QShortcut(QKeySequence("F5"), self)
         self.scan_shortcut.activated.connect(window.start_scan)
+        if hasattr(window, "global_search"):
+            self.scan_shortcut.setEnabled(False)
+            self.clear_search_shortcut.setEnabled(False)
         hero = QWidget()
         hero.setFixedHeight(94)
         hero_row = row(spacing=12, margins=(13, 5, 0, 0))
@@ -668,6 +672,8 @@ class ReadyRoomMethods(ReadyRoomActions):
             self.inventory, disk_free_percent=free_percent, state=self._ready_state,
             evidence=self._ready_evidence if self._ready_evidence_inventory is self.inventory else {})
         self.page_for("Ready Room", page=ReadyRoomPage(self, data))
+        if self.reference_preview and hasattr(self, "global_search"):
+            self.global_search.setPlaceholderText("REFERENCE PREVIEW · SAMPLE DATA · Search Ready Room")
         self.page.setFocusPolicy(Qt.StrongFocus)
         self.page.setFocus()
 

@@ -14,6 +14,7 @@ from gg_desktop.theme import COLORS
 
 def label(text: str = "", role: str = "", wrap: bool = False) -> QLabel:
     widget = QLabel(text)
+    widget.setTextFormat(Qt.PlainText)
     if role:
         widget.setObjectName(role)
     widget.setWordWrap(wrap)

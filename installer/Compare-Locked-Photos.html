@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Grave — locked photo comparison</title>
+<style>
+  :root { color-scheme:dark; font:15px system-ui,sans-serif; background:#06090d; color:#edf2f6; }
+  body { margin:24px; }
+  h1 { font-size:24px; margin:0 0 8px; }
+  p { color:#b7c3ce; max-width:960px; line-height:1.5; }
+  nav { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0; }
+  button { font:inherit; color:inherit; background:#141d25; border:1px solid #36424d; padding:8px 12px; border-radius:5px; cursor:pointer; }
+  button[aria-pressed="true"] { background:#9a0824; border-color:#ff3859; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  figure { margin:0; min-width:0; }
+  figcaption { padding:8px 0; font-weight:600; }
+  img { width:100%; height:auto; border:1px solid #36424d; display:block; }
+  a { color:#65d8f2; }
+  .blend { position:relative; max-width:1280px; margin-top:24px; }
+  .blend img:last-child { position:absolute; left:0; top:0; opacity:.5; }
+  label { display:flex; align-items:center; gap:12px; margin-top:24px; }
+  input { width:min(440px,50vw); }
+  @media(max-width:850px) { .pair { grid-template-columns:1fr; } body { margin:12px; } }
+</style>
+<h1>Locked photo / running Windows app</h1>
+<p>The original photos are the visual specification. These app captures use
+disposable QA libraries, so counts, file paths and evidence differ from the
+photos. Every app capture is a native Qt window with working controls.</p>
+<nav aria-label="Choose a page"></nav>
+<div class="pair">
+  <figure><figcaption>Original owner photo</figcaption><a id="originalLink"><img id="original" alt="Original owner photo"></a></figure>
+  <figure><figcaption>Running app — native Windows capture</figcaption><a id="actualLink"><img id="actual" alt="Running app capture"></a></figure>
+</div>
+<label>Overlay opacity <input id="opacity" type="range" min="0" max="100" value="50"> <output id="amount">50%</output> app</label>
+<p>Move the slider to compare alignment. Click either image above to open it at full size.</p>
+<div class="blend"><img id="base" alt="Original photo for overlay comparison"><img id="overlay" alt="App render over original photo"></div>
+<p><a href="ready-room-reference-1280.png">Ready Room sample render</a> ·
+<a href="overview-1280.png">Overview render</a> ·
+<a href="Build-Info.txt">Build identity</a></p>
+<script>
+const pages = [
+  ['Games','games','photo-games-functional-1280.png'],
+  ['Mods','mods','photo-mods-functional-1280.png'],
+  ['Old Files','old_files','photo-old-files-functional-1280.png'],
+  ['Other Storage','other_storage','other-storage-1280.png'],
+  ['Captures','captures','captures-1280.png'],
+  ['Graveyard','graveyard','graveyard-1280.png'],
+  ['Game DNA','dna','game-dna-1280.png'],
+  ['Undo Center','undo','undo-center-1280.png']
+];
+const node = id => document.getElementById(id);
+function select(page, button) {
+  const original = 'Locked-Photos/' + page[1] + '.jpg';
+  node('original').src = node('base').src = node('originalLink').href = original;
+  node('actual').src = node('overlay').src = node('actualLink').href = page[2];
+  document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-pressed', b === button ? 'true' : 'false'));
+}
+for (const page of pages) {
+  const button = document.createElement('button');
+  button.textContent = page[0];
+  button.type = 'button';
+  button.addEventListener('click', () => select(page, button));
+  document.querySelector('nav').append(button);
+  if (page === pages[0]) select(page, button);
+}
+node('opacity').addEventListener('input', event => {
+  node('overlay').style.opacity = event.target.value / 100;
+  node('amount').value = event.target.value + '%';
+});
+</script>
+</html>

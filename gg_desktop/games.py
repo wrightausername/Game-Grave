@@ -430,6 +430,8 @@ class GamesController(QObject):
         if not self._valid():
             return
         menu = QMenu(self.window)
+        menu.addAction("View source evidence", lambda: self.window.info("Game Source Evidence",
+            game.install_evidence + "\n\nSize source: " + game.size_source + "\nLast played source: " + game.last_played_source))
         menu.addAction("Choose artwork…", lambda: self.choose_picture(game))
         menu.addAction("Download official artwork", lambda: self.download_artwork([game]))
         menu.addAction("Use a Steam artwork app ID…", lambda: self.choose_art_id(game))
