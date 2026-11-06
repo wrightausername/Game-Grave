@@ -254,7 +254,8 @@ def status_badge(text, tone, glyph, *, bordered=True):
     frame.setLayout(contents)
     contents.addWidget(icon_label(glyph, color, 18))
     words = label(text)
-    words.setStyleSheet(f"color:{color};font-size:12px;font-weight:500;")
+    size = 11 if len(text) > 13 else 12
+    words.setStyleSheet(f"color:{color};font-size:{size}px;font-weight:500;")
     contents.addWidget(words, 1)
     frame.setAccessibleName(text)
     return frame
@@ -323,9 +324,8 @@ class HealthGauge(QWidget):
             painter.setOpacity(1)
         painter.setPen(QColor("#F5F3F6"))
         font = QFont("Roboto Condensed")
-        font.setPixelSize(28)
-        font.setStretch(108)
-        font.setWeight(QFont.Bold)
+        font.setPixelSize(27)
+        font.setWeight(QFont.DemiBold)
         painter.setFont(font)
         painter.drawText(QRectF(9, 36, 107, 37), Qt.AlignCenter,
                          f"{self.score}%" if self.score is not None else "—")
