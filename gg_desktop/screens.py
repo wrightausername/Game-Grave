@@ -749,6 +749,8 @@ class ScreenMethods:
             _box_notice(page, "No Game DNA relationships available. Unknown files stay protected.")
 
     def mods_page(self):
+        from gg_desktop.mods import ModsController
+
         page = self._new("Mods", "Mod Radar shows potential mod storage without touching profiles, saves or managed assets.")
         if self._not_scanned(page):
             return
@@ -759,34 +761,17 @@ class ScreenMethods:
         table.setColumnWidth(0, 305)
         table.setColumnWidth(1, 150)
         table.setColumnWidth(2, 240)
-        table.setRowCount(min(len(self.inventory.mods), 400))
-        for i, m in enumerate(self.inventory.mods[:400]):
-            fields = (str(getattr(m, "path", "")),
-                      str(getattr(m, "source", "Unknown")),
-                      str(getattr(m, "status", "Protected")),
-                      readable_bytes(getattr(m, "apparent_bytes", None)))
-            for j, val in enumerate(fields):
-                _table_text(table, i, j, val)
         contents.addWidget(table)
+        self.mod_table = table
+        control = ModsController(self, page, table)
+        page.mods = control
+        control.bind(contents)
         controls = QWidget()
         tools = row()
         controls.setLayout(tools)
-        def inspect_selected():
-            indexes = _selected_indices(table)
-            if not indexes:
-                self.info("Choose a mod location", "Select one inventory row.")
-                return
-            m = self.inventory.mods[indexes[0]]
-            self.info("Why this mod is protected",
-                      "LOCATION: " + str(getattr(m, "path", "")) +
-                      "\n\nSOURCE: " + str(getattr(m, "source", "Unknown")) +
-                      "\n\nEVIDENCE: " + str(getattr(m, "status", "Unknown")) +
-                      "\n\nGame Grave will never delete a mod-manager "
-                      "profile or active mod based on an old timestamp.")
-        tools.addWidget(button("Explain selected source", inspect_selected))
-        tools.addWidget(button("Game DNA", lambda: self.navigate("Game DNA")))
-        tools.addWidget(button("Open classic Mod Radar tools",
-                               self._launch_classic_tools))
+        tools.addWidget(button("Explain selected source", control.explain))
+        tools.addWidget(button("Game DNA", control.dna))
+        tools.addWidget(button("Open Mod Radar tools", control.open_tools))
         tools.addStretch()
         contents.addWidget(controls)
         page.content.addWidget(p)
