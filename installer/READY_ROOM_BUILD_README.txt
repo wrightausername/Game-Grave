@@ -1,38 +1,32 @@
-GAME GRAVE - OLD FILES WINDOWS PREVIEW 0.2.6
+GAME GRAVE - LOCKED PHOTO UI WINDOWS PREVIEW 0.2.7
 
 Extract the entire ZIP, then run GameGrave-Crimson-Preview.exe.
-Open Old Files. These scan controls work before Scan PC.
-All other pages, including Mods, Games, Overview and Ready Room, are preserved.
+The app uses the original owner-photo sidebar, artwork, cover grid, metrics,
+filters, tabs and detail inspectors. The eight unmodified attached photo files
+are included in Locked-Photos, alongside actual native Windows page captures.
 
-Use Scan location to choose your selected folder or an available drive.
-Refresh drives updates the list after a drive is connected/disconnected.
-Leave Full scan of selected drive (optional) unchecked for Downloads, Documents
-and the selected folder on that drive. Check it to inspect the chosen drive
-outside those quick locations. Press Rescan to start. Change scan folder saves
-and selects an ordinary folder here without sending you to Settings.
+Choose Scan PC in Overview or press F5 to discover your local library.
+Games keeps cached/chosen/official artwork tools, favorite filters, exact launcher
+handoffs and verified Steam uninstall. Use the ellipsis beside Play or right-click
+a cover for game options. Ordinary rendering does not download artwork.
 
-Scanning reads file metadata and lists files meeting the existing old-file age
-threshold. It excludes system locations, known games/mods/saves, Never Touch,
-links, offline placeholders, hardlinks and nested volumes. Inaccessible content
-and inspection limits are reported as a partial scan. No file content is loaded.
+Mods includes local descriptions and saved-profile conflict evidence on hover,
+inside the right inspector and in native Mod Radar tools. Double-click a mod
+for complete details. Runtime compatibility remains unverified.
 
-Progress shows real entry/file counts. Cancel scan, Escape or the toolbar cancel
-retains the last completed results. Navigation stays available while scanning.
-The heading separates your pending selection from the completed scan on display.
-Search covers all results; Previous/Next reaches files beyond the first 500.
-Double-click an entry for its path, protection and current identity status.
-Ctrl+F focuses search; F5 rescans; Ctrl+PageUp/PageDown changes result pages.
+Old Files uses Scan & Filter, Scan Results and the right-hand inspector. Choose
+a folder or drive, optionally check Full scan, then Scan Now. Cancellation keeps
+the last completed scan. Search and paging reach the complete result set.
+Recycling still requires review of exact individual files and the existing
+Windows protection, identity, age, scope and recovery checks. No permanent-delete
+fallback exists. Drive-root files remain inspection-only.
 
-Select 1-200 individual files and use Move reviewed individual files to Recycle
-Bin to review the exact paths. After confirmation, the existing Windows recovery
-worker rechecks scope, age, identity and current protections. Drive-root files
-are inspection-only. Windows fixed-disk/session/recovery restrictions remain.
-Failed recovery checks leave the source file in place. There is no permanent
-removal fallback. Age does not prove disuse; Recycle Bin may still occupy space.
+At narrow sizes, Details opens the same inspector in a native window.
+Ready Room retains its news, follows, backup and local-check functions.
+Start_Ready_Room_Reference.bat opens explicitly labeled sample data.
+Normal operation uses your actual inventory, with unsupported values unknown.
 
-Run GameGrave-Crimson-Preview-Setup.exe to install this preview.
-Start_Ready_Room_Reference.bat opens the labeled sample-data reference view.
-This is an unsigned engineering preview. Python is bundled.
-Included screenshots use disposable QA drives and files; normal scans use your PC.
+Run GameGrave-Crimson-Preview-Setup.exe to install this unsigned preview.
+The screenshot files use isolated synthetic data for visual review.
 Build-Info.txt identifies the source commit and Windows build run.
 SHA256SUMS.txt contains checksums for the EXE and installer.

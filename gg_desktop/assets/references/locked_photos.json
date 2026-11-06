@@ -1,0 +1,50 @@
+{
+  "games": {
+    "sha256": "f9e6721cd63bee825081bba245742261510fba21e42f57fcfd527676c1ee1d31",
+    "width": 1280,
+    "height": 720,
+    "source_commit": "25f5955"
+  },
+  "mods": {
+    "sha256": "c3ca41a026959277d765337058a047f51966c38ceb4f5c424d298f653397ba14",
+    "width": 1280,
+    "height": 720,
+    "source_commit": "25f5955"
+  },
+  "old_files": {
+    "sha256": "04d20ec6b1195ff5bbfaf0b0f0cc2e7427ceaa3413bf5deba23fbce7fcdc3e76",
+    "width": 1280,
+    "height": 720,
+    "source_commit": "25f5955"
+  },
+  "other_storage": {
+    "sha256": "79212a685614cde5e36c545b9419a89bd3a2fa2565e975da438866cc3399223e",
+    "width": 1280,
+    "height": 720,
+    "source_commit": "25f5955"
+  },
+  "captures": {
+    "sha256": "cb102c63032025568a8fa384e5748b4a35e75d6c1a702d9eca2caaab30452b81",
+    "width": 1280,
+    "height": 720,
+    "source_commit": "25f5955"
+  },
+  "graveyard": {
+    "sha256": "b39093b94fc1d0e306962b7298495c9d73aff3a873ad8228c1cec10384310239",
+    "width": 1280,
+    "height": 720,
+    "source_commit": "25f5955"
+  },
+  "dna": {
+    "sha256": "4d87be0b3d77092da214800cff17edd23d65276af693cd6f1799fc7a5f6a132c",
+    "width": 1280,
+    "height": 720,
+    "source_commit": "25f5955"
+  },
+  "undo": {
+    "sha256": "3136f9d546243e28dad07f96fddaff7a268dd4251166861e2c8f2e543e14043c",
+    "width": 1280,
+    "height": 720,
+    "source_commit": "25f5955"
+  }
+}

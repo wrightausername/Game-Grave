@@ -16,6 +16,9 @@ on:
       - 'tests/test_old_files_functionality.py'
       - 'tools/old_files_live_smoke.py'
       - 'tools/old_files_scope_smoke.py'
+      - 'tools/photo_ui_smoke.py'
+      - 'tools/photo_reference_guard.py'
+      - 'tools/render_reference_previews.py'
       - 'tools/mods_live_smoke.py'
       - 'tools/mods_scope_smoke.py'
       - 'tools/games_live_smoke.py'
@@ -44,6 +47,9 @@ on:
       - 'tests/test_old_files_functionality.py'
       - 'tools/old_files_live_smoke.py'
       - 'tools/old_files_scope_smoke.py'
+      - 'tools/photo_ui_smoke.py'
+      - 'tools/photo_reference_guard.py'
+      - 'tools/render_reference_previews.py'
       - 'tools/mods_live_smoke.py'
       - 'tools/mods_scope_smoke.py'
       - 'tools/games_live_smoke.py'
@@ -96,20 +102,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
-          python tools/ready_room_ui_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Ready Room layout and interaction checks failed.' }
+          python tools/photo_reference_guard.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Owner photos or protected engines changed.' }
+          python tools/photo_ui_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Photo-layout functionality or reference geometry failed.' }
           python tools/ready_room_live_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Ready Room live functionality checks failed.' }
-          python tools/overview_live_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Overview functionality checks failed.' }
-          python tools/games_live_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Games functionality and artwork checks failed.' }
-          python tools/mods_live_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Mods controls, descriptions or conflict checks failed.' }
-          python tools/old_files_live_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Old Files buttons, drive scans or review controls failed.' }
-          python tools/old_files_scope_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'A page or shared component changed outside Old Files.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Ready Room live news or verified backup checks failed.' }
+          python tools/render_reference_previews.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Native photo comparison renders failed.' }
       - name: Upload actual Qt screen captures for design review
         uses: actions/upload-artifact@v4
         with:
@@ -122,6 +122,8 @@ jobs:
             _ci_temp/games-*.png
             _ci_temp/mods-*.png
             _ci_temp/old-files-*.png
+            _ci_temp/photo-*.png
+            _ci_temp/*-1280.png
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -202,7 +204,7 @@ jobs:
           if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
           if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
           Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
-      - name: Assemble Old Files Windows download
+      - name: Assemble Locked Photo UI Windows download
         shell: pwsh
         run: |
           $taskBundle = Join-Path (Resolve-Path '_ci_temp').Path 'ReadyRoomWindows'
@@ -211,32 +213,30 @@ jobs:
             'dist/GameGrave-Crimson-Preview.exe',
             'release/GameGrave-Crimson-Preview-Setup.exe',
             'installer/Start_Ready_Room_Reference.bat',
-            'installer/READY_ROOM_BUILD_README.txt'
+            'installer/READY_ROOM_BUILD_README.txt',
+            'installer/Compare-Locked-Photos.html'
           ) -Destination $taskBundle
           Copy-Item '_ci_temp/ready-room-reference-1280.png' (Join-Path $taskBundle 'Ready-Room-Preview.png')
-          Copy-Item '_ci_temp/restored-overview.png' (Join-Path $taskBundle 'Restored-Overview.png')
-          Copy-Item '_ci_temp/overview-functional-1450.png' (Join-Path $taskBundle 'Overview-Functionality-QA.png')
-          Copy-Item '_ci_temp/games-functional-1450.png' (Join-Path $taskBundle 'Games-Preview.png')
-          Copy-Item '_ci_temp/games-artwork-details-1450.png' (Join-Path $taskBundle 'Games-Artwork-Details.png')
-          Copy-Item '_ci_temp/mods-functional-1450.png' (Join-Path $taskBundle 'Mods-Preview.png')
-          Copy-Item '_ci_temp/mods-description-and-conflicts-1450.png' (Join-Path $taskBundle 'Mods-Description-and-Conflicts.png')
-          Copy-Item '_ci_temp/mods-tools-1450.png' (Join-Path $taskBundle 'Mod-Radar-Tools.png')
-          Copy-Item '_ci_temp/old-files-functional-1450.png' (Join-Path $taskBundle 'Old-Files-Preview.png')
+          Copy-Item '_ci_temp/*-1280.png' $taskBundle
+          $lockedPhotos = Join-Path $taskBundle 'Locked-Photos'
+          New-Item -ItemType Directory -Force $lockedPhotos | Out-Null
+          Copy-Item 'gg_desktop/assets/references/*.jpg' $lockedPhotos
+          Copy-Item 'gg_desktop/assets/references/locked_photos.json' $lockedPhotos
           $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
             $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$digest  $($_.Name)"
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Old Files Windows preview 0.2.6',
+            'Game Grave Locked Photo UI Windows preview 0.2.7',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
           ) | Set-Content (Join-Path $taskBundle 'Build-Info.txt') -Encoding ascii
-      - name: Upload Old Files Windows build
+      - name: Upload Locked Photo UI Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: GameGrave-Old-Files-Windows-Preview
+          name: GameGrave-Locked-Photo-UI-Windows-Preview
           path: _ci_temp/ReadyRoomWindows/*
           if-no-files-found: error
           retention-days: 14

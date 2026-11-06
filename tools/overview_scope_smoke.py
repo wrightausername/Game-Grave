@@ -1,12 +1,12 @@
-"""Compatibility entrypoint for the authorized Old Files-only scope check.
+"""Compatibility entrypoint for the owner-photo and safety-engine guard.
 
-Baseline cc64c75 contains the completed Mods, Games, Overview and Ready Room.
-All nine pages outside Old Files and their shared controls remain protected.
+The owner rejected the previous plain-table baseline. The original photographs,
+actual photo_ui_smoke geometry and rendered comparisons now define visual QA.
 """
 if __package__:
-    from .old_files_scope_smoke import main
+    from .photo_reference_guard import main
 else:
-    from old_files_scope_smoke import main
+    from photo_reference_guard import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -33,6 +33,9 @@ class Inventory:
     graveyard: list = field(default_factory=list)
     scanned_at: str = ""
     warnings: list[str] = field(default_factory=list)
+    source_reports: list = field(default_factory=list)
+    file_scan_root: str = ""
+    file_scan_days: int | None = None
 
 
 STAGES = ("Steam and launchers", "Mod Radar", "Old files", "Game captures", "Protected saves")

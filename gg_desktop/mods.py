@@ -288,9 +288,10 @@ class ModsController(QObject):
         if index < 0:
             self.window.info("Game association unavailable", "The associated installation has no Game DNA record. Run Scan PC again.")
             return
+        self.window._pending_dna_game_key = game.key
         self.window.navigate("Game DNA")
         chooser = self.window.page.findChild(QComboBox)
-        if chooser:
+        if chooser and not hasattr(self.window, "dna_games"):
             chooser.setCurrentIndex(index)
 
     def export(self, parent):

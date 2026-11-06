@@ -69,7 +69,7 @@ class OldFilesSession(QObject):
         try:
             root = self.location or self.folder
             mode = "full" if self.location and self.full else "quick" if self.location else "folder"
-            days = int(window.settings.get("files_stale_days", 180))
+            days = int(getattr(self, "days_override", None) or window.settings.get("files_stale_days", 180))
             rules, folder = protected_roots(window.inventory, window.settings), self.folder
         except (OSError, ValueError) as exc:
             window.error("Cannot scan this location", message_text(exc))
@@ -327,11 +327,14 @@ class OldFilesController(QObject):
                 "\n\nAge does not prove disuse. Nothing is recycled by opening these details."))
 
     def remove(self):
+        selected = [self.shown[i.row()] for i in self.table.selectionModel().selectedRows()]
+        self.remove_files(selected)
+
+    def remove_files(self, selected):
         window, state = self.window, self.state
         if state.busy or window.scanning or window.cleaning:
             window.info("Game Grave is busy", "Finish or cancel the current operation first.")
             return
-        selected = [self.shown[i.row()] for i in self.table.selectionModel().selectedRows()]
         if not 1 <= len(selected) <= 200:
             window.info("Choose files", "Select between 1 and 200 individual files.")
             return

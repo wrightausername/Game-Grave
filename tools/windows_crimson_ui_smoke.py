@@ -99,7 +99,7 @@ def main():
             archive = next(e for e in window.inventory.graveyard
                            if e.category == "Possible mod / game download")
             with patch.object(window, "confirm", return_value=True), \
-                 patch("gg_desktop.screens.recycle_reviewed_entries") as recycle:
+                 patch("gg_desktop.reference_screens.recycle_reviewed_entries") as recycle:
                 unlock.click()
                 assert oldzip.is_file()
                 assert str(oldzip) not in window.settings["never_touch"]
@@ -120,7 +120,7 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
-            print("PASS: Qt Crimson Overview, Ready Room and 10 interactive pages, mixed-launcher "
+            print("PASS: Qt Crimson Overview, Ready Room and 13 interactive pages, mixed-launcher "
                   "Games, inline exact-rule Unprotect without deletion, "
                   "five screenshots and original hero asset.")
         finally:

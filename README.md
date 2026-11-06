@@ -9,6 +9,36 @@ Game Grave finds games, mod-manager storage, Workshop folders, caches, and lefto
 
 ## Crimson Command: native premium UI engineering preview
 
+### Locked-photo restoration — preview 0.2.7
+
+The owner's attached photos are the visual specification. Earlier 0.2.x builds
+incorrectly preserved a plain-table fallback after a rollback removed the locked
+shell and page implementations. Their code-baseline pixel comparisons did not
+establish fidelity to the photos and are superseded by this correction.
+
+The restored app uses the original GG/forest sidebar, native window controls,
+search, photo-derived headers, metric strips, cover grid, tab strips, filter
+columns and right-side inspectors. Games, Mods, Old Files, Other Storage, Captures,
+Graveyard, Game DNA and Undo Center have their unmodified full reference images
+under `gg_desktop/assets/references`. Ready Room uses its attached reference and
+original extracted assets; Overview restores the original dashboard composition
+and tombstone artwork. Text, values, filters, selections and buttons are native
+Qt controls driven by real data. Sample statistics are never normal live values.
+
+The completed game actions/artwork, local mod descriptions and profile conflict
+checks, and Old Files drive/full-scan/recycling workflows are connected to these
+layouts. Smaller windows expose the same inspector through **Details**. At the
+1280×720 reference size, the original three-column composition remains visible.
+
+`tools/photo_ui_smoke.py` checks reference geometry and actual interactions across
+all thirteen routes and three viewport sizes. `tools/render_reference_previews.py`
+produces populated, isolated synthetic-data captures for comparison. The owner
+photos and unchanged safety/data engines are protected by
+`tools/photo_reference_guard.py`. Earlier `*_scope_smoke.py` commands now invoke
+that guard; the old fallback layout is not a visual approval baseline.
+
+See [original photos beside actual app captures](docs/ui-review/locked-photo-restoration/README.md).
+
 The owner's approved cinematic crimson-and-cyan UI is now implemented as a
 **separate, opt-in Windows desktop preview**, not as a screenshot or a replacement
 for the tested classic program. It shares Game Grave's existing game discovery,
@@ -38,21 +68,21 @@ wait until the current operation finishes before changing interfaces.
 
 ### Old Files drive selection and optional full scan
 
-Old Files keeps its file table, existing folder/rescan/recycle buttons and theme.
+Old Files uses the locked Scan & Filter, Scan Results and detail-inspector layout.
 Its scan controls work before Scan PC and stay inside this page.
 
 - **Scan location** lists the selected folder and available local/removable
-  drives. **Refresh drives** updates the list after a drive is attached or removed.
-- Leave **Full scan of selected drive (optional)** unchecked for a quick scan
+  drives. Opening the selector refreshes drives after one is attached or removed.
+- Leave **Full scan (optional)** unchecked for a quick scan
   of Downloads, Documents and the selected folder on that drive. Enable it to
-  inspect the selected drive outside those quick locations. **Rescan** starts
+  inspect the selected drive outside those quick locations. **Scan Now** starts
   the chosen scope; changing the selection does not silently start a scan.
 - Scanning reads metadata and lists files meeting the existing old-file age
   threshold. It excludes system locations, known game/mod/save roots, Never
   Touch rules, linked/cloud-offline content, hardlinks and nested volumes.
   Access failures and inspection limits are reported as a partial scan.
-- Progress shows actual entries checked and files found. **Cancel scan**,
-  **Escape**, and the existing toolbar cancel retain the last completed result.
+- Progress shows actual entries checked and files found. **Cancel Scan** and
+  **Escape** retain the last completed result.
   Scanning can continue while navigating other tabs; it does not replace their
   accepted PC-scan inventory. The heading distinguishes the pending selection
   from the scope and time of the results currently displayed.
@@ -60,7 +90,7 @@ Its scan controls work before Scan PC and stay inside this page.
   Files and retains the previous results until a successful Rescan. Search covers
   the complete result set, and Previous/Next reaches files beyond the first 500.
   Double-click a file for its path, protection and current identity status.
-- **Move reviewed individual files to Recycle Bin…** reviews 1–200 specific
+- **Recycle…** reviews 1–200 specific
   selected files. After confirmation it uses the existing Windows recovery
   worker and rechecks scope, identity, age and current protections. Drive-root
   files remain inspection-only; the ordinary-parent-folder guard is unchanged.
@@ -77,7 +107,7 @@ metadata-only scanning, cancellation, partial coverage and recovery safeguards.
 
 ### Mods functionality and hover details
 
-Mods preserves its existing table, three-button layout and theme. After Scan PC,
+Mods uses the locked game/manager filters, table and detail-inspector layout. After Scan PC,
 it reads bounded local metadata inside the accepted mod locations and checks
 saved manager profiles in the background. It never edits game files, manager
 settings, activation flags, saves or load order.
@@ -116,8 +146,7 @@ conflict evidence and inspection limits. No network request is needed for Mods.
 
 ### Games functionality and artwork
 
-Games retains its table layout, filters, counters and theme. Artwork appears
-inside each existing game row and the selected game's details panel.
+Games uses the locked cover grid, filters, counters and right-side details panel.
 
 - Every game has a visible title-specific local fallback immediately. Known
   Steam library caches and named game-folder covers replace it when present.
@@ -156,7 +185,8 @@ every entry continues to display artwork when offline or unavailable.
 
 ### Overview functionality, with its approved UI preserved
 
-Overview retains its existing artwork, layout, cards, labels and styling.
+Overview restores the locked tombstone artwork, metric band, activity/storage/
+quick-action panels and library shelf.
 Its existing controls now support:
 
 - Clicking a quick-action card's title, body or arrow, or using its keyboard action.
@@ -173,21 +203,21 @@ Its existing controls now support:
   **Preview this image**. This read-only preview has no cleanup action and never
   adds recent screenshots to Graveyard's old-file inventory.
 
-`tools/overview_live_smoke.py` exercises those actions with disposable files.
-`tools/overview_scope_smoke.py` compares the approved Overview pixels at three
-window sizes and verifies every other screen and the shared shell are unchanged.
+Those behaviors were implemented against the earlier fallback layout. The
+restored photo dashboard exposes its native scan controls, metric links,
+Recent Activity, storage details, Quick Actions and library shelf. Capture
+inspection lives in Captures. The current integration check is
+`tools/photo_ui_smoke.py`; the former scope entrypoint protects original photos
+and the data engines rather than the rejected fallback pixels.
 
 ### Ready Room page
 
-Choose **Ready Room** in the existing sidebar to open the reference-inspired
+Choose **Ready Room** in the restored sidebar to open the reference
 page with its gaming-room header, search, five neon counters, Patch Watch,
 Your Games, Mod Radar, Save Vault and System & Game Health. Its local font,
-artwork and styling apply only inside this page.
-
-The original sidebar design, native window frame, scan toolbar, application-wide
-theme, Overview startup page and all other screens retain their previous
-presentation and behavior. Ready Room actions use the existing scan, Games,
-Mods and Save Vault/More Tools workflows.
+artwork is preserved. The shared GG sidebar, global search and native borderless
+window controls follow the locked photos. Ready Room actions use the existing
+scan, Games, Mods and Save Vault/More Tools workflows.
 
 To open Ready Room directly with the reference's sample games and counters:
 
@@ -226,30 +256,27 @@ Ready Room. Normal mode uses your local inventory and saved Ready Room records:
 Ready Room history is stored separately in the local `ready-room.json`; it does
 not rewrite shared settings or make network requests on launch or navigation.
 
-Inside Ready Room, `Ctrl+K` focuses its search, `Escape` clears it, and `F5` starts
-the existing read-only scan. These shortcuts and styles leave the other pages
-when Ready Room is closed.
+`Ctrl+K` focuses global search, `Escape` cancels the active scan or clears search,
+and `F5` starts the current page's read-only scan.
 
 For repeatable visual and scope verification:
 
 ```powershell
-py tools/ready_room_ui_smoke.py --output _ci_temp
+py tools/photo_reference_guard.py --output _ci_temp
+py tools/photo_ui_smoke.py --output _ci_temp
 py tools/ready_room_live_smoke.py --output _ci_temp
-py tools/ready_room_scope_smoke.py --output _ci_temp
+py tools/render_reference_previews.py --output _ci_temp
 ```
 
-The current scope check uses approved baseline `cc64c75`, including completed
-Mods, Games, Overview and Ready Room functionality. It permits changes only in
-the Old Files page's construction method and its isolated controller/read model.
-Overview is compared at three window sizes, and all nine pages outside Old Files are
-compared with empty and populated data. Shared artwork, styles, widgets, backends
-and prior controllers remain unchanged. The earlier scope command names forward
-to `tools/old_files_scope_smoke.py`. The Windows workflow runs the scope and interaction
-checks before packaging the EXE.
+The owner's original photos are checked byte-for-byte against their original
+asset commit. Existing scanning, protection, recovery, mod evidence and artwork
+engines are checked against the tested functional baseline. Visual QA uses
+the source photos, actual native renders and reference geometry, not equality
+with a previous code layout. Windows runs these checks before packaging.
 
 ### What the new preview actually does
 
-- **Overview:** locally rendered crimson-moon ruins art, real Windows drive
+- **Overview:** original tombstone artwork and dashboard composition, real drive
   capacity, launcher counts, actual findings and manual scan/cancel. No
   fabricated reclaimed-space numbers.
 - **Games:** Steam, Epic, GOG, EA, verified Battle.net/Blizzard publisher
