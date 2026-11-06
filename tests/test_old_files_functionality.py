@@ -207,6 +207,23 @@ class OldFilesTests(unittest.TestCase):
         result = ScanResult(plan, [record])
         self.assertTrue(review_reason(record, result, ()).startswith("Review only"))
 
+    def test_cached_directory_entry_identity_is_not_trusted(self):
+        from types import SimpleNamespace
+        record = old_file(self.downloads / "old.zip")
+        original = os.scandir
+        class CachedEntries:
+            def __init__(self, folder):
+                self.stream = original(folder)
+            def __enter__(self):
+                return (SimpleNamespace(path=item.path, stat=lambda **_: SimpleNamespace(st_dev=0, st_ino=0, st_nlink=0))
+                        for item in self.stream)
+            def __exit__(self, *_):
+                self.stream.close()
+        with patch("gg_desktop.old_files_data.os.scandir", side_effect=CachedEntries):
+            result = scan_files(self.plan())
+        self.assertEqual(result.files, [record])
+        self.assertFalse(result.limited)
+
 
 if __name__ == "__main__":
     unittest.main()

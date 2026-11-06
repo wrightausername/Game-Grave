@@ -198,7 +198,10 @@ def scan_files(plan, canceled=lambda: False, progress=lambda *_: None):
                         break
                     path = Path(item.path)
                     try:
-                        info = item.stat(follow_symlinks=False)
+                        # Windows DirEntry.stat caches zero device/inode/link
+                        # fields. lstat supplies the full identity used by the
+                        # volume boundary, hardlink and later recovery checks.
+                        info = path.lstat()
                         if (blocked(path, plan.protections) or _has_reparse_component(path) or stat.S_ISLNK(info.st_mode)
                                 or getattr(info, "st_file_attributes", 0) & (SKIP_ATTRIBUTES | 0x400)):
                             result.skipped += 1
