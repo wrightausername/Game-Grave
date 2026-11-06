@@ -36,6 +36,29 @@ The usual `py launcher.py` still opens the classic Tk application.
 Do not run both while carrying out Recycle Bin or restore operations;
 wait until the current operation finishes before changing interfaces.
 
+### Overview functionality, with its approved UI preserved
+
+Overview retains its existing artwork, layout, cards, labels and styling.
+Its existing controls now support:
+
+- Clicking a quick-action card's title, body or arrow, or using its keyboard action.
+  `F5` starts the same read-only Scan PC action while Overview is open.
+- Live system-drive used/free readings, refreshed every 30 seconds while this
+  page is open. Click the existing storage gauge for details or a manual refresh.
+  Unavailable readings stay unknown; they are not reported as zero usage.
+- Launcher links that inspect the correct installs. Shared launcher claims have
+  a drilldown and remain counted once; unknown sizes stay separate from known zero.
+- Recent Findings and Review Queue links that select the exact finding, including
+  findings beyond the first 500 rows. Needs Review selects the relevant mod row.
+- Latest Screenshot discovery by metadata in known game-capture or selected
+  folders, including today's captures. Image content opens only after clicking
+  **Preview this image**. This read-only preview has no cleanup action and never
+  adds recent screenshots to Graveyard's old-file inventory.
+
+`tools/overview_live_smoke.py` exercises those actions with disposable files.
+`tools/overview_scope_smoke.py` compares the approved Overview pixels at three
+window sizes and verifies every other screen and the shared shell are unchanged.
+
 ### Ready Room page
 
 Choose **Ready Room** in the existing sidebar to open the reference-inspired
@@ -97,10 +120,11 @@ py tools/ready_room_live_smoke.py --output _ci_temp
 py tools/ready_room_scope_smoke.py --output _ci_temp
 ```
 
-The scope check compares the original theme and screen source against commit
-`7353eeb`, verifies the original shared shell and window behavior, and checks
-that all nine original pages render identical pixels before and after a visit
-to Ready Room. The Windows workflow runs both checks before packaging the EXE.
+The scope check now uses the approved `77eaa28` baseline, including the completed
+Ready Room. It permits behavior changes only inside Overview, compares Overview's
+pixels with empty and populated data, and checks that every other page, shared
+style and backend remains unchanged. The Windows workflow runs the scope check
+and both pages' interaction checks before packaging the EXE.
 
 ### What the new preview actually does
 
