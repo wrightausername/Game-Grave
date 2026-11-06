@@ -1,13 +1,12 @@
-"""Compatibility entrypoint for the approved Overview + Ready Room scope check.
+"""Compatibility entrypoint for the latest authorized Games scope check.
 
-Overview functionality was explicitly authorized after Ready Room. The expanded
-check preserves the approved Overview pixels and all ten pages, and verifies
-that shared styles, application behavior and cleanup backends are unchanged.
+The current check protects the completed Overview and Ready Room, every other
+page outside Games, the shared shell, styles, artwork and cleanup engines.
 """
 if __package__:
-    from .overview_scope_smoke import main
+    from .games_scope_smoke import main
 else:
-    from overview_scope_smoke import main
+    from games_scope_smoke import main
 
 if __name__ == "__main__":
     raise SystemExit(main())
