@@ -1,27 +1,29 @@
-GAME GRAVE - OVERVIEW WINDOWS PREVIEW 0.2.3
+GAME GRAVE - GAMES WINDOWS PREVIEW 0.2.4
 
-Extract the entire ZIP first.
+Extract the entire ZIP first, then run GameGrave-Crimson-Preview.exe.
+Choose Scan PC and open Games for your actual installed library.
+The Games table, filters, counters and theme are preserved. Overview, Ready Room
+and all other pages remain unchanged.
 
-Overview keeps its approved artwork, layout and styling. This update connects
-its existing actions and data. Ready Room and every other page are unchanged.
+Every game displays artwork. The app first uses known local launcher caches or
+named covers in the game folder; otherwise it shows a labeled local fallback.
+Right-click a game or use Game options to download official artwork, download
+missing artwork for the entire library, choose a local cover, or set an artwork
+Steam app ID explicitly. Covers are cached for offline use. Rendering a page
+does not send network requests. Missing official art never leaves a blank entry.
 
-To use your actual local inventory:
-  Double-click GameGrave-Crimson-Preview.exe, then choose Scan PC.
-  Overview quick actions open the existing review, recovery and settings tools.
-  Click the storage gauge for live readings and its manual refresh.
-  Launcher and finding links inspect the exact installation or finding.
-  Latest Screenshot includes fresh captures from known or selected folders.
-  Preview this image opens only the chosen local image and has no delete action.
+Search/filter/sort the full library. Previous/Next makes games beyond the first
+500 accessible. Double-click a game to bring its details and artwork into view.
+Steam and Epic launch through their clients. Choose a game launch EXE for other
+verified installations when needed. Steam uninstall opens only Steam's own
+confirmation after revalidating the current installation. No game files are
+removed by this page, and no launch happens just by selecting a game.
 
-To install the preview:
-  Run GameGrave-Crimson-Preview-Setup.exe.
-
-Ready Room retains its existing live functions and explicit design-reference mode:
-  Start_Ready_Room_Reference.bat opens the labeled sample-data view.
+Run GameGrave-Crimson-Preview-Setup.exe to install this preview.
+Start_Ready_Room_Reference.bat still opens its labeled sample-data view.
 
 This is an unsigned engineering preview. Python is bundled.
-Restored-Overview.png and Overview-Functionality-QA.png are native Qt captures
-using disposable QA data; the normal program uses your actual local inventory.
-Ready-Room-Preview.png shows the unchanged, labeled reference preview.
-Build-Info.txt identifies the source commit and Windows build run.
-SHA256SUMS.txt contains the SHA-256 checksums of both executables.
+The included Qt screenshots use disposable QA data and sample artwork; the
+normal application uses your own installation records and local/official covers.
+Build-Info.txt records the source commit and Windows build run.
+SHA256SUMS.txt contains checksums for the EXE and installer.

@@ -36,6 +36,46 @@ The usual `py launcher.py` still opens the classic Tk application.
 Do not run both while carrying out Recycle Bin or restore operations;
 wait until the current operation finishes before changing interfaces.
 
+### Games functionality and artwork
+
+Games retains its table layout, filters, counters and theme. Artwork appears
+inside each existing game row and the selected game's details panel.
+
+- Every game has a visible title-specific local fallback immediately. Known
+  Steam library caches and named game-folder covers replace it when present.
+  Fallbacks are labeled and are not presented as official publisher artwork.
+- Right-click a game or choose **Game options… → Download official artwork**.
+  **Download missing artwork for all games** fills missing covers in bulk and
+  can be canceled from the same menu. Requests happen only on this action;
+  ordinary navigation and rendering never contact a server. Cached artwork
+  remains available offline.
+- Steam artwork uses exact AppIDs, including modern hashed CDN paths.
+  Non-Steam lookups require an exact title match and never change launcher or
+  install evidence. **Use a Steam artwork app ID…** lets you select an artwork
+  source explicitly when a game has another title or edition.
+- **Choose artwork…** saves a bounded, decoded local copy for that exact game
+  installation. **Reset chosen artwork** restores automatic local/cached art
+  or its fallback. Installed game files and the original image stay untouched.
+- All search results are reachable through Previous/Next pages, including
+  libraries beyond 500 games. Search accepts multiple words; filtering and
+  sorting retain the selected installation when it still matches.
+- Steam and Epic use their registered game launch shortcuts. Other verified
+  installations can use **Choose game launch EXE…**, restricted to an ordinary
+  EXE inside that installation. Selecting a file only saves a preference;
+  **Launch game** sends the separate launch request.
+- Steam uninstall revalidates the current manifest and installation before and
+  after confirmation, then opens Steam's own dialog. Game Grave does not delete
+  game files. Game DNA opens the selected installation's relationship record.
+
+`Ctrl+K` focuses Games search, `Escape` clears it, and `Ctrl+PageUp/PageDown`
+switch pages. `Shift+F10` opens the selected game's options. No launch or
+uninstall happens on row selection or artwork loading.
+
+Artwork and optional launch preferences are private local files under the
+existing Game Grave configuration directory's `Games` subfolder. Official
+artwork availability depends on the publisher/service; local fallbacks ensure
+every entry continues to display artwork when offline or unavailable.
+
 ### Overview functionality, with its approved UI preserved
 
 Overview retains its existing artwork, layout, cards, labels and styling.
@@ -120,11 +160,13 @@ py tools/ready_room_live_smoke.py --output _ci_temp
 py tools/ready_room_scope_smoke.py --output _ci_temp
 ```
 
-The scope check now uses the approved `77eaa28` baseline, including the completed
-Ready Room. It permits behavior changes only inside Overview, compares Overview's
-pixels with empty and populated data, and checks that every other page, shared
-style and backend remains unchanged. The Windows workflow runs the scope check
-and both pages' interaction checks before packaging the EXE.
+The current scope check uses approved baseline `5f5d57d`, including completed
+Overview and Ready Room functionality. It permits changes only in the Games
+page's construction, filling and details methods. Overview is compared at three
+window sizes, and all nine pages outside Games are compared with empty and
+populated data. Shared artwork, styles, widgets, backends and prior controllers
+remain unchanged. The Windows workflow runs the scope and interaction checks
+before packaging the EXE.
 
 ### What the new preview actually does
 

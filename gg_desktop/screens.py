@@ -245,9 +245,13 @@ class ScreenMethods:
         self.navigate("Games")
 
     def games_page(self):
+        from gg_desktop.games import GamesController
+
         page = self._new("Games", "All installed games Game Grave can verify, in one list across supported launchers.")
         if self._not_scanned(page):
             return
+        control = GamesController(self, page)
+        page.games = control
         ctrl = QWidget()
         filters = row()
         ctrl.setLayout(filters)
@@ -289,6 +293,7 @@ class ScreenMethods:
         self.game_table.setColumnWidth(3, 145)
         self.game_table.setMinimumHeight(370)
         pcol.addWidget(self.game_table)
+        control.bind(pcol)
         page.content.addWidget(p)
         self.game_details = panel()[0]
         self.game_details_col = self.game_details.layout()
@@ -300,71 +305,14 @@ class ScreenMethods:
         self._fill_games()
 
     def _fill_games(self, *_):
-        if not hasattr(self, "game_table"):
-            return
-        query = self.game_search.text().casefold().strip()
-        launcher = self.game_filter.currentText()
-        rows = [g for g in self.inventory.games
-                if (launcher == "All launchers" or g.launcher == launcher)
-                and (not query or query in (g.name + " " + g.launcher + " " +
-                                             g.install_path).casefold())]
-        sort = self.game_sort.currentText()
-        if sort == "Name A to Z":
-            rows.sort(key=lambda g: (g.name.casefold(), g.launcher.casefold()))
-        elif sort == "Launcher":
-            rows.sort(key=lambda g: (g.launcher.casefold(), g.name.casefold()))
-        elif sort in ("Recently played", "Oldest played"):
-            rows.sort(key=lambda g: (g.last_played_at is None,
-                                     -(g.last_played_at or 0) if sort == "Recently played"
-                                     else g.last_played_at or 0))
-        else:
-            rows.sort(key=lambda g: (g.size_bytes is None,
-                                     (g.size_bytes or 0) * (-1 if sort == "Largest known size" else 1)))
-        self._shown_games = rows[:500]  # bounded presentation, full inventory retained
-        self.game_table.setRowCount(len(self._shown_games))
-        for i, g in enumerate(self._shown_games):
-            fields = (g.name, g.launcher, readable_bytes(g.size_bytes),
-                      age_text(g.last_played_at) if g.last_played_at is not None else "Unknown",
-                      g.status)
-            for c, text in enumerate(fields):
-                _table_text(self.game_table, i, c, text)
-            self.game_table.setRowHeight(i, 36)
-        if rows and len(rows) > len(self._shown_games):
-            self.status.setText(
-                f"Showing first 500 of {len(rows)} filtered games. Narrow the search for later results.")
-        self._game_details()
+        control = getattr(self.page, "games", None)
+        if control:
+            control.fill()
 
     def _game_details(self):
-        from gg_desktop.widgets import destroy_layout
-        destroy_layout(self.game_details_col)
-        selected = _selected_indices(self.game_table)
-        if not selected or selected[0] >= len(getattr(self, "_shown_games", [])):
-            self.game_details_col.addWidget(label("Select a game to see source evidence and safe actions.", "subtle"))
-            return
-        game = self._shown_games[selected[0]]
-        self.game_details_col.addWidget(label(game.name, "sectionTitle", wrap=True))
-        for line in (
-            f"Launcher: {game.launcher}",
-            f"Install location: {game.install_path}",
-            f"Install status: {game.status}",
-            f"Evidence: {game.install_evidence}",
-            f"Size: {readable_bytes(game.size_bytes)} ({game.size_source})",
-            f"Last played: {age_text(game.last_played_at) if game.last_played_at else 'Unknown'}",
-        ):
-            self.game_details_col.addWidget(label(line, "subtle", wrap=True))
-        actions = QWidget()
-        bar = row()
-        actions.setLayout(bar)
-        open_btn = button("Open installation folder",
-                          lambda _=False, path=game.install_path: self._open_folder(path))
-        open_btn.setEnabled("open_folder" in game.capabilities)
-        bar.addWidget(open_btn)
-        bar.addWidget(button("See related Game DNA", lambda: self.navigate("Game DNA")))
-        if "steam_uninstall" in game.capabilities and game.app_id and game.app_id.isdecimal():
-            bar.addWidget(button("Open Steam uninstall…",
-                                 lambda _=False, g=game: self._steam_uninstall(g), kind="danger"))
-        bar.addStretch()
-        self.game_details_col.addWidget(actions)
+        control = getattr(self.page, "games", None)
+        if control:
+            control.details()
 
     def _steam_uninstall(self, game):
         if ("steam_uninstall" not in game.capabilities or game.launcher != "Steam"
