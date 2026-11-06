@@ -55,8 +55,35 @@ py launcher.py --ui-preview --ready-room-reference
 ```
 
 This design mode has a visible **REFERENCE PREVIEW · SAMPLE DATA** marker inside
-Ready Room. Normal mode uses your local inventory; unsupported update, playtime,
-backup-history, compatibility and overall health data remain unknown.
+Ready Room. Normal mode uses your local inventory and saved Ready Room records:
+
+- **Patch Watch / Game Updates / Maintenance / New Releases:** open the news
+  list, filter posts, then choose **Refresh official news**. This explicitly
+  fetches public Steam announcements for installed and followed Steam games.
+  Cached news remains readable offline; failures retain the affected games'
+  earlier posts. Counters describe announcement categories, not pending updates
+  or confirmed live maintenance. Other launchers have no connected news feed.
+- **Followed Games:** select installed games and save the watch list. Followed
+  Steam games retain their news connection after uninstalling. Up to 40 games
+  are refreshed per request, with followed games first.
+- **Your Games:** inspect the exact installation in Games. Recorded Steam
+  hours come from local account metadata (highest recorded value across accounts,
+  never added together); missing playtime stays unknown. News never establishes
+  that the installed version is current.
+- **Mod Alerts:** review actual association/profile warnings; **Run Mod Scan**
+  uses the existing read-only scan. Version availability and in-game mod
+  compatibility remain unverified.
+- **Save Vault:** **Backup Now** creates a verified ZIP through the existing
+  backup engine and records its history locally. **Manage Saves** shows backup
+  history, discovered save folders and recovery tools. Missing or changed
+  archives are clearly marked and excluded from the available-backup count.
+- **System & Game Health:** click the gauge for individual local checks and
+  refresh them. Its percentage describes available storage, folder-access and
+  scan-source checks only; game-file integrity and mod compatibility are not
+  inferred. Unchecked results stay unknown.
+
+Ready Room history is stored separately in the local `ready-room.json`; it does
+not rewrite shared settings or make network requests on launch or navigation.
 
 Inside Ready Room, `Ctrl+K` focuses its search, `Escape` clears it, and `F5` starts
 the existing read-only scan. These shortcuts and styles leave the other pages
@@ -66,6 +93,7 @@ For repeatable visual and scope verification:
 
 ```powershell
 py tools/ready_room_ui_smoke.py --output _ci_temp
+py tools/ready_room_live_smoke.py --output _ci_temp
 py tools/ready_room_scope_smoke.py --output _ci_temp
 ```
 

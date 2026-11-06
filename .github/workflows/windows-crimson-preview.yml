@@ -9,6 +9,8 @@ on:
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
       - 'tests/test_ready_room_data.py'
+      - 'tests/test_ready_room_services.py'
+      - 'tools/ready_room_live_smoke.py'
       - 'tools/ready_room_ui_smoke.py'
       - 'tools/ready_room_scope_smoke.py'
       - 'tools/windows_crimson_ui_smoke.py'
@@ -23,6 +25,8 @@ on:
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
       - 'tests/test_ready_room_data.py'
+      - 'tests/test_ready_room_services.py'
+      - 'tools/ready_room_live_smoke.py'
       - 'tools/ready_room_ui_smoke.py'
       - 'tools/ready_room_scope_smoke.py'
       - 'tools/windows_crimson_ui_smoke.py'
@@ -64,12 +68,14 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
           python tools/ready_room_ui_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room layout and interaction checks failed.' }
+          python tools/ready_room_live_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Ready Room live functionality checks failed.' }
           python tools/ready_room_scope_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'A screen or shared shell changed outside Ready Room.' }
       - name: Upload actual Qt screen captures for design review
@@ -179,7 +185,7 @@ jobs:
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Ready Room Windows preview 0.2.1',
+            'Game Grave Ready Room Windows preview 0.2.2',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
