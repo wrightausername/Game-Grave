@@ -30,6 +30,7 @@ def main():
     from gg_desktop.app import CrimsonWindow
     from gg_desktop.models import merge_games
     from gg_desktop.mods import ModDetails
+    from gg_desktop.mods_data import identity
     from tests.test_mods_functionality import mo2_fixture
 
     app = QApplication.instance() or QApplication([])
@@ -111,9 +112,9 @@ def main():
             assert "textures/mountain.dds" in details.text.toPlainText()
             assert "Default: enabled in saved profile" in details.text.toPlainText()
             click(details, "Open folder")
-            assert opened.call_args[0][0].toLocalFile() == mountain.path
+            assert identity(opened.call_args[0][0].toLocalFile()) == identity(mountain.path)
             click(details, "Manager folder")
-            assert opened.call_args[0][0].toLocalFile() == str(ini.parent)
+            assert identity(opened.call_args[0][0].toLocalFile()) == identity(ini.parent)
             click(details, "Mod page")
             assert opened.call_args[0][0].toString() == data["Website"]
             click(details, "Copy path")
