@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 import shutil
 
-from PySide6.QtCore import QRectF, QSize, Qt
+from PySide6.QtCore import QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import (
     QColor, QFont, QFontDatabase, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QShortcut,
 )
@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from gg_desktop.ready_room_icons import icon, icon_label
 from gg_desktop.ready_room_data import live_ready_room, reference_ready_room
+from gg_desktop.ready_room_actions import ReadyRoomActions
 from gg_desktop.widgets import ScrollPage, button, column, label, row
 
 ASSETS = Path(__file__).parent / "assets" / "ready_room"
@@ -73,6 +74,7 @@ QPushButton#readyItem:focus { border: 1px solid #4DD8E2; }
 
 def fitted_text(text, role, *, wrap=False):
     result = label(text, role, wrap=wrap)
+    result.setTextFormat(Qt.PlainText)
     result.setMinimumWidth(0)
     result.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
     result.setToolTip(text)
@@ -279,12 +281,30 @@ def action_button(text, action, glyph="", *, primary=False):
 
 
 class HealthGauge(QWidget):
-    def __init__(self, score):
+    def __init__(self, score, *, caption="System Ready", note="", action=None):
         super().__init__()
         self.score = score
+        self.caption = caption
+        self.action = action
         self.setFixedSize(123, 119)
-        self.setAccessibleName(f"System ready: {score}% (design sample)" if score is not None
+        self.setAccessibleName(f"{caption}: {score}%" if score is not None
                                else "System health has not been verified")
+        self.setToolTip(note)
+        if action:
+            self.setFocusPolicy(Qt.StrongFocus)
+            self.setCursor(Qt.PointingHandCursor)
+            self.setAccessibleDescription("Open the local check results. " + note)
+
+    def mouseReleaseEvent(self, event):
+        if self.action and event.button() == Qt.LeftButton and self.rect().contains(event.position().toPoint()):
+            self.action()
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):
+        if self.action and event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space):
+            self.action()
+        else:
+            super().keyPressEvent(event)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -314,7 +334,7 @@ class HealthGauge(QWidget):
         painter.setFont(font)
         painter.setPen(QColor("#D0D3D9"))
         painter.drawText(QRectF(7, 71, 110, 16), Qt.AlignCenter,
-                         "System Ready" if self.score is not None else "Not verified")
+                         self.caption if self.score is not None else "Not verified")
 
 
 class ReadyRoomPage(ScrollPage):
@@ -405,6 +425,9 @@ class ReadyRoomPage(ScrollPage):
                 ("red", "purple", "amber", "cyan", "blue"), (223, 200, 200, 209, 210)):
             metric = MetricButton(caption, value, glyph, tone,
                 lambda _=False, c=caption: window.ready_metric_details(c))
+            metric.setToolTip("Open " + caption + ". " +
+                             ("Counts use saved official posts, not pending installations."
+                              if caption in ("Game Updates", "Maintenance", "New Releases") else ""))
             self.metric_buttons.append(metric)
             self.metrics_grid.addWidget(metric, 0, len(self.metric_buttons) - 1)
             self.metrics_grid.setColumnStretch(len(self.metric_buttons) - 1, stretch)
@@ -451,6 +474,8 @@ class ReadyRoomPage(ScrollPage):
         for index, notice in enumerate(patches[:5]):
             control = item_button(lambda _=False, p=notice: self.window_owner.ready_patch_details(p),
                                   notice.game + ": " + notice.status)
+            if len(patches) < 5:
+                control.setFixedHeight(41)
             contents = row(spacing=12)
             control.setLayout(contents)
             contents.addWidget(thumbnail(notice.artwork, "logo", 140, 38))
@@ -471,12 +496,15 @@ class ReadyRoomPage(ScrollPage):
         for index, game in enumerate(games[:5]):
             control = item_button(lambda _=False, g=game: self.window_owner.ready_game_details(g),
                                   game.name + ": " + game.status)
+            if len(games) < 5:
+                control.setFixedHeight(41)
             contents = row(spacing=9)
             control.setLayout(contents)
             contents.addWidget(thumbnail(game.artwork, "portrait", 74, 36))
             contents.addWidget(fitted_text(game.name, "readyGameTitle"), 1)
             played = QWidget()
             played.setFixedWidth(62)
+            played.setToolTip("Recorded Steam playtime: highest value among local accounts. Unknown stays unknown.")
             played_row = row(spacing=4)
             played.setLayout(played_row)
             played_row.addWidget(icon_label("clock", "#C9CCD0", 15))
@@ -489,12 +517,16 @@ class ReadyRoomPage(ScrollPage):
             self.games.body_layout.addWidget(control, 1)
             if index < len(games[:5]) - 1:
                 self._separator(self.games.body_layout)
+        if 0 < len(patches) < 5:
+            self.patches.body_layout.addStretch()
+        if 0 < len(games) < 5:
+            self.games.body_layout.addStretch()
         if not patches:
             self._empty(self.patches.body_layout,
                         "No matching updates" if query else "Your watch starts here",
                         "Try another game or keyword." if query else
-                        "A game update feed hasn’t been connected yet.",
-                        "About Patch Watch", self.window_owner.ready_updates)
+                        self.data.news_note,
+                        "Open Patch Watch", self.window_owner.ready_updates)
         if not games:
             self._empty(self.games.body_layout,
                         "No matching games" if query else "Make room for your games",
@@ -529,8 +561,9 @@ class ReadyRoomPage(ScrollPage):
         state_box.setFixedWidth(146)
         state = column(spacing=0)
         state_box.setLayout(state)
-        state.addWidget(icon_label("check" if self.data.reference else "scan",
-                                   TONES["green"] if self.data.reference else TONES["cyan"], 36),
+        reviewed = self.data.reference or self.data.mod_state == "Reviewed"
+        state.addWidget(icon_label("check" if reviewed else "scan",
+                                   TONES["green"] if reviewed else TONES["cyan"], 36),
                         0, Qt.AlignHCenter)
         state.addWidget(label(self.data.mod_state, "readyState"), 0, Qt.AlignHCenter)
         note = label(self.data.mod_note, "readyDetail")
@@ -578,8 +611,9 @@ class ReadyRoomPage(ScrollPage):
         summary.addLayout(words, 1)
         card.body_layout.addLayout(summary, 1)
         controls = row(spacing=11)
-        controls.addWidget(action_button("Manage Saves  →", lambda: self.window_owner.navigate("Save Vault")), 1)
-        controls.addWidget(action_button("Backup Now", self.window_owner._create_save_backup, "cloud", primary=True), 1)
+        controls.addWidget(action_button("Manage Saves  →", self.window_owner.ready_manage_saves), 1)
+        controls.addWidget(action_button("Backup Now", self.window_owner._create_save_backup if self.data.reference
+                                         else self.window_owner.ready_backup_now, "cloud", primary=True), 1)
         card.body_layout.addLayout(controls)
         return card
 
@@ -588,7 +622,8 @@ class ReadyRoomPage(ScrollPage):
                           "pulse", artwork="health_landscape")
         card.body_layout.setContentsMargins(9, 0, 12, 12)
         summary = row(spacing=12)
-        summary.addWidget(HealthGauge(self.data.health_score))
+        summary.addWidget(HealthGauge(self.data.health_score, caption=self.data.health_caption,
+                                      note=self.data.health_note, action=self.window_owner.ready_health_details))
         checks = column(spacing=10, margins=(0, 10, 0, 15))
         for title, tone in self.data.health:
             line = row(spacing=8)
@@ -621,45 +656,21 @@ class ReadyRoomPage(ScrollPage):
         super().resizeEvent(event)
 
 
-class ReadyRoomMethods:
+class ReadyRoomMethods(ReadyRoomActions):
     def ready_room_page(self):
+        self.ready_init()
         try:
             disk = shutil.disk_usage(Path.home())
             free_percent = disk.free * 100 / disk.total if disk.total else None
         except OSError:
             free_percent = None
         data = reference_ready_room() if self.reference_preview else live_ready_room(
-            self.inventory, disk_free_percent=free_percent)
+            self.inventory, disk_free_percent=free_percent, state=self._ready_state,
+            evidence=self._ready_evidence if self._ready_evidence_inventory is self.inventory else {})
         self.page_for("Ready Room", page=ReadyRoomPage(self, data))
         self.page.setFocusPolicy(Qt.StrongFocus)
         self.page.setFocus()
 
-    def ready_updates(self):
-        if self.reference_preview:
-            self.info("Patch Watch · reference preview", "These are the sample updates in your design reference.\n\n" +
-                      "\n\n".join(p.game + "\n" + p.detail for p in reference_ready_room().patches))
-        else:
-            self.info("Patch Watch", "An official game update feed has not been connected. "
-                      "Local scans discover installations; they do not establish the latest patch, "
-                      "mod compatibility, maintenance or release dates.")
-
-    def ready_metric_details(self, caption):
-        if caption == "Mod Alerts":
-            self.navigate("Mods")
-        elif self.reference_preview:
-            self.info(caption + " · reference preview", "Sample data from the supplied Ready Room design. "
-                      "This does not describe your PC or live services.")
-        else:
-            self.ready_updates()
-
-    def ready_patch_details(self, notice):
-        self.info(notice.game + " · reference preview",
-                  notice.status + "\n\n" + notice.detail + "\n\nDesign sample; no game files were checked or changed.")
-
-    def ready_game_details(self, game):
-        if self.reference_preview:
-            self.info(game.name + " · reference preview", game.hours + " · " + game.status +
-                      "\n\nSample data from the design reference.")
-        else:
-            self.navigate("Games")
-            self.game_search.setText(game.name)
+        if (not self.reference_preview and self.inventory.scanned_at
+                and self._ready_evidence_inventory is not self.inventory and not self._ready_checks_busy):
+            QTimer.singleShot(0, self.ready_refresh_checks)

@@ -1,4 +1,4 @@
-GAME GRAVE - READY ROOM WINDOWS PREVIEW 0.2.1
+GAME GRAVE - READY ROOM WINDOWS PREVIEW 0.2.2
 
 Extract the entire ZIP first.
 
@@ -10,7 +10,11 @@ To inspect the supplied design with its sample games and counters:
   Double-click Start_Ready_Room_Reference.bat
 
 To use your actual local inventory:
-  Double-click GameGrave-Crimson-Preview.exe, then choose Scan PC.
+  Double-click GameGrave-Crimson-Preview.exe, choose Scan PC, then Ready Room.
+  Open View All Updates and choose Refresh official news for public Steam posts.
+  Use Followed Games to save a watch list, Backup Now to create a verified ZIP,
+  Manage Saves to view local backup history, and the health gauge for local checks.
+  Game integrity and mod compatibility are not inferred from news or folder access.
 
 To install the preview:
   Run GameGrave-Crimson-Preview-Setup.exe.

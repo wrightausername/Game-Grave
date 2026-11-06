@@ -1,7 +1,7 @@
-"""Ready Room presentation data, with explicit separation of fixtures and evidence.
+"""Ready Room presentation: observed local records and official cached news.
 
-The local inventory does not supply patch feeds, playtime totals, mod version
-compatibility, a backup registry or an overall health score. Unknown stays unknown.
+News never establishes an installed version or mod compatibility. The live gauge
+describes the displayed local checks, not a game's integrity or an overall score.
 """
 from __future__ import annotations
 
@@ -30,6 +30,10 @@ class PatchNotice:
     tone: str
     glyph: str
     artwork: str = ""
+    url: str = ""
+    timestamp: int = 0
+    kind: str = "news"
+    app_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -59,10 +63,13 @@ class ReadyRoomData:
         ("Storage not checked", "muted"), ("Game files not verified", "muted"),
         ("Conflicts not checked", "muted"), ("Managers not checked", "muted"))
     reference: bool = False
+    health_caption: str = "System Ready"
+    health_note: str = "Game integrity and mod compatibility have not been verified."
+    news_note: str = "Refresh public Steam news to connect Patch Watch."
 
 
 def live_ready_room(inventory, *, disk_free_percent: float | None = None,
-                    session_backups: int = 0) -> ReadyRoomData:
+                    session_backups: int = 0, state=None, evidence=None) -> ReadyRoomData:
     """Only values supported by an accepted local inventory or OS disk reading."""
     scanned = bool(inventory.scanned_at)
     games = tuple(GamePulse(g.name, "— hrs", "Recorded install", "muted", "shield",
@@ -72,7 +79,7 @@ def live_ready_room(inventory, *, disk_free_percent: float | None = None,
     storage = (("Storage available", "green") if disk_free_percent >= 10
                else ("Storage running low", "amber")) if disk_free_percent is not None else (
                    "Storage unavailable", "muted")
-    return ReadyRoomData(
+    result = ReadyRoomData(
         counts=("—", "—", "—", "—", "—"),
         games=games,
         mod_state="Review mods" if scanned else "Not scanned",
@@ -86,6 +93,70 @@ def live_ready_room(inventory, *, disk_free_percent: float | None = None,
                 ("Partial scan: review warnings", "amber") if inventory.warnings else
                 ("Conflicts not checked", "muted"), ("Managers not checked", "muted")),
     )
+    if state is None:
+        return result
+    from dataclasses import replace
+    from gg_desktop.ready_room_services import backup_status, date_label, news_targets
+    evidence = evidence or {}
+    audit = evidence.get("audit", {})
+    alerts = audit.get("unresolved_records", 0) + len(evidence.get("profiles", {}).get("warnings", []))
+    kinds = {"hotfix": ("Hotfix", "amber", "wrench"),
+             "update": ("Update", "cyan", "sync"), "mod": ("Mod Impact", "purple", "puzzle"),
+             "maintenance": ("Maintenance", "amber", "calendar"),
+             "release": ("Release News", "cyan", "download"), "news": ("News", "blue", "megaphone")}
+    active = {steam_id for steam_id, _ in news_targets(inventory.games, state.get("followed", []))}
+    patches = tuple(PatchNotice(n["game"], n["title"], date_label(n["timestamp"]),
+                               *kinds.get(n["kind"], kinds["news"]), artwork=game_artwork(n["game"]),
+                               url=n["url"], timestamp=n["timestamp"], kind=n["kind"], app_id=n["app_id"])
+                    for n in state.get("news", []) if n["app_id"] in active)
+    playtimes = evidence.get("playtimes", {})
+    ordered = sorted(inventory.games, key=lambda g: (
+        -playtimes.get(getattr(g, "app_id", ""), -1) if getattr(g, "launcher", "") == "Steam" else 1,
+        -(g.last_played_at or 0), g.name.casefold()))
+    games = []
+    for game in ordered:
+        steam_id = getattr(game, "app_id", "") if getattr(game, "launcher", "") == "Steam" else ""
+        minutes = playtimes.get(steam_id)
+        latest = next((p for p in patches if p.app_id == steam_id), None)
+        status, tone, glyph = ("Recorded install", "muted", "shield")
+        if latest:
+            status = {"update": "Patch news", "hotfix": "Hotfix news", "mod": "Mod news",
+                      "maintenance": "Service news", "release": "Release news"}.get(latest.kind, "Game news")
+            tone, glyph = latest.tone, latest.glyph
+        hours = f"{minutes / 60:.1f}".rstrip("0").rstrip(".") + " hrs" if minutes is not None else "— hrs"
+        games.append(GamePulse(game.name, hours,
+                               status, tone, glyph, game_artwork(game.name), game.key))
+    connected = bool(state.get("news_checked"))
+    counts = (str(sum(p.kind in ("update", "hotfix", "mod") for p in patches)) if connected else "—",
+              str(alerts) if evidence else "—",
+              str(sum(p.kind == "maintenance" for p in patches)) if connected else "—",
+              str(sum(p.kind == "release" for p in patches)) if connected else "—",
+              str(len(state.get("followed", []))))
+    available = [b for b in state.get("backups", []) if backup_status(b) == "Verified when created"]
+    health = list(result.health)
+    if evidence and scanned:
+        total = len(inventory.games)
+        health[1] = ((f"{total} install folders available", "green") if evidence["accessible_games"] == total
+                     else ("Install folder missing", "amber")) if total else ("No game folders to check", "muted")
+        health[2] = ("Scan sources available", "green") if not inventory.warnings else ("Partial scan: review warnings", "amber")
+        managers = evidence["manager_count"]
+        health[3] = (("Manager folders available", "green") if evidence["accessible_managers"] == managers
+                     else ("Manager folder unavailable", "amber")) if managers else ("No managers detected", "muted")
+    checked = sum(tone != "muted" for _, tone in health)
+    passed = sum(tone == "green" for _, tone in health)
+    return replace(result, patches=patches, games=tuple(games), counts=counts,
+                   mod_state=("Needs Review" if alerts else "Reviewed") if evidence else result.mod_state,
+                   mod_note=(f"{alerts} evidence warnings." if alerts else "No association warnings.") if evidence else result.mod_note,
+                   mod_stats=((mod_count, "Mod locations"),
+                              (str(audit.get("enabled_profile_references", 0) + audit.get("disabled_profile_references", 0)), "Profile references") if evidence else ("—", "Profile references"),
+                              (str(alerts), "Review warnings") if evidence else ("—", "Review warnings")),
+                   backup_title=f"{len(available)} Saved Backup" + ("s" if len(available) != 1 else ""),
+                   backup_note=("Last backup: " + date_label(max(b["created_at"] for b in available))) if available else "Choose a save folder to back up.",
+                   health=tuple(health), health_score=round(passed * 100 / checked) if evidence and scanned and checked else None,
+                   health_caption="Local checks",
+                   health_note=f"{passed} of {checked} available local checks passed. "
+                               "Folder access is checked; game-file integrity, mod compatibility and running managers are not verified.",
+                   news_note=("Cached official Steam posts; news is not an installed-version check." if connected else result.news_note))
 
 
 def reference_ready_room() -> ReadyRoomData:
