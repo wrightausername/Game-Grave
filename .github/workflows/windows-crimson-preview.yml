@@ -115,6 +115,7 @@ jobs:
           python tools/render_reference_previews.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Native photo comparison renders failed.' }
       - name: Upload actual Qt screen captures for design review
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: GameGrave-Crimson-Rendered-UI-Screenshots

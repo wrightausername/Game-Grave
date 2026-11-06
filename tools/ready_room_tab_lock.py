@@ -110,7 +110,8 @@ def source_guard(root):
             continue
         before = subprocess.check_output(["git","show",BASELINE+":"+path],cwd=root)
         after = (root/path).read_bytes()
-        if path.endswith(".py"):
+        # Git converts these text files to CRLF on Windows checkouts.
+        if Path(path).suffix in {".py", ".svg", ".md", ".json", ".txt"}:
             before, after = before.replace(b"\r\n",b"\n"), after.replace(b"\r\n",b"\n")
         assert before == after, "Locked source/artwork changed: "+path
     def methods(source):
