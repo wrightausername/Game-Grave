@@ -1,28 +1,27 @@
-GAME GRAVE - READY ROOM WINDOWS PREVIEW 0.2.2
+GAME GRAVE - OVERVIEW WINDOWS PREVIEW 0.2.3
 
 Extract the entire ZIP first.
 
-This correction restores the original application shell, global styling, native
-window frame, Overview startup and all other pages. The redesign is confined to
-the Ready Room page. Restored-Overview.png shows the preserved Overview screen.
-
-To inspect the supplied design with its sample games and counters:
-  Double-click Start_Ready_Room_Reference.bat
+Overview keeps its approved artwork, layout and styling. This update connects
+its existing actions and data. Ready Room and every other page are unchanged.
 
 To use your actual local inventory:
-  Double-click GameGrave-Crimson-Preview.exe, choose Scan PC, then Ready Room.
-  Open View All Updates and choose Refresh official news for public Steam posts.
-  Use Followed Games to save a watch list, Backup Now to create a verified ZIP,
-  Manage Saves to view local backup history, and the health gauge for local checks.
-  Game integrity and mod compatibility are not inferred from news or folder access.
+  Double-click GameGrave-Crimson-Preview.exe, then choose Scan PC.
+  Overview quick actions open the existing review, recovery and settings tools.
+  Click the storage gauge for live readings and its manual refresh.
+  Launcher and finding links inspect the exact installation or finding.
+  Latest Screenshot includes fresh captures from known or selected folders.
+  Preview this image opens only the chosen local image and has no delete action.
 
 To install the preview:
   Run GameGrave-Crimson-Preview-Setup.exe.
-  The Start menu contains both the normal preview and
-  Game Grave Ready Room Reference (sample data).
+
+Ready Room retains its existing live functions and explicit design-reference mode:
+  Start_Ready_Room_Reference.bat opens the labeled sample-data view.
 
 This is an unsigned engineering preview. Python is bundled.
-Reference mode is visibly marked as sample data; it does not describe your PC.
-Ready-Room-Preview.png shows this build's actual rendered reference screen.
+Restored-Overview.png and Overview-Functionality-QA.png are native Qt captures
+using disposable QA data; the normal program uses your actual local inventory.
+Ready-Room-Preview.png shows the unchanged, labeled reference preview.
 Build-Info.txt identifies the source commit and Windows build run.
 SHA256SUMS.txt contains the SHA-256 checksums of both executables.

@@ -87,7 +87,13 @@ class ScreenMethods:
         return True
 
     def overview_page(self):
+        from PySide6.QtCore import QTimer
+        from gg_desktop.overview import OverviewController
+        from gg_desktop.overview_data import disk_reading, launcher_summaries
+
         page = self.page_for("Overview")
+        control = OverviewController(self, page)
+        page.overview = control
         page.content.addWidget(HeroBanner(
             title="YOUR GAMES.", subtitle="A CLEANER TOMORROW.",
             detail="Find what your games leave behind across launchers. Review everything; keep what matters."))
@@ -97,14 +103,16 @@ class ScreenMethods:
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(10)
         cards = [
-            ("⌕", "Scan PC", "Find game files, mods and captures", self.start_scan),
+            ("⌕", "Scan PC", "Find game files, mods and captures", control.scan),
             ("♱", "Review Graveyard", "Check individual files and protections", lambda: self.navigate("Graveyard")),
             ("↶", "Open Undo Center", "Check what Windows can restore", lambda: self.navigate("Undo Center")),
             ("⚙", "Quick Settings", "Folders, exclusions and appearance", lambda: self.navigate("Settings")),
         ]
         compact = self.width() < 1220
         for index, (symbol, title, explanation, action) in enumerate(cards):
-            grid.addWidget(ActionCard(symbol, title, explanation, action),
+            card = ActionCard(symbol, title, explanation, action)
+            control.bind_action(card, action)
+            grid.addWidget(card,
                            index // (2 if compact else 4), index % (2 if compact else 4))
         page.content.addWidget(strip)
 
@@ -115,7 +123,7 @@ class ScreenMethods:
         storage_col.addWidget(section_title("Storage Overview", "Local system disk"))
         disk = StorageRing()
         try:
-            usage = shutil.disk_usage(Path.home())
+            drive, usage = disk_reading()
             disk.update_amounts(usage.total, usage.free)
             total = human_size(usage.total)
             used = human_size(usage.used)
@@ -124,7 +132,9 @@ class ScreenMethods:
         except OSError:
             summary = "Drive usage not available"
         storage_col.addWidget(disk, 1)
-        storage_col.addWidget(label(summary, "caption", wrap=True))
+        disk_summary = label(summary, "caption", wrap=True)
+        storage_col.addWidget(disk_summary)
+        control.bind_storage(disk, disk_summary)
         storage_col.addWidget(label(
             "OS disk usage only. App and mod bytes may overlap with installed games.", "subtle", wrap=True))
         r.addWidget(storage, 4)
@@ -134,23 +144,18 @@ class ScreenMethods:
         if not self.inventory.scanned_at:
             launcher_col.addWidget(label("Run Scan PC to inspect installed launchers.", "subtle", wrap=True))
         else:
-            counts = unique_launcher_counts(self.inventory.games)
-            reported = defaultdict(int)
-            missing = defaultdict(int)
-            for game in self.inventory.games:
-                family = game.launcher if len(game.claimed_by) == 1 else "Multiple launchers"
-                if game.size_bytes is None:
-                    missing[family] += 1
-                else:
-                    reported[family] += game.size_bytes
-            for name, count in sorted(counts.items(), key=lambda x: (-x[1], x[0]))[:9]:
+            summaries = launcher_summaries(self.inventory.games)
+            counts = {item.name: item.count for item in summaries}
+            for item in summaries[:9]:
+                name, count = item.name, item.count
                 line = QWidget()
                 inner = row(spacing=7)
                 line.setLayout(inner)
-                opening = button(name, lambda _=False, n=name: self._go_launcher(n), kind="link")
+                opening = button(name, lambda _=False, n=name: control.show_launcher(n), kind="link")
+                opening.setToolTip(f"{count} recorded installs; {item.unknown_sizes} sizes unknown. Open these installations.")
                 inner.addWidget(opening)
                 inner.addStretch()
-                amount = (human_size(reported[name]) + " known" if reported[name] else "Size unknown")
+                amount = (human_size(item.known_bytes) + " known" if item.unknown_sizes < count else "Size unknown")
                 inner.addWidget(label(f"{count}  •  {amount}", "caption"))
                 launcher_col.addWidget(line)
                 bar = QProgressBar()
@@ -176,7 +181,7 @@ class ScreenMethods:
             recent_col.addWidget(label("No review findings yet. Scan first or adjust the age threshold.", "subtle", wrap=True))
         for item in findings:
             ctl = button(item.name[:24] + "  ›",
-                         lambda _=False, key=item.key: self._go_grave_item(key), kind="link")
+                         lambda _=False, key=item.key: control.show_finding(key), kind="link")
             ctl.setToolTip(item.finding)
             recent_col.addWidget(ctl)
             recent_col.addWidget(label(
@@ -192,18 +197,8 @@ class ScreenMethods:
         capture, cap_col = panel()
         cap_col.addWidget(section_title("Latest Screenshot", "Private and on-device"))
         cap_col.addWidget(LandscapeArt(136))
-        if self.inventory.screenshots:
-            latest = max(self.inventory.screenshots, key=lambda x: x.modified)
-            cap_col.addWidget(label("▧", "metricValue"))
-            cap_col.addWidget(label(Path(latest.path).name, "sectionTitle", wrap=True))
-            cap_col.addWidget(label(human_size(latest.size) +
-                                   "  •  Content not opened automatically", "caption", wrap=True))
-            cap_col.addWidget(button("Preview this image", lambda _=False, e=latest: self._preview_capture(e)))
-        else:
-            cap_col.addWidget(label(
-                "No old in-game screenshots recorded. Personal photos are never browsed by default.",
-                "subtle", wrap=True))
-        cap_col.addStretch()
+        control.capture_layout = cap_col
+        control.render_capture(max(self.inventory.screenshots, key=lambda x: x.modified, default=None))
         bottom_row.addWidget(capture, 2)
 
         queue, queue_col = panel()
@@ -211,7 +206,7 @@ class ScreenMethods:
                                           f"{len(self.inventory.graveyard)} findings"))
         for item in self.inventory.graveyard[:4]:
             ctl = button(item.name[:26] + "  ›",
-                         lambda _=False, key=item.key: self._go_grave_item(key), kind="link")
+                         lambda _=False, key=item.key: control.show_finding(key), kind="link")
             queue_col.addWidget(ctl)
             queue_col.addWidget(label(item.category + "  •  " +
                                       human_size(item.apparent_bytes) +
@@ -231,7 +226,7 @@ class ScreenMethods:
             alert_col.addWidget(label(
                 "Related mod folder detected. Its age alone cannot establish whether it's safe to delete.",
                 "subtle", wrap=True))
-            alert_col.addWidget(button("Inspect protected mods", lambda: self.navigate("Mods"), kind="primary"))
+            alert_col.addWidget(button("Inspect protected mods", lambda _=False, mod=uncertain: control.show_mod(mod), kind="primary"))
         else:
             alert_col.addWidget(label(
                 "Nothing identified for manual review. Protected content stays protected.",
@@ -242,6 +237,8 @@ class ScreenMethods:
         page.content.addWidget(label(
             "Recycle Bin moves are NOT confirmed free space. No permanent deletion, "
             "automatic screenshot cleanup or fake savings metrics.", "caption", wrap=True))
+        if self.inventory.scanned_at:
+            QTimer.singleShot(0, control.refresh_capture)
 
     def _go_launcher(self, launcher):
         self._pending_launcher_filter = launcher
