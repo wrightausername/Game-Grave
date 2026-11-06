@@ -77,9 +77,12 @@ def main():
     with patch("gg_desktop.app.load_settings", side_effect=default_settings), \
             patch("gg_desktop.screens.shutil.disk_usage", return_value=disk):
         baseline = namespace["CrimsonWindow"]()
-        baseline.show()
         window = CrimsonWindow()
+        assert window.size() == baseline.size(), "Configured startup size changed"
+        baseline.show()
         window.show()
+        baseline.resize(1450, 900)
+        window.resize(1450, 900)
         settle(window)
         assert window.current_route == baseline.current_route == "Overview"
         assert window.size() == baseline.size()

@@ -66,6 +66,10 @@ def main():
         window.resize(1280, 900)
         window.show()
         settle()
+        # Windows may fit a newly created native frame to the runner's desktop.
+        # Set the review size after showing it, as the original UI smoke does.
+        window.resize(1280, 900)
+        settle()
         assert isinstance(window.page, ReadyRoomPage)
         assert window.current_route == "Ready Room"
         assert window.page.data.reference
@@ -77,8 +81,10 @@ def main():
         check_page_reachable(window)
         assert window.nav_buttons["Ready Room"].property("active")
         # Compare primary reference rectangles, not fragile raster/font hashes.
-        assert window.page.patches.mapTo(window.page.body, window.page.patches.rect().topLeft()).y() == 215
-        expected_width = (window.page.body.width() - 32) * 626 / 1030
+        assert window.page.patches.mapTo(window.page.body, window.page.patches.rect().topLeft()).y() == (
+            273 if window.page.compact else 215)
+        expected_width = (window.page.body.width() - 20 if window.page.compact else
+                          (window.page.body.width() - 32) * 626 / 1030)
         assert abs(window.page.patches.width() - expected_width) <= 3
 
         window.page.search.setText("WITCHER")
@@ -129,7 +135,7 @@ def main():
         window.resize(1280, 900)
         settle()
         check_page_reachable(window)
-        assert window.page.metrics.height() == 58
+        assert window.page.metrics.height() == (116 if window.page.compact else 58)
 
         for route, _glyph in ROUTES:
             window.nav_buttons[route].click()
