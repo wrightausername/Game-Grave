@@ -8,16 +8,26 @@ on:
       - 'gg_desktop/**'
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
+      - 'tests/test_ready_room_data.py'
+      - 'tools/ready_room_ui_smoke.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
+      - 'installer/GameGraveCrimsonPreview.iss'
+      - 'installer/Start_Ready_Room_Reference.bat'
+      - 'installer/READY_ROOM_BUILD_README.txt'
   pull_request:
     branches: [main]
     paths:
       - 'gg_desktop/**'
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
+      - 'tests/test_ready_room_data.py'
+      - 'tools/ready_room_ui_smoke.py'
       - 'tools/windows_crimson_ui_smoke.py'
       - '.github/workflows/windows-crimson-preview.yml'
+      - 'installer/GameGraveCrimsonPreview.iss'
+      - 'installer/Start_Ready_Room_Reference.bat'
+      - 'installer/READY_ROOM_BUILD_README.txt'
 
 concurrency:
   group: crimson-command-${{ github.ref }}
@@ -52,15 +62,19 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
+          python tools/ready_room_ui_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Ready Room layout and interaction checks failed.' }
       - name: Upload actual Qt screen captures for design review
         uses: actions/upload-artifact@v4
         with:
           name: GameGrave-Crimson-Rendered-UI-Screenshots
-          path: _ci_temp/crimson-*-1440.png
+          path: |
+            _ci_temp/crimson-*-1440.png
+            _ci_temp/ready-room-*.png
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -84,6 +98,14 @@ jobs:
             Write-Host 'Packaged Crimson Qt UI launched without changing game files.'
           } finally {
             if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          }
+          $reference = Start-Process -FilePath $binary -ArgumentList '--ready-room-reference' -PassThru
+          Start-Sleep -Seconds 5
+          try {
+            if ($reference.HasExited) { throw 'Packaged Ready Room reference preview quit immediately.' }
+            Write-Host 'Packaged Ready Room reference preview launched.'
+          } finally {
+            if (-not $reference.HasExited) { Stop-Process -Id $reference.Id -Force }
           }
       - name: Install Inno Setup 6 for distinct preview installer
         shell: pwsh
@@ -133,6 +155,36 @@ jobs:
           if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
           if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
           Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
+      - name: Assemble Ready Room Windows download
+        shell: pwsh
+        run: |
+          $taskBundle = Join-Path (Resolve-Path '_ci_temp').Path 'ReadyRoomWindows'
+          New-Item -ItemType Directory -Force $taskBundle | Out-Null
+          Copy-Item -Path @(
+            'dist/GameGrave-Crimson-Preview.exe',
+            'release/GameGrave-Crimson-Preview-Setup.exe',
+            'installer/Start_Ready_Room_Reference.bat',
+            'installer/READY_ROOM_BUILD_README.txt'
+          ) -Destination $taskBundle
+          Copy-Item '_ci_temp/ready-room-reference-1280.png' (Join-Path $taskBundle 'Ready-Room-Preview.png')
+          $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
+            $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$digest  $($_.Name)"
+          }
+          Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
+          @(
+            'Game Grave Ready Room Windows preview 0.2.0',
+            'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
+            'Checkout commit: ${{ github.sha }}',
+            'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          ) | Set-Content (Join-Path $taskBundle 'Build-Info.txt') -Encoding ascii
+      - name: Upload Ready Room Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameGrave-Ready-Room-Windows-Preview
+          path: _ci_temp/ReadyRoomWindows/*
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload Crimson screenshot and Windows engineering EXE
         uses: actions/upload-artifact@v4
         with:
@@ -140,6 +192,7 @@ jobs:
           path: |
             dist/GameGrave-Crimson-Preview.exe
             _ci_temp/crimson-*-1440.png
+            _ci_temp/ready-room-*.png
             release/GameGrave-Crimson-Preview-Setup.exe
             release/GameGrave-Crimson-Preview-Setup.sha256
           if-no-files-found: error

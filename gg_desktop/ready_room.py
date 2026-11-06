@@ -1,0 +1,767 @@
+"""The reference Ready Room, built from real, keyboard-accessible Qt widgets.
+
+Artwork is local; no screenshot is used as an interactive surface. Reference
+fixtures are available only via the explicit design-preview launch option.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+import shutil
+
+from PySide6.QtCore import QRectF, QSize, Qt
+from PySide6.QtGui import (
+    QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
+)
+from PySide6.QtWidgets import (
+    QBoxLayout, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
+    QWidget,
+)
+
+from gg_desktop.icons import icon, icon_label
+from gg_desktop.ready_room_data import live_ready_room, reference_ready_room
+from gg_desktop.widgets import ScrollPage, button, column, label, row
+
+ASSETS = Path(__file__).parent / "assets" / "ready_room"
+TONES = {
+    "red": "#F32D47", "purple": "#C175D8", "amber": "#DFAC46",
+    "cyan": "#4DD8E2", "blue": "#6CAFE6", "green": "#35DC7C",
+    "muted": "#9AA4AC",
+}
+
+READY_STYLE = """
+QWidget#readyBody, QScrollArea#readyRoom, QScrollArea#readyRoom > QWidget > QWidget {
+    background: transparent; border: none;
+}
+QLabel#readyTitle { font-family: Arial; font-size: 36px; font-weight: 700; }
+QLabel#readySubtitle { font-size: 16px; color: #E0E1E3; }
+QLabel#readyHeading { font-size: 20px; font-weight: 700; color: #F2F1F3; }
+QLabel#readyDetail { font-size: 12px; color: #C8C9CD; }
+QLabel#readyGameTitle { font-size: 15px; font-weight: 600; color: #F3F2F4; }
+QLabel#readyWhen { font-size: 12px; color: #CACBD0; }
+QLabel#readyMetricValue { font-size: 22px; font-weight: 600; }
+QLabel#readyMetricCaption { font-size: 13px; color: #D5D7DB; }
+QLabel#readyState { font-size: 23px; font-weight: 600; }
+QLabel#readyBackupTitle { font-size: 20px; font-weight: 500; }
+QLabel#readyEmptyTitle { font-size: 19px; font-weight: 600; }
+QLabel#readyEmptyDetail { font-size: 14px; color: #AAB4BE; }
+QPushButton#referenceNav {
+    background: transparent; border: none; padding: 0; min-height: 35px; max-height: 35px;
+}
+QPushButton#readyMetric { background: transparent; border: none; border-radius: 0; padding: 0; min-height: 0; }
+QPushButton#readyMetric:hover { background: rgba(255,255,255,5); }
+QPushButton#readyMetric:focus { border: 1px solid #4DD8E2; }
+QPushButton#readyLink {
+    font-size: 12px; font-weight: 400; background: transparent;
+    border: none; padding: 0; min-height: 20px;
+}
+QPushButton#readyLink:hover { color: #FF5269; }
+QPushButton#readyLink:focus { border-bottom: 1px solid #4DD8E2; }
+QPushButton#readyButton, QPushButton#readyPrimary {
+    font-size: 14px; font-weight: 400; min-height: 30px; max-height: 30px; padding: 0 8px;
+    border: 1px solid #414B56; border-radius: 6px;
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #192129,stop:1 #090F15);
+}
+QPushButton#readyButton:hover { border-color: #718393; background: #1C2831; }
+QPushButton#readyPrimary {
+    border-color: #E32C43;
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #A91629,stop:.5 #730A18,stop:1 #440910);
+}
+QPushButton#readyPrimary:hover { background: #AC172A; border-color: #FF5269; }
+QPushButton#readyButton:focus, QPushButton#readyPrimary:focus { border: 2px solid #4DD8E2; }
+QPushButton#readyItem { background: transparent; border: none; border-radius: 3px; padding: 0; }
+QPushButton#readyItem:hover { background: rgba(120,150,175,16); }
+QPushButton#readyItem:focus { border: 1px solid #4DD8E2; }
+"""
+
+
+def fitted_text(text, role, *, wrap=False):
+    result = label(text, role, wrap=wrap)
+    result.setMinimumWidth(0)
+    result.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+    result.setToolTip(text)
+    return result
+
+
+class MainCanvas(QWidget):
+    """Gaming-room illustration behind the title and the real search controls."""
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("mainCanvas")
+        self.art = QPixmap(str(ASSETS / "gaming_room.png"))
+        self.ready = True
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor("#05090C"))
+        if not self.ready:
+            return
+        art_width = max(660, self.width() * .63)
+        target = QRectF(self.width() - art_width, 0, art_width, 150)
+        # The reference's search and window chrome are excluded from the art.
+        painter.save()
+        clip = QPainterPath()
+        clip.addRect(QRectF(0, 44, self.width(), 106))
+        clip.addRect(QRectF(self.width() - art_width + 78, 0,
+                            max(0, art_width - 280), 44))
+        painter.setClipPath(clip)
+        painter.drawPixmap(target, self.art, QRectF(self.art.rect()))
+        painter.restore()
+        fade = QLinearGradient(target.left(), 0, target.left() + 180, 0)
+        fade.setColorAt(0, QColor("#05090C"))
+        fade.setColorAt(1, QColor(5, 9, 12, 0))
+        painter.fillRect(target, fade)
+        if self.width() < 900:
+            shade = QLinearGradient(0, 0, self.width() * .85, 0)
+            shade.setColorAt(0, QColor(5, 9, 12, 250))
+            shade.setColorAt(.7, QColor(5, 9, 12, 205))
+            shade.setColorAt(1, QColor(5, 9, 12, 0))
+            painter.fillRect(QRectF(0, 0, self.width(), 150), shade)
+        bottom = QLinearGradient(0, 126, 0, 159)
+        bottom.setColorAt(0, QColor(5, 9, 12, 0))
+        bottom.setColorAt(1, QColor("#05090C"))
+        painter.fillRect(QRectF(0, 126, self.width(), 34), bottom)
+
+
+class NavigationRail(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("navRail")
+        self.setFixedWidth(218)
+        self.art = QPixmap(str(ASSETS / "sidebar_forest.png"))
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        background = QLinearGradient(0, 0, self.width(), self.height())
+        background.setColorAt(0, QColor("#060C10"))
+        background.setColorAt(1, QColor("#070B0E"))
+        painter.fillRect(self.rect(), background)
+        height = max(183, self.height() * .255)
+        target = QRectF(0, self.height() - height, 217, height)
+        painter.drawPixmap(target, self.art, QRectF(self.art.rect()))
+        painter.setPen(QColor("#20282E"))
+        painter.drawLine(self.width() - 1, 0, self.width() - 1, self.height())
+
+
+class NavigationButton(QPushButton):
+    def __init__(self, title, glyph, action):
+        super().__init__()
+        self.title = title
+        self.glyph = glyph
+        self.setObjectName("referenceNav")
+        self.setFixedHeight(35)
+        self.setAccessibleName(title + " page")
+        self.setToolTip(title)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setCursor(Qt.PointingHandCursor)
+        self.clicked.connect(action)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        active = self.property("active")
+        if active or self.underMouse():
+            glow = QLinearGradient(0, 0, self.width(), 0)
+            glow.setColorAt(0, QColor(106, 4, 18, 30))
+            glow.setColorAt(.38, QColor(171, 12, 29, 185 if active else 65))
+            glow.setColorAt(1, QColor(83, 3, 14, 0))
+            painter.fillRect(self.rect(), glow)
+            if active:
+                for y in (0, self.height() - 1):
+                    painter.setPen(QPen(glow, 1))
+                    painter.drawLine(0, y, self.width(), y)
+        icon(self.glyph, "#F1EDF0" if active else "#C4C7C9", 23).paint(
+            painter, 34, 6, 23, 23)
+        painter.setFont(QFont("Roboto Condensed", 12))
+        painter.setPen(QColor("#F4F1F3" if active else "#D6D6D9"))
+        painter.drawText(QRectF(80, 0, self.width() - 90, 35), Qt.AlignVCenter, self.title)
+        if self.title == "More Tools":
+            icon("chevron", "#CDD1D6", 16).paint(painter, 190, 10, 16, 16)
+        if self.hasFocus():
+            painter.setPen(QPen(QColor(TONES["cyan"]), 1))
+            painter.drawRoundedRect(self.rect().adjusted(2, 1, -3, -2), 3, 3)
+
+
+class WindowHeader(QWidget):
+    """Native move/maximize behavior for the reference's custom title bar."""
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self.window().windowHandle():
+            self.window().windowHandle().startSystemMove()
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            window = self.window()
+            window.showNormal() if window.isMaximized() else window.showMaximized()
+        super().mouseDoubleClickEvent(event)
+
+
+class ReadyPanel(QFrame):
+    def __init__(self, title, subtitle, glyph, *, artwork="", trailing=None):
+        super().__init__()
+        self.setObjectName("readyPanel")
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.art = QPixmap(str(ASSETS / (artwork + ".png"))) if artwork else QPixmap()
+        self.stack = column(spacing=0)
+        self.setLayout(self.stack)
+        header = QWidget()
+        header.setFixedHeight(48 if not artwork else 51)
+        heading = row(spacing=18 if glyph == "gamepad" else 15,
+                      margins=(12 if glyph == "gamepad" else 14,
+                               7 if artwork else 5, 13, 5 if artwork else 4))
+        header.setLayout(heading)
+        heading.addWidget(icon_label(glyph, TONES["red"], 38 if glyph == "gamepad" else 30))
+        words = column(spacing=0)
+        title_label = fitted_text(title, "readyHeading")
+        title_label.setFixedHeight(24)
+        detail_label = fitted_text(subtitle, "readyDetail")
+        detail_label.setFixedHeight(15)
+        words.addWidget(title_label)
+        words.addWidget(detail_label)
+        heading.addLayout(words, 1)
+        if trailing:
+            heading.addWidget(trailing)
+        self.stack.addWidget(header)
+        self.body = QWidget()
+        self.body_layout = column(spacing=0, margins=(12, 3, 11, 7))
+        self.body.setLayout(self.body_layout)
+        self.stack.addWidget(self.body, 1)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        area = QRectF(self.rect()).adjusted(.5, .5, -.5, -.5)
+        clip = QPainterPath()
+        clip.addRoundedRect(area, 12, 12)
+        painter.setClipPath(clip)
+        bg = QLinearGradient(0, 0, 0, self.height())
+        bg.setColorAt(0, QColor("#101418"))
+        bg.setColorAt(.23, QColor("#080E12"))
+        bg.setColorAt(1, QColor("#050A0E"))
+        painter.fillRect(area, bg)
+        if not self.art.isNull():
+            target = QRectF(self.width() - self.art.width() - 1, 1,
+                            self.art.width(), 50)
+            painter.drawPixmap(target, self.art, QRectF(self.art.rect()))
+            fade = QLinearGradient(target.left(), 0, target.right(), 0)
+            fade.setColorAt(0, QColor("#0D1317"))
+            fade.setColorAt(.55, QColor(8, 14, 18, 110))
+            fade.setColorAt(1, QColor(8, 14, 18, 8))
+            painter.fillRect(target, fade)
+        painter.setPen(QColor("#30353C"))
+        painter.drawLine(12, 48 if self.art.isNull() else 51,
+                         self.width() - 12, 48 if self.art.isNull() else 51)
+        edge = QLinearGradient(0, 0, self.width(), self.height())
+        edge.setColorAt(0, QColor("#73404A"))
+        edge.setColorAt(.25, QColor("#41464F"))
+        edge.setColorAt(1, QColor("#36424C"))
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(QPen(edge, 1))
+        painter.drawRoundedRect(area, 12, 12)
+        painter.setPen(QColor(255, 255, 255, 10))
+        painter.drawRoundedRect(area.adjusted(2, 2, -2, -2), 10, 10)
+
+
+class MetricButton(QPushButton):
+    def __init__(self, caption, value, glyph, tone, action):
+        super().__init__()
+        self.setObjectName("readyMetric")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setAccessibleName(caption + ": " + value)
+        self.setCursor(Qt.PointingHandCursor)
+        self.clicked.connect(action)
+        self.color = TONES[tone]
+        self.setFocusPolicy(Qt.StrongFocus)
+        contents = row(spacing=17, margins=(40, 0, 6, 9))
+        self.setLayout(contents)
+        contents.addWidget(icon_label(glyph, self.color, 30))
+        words = column(spacing=0)
+        words.addWidget(label(value, "readyMetricValue"))
+        words.addWidget(label(caption, "readyMetricCaption"))
+        contents.addLayout(words, 1)
+        for child in self.findChildren(QWidget):
+            child.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        line = QLinearGradient(16, 0, self.width() - 16, 0)
+        line.setColorAt(0, QColor(0, 0, 0, 0))
+        line.setColorAt(.5, QColor(self.color))
+        line.setColorAt(1, QColor(0, 0, 0, 0))
+        for width, alpha in ((8, .025), (5, .06), (3, .16), (1.5, .9)):
+            painter.setOpacity(alpha)
+            painter.setPen(QPen(line, width))
+            painter.drawLine(24, self.height() - 7, self.width() - 16, self.height() - 7)
+        painter.setOpacity(1)
+        painter.setPen(QColor("#30343A"))
+        painter.drawLine(self.width() - 1, 12, self.width() - 1, 44)
+
+
+def thumbnail(artwork, kind, width, height):
+    result = QLabel()
+    result.setFixedSize(width, height)
+    if artwork:
+        result.setPixmap(QPixmap(str(ASSETS / f"{artwork}_{kind}.png")).scaled(
+            width, height, Qt.IgnoreAspectRatio, Qt.SmoothTransformation))
+    else:
+        result.setPixmap(icon("gamepad", "#778993", 28).pixmap(QSize(28, 28)))
+        result.setAlignment(Qt.AlignCenter)
+        result.setStyleSheet("background:#111B23;border:1px solid #33414D;border-radius:5px;")
+    return result
+
+
+def status_badge(text, tone, glyph, *, bordered=True):
+    frame = QFrame()
+    color = TONES[tone]
+    rgb = QColor(color)
+    frame.setFixedSize(108 if bordered else 106, 29)
+    if bordered:
+        frame.setStyleSheet(
+            f"QFrame {{ border:1px solid rgba({rgb.red()},{rgb.green()},{rgb.blue()},95);"
+            f"border-radius:6px; background:rgba({rgb.red()},{rgb.green()},{rgb.blue()},13); }}"
+            "QLabel { border:none;background:transparent; }")
+    contents = row(spacing=7, margins=(7 if bordered else 3, 0, 3, 0))
+    frame.setLayout(contents)
+    contents.addWidget(icon_label(glyph, color, 18))
+    words = label(text)
+    words.setStyleSheet(f"color:{color};font-size:12px;")
+    contents.addWidget(words, 1)
+    frame.setAccessibleName(text)
+    return frame
+
+
+def item_button(action, name):
+    control = button("", action, kind="readyItem")
+    control.setAccessibleName(name)
+    control.setToolTip(name)
+    control.setMinimumHeight(40)
+    control.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    control.setCursor(Qt.PointingHandCursor)
+    return control
+
+
+def action_button(text, action, glyph="", *, primary=False):
+    result = button(text, action, kind="readyPrimary" if primary else "readyButton")
+    result.setFixedHeight(32)
+    if glyph:
+        result.setIcon(icon(glyph, "#E9D8DE" if primary else "#D6DDE2", 20))
+        result.setIconSize(QSize(20, 20))
+    if primary:
+        from PySide6.QtWidgets import QGraphicsDropShadowEffect
+        glow = QGraphicsDropShadowEffect(result)
+        glow.setBlurRadius(14)
+        glow.setOffset(0, 1)
+        glow.setColor(QColor(240, 14, 39, 105))
+        result.setGraphicsEffect(glow)
+    return result
+
+
+class HealthGauge(QWidget):
+    def __init__(self, score):
+        super().__init__()
+        self.score = score
+        self.setFixedSize(123, 119)
+        self.setAccessibleName(f"System ready: {score}% (design sample)" if score is not None
+                               else "System health has not been verified")
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        arc = QRectF(12, 12, 98, 98)
+        painter.setPen(QPen(QColor("#222F36"), 8))
+        painter.drawArc(arc, 225 * 16, -270 * 16)
+        if self.score is not None:
+            for size, opacity in ((18, .025), (13, .08), (8, 1)):
+                painter.setOpacity(opacity)
+                gradient = QLinearGradient(12, 98, 100, 15)
+                gradient.setColorAt(0, QColor("#7BE500"))
+                gradient.setColorAt(.5, QColor("#13E50A"))
+                gradient.setColorAt(1, QColor("#40D70B"))
+                painter.setPen(QPen(gradient, size))
+                painter.drawArc(arc, 225 * 16, -int(270 * 16 * self.score / 100))
+            painter.setOpacity(1)
+        painter.setPen(QColor("#F5F3F6"))
+        font = QFont("Roboto Condensed")
+        font.setPixelSize(27)
+        font.setWeight(QFont.DemiBold)
+        painter.setFont(font)
+        painter.drawText(QRectF(9, 36, 107, 37), Qt.AlignCenter,
+                         f"{self.score}%" if self.score is not None else "—")
+        font.setPixelSize(11)
+        font.setWeight(QFont.Normal)
+        painter.setFont(font)
+        painter.setPen(QColor("#D0D3D9"))
+        painter.drawText(QRectF(7, 71, 110, 16), Qt.AlignCenter,
+                         "System Ready" if self.score is not None else "Not verified")
+
+
+class ReadyRoomPage(ScrollPage):
+    def __init__(self, window, data):
+        super().__init__()
+        self.setObjectName("readyRoom")
+        self.body.setObjectName("readyBody")
+        self.viewport().setAutoFillBackground(False)
+        self.body.setAutoFillBackground(False)
+        self.window_owner = window
+        self.data = data
+        self.content.setContentsMargins(12, 0, 8, 30)
+        self.content.setSpacing(0)
+        hero = QWidget()
+        hero.setFixedHeight(94)
+        hero_row = row(spacing=12, margins=(13, 5, 0, 0))
+        hero.setLayout(hero_row)
+        slash = label("/")
+        slash.setStyleSheet("color:#F02640;font-family:Arial;font-weight:700;font-size:52px;")
+        slash.setFixedWidth(21)
+        slash.setAlignment(Qt.AlignTop)
+        hero_row.addWidget(slash)
+        words = column(spacing=0)
+        words.addWidget(label("Ready Room", "readyTitle"))
+        words.addWidget(label("Your mission hub for updates, patches, mod alerts, and a\n"
+                              "live pulse on your games.", "readySubtitle"))
+        words.addStretch()
+        hero_row.addLayout(words)
+        hero_row.addStretch()
+        self.content.addWidget(hero)
+
+        self.metrics = QWidget()
+        self.metrics.setFixedHeight(58)
+        self.metrics_grid = QGridLayout(self.metrics)
+        self.metrics_grid.setContentsMargins(0, 0, 0, 0)
+        self.metrics_grid.setSpacing(0)
+        self.metric_buttons = []
+        self.compact = False
+        for caption, value, glyph, tone, stretch in zip(
+                ("Game Updates", "Mod Alerts", "Maintenance", "New Releases", "Followed Games"),
+                data.counts, ("megaphone", "cube", "calendar", "download", "star"),
+                ("red", "purple", "amber", "cyan", "blue"), (223, 200, 200, 209, 210)):
+            metric = MetricButton(caption, value, glyph, tone,
+                lambda _=False, c=caption: window.ready_metric_details(c))
+            self.metric_buttons.append(metric)
+            self.metrics_grid.addWidget(metric, 0, len(self.metric_buttons) - 1)
+            self.metrics_grid.setColumnStretch(len(self.metric_buttons) - 1, stretch)
+        self.content.addWidget(self.metrics)
+        self.content.addSpacing(11)
+
+        self.middle = QHBoxLayout()
+        self.middle.setSpacing(12)
+        self.patches = ReadyPanel("Patch Watch", "Official updates, hotfixes, and maintenance for your games.",
+                                 "layers", trailing=button("View All Updates  →",
+                                  window.ready_updates, kind="readyLink"))
+        self.games = ReadyPanel("Your Games – At a Glance", "Your top played games and what’s happening with them.",
+                               "gamepad")
+        self.patches.setMinimumHeight(269)
+        self.games.setMinimumHeight(269)
+        self.middle.addWidget(self.patches, 626)
+        self.middle.addWidget(self.games, 404)
+        self.content.addLayout(self.middle, 7)
+        self.content.addSpacing(13)
+
+        self.bottom = QHBoxLayout()
+        self.bottom.setSpacing(12)
+        self.mod_panel = self._mod_card()
+        self.save_panel = self._save_card()
+        self.health_panel = self._health_card()
+        for card, stretch in ((self.mod_panel, 354), (self.save_panel, 334), (self.health_panel, 330)):
+            card.setMinimumHeight(193)
+            self.bottom.addWidget(card, stretch)
+        self.content.addLayout(self.bottom, 5)
+        self.filter_rows("")
+
+    def filter_rows(self, query):
+        for layout in (self.patches.body_layout, self.games.body_layout):
+            while layout.count():
+                item = layout.takeAt(0)
+                if item.widget():
+                    item.widget().hide()
+                    item.widget().deleteLater()
+        query = query.strip().casefold()
+        patches = [p for p in self.data.patches if query in (p.game + " " + p.detail).casefold()]
+        games = [g for g in self.data.games if query in g.name.casefold()]
+        self.visible_patches = patches
+        self.visible_games = games[:5]
+        for index, notice in enumerate(patches[:5]):
+            control = item_button(lambda _=False, p=notice: self.window_owner.ready_patch_details(p),
+                                  notice.game + ": " + notice.status)
+            contents = row(spacing=12)
+            control.setLayout(contents)
+            contents.addWidget(thumbnail(notice.artwork, "logo", 140, 38))
+            words = column(spacing=0)
+            words.addWidget(fitted_text(notice.game, "readyGameTitle"))
+            words.addWidget(fitted_text(notice.detail, "readyDetail"))
+            contents.addLayout(words, 1)
+            when = label(notice.when, "readyWhen")
+            when.setFixedWidth(70)
+            when.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            contents.addWidget(when)
+            contents.addWidget(status_badge(notice.status, notice.tone, notice.glyph))
+            for child in control.findChildren(QWidget):
+                child.setAttribute(Qt.WA_TransparentForMouseEvents)
+            self.patches.body_layout.addWidget(control, 1)
+            if index < len(patches[:5]) - 1:
+                self._separator(self.patches.body_layout)
+        for index, game in enumerate(games[:5]):
+            control = item_button(lambda _=False, g=game: self.window_owner.ready_game_details(g),
+                                  game.name + ": " + game.status)
+            contents = row(spacing=9)
+            control.setLayout(contents)
+            contents.addWidget(thumbnail(game.artwork, "portrait", 74, 36))
+            contents.addWidget(fitted_text(game.name, "readyGameTitle"), 1)
+            played = QWidget()
+            played.setFixedWidth(62)
+            played_row = row(spacing=4)
+            played.setLayout(played_row)
+            played_row.addWidget(icon_label("clock", "#C9CCD0", 15))
+            played_row.addWidget(label(game.hours, "readyWhen"))
+            contents.addWidget(played)
+            contents.addWidget(status_badge(game.status, game.tone, game.glyph,
+                                            bordered=game.tone in ("purple", "amber")))
+            for child in control.findChildren(QWidget):
+                child.setAttribute(Qt.WA_TransparentForMouseEvents)
+            self.games.body_layout.addWidget(control, 1)
+            if index < len(games[:5]) - 1:
+                self._separator(self.games.body_layout)
+        if not patches:
+            self._empty(self.patches.body_layout,
+                        "No matching updates" if query else "Your watch starts here",
+                        "Try another game or keyword." if query else
+                        "A game update feed hasn’t been connected yet.",
+                        "About Patch Watch", self.window_owner.ready_updates)
+        if not games:
+            self._empty(self.games.body_layout,
+                        "No matching games" if query else "Make room for your games",
+                        "Try another game title." if query else "Scan your PC to see your installed games here.",
+                        "Scan PC", self.window_owner.start_scan)
+
+    @staticmethod
+    def _separator(layout):
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setStyleSheet("background:#222A30;")
+        layout.addWidget(line)
+
+    @staticmethod
+    def _empty(layout, title, detail, action_text, action):
+        box = QWidget()
+        words = column(spacing=10, margins=(15, 22, 15, 20))
+        box.setLayout(words)
+        words.addStretch()
+        words.addWidget(label(title, "readyEmptyTitle"))
+        words.addWidget(label(detail, "readyEmptyDetail", wrap=True))
+        words.addWidget(button(action_text + "  →", action, kind="readyLink"), 0, Qt.AlignLeft)
+        words.addStretch()
+        layout.addWidget(box, 1)
+
+    def _mod_card(self):
+        card = ReadyPanel("Mod Radar", "Mod manager and mod health monitoring.",
+                          "puzzle", artwork="mod_landscape")
+        card.body_layout.setContentsMargins(13, 8, 12, 12)
+        summary = row(spacing=12)
+        state_box = QWidget()
+        state_box.setFixedWidth(146)
+        state = column(spacing=0)
+        state_box.setLayout(state)
+        state.addWidget(icon_label("check" if self.data.reference else "scan",
+                                   TONES["green"] if self.data.reference else TONES["cyan"], 36),
+                        0, Qt.AlignHCenter)
+        state.addWidget(label(self.data.mod_state, "readyState"), 0, Qt.AlignHCenter)
+        note = label(self.data.mod_note, "readyDetail")
+        note.setStyleSheet("font-size:11px;color:#D0D1D5;")
+        state.addWidget(note, 0, Qt.AlignHCenter)
+        summary.addWidget(state_box)
+        divider = QFrame()
+        divider.setFixedWidth(1)
+        divider.setStyleSheet("background:#30373D;")
+        summary.addWidget(divider)
+        stats = column(spacing=5)
+        for (value, caption), glyph in zip(self.data.mod_stats, ("cube", "sync", "warning")):
+            line = row(spacing=8)
+            line.addWidget(icon_label(glyph, "#F1C13E" if glyph == "warning" else "#D6DAE0", 16))
+            amount = label(value, "readyGameTitle")
+            amount.setFixedWidth(25)
+            line.addWidget(amount)
+            detail = label(caption, "readyDetail")
+            detail.setStyleSheet("font-size:11px;color:#D0D1D5;")
+            line.addWidget(detail, 1)
+            stats.addLayout(line)
+        summary.addLayout(stats, 1)
+        card.body_layout.addLayout(summary, 1)
+        card.body_layout.addSpacing(10)
+        controls = row(spacing=11)
+        controls.addWidget(action_button("View Mods  →", lambda: self.window_owner.navigate("Mods")), 1)
+        controls.addWidget(action_button("Run Mod Scan", self.window_owner.start_scan, "scan", primary=True), 1)
+        card.body_layout.addLayout(controls)
+        return card
+
+    def _save_card(self):
+        card = ReadyPanel("Save Vault", "Protect and manage your game saves.",
+                          "save", artwork="vault_landscape")
+        card.body_layout.setContentsMargins(13, 8, 12, 12)
+        summary = row(spacing=22, margins=(29, 0, 0, 20))
+        summary.addWidget(icon_label("database", "#45DFB1", 40))
+        words = column(spacing=2)
+        words.addStretch()
+        words.addWidget(fitted_text(self.data.backup_title, "readyBackupTitle"))
+        note = row(spacing=6)
+        note.addWidget(icon_label("check" if self.data.reference else "clock", "#35CD78", 15))
+        note.addWidget(fitted_text(self.data.backup_note, "readyDetail"), 1)
+        words.addLayout(note)
+        words.addStretch()
+        summary.addLayout(words, 1)
+        card.body_layout.addLayout(summary, 1)
+        controls = row(spacing=11)
+        controls.addWidget(action_button("Manage Saves  →", self.window_owner.save_vault_page), 1)
+        controls.addWidget(action_button("Backup Now", self.window_owner._create_save_backup, "cloud", primary=True), 1)
+        card.body_layout.addLayout(controls)
+        return card
+
+    def _health_card(self):
+        card = ReadyPanel("System & Game Health", "Quick checks to keep everything running smooth.",
+                          "pulse", artwork="health_landscape")
+        card.body_layout.setContentsMargins(9, 0, 12, 12)
+        summary = row(spacing=12)
+        summary.addWidget(HealthGauge(self.data.health_score))
+        checks = column(spacing=10, margins=(0, 10, 0, 15))
+        for title, tone in self.data.health:
+            line = row(spacing=8)
+            line.addWidget(icon_label("check" if tone == "green" else "help", TONES[tone], 17))
+            line.addWidget(fitted_text(title, "readyDetail"), 1)
+            checks.addLayout(line)
+        checks.addStretch()
+        summary.addLayout(checks, 1)
+        card.body_layout.addLayout(summary, 1)
+        return card
+
+    def resizeEvent(self, event):
+        compact = event.size().width() < 900
+        direction = QBoxLayout.TopToBottom if compact else QBoxLayout.LeftToRight
+        if hasattr(self, "middle"):
+            self.middle.setDirection(direction)
+            self.bottom.setDirection(direction)
+            if compact != self.compact:
+                self.compact = compact
+                self.metrics.setFixedHeight(116 if compact else 58)
+                for metric in self.metric_buttons:
+                    self.metrics_grid.removeWidget(metric)
+                for index in range(5):
+                    self.metrics_grid.setColumnStretch(index, 0)
+                for index, metric in enumerate(self.metric_buttons):
+                    columns = 3 if compact else 5
+                    self.metrics_grid.addWidget(metric, index // columns, index % columns)
+                    self.metrics_grid.setColumnStretch(index % columns,
+                        1 if compact else (223, 200, 200, 209, 210)[index])
+        super().resizeEvent(event)
+
+
+class ReadyRoomMethods:
+    def ready_room_page(self):
+        try:
+            disk = shutil.disk_usage(Path.home())
+            free_percent = disk.free * 100 / disk.total if disk.total else None
+        except OSError:
+            free_percent = None
+        data = reference_ready_room() if self.reference_preview else live_ready_room(
+            self.inventory, disk_free_percent=free_percent,
+            session_backups=getattr(self, "session_backups", 0))
+        self.page_for("Ready Room", page=ReadyRoomPage(self, data))
+        self.page.filter_rows(self.search.text())
+
+    def ready_updates(self):
+        if self.reference_preview:
+            self.info("Patch Watch · reference preview", "These are the sample updates in your design reference.\n\n" +
+                      "\n\n".join(p.game + "\n" + p.detail for p in reference_ready_room().patches))
+        else:
+            self.info("Patch Watch", "An official game update feed has not been connected. "
+                      "Local scans discover installations; they do not establish the latest patch, "
+                      "mod compatibility, maintenance or release dates.")
+
+    def ready_metric_details(self, caption):
+        if caption == "Mod Alerts":
+            self.navigate("Mods")
+        elif self.reference_preview:
+            self.info(caption + " · reference preview", "Sample data from the supplied Ready Room design. "
+                      "This does not describe your PC or live services.")
+        else:
+            self.ready_updates()
+
+    def ready_patch_details(self, notice):
+        self.info(notice.game + " · reference preview",
+                  notice.status + "\n\n" + notice.detail + "\n\nDesign sample; no game files were checked or changed.")
+
+    def ready_game_details(self, game):
+        if self.reference_preview:
+            self.info(game.name + " · reference preview", game.hours + " · " + game.status +
+                      "\n\nSample data from the design reference.")
+        else:
+            self.navigate("Games")
+            self.game_search.setText(game.name)
+
+    def save_vault_page(self):
+        from gg_desktop.widgets import page_heading, panel
+        page = self.page_for("Save Vault")
+        page_heading(page, "Save Vault", "Protect and manage your game saves.")
+        frame, stack = panel()
+        stack.addWidget(label("Your saves stay on your PC", "sectionTitle"))
+        stack.addWidget(label("Create a verified ZIP of one save or profile folder. "
+                              "Close the game first for a consistent backup.", "subtle", wrap=True))
+        stack.addWidget(button("Back up a save folder…", self._create_save_backup, kind="primary"))
+        if self.inventory.saves:
+            for save in self.inventory.saves[:25]:
+                stack.addWidget(label(str(getattr(save, "game", "Save folder")), "sectionTitle"))
+                stack.addWidget(label(str(getattr(save, "path", "")), "subtle", wrap=True))
+        else:
+            stack.addWidget(label("Scan PC to discover local save locations.", "subtle"))
+            stack.addWidget(button("Scan PC", self.start_scan))
+        page.content.addWidget(frame)
+        page.content.addStretch()
+
+    def other_storage_page(self):
+        from gg_desktop.widgets import page_heading, panel
+        page = self.page_for("Other Storage")
+        page_heading(page, "Other Storage", "Review the storage recorded by your last local scan.")
+        for title, records, destination in (
+                ("Mod locations", self.inventory.mods, "Mods"),
+                ("Old downloads", self.inventory.files, "Old Files"),
+                ("Game captures", [*self.inventory.screenshots, *self.inventory.recordings], "Captures")):
+            frame, stack = panel()
+            stack.addWidget(label(title, "sectionTitle"))
+            stack.addWidget(label(str(len(records)) + " recorded locations or files" if self.inventory.scanned_at
+                                  else "Not scanned yet", "subtle"))
+            stack.addWidget(button("Review " + title.lower(), lambda _=False, r=destination: self.navigate(r)))
+            page.content.addWidget(frame)
+        page.content.addStretch()
+
+    def captures_page(self):
+        from gg_desktop.widgets import page_heading, panel
+        page = self.page_for("Captures")
+        page_heading(page, "Captures", "Game screenshots and recordings recorded by the age-filtered local scan.")
+        frame, stack = panel()
+        if not self.inventory.scanned_at:
+            stack.addWidget(label("Scan PC to discover game capture folders.", "subtle"))
+            stack.addWidget(button("Scan PC", self.start_scan, kind="primary"))
+        else:
+            for capture in self.inventory.screenshots[:100]:
+                stack.addWidget(button(Path(capture.path).name + "  ·  Preview",
+                    lambda _=False, c=capture: self._preview_capture(c)))
+            for capture in self.inventory.recordings[:100]:
+                stack.addWidget(label(Path(capture.path).name + "  ·  Recording", "subtle"))
+            if not self.inventory.screenshots and not self.inventory.recordings:
+                stack.addWidget(label("No captures matched your scan settings.", "subtle"))
+        stack.addWidget(button("Manage game capture folders", lambda: self.navigate("Settings")))
+        page.content.addWidget(frame)
+        page.content.addStretch()
+
+    def assistant_page(self):
+        from gg_desktop.widgets import page_heading, panel
+        page = self.page_for("AI Assistant")
+        page_heading(page, "AI Assistant", "Help understanding your local gaming setup.")
+        frame, stack = panel()
+        stack.addWidget(label("Explore your scan evidence", "sectionTitle"))
+        stack.addWidget(label("An AI service is not connected. You can inspect the local evidence "
+                              "in Game DNA and Mod Radar, or review your findings in the Graveyard.",
+                              "subtle", wrap=True))
+        for title in ("Game DNA", "Mods", "Graveyard"):
+            stack.addWidget(button("Open " + title, lambda _=False, r=title: self.navigate(r)))
+        page.content.addWidget(frame)
+        page.content.addStretch()

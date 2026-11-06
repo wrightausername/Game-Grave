@@ -3,7 +3,7 @@
 ; UNSIGNED and NOT publicly released. Production Qt LGPL/redistribution, signing,
 ; payment and consumer Windows release acceptance remain open.
 #define AppName "Game Grave Crimson Preview"
-#define AppVersion "0.1.0"
+#define AppVersion "0.2.0"
 #define AppExe "GameGrave-Crimson-Preview.exe"
 
 [Setup]
@@ -32,6 +32,7 @@ Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\Game Grave Crimson Preview"; Filename: "{app}\{#AppExe}"
+Name: "{autoprograms}\Game Grave Ready Room Reference (sample data)"; Filename: "{app}\{#AppExe}"; Parameters: "--ready-room-reference"
 Name: "{autodesktop}\Game Grave Crimson Preview"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Tasks]

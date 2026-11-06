@@ -1217,9 +1217,12 @@ class ScreenMethods:
             self.info("Operation busy", "Finish the current scan or backup first.")
             return
         self.cleaning = True
+        self.operation_bar.show()
         self.status.setText(name + "… Existing game, mod and save files stay untouched.")
         def finish(report):
             self.cleaning = False
+            if name == "Save Vault backup" and report.get("verified"):
+                self.session_backups += 1
             self.status.setText(name + " complete. Original files untouched.")
             # Reports contain on-device user file names; never upload any result.
             lines = [f"{key}: {val}" for key, val in report.items()
@@ -1227,6 +1230,8 @@ class ScreenMethods:
             self.info(name + " completed",
                       "\n".join(lines[:14])[:1800] +
                       "\n\nYour existing game/mod/save files were not modified.")
+            if name == "Save Vault backup" and self.current_route in ("Ready Room", "Save Vault"):
+                self.navigate(self.current_route)
         self.job(lambda _progress: fn(), finish, error_title=name + " failed")
 
     def _create_save_backup(self):

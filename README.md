@@ -36,6 +36,42 @@ The usual `py launcher.py` still opens the classic Tk application.
 Do not run both while carrying out Recycle Bin or restore operations;
 wait until the current operation finishes before changing interfaces.
 
+### Ready Room reference layout
+
+The Qt preview now opens on **Ready Room**, rebuilt against the supplied
+1280 × 720 reference: the GG sidebar and red forest, gaming-room header, global
+search, five neon counters, Patch Watch, Your Games, Mod Radar, Save Vault and
+System & Game Health. All controls are real Qt widgets; artwork and the bundled
+Roboto Condensed font load locally. Smaller windows stack the panels and keep
+every section reachable by scrolling.
+
+To inspect the reference's exact sample games, patch notices and counters:
+
+```powershell
+py launcher.py --ui-preview --ready-room-reference
+```
+
+That explicit design mode has a visible **REFERENCE PREVIEW · SAMPLE DATA**
+marker. Normal mode uses your accepted local scan: patch/version feeds,
+playtime totals, compatibility checks and overall health scores remain unknown
+until supported. Discovered save folders do not count as backups. Completed,
+verified Save Vault backups are counted for the current session.
+
+`Ctrl+K` focuses search, `Escape` clears it, and `F5` starts the existing
+read-only scan. Search filters Ready Room rows or the installed Games list.
+The window controls support move, edge resize, minimize, maximize and close.
+
+For repeatable visual review without scanning or changing a personal profile:
+
+```powershell
+py tools/ready_room_ui_smoke.py --output _ci_temp
+```
+
+This exercises layout, search, keyboard navigation, scan/backup routing, all
+sidebar destinations and fixture isolation. It renders reference screenshots
+at 1280 × 720, 1440 × 900 and 960 × 650, plus the empty live dashboard. The
+Windows preview workflow runs it and uploads the screenshots alongside the EXE.
+
 ### What the new preview actually does
 
 - **Overview:** locally rendered crimson-moon ruins art, real Windows drive

@@ -63,8 +63,9 @@ def main():
             window.inventory.files = [old]
             window.inventory.scanned_at = "Synthetic test date"
             window.inventory.graveyard = build_graveyard(steam, [], [old], 365)
-            for route in ("Overview", "Games", "Graveyard", "Game DNA",
-                          "Mods", "Old Files", "Undo Center", "Settings", "More Tools"):
+            for route in ("Overview", "Ready Room", "Games", "Graveyard", "Game DNA",
+                          "Mods", "Old Files", "Other Storage", "Captures", "AI Assistant",
+                          "Undo Center", "Settings", "More Tools", "Save Vault"):
                 window.navigate(route)
                 window.resize(1366, 768)
                 app.processEvents()
@@ -109,6 +110,7 @@ def main():
 
             for route, filename in (
                 ("Overview", "crimson-desktop-1440.png"),
+                ("Ready Room", "crimson-ready-room-1440.png"),
                 ("Games", "crimson-games-1440.png"),
                 ("Graveyard", "crimson-graveyard-1440.png"),
                 ("Game DNA", "crimson-dna-1440.png"),
@@ -119,9 +121,9 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
-            print("PASS: Qt Crimson Overview and 9 interactive pages, mixed-launcher "
+            print("PASS: Qt Crimson Overview, Ready Room and 14 interactive pages, mixed-launcher "
                   "Games, inline exact-rule Unprotect without deletion, "
-                  "four screenshots and original hero asset.")
+                  "five screenshots and local hero assets.")
         finally:
             window.close()
             app.processEvents()

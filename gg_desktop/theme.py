@@ -18,7 +18,7 @@ COLORS = {
 
 STYLE = r"""
 QMainWindow, QWidget#appRoot, QScrollArea, QWidget#scrollBody { background: #080C13; color: #F4F7FC; }
-QWidget { font-family: "Segoe UI Variable", "Segoe UI", Arial; font-size: 12px; color: #F4F7FC; }
+QWidget { font-family: "Roboto Condensed", "Segoe UI Variable", "Segoe UI", Arial; font-size: 12px; color: #F4F7FC; }
 QWidget#navRail { background: #0B111A; border-right: 1px solid #25303C; }
 QFrame#panel, QFrame#metricCard, QFrame#actionCard, QFrame#infoCard, QFrame#heroBottom {
     background: #111922; border: 1px solid #2A3541; border-radius: 11px;
