@@ -31,12 +31,24 @@ behavior. An overall redesign requires an explicit request from the owner.
   Continue only independent work within the active tab. Refactoring, cleanup,
   consistency work or an incidental fix does not authorize reopening a tab.
 
-For the Ready Room task, preserve its supplied reference layout and local artwork.
-Connect its live controls and evidence without changing other screens. Keep
-sample data confined to the explicitly labeled reference preview.
+## Locked tabs
 
-Active tab: Ready Room. The owner has explicitly reopened only this tab to match
-the attached 1536×864 mockup. Its sidebar/header presentation must be scoped to
-Ready Room and released before navigating elsewhere. Other tabs must remain
-unchanged, including through shared code. Ready Room is awaiting owner signoff;
-do not move on or record it as completed without that signoff.
+Ready Room: OWNER APPROVED AND LOCKED. The owner explicitly accepted the result
+and instructed that it must not be touched unless they specifically say otherwise.
+The approved runtime baseline is commit
+0b6083ff645395692b144c4cb34fe382cffcaeeb, Windows preview 0.2.8:
+https://github.com/wrightausername/Game-Grave/actions/runs/42311267197
+
+Preserve Ready Room's layout, typography, artwork, scaling, controls and behavior.
+This includes its dedicated sidebar/header, search, icons, actions, data/services,
+assets and shared-app lifecycle hook. Changes to shared styles, components or
+backend code must not alter the approved Ready Room. Its presentation must stay
+scoped to Ready Room and release the shared shell when navigating elsewhere.
+Keep sample data confined to the explicitly labeled reference preview.
+
+Read-only inspection and regression checks are allowed. A discovered issue,
+refactor or work on another tab does not authorize reopening Ready Room.
+Only the owner's explicit instruction to change Ready Room can unlock it.
+
+Active tab: none. Wait for the owner to name the next tab; do not move on
+automatically.
