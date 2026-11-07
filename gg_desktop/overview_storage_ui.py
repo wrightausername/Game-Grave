@@ -7,7 +7,7 @@ import threading
 import weakref
 
 from PySide6.QtCore import QObject, QEvent, Qt, QTimer, Signal
-from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QListWidget, QListWidgetItem, QTableWidget
+from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QTableWidget
 from shiboken6 import isValid
 
 from core import friendly_activity, human_size, save_settings
@@ -75,12 +75,14 @@ class OverviewStorageController(QObject):
         w.overview_ring.activated.connect(self.storage_details)
         w.overview_ring.setAccessibleName("Measured game and mod storage; press Enter for breakdown")
         for name, (caption, value, _) in w.overview_legend.items():
-            for widget in (caption, value):
+            legend_row = caption.parentWidget()
+            for widget in (legend_row, *legend_row.findChildren(QLabel)):
                 widget.setCursor(Qt.PointingHandCursor)
-                widget.setFocusPolicy(Qt.StrongFocus)
+                widget.setFocusPolicy(Qt.StrongFocus if widget is caption else Qt.NoFocus)
                 widget.setAccessibleName("Inspect " + name + " storage")
                 widget.installEventFilter(self)
                 self.legend_targets[widget] = name
+        QApplication.instance().installEventFilter(self)
         w.scan_button.installEventFilter(self)
         w.cancel_button.installEventFilter(self)
         w.overview_library.favoriteRequested.connect(self.favorite)
@@ -100,6 +102,17 @@ class OverviewStorageController(QObject):
         QTimer.singleShot(0, self.refresh_storage)
 
     def eventFilter(self, target, event):
+        if (event.type() == QEvent.Close and target is self.window and self.valid()
+                and not self.window.scanning and not self.window.cleaning):
+            self.cancel.set()
+            self.active.clear()
+        if (event.type() in (QEvent.Polish, QEvent.Show) and isinstance(target, QMessageBox)
+                and self.valid() and target.parentWidget() is self.window
+                and not target.property("overviewReadable")):
+            # Only this Overview-owned message instance is styled. The shared
+            # header/helpers and messages opened on locked tabs stay untouched.
+            target.setProperty("overviewReadable", True)
+            target.setStyleSheet("QMessageBox { background:#020609; color:#F4F7FC; }")
         category = self.legend_targets.get(target)
         if category and ((event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton)
                 or (event.type() == QEvent.KeyPress and event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space))):
@@ -118,6 +131,7 @@ class OverviewStorageController(QObject):
         w.overview_hero.locations.setEnabled(not w.cleaning)
         w.overview_cancel.setVisible(w.scanning or self.storage_busy)
         w.overview_cancel.setText("Cancel Scan" if w.scanning else "Cancel measurement")
+        w.overview_cancel.setAccessibleName(w.overview_cancel.text())
         w.overview_cancel.setEnabled((w.scanning and not w.cancel.is_set()) or
             (not w.scanning and self.storage_busy and not self.cancel.is_set()))
         status = self.message if self.storage_busy and not w.scanning else w.status.text()
@@ -405,7 +419,7 @@ class OverviewStorageController(QObject):
             return
         w = self.window
         game = w._overview_games[index]
-        favorites = set(w.settings.get("desktop_favorites", []))
+        favorites = set(w._overview_favorites)
         favorites.symmetric_difference_update({game.key})
         updated = dict(w.settings, desktop_favorites=sorted(favorites))
         try:
@@ -414,6 +428,7 @@ class OverviewStorageController(QObject):
             w.error("Favorite not saved", str(exc))
             return
         w.settings = updated
+        w._overview_favorites = favorites
         item = w.overview_library.item(index)
         data = dict(item.data(CARD_ROLE))
         data["favorite"] = game.key in favorites

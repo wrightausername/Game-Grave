@@ -47,7 +47,7 @@ def probe(root, fixtures, output, foundation=False):
     steam = SteamGame("1091500", "Cyberpunk 2077", str(fixtures/"Steam"), str(install), 120000000, None, "Scope fixture")
     mod = ModFolder("Scope fixture", str(mods_path), "", "Installed: possible mods", (), 12000, 1, False, "Manual / Other", "Protected scope fixture")
     settings = default_settings()
-    settings.update(scan_on_launch=False, scan_folder=str(download.parent))
+    settings.update(scan_on_launch=False, scan_folder=str(download.parent), desktop_favorites=[])
     hashes = {}
     usage = namedtuple("usage", "total used free")(8*1024**4, 5*1024**4, 3*1024**4)
     with ExitStack() as stack:

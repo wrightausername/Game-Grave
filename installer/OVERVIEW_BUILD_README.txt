@@ -1,4 +1,18 @@
-GAME GRAVE - OVERVIEW CLICK-THROUGH FIXES WINDOWS PREVIEW 0.2.11
+GAME GRAVE - OVERVIEW TRIPLE-CHECK WINDOWS PREVIEW 0.2.12
+
+The expanded check runs 66 mouse, keyboard and state journeys in three fresh
+processes. This version fixes the additional problems it found: every part of
+a chart legend row is clickable; Overview Help/status/error messages have a
+readable background; closing Overview stops its storage measurement; Remove
+Selected is disabled without a selection; favorite stars restore after a
+restart and survive saving scan locations. Saved favorites also remain visible
+when opening the corresponding game details. The shared settings loader and
+locked-tab source remain unchanged.
+
+The checks use real Qt events, real temporary preference files and fresh app
+windows. Folder-opening URLs are checked at the OS dispatch boundary; game
+launches and cleanup are prevented during the checks. The Windows workflow
+repeats all three passes and the existing 78 image comparisons.
 
 This version fixes problems found while using Overview as a person would:
 Overview dialogs now have readable dark backgrounds; chart slices open their

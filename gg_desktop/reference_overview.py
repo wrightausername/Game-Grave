@@ -372,13 +372,16 @@ class OverviewScreens:
         self.overview_library.set_artwork(self.artwork)
         self.overview_library.setAccessibleName("Your detected game library")
         games = list(self.inventory.games)
+        from gg_desktop.overview_preferences import restore_overview_favorites
+        self._overview_favorites = restore_overview_favorites(self.settings)
+        self.settings = dict(self.settings, desktop_favorites=sorted(self._overview_favorites))
         for game in games:
             from PySide6.QtWidgets import QListWidgetItem
             item = QListWidgetItem(game.name)
             item.setToolTip(game.name + " · " + game.launcher)
             item.setData(CARD_ROLE, {"name": game.name, "source": game.launcher, "steam_app_id": game_app_id(game),
                 "size": "Measuring…" if found else "Not measured",
-                "favorite": game.key in self.settings.get("desktop_favorites", [])})
+                "favorite": game.key in self._overview_favorites})
             self.overview_library.addItem(item)
         self.overview_library.itemActivated.connect(self._overview_inspect_game)
         self.overview_library.itemClicked.connect(self._overview_inspect_game)
@@ -451,6 +454,7 @@ class OverviewScreens:
         roots.setMinimumHeight(90)
         contents.addWidget(roots)
         pending = {key: list(self.settings.get(key, [])) for key in groups.values()}
+        busy = self.scanning or self.cleaning
         def refresh():
             roots.clear()
             roots.addItems(pending[groups[choice.currentText()]])
@@ -467,7 +471,10 @@ class OverviewScreens:
                 refresh()
         actions = row()
         actions.addWidget(tool("Add Folder…", "folder", add))
-        actions.addWidget(tool("Remove Selected", "minus", remove))
+        remove_control = tool("Remove Selected", "minus", remove)
+        remove_control.setEnabled(False)
+        roots.currentRowChanged.connect(lambda index: remove_control.setEnabled(index >= 0 and not busy))
+        actions.addWidget(remove_control)
         actions.addStretch()
         contents.addWidget(_widget(actions))
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
@@ -477,9 +484,11 @@ class OverviewScreens:
         buttons.button(QDialogButtonBox.Save).setEnabled(not busy)
         for control in actions.parentWidget().findChildren(QPushButton) if actions.parentWidget() else []:
             control.setEnabled(not busy)
+        remove_control.setEnabled(roots.currentRow() >= 0 and not busy)
         contents.addWidget(buttons)
         if dialog.exec() == QDialog.Accepted:
             updated = dict(self.settings, **pending)
+            updated["desktop_favorites"] = sorted(self._overview_favorites)
             try:
                 save_settings(updated)
             except (OSError, ValueError) as exc:

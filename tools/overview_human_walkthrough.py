@@ -21,6 +21,7 @@ from unittest.mock import patch
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("_ci_temp"))
+    parser.add_argument("--all-controls", action="store_true")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -32,6 +33,7 @@ def main():
     from core import default_settings
     from gg_desktop.app import CrimsonWindow
     from tests.test_mods_functionality import mo2_fixture
+    native_error = CrimsonWindow.error
 
     app = QApplication.instance() or QApplication([])
     journeys = []
@@ -49,6 +51,11 @@ def main():
     def clicked(parent, title):
         control = next(b for b in parent.findChildren(QPushButton) if b.text() == title)
         assert control.isVisible() and control.isEnabled(), title
+        window = control.window()
+        if hasattr(window, "page") and window.page.isAncestorOf(control):
+            window.page.ensureWidgetVisible(control)
+            QTest.qWait(20)
+            assert not control.visibleRegion().isEmpty(), "Control is outside the visible viewport: " + title
         QTest.mouseClick(control, Qt.LeftButton)
         settle()
     def drive(open_action, visit):
@@ -72,6 +79,8 @@ def main():
         assert image.pixelColor(3, 3).lightness() < 60, "Overview dialog has a light background behind light text"
     def completed(name, thought):
         journeys.append(dict(task=name, expected_by_user=thought, result="passed"))
+        if args.all_controls:
+            print("CHECKED: " + name, flush=True)
 
     with tempfile.TemporaryDirectory(prefix="GG-Overview-Click-Through-") as temporary:
         root = Path(temporary)
@@ -84,6 +93,7 @@ def main():
         inventory.games.append(duplicate)
         preferences = default_settings()
         preferences["scan_on_launch"] = False
+        preferences["desktop_favorites"] = []
         event = dict(kind="Scan completed", date="2026-11-06T12:00:00+00:00", details="Disposable walkthrough scan")
         with patch("gg_desktop.app.load_settings", return_value=preferences), \
              patch("gg_desktop.reference_overview.get_activity", return_value=[event]), \
@@ -246,6 +256,13 @@ def main():
             assert not window.overview_search_hint.isVisible()
             assert sum(not window.overview_library.item(i).isHidden() for i in range(2)) == 2
             completed("Get no search results, close, and clear search", "Explain the empty result and restore my whole library when cleared.")
+
+            if args.all_controls:
+                from tools.overview_all_controls import check_controls
+                check_controls(window=window, inventory=inventory, storage=storage, root=root, app=app,
+                    home=home, drive=drive, clicked=clicked, completed=completed, wait_for=wait_for,
+                    settle=settle, readable=readable, native_error=native_error, output=args.output)
+                control = window.page.overview
 
             control.refresh_storage(force=True)
             wait_for(lambda: not control.storage_busy)
