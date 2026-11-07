@@ -145,6 +145,7 @@ jobs:
             _ci_temp/*-1280.png
             _ci_temp/overview-tab-lock/**/hashes.json
             _ci_temp/overview-foundation-lock/**/hashes.json
+            _ci_temp/overview-foundation-lock/**/*.png
             _ci_temp/overview-measurement.json
             _ci_temp/overview-human-journeys.json
           if-no-files-found: error
