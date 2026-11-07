@@ -11,6 +11,7 @@ import sys
 import tempfile
 import threading
 import time
+import traceback
 from unittest.mock import patch
 
 
@@ -44,6 +45,11 @@ def main():
         deadline = time.monotonic()+20
         while not predicate() and time.monotonic() < deadline:
             QTest.qWait(10)
+            # Yield the Python GIL as well as Qt events on native Windows.
+            time.sleep(.004)
+        if not predicate():
+            for ident, frame in sys._current_frames().items():
+                print("Overview QA thread", ident, "".join(traceback.format_stack(frame)[-8:]), flush=True)
         assert predicate(), "Overview operation did not finish"
         settle()
     def click(parent, text):
