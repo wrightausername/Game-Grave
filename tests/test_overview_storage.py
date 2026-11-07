@@ -228,6 +228,15 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(result.mod_unit, "Mods")
         self.assertGreater(result.totals["Mods"], 0)
 
+    def test_individual_plugin_files_count_as_mods(self):
+        game = self.game()
+        plugin = self.payload("Game/Mods/plugin.dll", 81)
+        raw = replace(self.mod(plugin.parent.parent, "Steam game folder", "Installed: possible mods"), indicators=("Mods",))
+        result = measure_storage(Inventory(games=[game], mods=[raw]))
+        self.assertEqual(result.mod_count, 1)
+        self.assertEqual(result.mod_unit, "Mods")
+        self.assertEqual(result.totals["Mods"], 81)
+
     def test_cache_key_changes_with_accepted_scan(self):
         inventory = Inventory(games=[self.game()])
         before = inventory_key(inventory)

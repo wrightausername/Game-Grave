@@ -196,7 +196,8 @@ def measure_storage(inventory, *, canceled=lambda: False, progress=lambda checke
     result.roots = measurement_roots(inventory, catalog, canceled)
     result.game_count = len({path_key(g.install_path) for g in inventory.games if g.install_path})
     individuals = {path_key(e.path) for e in catalog.entries if e.kind == "mod"}
-    present = {key for key in individuals if Path(key).is_dir() and not _has_reparse_component(Path(key))}
+    present = {key for key in individuals if not _has_reparse_component(Path(key))
+               and (Path(key).is_dir() or Path(key).is_file())}
     result.mod_count = len(present) if individuals else len({path_key(e.path) for e in catalog.entries})
     result.mod_unit = "Mods" if individuals else "Mod locations"
     result.mod_count_partial = catalog.limited
