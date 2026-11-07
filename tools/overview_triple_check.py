@@ -1,6 +1,7 @@
 """Run the complete Overview mouse/keyboard/state matrix three fresh times."""
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -16,7 +17,8 @@ def main():
     for number in (1, 2, 3):
         target = output/("pass-"+str(number))
         result = subprocess.run([sys.executable, str(root/"tools/overview_human_walkthrough.py"),
-            "--all-controls", "--output", str(target)], cwd=root, capture_output=True, text=True, timeout=150)
+            "--all-controls", "--output", str(target)], cwd=root, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", env=dict(os.environ, PYTHONIOENCODING="utf-8"), timeout=150)
         if result.returncode:
             print(result.stdout[-2000:]+result.stderr[-6000:], flush=True)
             raise AssertionError(f"Overview click matrix failed in pass {number}")
