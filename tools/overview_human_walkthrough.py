@@ -176,7 +176,12 @@ def main():
             assert window.overview_search_hint.isVisible()
             assert "No matching games" in window.overview_search_hint.text()
             assert "Press Enter" in window.overview_search_hint.text()
+            window.resize(1280, 720)
+            QTest.qWait(60)
+            assert "Press Enter" in window.overview_scan_status.text()
+            assert not window.overview_scan_status.visibleRegion().isEmpty(), "Search instructions are below the visible viewport"
             assert window.grab().save(str(args.output/"overview-human-search-help.png"))
+            window.resize(1450, 900)
             def mod_search(dialog):
                 readable(dialog)
                 entries = dialog.findChild(QListWidget)

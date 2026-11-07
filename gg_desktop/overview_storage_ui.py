@@ -120,7 +120,10 @@ class OverviewStorageController(QObject):
         w.overview_cancel.setText("Cancel Scan" if w.scanning else "Cancel measurement")
         w.overview_cancel.setEnabled((w.scanning and not w.cancel.is_set()) or
             (not w.scanning and self.storage_busy and not self.cancel.is_set()))
-        w.overview_scan_status.setText(self.message if self.storage_busy and not w.scanning else w.status.text())
+        status = self.message if self.storage_busy and not w.scanning else w.status.text()
+        if w.global_search.text().strip() and not w.scanning and not self.storage_busy:
+            status = w.overview_search_hint.text()
+        w.overview_scan_status.setText(status)
 
     def cancel_current(self):
         if self.window.scanning:
@@ -431,6 +434,7 @@ class OverviewStorageController(QObject):
         hint = (f"{matching} matching game{'s' if matching != 1 else ''}. " if matching else "No matching games in your library. ")
         w.overview_search_hint.setText(hint + "Press Enter to search games, mods and file findings.")
         w.overview_search_hint.setVisible(bool(query))
+        self.sync_controls()
         w.overview_library.doItemsLayout()
         self.sync_pager()
 
