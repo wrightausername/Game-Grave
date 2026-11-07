@@ -9,6 +9,20 @@ Game Grave finds games, mod-manager storage, Workshop folders, caches, and lefto
 
 ## Crimson Command: native premium UI engineering preview
 
+### Ready Room native scale — preview 0.2.9
+
+Switching into Ready Room now keeps the same native sidebar, header, window
+dimensions and text scale as the rest of the app. The separate whole-window
+graphics canvas caused the zoomed appearance and has been removed. The approved
+artwork, card composition and existing actions are retained. Narrow windows use
+normal responsive layout and vertical scrolling rather than scaling the app.
+
+Checks cover repeated tab/panel clicks, wheel/Ctrl+wheel, live refresh and five
+window sizes. The twelve other tabs are compared against the previously locked
+build with 72 pixel comparisons; their runtime code, shared shell and assets
+remain unchanged. [See the scale correction](docs/ui-review/ready-room-native-scale/README.md).
+This specific Ready Room correction awaits renewed owner signoff.
+
 ### Ready Room only — preview 0.2.8
 
 Ready Room now uses a single 1280×720 design surface that scales uniformly to

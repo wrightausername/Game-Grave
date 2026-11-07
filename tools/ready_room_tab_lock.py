@@ -1,7 +1,6 @@
 """Protect all twelve other tabs while Ready Room is being repaired."""
 from __future__ import annotations
 import argparse
-import ast
 from collections import namedtuple
 from contextlib import ExitStack
 import hashlib
@@ -15,7 +14,7 @@ import tarfile
 import tempfile
 from unittest.mock import patch
 
-BASELINE = "fa88f10c56b01432cf226a06f91dac71cc4628a0"
+BASELINE = "c636b60519b20e37afceb45d7fbb177a08e0188f"
 
 
 def probe(root, fixtures, output):
@@ -103,7 +102,7 @@ def probe(root, fixtures, output):
 def source_guard(root):
     if subprocess.run(["git","cat-file","-e",BASELINE],cwd=root,capture_output=True).returncode:
         subprocess.run(["git","fetch","--no-tags","--depth=1","origin",BASELINE],cwd=root,check=True)
-    allowed = {"gg_desktop/app.py","gg_desktop/ready_room.py","gg_desktop/ready_room_shell.py","gg_desktop/ready_room_icons.py"}
+    allowed = {"gg_desktop/ready_room.py","gg_desktop/ready_room_shell.py"}
     paths = subprocess.check_output(["git","ls-tree","-r","--name-only",BASELINE,"gg_desktop"],cwd=root).decode().splitlines()
     for path in paths:
         if path in allowed:
@@ -114,17 +113,6 @@ def source_guard(root):
         if Path(path).suffix in {".py", ".svg", ".md", ".json", ".txt"}:
             before, after = before.replace(b"\r\n",b"\n"), after.replace(b"\r\n",b"\n")
         assert before == after, "Locked source/artwork changed: "+path
-    def methods(source):
-        cls = next(n for n in ast.parse(source).body if isinstance(n,ast.ClassDef) and n.name=="CrimsonWindow")
-        return {n.name:n for n in cls.body if isinstance(n,ast.FunctionDef)}
-    before = methods(subprocess.check_output(["git","show",BASELINE+":gg_desktop/app.py"],cwd=root))
-    after = methods((root/"gg_desktop/app.py").read_text(encoding="utf-8"))
-    assert before.keys() == after.keys()
-    page = next(n for n in after["page_for"].body if isinstance(n,ast.If) and ast.unparse(n.test)=="self.page is not None")
-    assert ast.unparse(page.body[0]) == "if self.current_route == 'Ready Room':\n    self.page.release_ready_shell()"
-    page.body.pop(0)
-    for name in before:
-        assert ast.dump(before[name]) == ast.dump(after[name]), "Shared app changed outside Ready Room lifecycle: "+name
 
 
 def main():

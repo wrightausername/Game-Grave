@@ -1,38 +1,34 @@
-GAME GRAVE - READY ROOM WINDOWS PREVIEW 0.2.8
+GAME GRAVE - READY ROOM NATIVE SCALE WINDOWS PREVIEW 0.2.9
 
-This update changes Ready Room only. Its layout uses one 1280x720 coordinate
-system, scaled uniformly to the owner's 1536x864 mockup. The sidebar, search,
-window controls, header artwork, metric band, game rows and three lower cards
-belong to this page. Leaving Ready Room restores the existing app shell.
+This update changes Ready Room only. It fixes the zoomed appearance when
+switching into this tab. Ready Room now uses the same native app sidebar,
+header, text scale and window dimensions as the other tabs. It no longer
+replaces the whole app frame with a separately scaled graphics canvas.
 
-To review the mockup's exact sample numbers and games, extract the entire ZIP
-and run Start_Ready_Room_Reference.bat. It opens the 1536x864 reference preview.
-Sample data is explicitly labeled at the bottom of the sidebar.
+The approved artwork, card arrangement, news, follows, game selection, mod
+scan, backup history, verified ZIP backups and local checks are retained.
+Content adapts to the available space. Narrow windows scroll vertically to
+keep controls readable and reachable instead of shrinking the whole app.
 
-GameGrave-Crimson-Preview.exe opens normal operation. Choose Ready Room in the
-sidebar. This mode uses actual discovered games, saved news, backup history
-and local checks. Unsupported values remain unknown; the mockup's statistics
-are not fabricated as live data.
+Extract the entire ZIP and run GameGrave-Crimson-Preview.exe. Choose Ready Room.
+Start_Ready_Room_Reference.bat opens the same app scale with clearly labeled
+sample data for visual review. Normal mode uses your actual local records.
 
-Search and Ctrl+K filter the real Ready Room rows. Patch Watch opens saved
-news and explicitly requested official-news refreshes. Game rows select the
-exact installation. View Mods opens Mods. Run Mod Scan/F5 starts the existing
-read-only inventory scan. Escape cancels a scan or clears search.
+Ctrl+K searches Ready Room. F5 starts the existing read-only scan. Escape
+cancels the active scan or clears search. Patch Watch and game rows open their
+existing details. View Mods, Run Mod Scan, Manage Saves, Backup Now and the
+health gauge keep their existing actions. The shared window controls and
+navigation remain in place while entering, leaving or refreshing Ready Room.
 
-Manage Saves opens real backup history; Backup Now creates and verifies a ZIP
-from the chosen save folder. The gauge opens the underlying local checks.
-Minimize, maximize/restore, close, window dragging and edge resizing use the
-native window functions.
+Tests cover repeated tab/panel clicks, wheel/Ctrl+wheel events, live refresh
+and five window sizes. Window geometry, native sidebar/header and text sizes
+must stay stable. All twelve other tabs must pass 72 pixel comparisons against
+the previously locked build, with their runtime source and artwork unchanged.
 
-The review PNGs are captures from actual Qt windows on Windows. Reference PNGs
-use the clearly labeled sample mode. Ready-Room-Live-Functional.png uses an
-isolated disposable library and a real verified test backup.
-
-All twelve other tabs were compared with the previous build after entering
-and leaving Ready Room, using empty/populated data at three window sizes.
-The 72 comparison images must remain pixel-identical before packaging.
+The included PNGs are actual native Windows captures. Reference captures use
+explicit sample data; the live capture uses disposable QA files and a verified
+backup. Build-Info.txt ties the EXEs to their source and Windows workflow.
+SHA256SUMS.txt contains checksums for both EXEs.
 
 GameGrave-Crimson-Preview-Setup.exe installs this unsigned engineering preview.
-Build-Info.txt identifies the source commit and Windows build run.
-SHA256SUMS.txt contains checksums for both EXEs.
-Ready Room remains the active tab until the owner accepts it and says move on.
+Ready Room's scaling correction awaits owner signoff. Other tabs are untouched.

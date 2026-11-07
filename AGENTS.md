@@ -50,5 +50,11 @@ Read-only inspection and regression checks are allowed. A discovered issue,
 refactor or work on another tab does not authorize reopening Ready Room.
 Only the owner's explicit instruction to change Ready Room can unlock it.
 
-Active tab: none. Wait for the owner to name the next tab; do not move on
-automatically.
+Limited reopening: the owner has explicitly reopened Ready Room to fix its
+zoomed appearance and make its scale consistent with the rest of the app.
+Use the existing native app sidebar/header and normal widget sizing; preserve
+the approved artwork, card composition and functionality. No other tab is
+authorized for changes. The earlier approval remains the visual foundation;
+this specific scaling correction awaits renewed owner signoff.
+
+Active tab: Ready Room, scaling correction only. Do not move on automatically.
