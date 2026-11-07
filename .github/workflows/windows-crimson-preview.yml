@@ -11,6 +11,8 @@ on:
       - 'tests/test_ready_room_data.py'
       - 'tests/test_ready_room_services.py'
       - 'tests/test_overview_data.py'
+      - 'tests/test_overview_storage.py'
+      - 'tools/overview_tab_lock.py'
       - 'tests/test_games_functionality.py'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -33,6 +35,7 @@ on:
       - 'installer/GameGraveCrimsonPreview.iss'
       - 'installer/Start_Ready_Room_Reference.bat'
       - 'installer/READY_ROOM_BUILD_README.txt'
+      - 'installer/OVERVIEW_BUILD_README.txt'
   pull_request:
     branches: [main]
     paths:
@@ -42,6 +45,8 @@ on:
       - 'tests/test_ready_room_data.py'
       - 'tests/test_ready_room_services.py'
       - 'tests/test_overview_data.py'
+      - 'tests/test_overview_storage.py'
+      - 'tools/overview_tab_lock.py'
       - 'tests/test_games_functionality.py'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -64,6 +69,7 @@ on:
       - 'installer/GameGraveCrimsonPreview.iss'
       - 'installer/Start_Ready_Room_Reference.bat'
       - 'installer/READY_ROOM_BUILD_README.txt'
+      - 'installer/OVERVIEW_BUILD_README.txt'
 
 concurrency:
   group: crimson-command-${{ github.ref }}
@@ -98,7 +104,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_games_functionality tests.test_mods_functionality tests.test_old_files_functionality -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_games_functionality tests.test_mods_functionality tests.test_old_files_functionality -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -108,8 +114,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Photo-layout functionality or reference geometry failed.' }
           python tools/ready_room_ui_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room native scale, navigation or controls failed.' }
-          python tools/ready_room_scope_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Another tab changed while repairing Ready Room.' }
+          python tools/overview_scope_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Ready Room or another locked tab changed while repairing Overview.' }
+          python tools/overview_live_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Overview measurements or live controls failed.' }
           python tools/ready_room_live_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room live news or verified backup checks failed.' }
           python tools/render_reference_previews.py --output _ci_temp
@@ -129,7 +137,8 @@ jobs:
             _ci_temp/old-files-*.png
             _ci_temp/photo-*.png
             _ci_temp/*-1280.png
-            _ci_temp/ready-room-tab-lock/**/hashes.json
+            _ci_temp/overview-tab-lock/**/hashes.json
+            _ci_temp/overview-measurement.json
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -210,37 +219,35 @@ jobs:
           if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
           if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
           Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
-      - name: Assemble Ready Room Windows download
+      - name: Assemble Overview Windows download
         shell: pwsh
         run: |
-          $taskBundle = Join-Path (Resolve-Path '_ci_temp').Path 'ReadyRoomWindows'
+          $taskBundle = Join-Path (Resolve-Path '_ci_temp').Path 'OverviewWindows'
           New-Item -ItemType Directory -Force $taskBundle | Out-Null
           Copy-Item -Path @(
             'dist/GameGrave-Crimson-Preview.exe',
             'release/GameGrave-Crimson-Preview-Setup.exe',
-            'installer/Start_Ready_Room_Reference.bat',
-            'installer/READY_ROOM_BUILD_README.txt'
+            'installer/OVERVIEW_BUILD_README.txt'
           ) -Destination $taskBundle
-          Copy-Item '_ci_temp/ready-room-reference-1280.png' (Join-Path $taskBundle 'Ready-Room-Preview.png')
-          Copy-Item '_ci_temp/ready-room-reference-1536.png' (Join-Path $taskBundle 'Ready-Room-Preview-1536.png')
-          Copy-Item '_ci_temp/ready-room-reference-960.png' (Join-Path $taskBundle 'Ready-Room-Preview-960.png')
-          Copy-Item '_ci_temp/ready-room-live-functional.png' (Join-Path $taskBundle 'Ready-Room-Live-Functional.png')
+          Copy-Item '_ci_temp/overview-functional-1450.png' (Join-Path $taskBundle 'Overview-Preview.png')
+          Copy-Item '_ci_temp/overview-functional-1280.png' (Join-Path $taskBundle 'Overview-Preview-1280.png')
+          Copy-Item '_ci_temp/overview-functional-960.png' (Join-Path $taskBundle 'Overview-Preview-960.png')
           $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
             $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$digest  $($_.Name)"
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Ready Room native scale Windows preview 0.2.9',
+            'Game Grave Overview measured storage Windows preview 0.2.10',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
           ) | Set-Content (Join-Path $taskBundle 'Build-Info.txt') -Encoding ascii
-      - name: Upload Ready Room Windows build
+      - name: Upload Overview Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: GameGrave-Ready-Room-Native-Scale-Windows-Preview
-          path: _ci_temp/ReadyRoomWindows/*
+          name: GameGrave-Overview-Storage-Windows-Preview
+          path: _ci_temp/OverviewWindows/*
           if-no-files-found: error
           retention-days: 14
       - name: Upload Crimson screenshot and Windows engineering EXE
