@@ -37,7 +37,7 @@ QLabel#readyTitle { font-family: Arial; font-size: 36px; font-weight: 700; }
 QLabel#readySubtitle { font-size: 16px; color: #E0E1E3; }
 QLabel#readyHeading { font-size: 20px; font-weight: 700; color: #F2F1F3; }
 QLabel#readyDetail { font-size: 12px; color: #C8C9CD; }
-QLabel#readyGameTitle { font-size: 15px; font-weight: 600; color: #F3F2F4; }
+QLabel#readyGameTitle { font-size: 15px; font-weight: 700; color: #F3F2F4; }
 QLabel#readyWhen { font-size: 12px; color: #CACBD0; }
 QLabel#readyMetricValue { font-size: 22px; font-weight: 600; }
 QLabel#readyMetricCaption { font-size: 13px; color: #D5D7DB; }
@@ -62,7 +62,7 @@ QPushButton#readyButton, QPushButton#readyPrimary {
 QPushButton#readyButton:hover { border-color: #718393; background: #1C2831; }
 QPushButton#readyPrimary {
     border-color: #E32C43;
-    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #A91629,stop:.5 #730A18,stop:1 #440910);
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #F52F48,stop:.08 #B9162D,stop:.55 #730A18,stop:.92 #960D25,stop:1 #EB2544);
 }
 QPushButton#readyPrimary:hover { background: #AC172A; border-color: #FF5269; }
 QPushButton#readyButton:focus, QPushButton#readyPrimary:focus { border: 2px solid #4DD8E2; }
@@ -123,6 +123,7 @@ class ReadyPanel(QFrame):
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.art = QPixmap(str(ASSETS / (artwork + ".png"))) if artwork else QPixmap()
+        self.primary_glow = glyph in ("puzzle", "save")
         self.stack = column(spacing=0)
         self.setLayout(self.stack)
         header = QWidget()
@@ -172,8 +173,14 @@ class ReadyPanel(QFrame):
         painter.setPen(QColor("#30353C"))
         painter.drawLine(12, 48 if self.art.isNull() else 51,
                          self.width() - 12, 48 if self.art.isNull() else 51)
+        if self.primary_glow:
+            glow = QRectF(self.width()/2 + 6, self.height()-44, self.width()/2-18, 32)
+            painter.setBrush(Qt.NoBrush)
+            for spread, alpha in ((12, 5), (8, 9), (4, 16), (1, 30)):
+                painter.setPen(QPen(QColor(255, 19, 51, alpha), spread))
+                painter.drawRoundedRect(glow, 6, 6)
         edge = QLinearGradient(0, 0, self.width(), self.height())
-        edge.setColorAt(0, QColor("#73404A"))
+        edge.setColorAt(0, QColor("#904052"))
         edge.setColorAt(.25, QColor("#41464F"))
         edge.setColorAt(1, QColor("#36424C"))
         painter.setBrush(Qt.NoBrush)
@@ -239,14 +246,16 @@ def status_badge(text, tone, glyph, *, bordered=True):
     frame.setFixedSize(108 if bordered else 106, 29)
     if bordered:
         frame.setStyleSheet(
-            f"QFrame {{ border:1px solid rgba({rgb.red()},{rgb.green()},{rgb.blue()},95);"
-            f"border-radius:6px; background:rgba({rgb.red()},{rgb.green()},{rgb.blue()},13); }}"
+            f"QFrame {{ border:1px solid rgba({rgb.red()},{rgb.green()},{rgb.blue()},115);"
+            f"border-radius:6px; background:qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+            f"stop:0 rgba({rgb.red()},{rgb.green()},{rgb.blue()},28),stop:1 #080e12); }}"
             "QLabel { border:none;background:transparent; }")
     contents = row(spacing=7, margins=(7 if bordered else 3, 0, 3, 0))
     frame.setLayout(contents)
     contents.addWidget(icon_label(glyph, color, 18))
     words = label(text)
-    words.setStyleSheet(f"color:{color};font-size:12px;")
+    size = 11 if len(text) > 13 else 12
+    words.setStyleSheet(f"color:{color};font-size:{size}px;font-weight:500;")
     contents.addWidget(words, 1)
     frame.setAccessibleName(text)
     return frame
@@ -268,13 +277,6 @@ def action_button(text, action, glyph="", *, primary=False):
     if glyph:
         result.setIcon(icon(glyph, "#E9D8DE" if primary else "#D6DDE2", 20))
         result.setIconSize(QSize(20, 20))
-    if primary:
-        from PySide6.QtWidgets import QGraphicsDropShadowEffect
-        glow = QGraphicsDropShadowEffect(result)
-        glow.setBlurRadius(14)
-        glow.setOffset(0, 1)
-        glow.setColor(QColor(240, 14, 39, 105))
-        result.setGraphicsEffect(glow)
     return result
 
 
@@ -335,8 +337,8 @@ class HealthGauge(QWidget):
                          self.caption if self.score is not None else "Not verified")
 
 
-class ReadyRoomPage(ScrollPage):
-    def __init__(self, window, data):
+class ReadyRoomContent(ScrollPage):
+    def __init__(self, window, data, search=None):
         super().__init__()
         self.setObjectName("readyRoom")
         font_id = QFontDatabase.addApplicationFont(str(ASSETS / "RobotoCondensed.ttf"))
@@ -354,7 +356,7 @@ class ReadyRoomPage(ScrollPage):
         self.body.setAutoFillBackground(False)
         self.window_owner = window
         self.data = data
-        self.content.setContentsMargins(12, 6 if hasattr(window, "global_search") else 0, 8, 30)
+        self.content.setContentsMargins(11, 6, 9, 30)
         self.content.setSpacing(0)
         header = QWidget()
         header.setFixedHeight(52)
@@ -386,11 +388,17 @@ class ReadyRoomPage(ScrollPage):
             header_row.addWidget(tag)
         header_row.addStretch()
         self.content.addWidget(header)
-        if hasattr(window, "global_search"):
+        if search is not None:
+            header.hide()
+            self.search = search
+            search.textChanged.connect(self.filter_rows)
+        elif hasattr(window, "global_search"):
             header.hide()
             window.global_search.textChanged.connect(self.filter_rows)
         self.search_shortcut = QShortcut(QKeySequence("Ctrl+K"), self.search)
         self.search_shortcut.activated.connect(window.global_search.setFocus if hasattr(window, "global_search") else self.search.setFocus)
+        if search is not None:
+            self.search_shortcut.setEnabled(False)
         self.clear_search_shortcut = QShortcut(QKeySequence("Escape"), self)
         self.clear_search_shortcut.activated.connect(self.search.clear)
         self.scan_shortcut = QShortcut(QKeySequence("F5"), self)
@@ -400,7 +408,7 @@ class ReadyRoomPage(ScrollPage):
             self.clear_search_shortcut.setEnabled(False)
         hero = QWidget()
         hero.setFixedHeight(94)
-        hero_row = row(spacing=12, margins=(13, 5, 0, 0))
+        hero_row = row(spacing=12, margins=(13, 8, 0, 0))
         hero.setLayout(hero_row)
         slash = label("/")
         slash.setStyleSheet("color:#F02640;font-family:Arial;font-weight:700;font-size:52px;")
@@ -450,7 +458,7 @@ class ReadyRoomPage(ScrollPage):
         self.middle.addWidget(self.patches, 626)
         self.middle.addWidget(self.games, 404)
         self.content.addLayout(self.middle, 7)
-        self.content.addSpacing(13)
+        self.content.addSpacing(14)
 
         self.bottom = QHBoxLayout()
         self.bottom.setSpacing(12)
@@ -458,7 +466,7 @@ class ReadyRoomPage(ScrollPage):
         self.save_panel = self._save_card()
         self.health_panel = self._health_card()
         for card, stretch in ((self.mod_panel, 354), (self.save_panel, 334), (self.health_panel, 330)):
-            card.setMinimumHeight(193)
+            card.setMinimumHeight(192)
             self.bottom.addWidget(card, stretch)
         self.content.addLayout(self.bottom, 5)
         self.filter_rows("")
@@ -489,7 +497,7 @@ class ReadyRoomPage(ScrollPage):
             contents.addLayout(words, 1)
             when = label(notice.when, "readyWhen")
             when.setFixedWidth(70)
-            when.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            when.setAlignment(Qt.AlignCenter)
             contents.addWidget(when)
             contents.addWidget(status_badge(notice.status, notice.tone, notice.glyph))
             for child in control.findChildren(QWidget):
@@ -593,8 +601,8 @@ class ReadyRoomPage(ScrollPage):
         card.body_layout.addLayout(summary, 1)
         card.body_layout.addSpacing(10)
         controls = row(spacing=11)
-        controls.addWidget(action_button("View Mods  →", lambda: self.window_owner.navigate("Mods")), 1)
-        controls.addWidget(action_button("Run Mod Scan", self.window_owner.start_scan, "scan", primary=True), 1)
+        controls.addWidget(action_button("View Mods  →", lambda: self.window_owner.navigate("Mods")), 152)
+        controls.addWidget(action_button("Run Mod Scan", self.window_owner.start_scan, "scan", primary=True), 166)
         card.body_layout.addLayout(controls)
         return card
 
@@ -602,7 +610,7 @@ class ReadyRoomPage(ScrollPage):
         card = ReadyPanel("Save Vault", "Protect and manage your game saves.",
                           "save", artwork="vault_landscape")
         card.body_layout.setContentsMargins(13, 8, 12, 12)
-        summary = row(spacing=22, margins=(29, 0, 0, 20))
+        summary = row(spacing=18, margins=(35, 0, 0, 20))
         summary.addWidget(icon_label("database", "#45DFB1", 40))
         words = column(spacing=2)
         words.addStretch()
@@ -615,9 +623,9 @@ class ReadyRoomPage(ScrollPage):
         summary.addLayout(words, 1)
         card.body_layout.addLayout(summary, 1)
         controls = row(spacing=11)
-        controls.addWidget(action_button("Manage Saves  →", self.window_owner.ready_manage_saves), 1)
+        controls.addWidget(action_button("Manage Saves  →", self.window_owner.ready_manage_saves), 153)
         controls.addWidget(action_button("Backup Now", self.window_owner._create_save_backup if self.data.reference
-                                         else self.window_owner.ready_backup_now, "cloud", primary=True), 1)
+                                         else self.window_owner.ready_backup_now, "cloud", primary=True), 144)
         card.body_layout.addLayout(controls)
         return card
 
@@ -660,6 +668,9 @@ class ReadyRoomPage(ScrollPage):
         super().resizeEvent(event)
 
 
+from gg_desktop.ready_room_shell import ReadyRoomPage
+
+
 class ReadyRoomMethods(ReadyRoomActions):
     def ready_room_page(self):
         self.ready_init()
@@ -672,8 +683,10 @@ class ReadyRoomMethods(ReadyRoomActions):
             self.inventory, disk_free_percent=free_percent, state=self._ready_state,
             evidence=self._ready_evidence if self._ready_evidence_inventory is self.inventory else {})
         self.page_for("Ready Room", page=ReadyRoomPage(self, data))
-        if self.reference_preview and hasattr(self, "global_search"):
-            self.global_search.setPlaceholderText("REFERENCE PREVIEW · SAMPLE DATA · Search Ready Room")
+        self.page.enter_ready_shell()
+        if self.reference_preview and not getattr(self, "_ready_preview_sized", False):
+            self._ready_preview_sized = True
+            self.resize(1536, 864)
         self.page.setFocusPolicy(Qt.StrongFocus)
         self.page.setFocus()
 

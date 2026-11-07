@@ -211,10 +211,10 @@ def main():
                 wait_for(lambda: window.page.isVisible())
                 assert window.current_route == route, (route, window.current_route)
             window.reference_preview = True
-            window.resize(1280, 720)
             window.navigate("Ready Room")
+            window.resize(1280, 720)
             settle()
-            y = window.page.patches.mapTo(window, window.page.patches.rect().topLeft()).y()
+            y = window.page.reference_point(window.page.patches).y()
             assert abs(y - 215) <= 3, (y, window.size().width(), window.size().height())
             screenshot(window, "ready-room-reference-1280.png")
             window.global_search.setText("WITCHER")

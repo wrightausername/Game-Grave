@@ -34,7 +34,7 @@ PATHS = {
     "calendar": '<rect x="3" y="5" width="18" height="17" rx="1"/><path d="M3 10h18M7 2v6M17 2v6M7 14h2M13 14h2M7 18h2"/>',
     "download": '<path d="M12 2v14m-6-6 6 6 6-6M3 15v7h18v-7"/>',
     "star": '<path d="m12 2 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z"/>',
-    "layers": '<path d="m2 7 10-5 10 5-10 5zM2 12l10 5 10-5M2 17l10 5 10-5"/>',
+    "layers": '<path d="m2 6 10-5 10 5-10 5z" fill="currentColor" stroke="none"/><path d="m2 11 10 5 10-5M2 16l10 5 10-5" stroke-width="3.5"/>',
     "shield": '<path d="m12 2 9 4-1 10-8 6-8-6L3 6zM7 12l3 3 7-7"/>',
     "wrench": '<path d="m14 7 3 3 5-5a7 7 0 0 1-9 9L6 21a2 2 0 0 1-3-3l7-7a7 7 0 0 1 9-9z"/>',
     "sync": '<path d="M3 9a9 9 0 0 1 16-4l2 3M21 2v6h-6M21 15a9 9 0 0 1-16 4l-2-3M3 22v-6h6"/>',
@@ -45,13 +45,13 @@ PATHS = {
     "pulse": '<path d="M1 13h6l3-10 4 20 3-13 2 3h4"/>',
     "save": '<path d="M3 2h15l4 4v16H2V2zM7 2v7h10V2M7 22V13h10v9"/>',
     "warning": '<path d="m12 2 11 20H1zM12 8v6M12 18h.01"/>',
-    "scan": '<path d="M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5M12 6v12M6 12h12"/>',
+    "scan": '<circle cx="12" cy="12" r="6"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3M4 4l2 2M18 18l2 2M4 20l2-2M18 6l2-2"/>',
 }
 
 
 def icon(name: str, color="#D9DCE0", size=24) -> QIcon:
     body = PATHS.get(name, PATHS["grid"])
-    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" '
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" color="{color}" '
            f'viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.65" '
            f'stroke-linecap="round" stroke-linejoin="round">{body}</svg>')
     # SVG-backed QIcon stays sharp under Windows display scaling.

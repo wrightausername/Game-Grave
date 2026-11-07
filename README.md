@@ -9,6 +9,22 @@ Game Grave finds games, mod-manager storage, Workshop folders, caches, and lefto
 
 ## Crimson Command: native premium UI engineering preview
 
+### Ready Room only — preview 0.2.8
+
+Ready Room now uses a single 1280×720 design surface that scales uniformly to
+the owner's attached 1536×864 mockup. Its own sidebar, header, search and native
+window controls are scoped to this route. Leaving it restores the previous shell.
+The original local artwork, fixed card proportions, typography, status badges,
+button lighting and health gauge are retained within that reference composition.
+News, follows, exact game selection, mod scan, verified backups and local checks
+continue through the existing Ready Room controllers.
+
+The other twelve tabs are protected by byte checks and 72 actual pixel comparisons
+after entering/leaving Ready Room: empty/populated inventories at three sizes.
+The reference preview opens at 1536×864 with a visible sample-data label; normal
+operation uses real local data. See the [Ready Room native captures and checks](docs/ui-review/ready-room-reference/README.md).
+Ready Room remains the active tab until the owner accepts it and says to move on.
+
 ### Locked-photo restoration — preview 0.2.7
 
 The owner's attached photos are the visual specification. Earlier 0.2.x builds

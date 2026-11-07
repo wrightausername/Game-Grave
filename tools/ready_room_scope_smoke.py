@@ -1,12 +1,8 @@
-"""Compatibility entrypoint for the owner-photo and safety-engine guard.
-
-The owner rejected the previous plain-table baseline. The original photographs,
-actual photo_ui_smoke geometry and rendered comparisons now define visual QA.
-"""
+"""Check that Ready Room changes preserve all twelve other tabs."""
 if __package__:
-    from .photo_reference_guard import main
+    from .ready_room_tab_lock import main
 else:
-    from photo_reference_guard import main
+    from ready_room_tab_lock import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

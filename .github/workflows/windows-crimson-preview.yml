@@ -106,11 +106,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Owner photos or protected engines changed.' }
           python tools/photo_ui_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Photo-layout functionality or reference geometry failed.' }
+          python tools/ready_room_ui_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Ready Room scaled reference or native mouse targets failed.' }
+          python tools/ready_room_scope_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Another tab changed while repairing Ready Room.' }
           python tools/ready_room_live_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room live news or verified backup checks failed.' }
           python tools/render_reference_previews.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Native photo comparison renders failed.' }
       - name: Upload actual Qt screen captures for design review
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: GameGrave-Crimson-Rendered-UI-Screenshots
@@ -124,6 +129,7 @@ jobs:
             _ci_temp/old-files-*.png
             _ci_temp/photo-*.png
             _ci_temp/*-1280.png
+            _ci_temp/ready-room-tab-lock/**/hashes.json
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -204,7 +210,7 @@ jobs:
           if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
           if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
           Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
-      - name: Assemble Locked Photo UI Windows download
+      - name: Assemble Ready Room Windows download
         shell: pwsh
         run: |
           $taskBundle = Join-Path (Resolve-Path '_ci_temp').Path 'ReadyRoomWindows'
@@ -213,30 +219,27 @@ jobs:
             'dist/GameGrave-Crimson-Preview.exe',
             'release/GameGrave-Crimson-Preview-Setup.exe',
             'installer/Start_Ready_Room_Reference.bat',
-            'installer/READY_ROOM_BUILD_README.txt',
-            'installer/Compare-Locked-Photos.html'
+            'installer/READY_ROOM_BUILD_README.txt'
           ) -Destination $taskBundle
           Copy-Item '_ci_temp/ready-room-reference-1280.png' (Join-Path $taskBundle 'Ready-Room-Preview.png')
-          Copy-Item '_ci_temp/*-1280.png' $taskBundle
-          $lockedPhotos = Join-Path $taskBundle 'Locked-Photos'
-          New-Item -ItemType Directory -Force $lockedPhotos | Out-Null
-          Copy-Item 'gg_desktop/assets/references/*.jpg' $lockedPhotos
-          Copy-Item 'gg_desktop/assets/references/locked_photos.json' $lockedPhotos
+          Copy-Item '_ci_temp/ready-room-reference-1536.png' (Join-Path $taskBundle 'Ready-Room-Preview-1536.png')
+          Copy-Item '_ci_temp/ready-room-reference-960.png' (Join-Path $taskBundle 'Ready-Room-Preview-960.png')
+          Copy-Item '_ci_temp/ready-room-live-functional.png' (Join-Path $taskBundle 'Ready-Room-Live-Functional.png')
           $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
             $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$digest  $($_.Name)"
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Locked Photo UI Windows preview 0.2.7',
+            'Game Grave Ready Room Windows preview 0.2.8',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
           ) | Set-Content (Join-Path $taskBundle 'Build-Info.txt') -Encoding ascii
-      - name: Upload Locked Photo UI Windows build
+      - name: Upload Ready Room Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: GameGrave-Locked-Photo-UI-Windows-Preview
+          name: GameGrave-Ready-Room-Reference-Windows-Preview
           path: _ci_temp/ReadyRoomWindows/*
           if-no-files-found: error
           retention-days: 14
