@@ -53,12 +53,14 @@ Only the owner's explicit instruction to change Ready Room can unlock it.
 The owner explicitly approved and locked the native-scale correction, then
 instructed work to move back to Overview. Ready Room is no longer open for edits.
 
-Active tab: Overview. Correct its storage accounting and complete all existing
-Overview functionality without redesigning the UI or changing another tab.
-Overview is awaiting owner signoff; do not move on automatically.
+Active tab: Games. The owner explicitly reopened Games to triple-check its
+functionality and ensure launcher cards and game artwork cover Steam, EA,
+Rockstar, Epic and other launchers. Preserve the locked Games photo layout.
+Confine fixes to Games, its own controllers, artwork and launcher adapters.
+The owner has not signed off on Games or authorized moving to the next tab.
 
-The owner has authorized a human-focused Overview click-through review and
-implementation of the resulting fixes. Preserve the default Overview dashboard
-from preview 0.2.10 (8733e55505e1500c74646e540fcd2f7ba565ec0f); confine
-usability changes to its dialogs, chart interactions, keyboard actions,
-search feedback and scan/measurement cancellation. Other tabs remain locked.
+Preserve Overview exactly as it stands in Windows preview 0.2.12, commit
+df6bd6628adf6dd9713fe41235acb618da594574. The owner moved the current work to
+Games; this does not authorize further Overview edits or imply new signoff.
+Protect all twelve other tabs, including Overview and the locked Ready Room,
+against this source and rendered baseline during Games work.

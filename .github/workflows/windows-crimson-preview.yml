@@ -122,10 +122,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Photo-layout functionality or reference geometry failed.' }
           python tools/ready_room_ui_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room native scale, navigation or controls failed.' }
-          python tools/overview_scope_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Ready Room or another locked tab changed while repairing Overview.' }
-          python tools/overview_scope_smoke.py --foundation --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Overview default dashboard changed during usability fixes.' }
+          python tools/games_tab_lock.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Overview, Ready Room or another locked tab changed during Games work.' }
+          python -m unittest tests.test_games_sources -v
+          if ($LASTEXITCODE -ne 0) { throw 'Mixed-launcher records, artwork or source identity checks failed.' }
+          python tools/games_triple_check.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Games mouse, keyboard, artwork or launcher triple-check failed.' }
           python tools/overview_live_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Overview measurements or live controls failed.' }
           python tools/overview_human_walkthrough.py --output _ci_temp
@@ -159,6 +161,10 @@ jobs:
             _ci_temp/overview-triple-check/report.json
             _ci_temp/overview-triple-check/**/overview-human-journeys.json
             _ci_temp/overview-triple-check/pass-1/overview-triple-*.png
+            _ci_temp/games-tab-lock/**/hashes.json
+            _ci_temp/games-triple-check/report.json
+            _ci_temp/games-triple-check/**/games-human-journeys.json
+            _ci_temp/games-triple-check/pass-1/*.png
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -239,38 +245,35 @@ jobs:
           if (-not (Test-Path $sentinel)) { throw 'Preview uninstall removed unrelated user settings' }
           if ((Get-Content $sentinel -Raw) -notmatch 'KEEP THIS') { throw 'Settings sentinel corrupted' }
           Write-Host 'PASS: unsigned Qt preview installs/launches/uninstalls; personal settings untouched.'
-      - name: Assemble Overview Windows download
+      - name: Assemble Games Windows download
         shell: pwsh
         run: |
-          $taskBundle = Join-Path (Resolve-Path '_ci_temp').Path 'OverviewWindows'
+          $taskBundle = Join-Path (Resolve-Path '_ci_temp').Path 'GamesWindows'
           New-Item -ItemType Directory -Force $taskBundle | Out-Null
           Copy-Item -Path @(
             'dist/GameGrave-Crimson-Preview.exe',
             'release/GameGrave-Crimson-Preview-Setup.exe',
-            'installer/OVERVIEW_BUILD_README.txt'
+            'installer/GAMES_BUILD_README.txt'
           ) -Destination $taskBundle
-          Copy-Item '_ci_temp/overview-functional-1450.png' (Join-Path $taskBundle 'Overview-Preview.png')
-          Copy-Item '_ci_temp/overview-functional-1280.png' (Join-Path $taskBundle 'Overview-Preview-1280.png')
-          Copy-Item '_ci_temp/overview-functional-960.png' (Join-Path $taskBundle 'Overview-Preview-960.png')
-          Copy-Item '_ci_temp/overview-human-storage.png' (Join-Path $taskBundle 'Overview-Storage-Details.png')
-          Copy-Item '_ci_temp/overview-human-search-results.png' (Join-Path $taskBundle 'Overview-Search-Results.png')
-          Copy-Item '_ci_temp/overview-triple-check/pass-1/overview-triple-help.png' (Join-Path $taskBundle 'Overview-Help.png')
+          Copy-Item '_ci_temp/games-triple-check/pass-1/games-mixed-launchers-1450.png' (Join-Path $taskBundle 'Games-Mixed-Launchers.png')
+          Copy-Item '_ci_temp/games-triple-check/pass-1/games-launcher-guidance.png' (Join-Path $taskBundle 'Games-Launcher-Guidance.png')
+          Copy-Item '_ci_temp/games-triple-check/report.json' (Join-Path $taskBundle 'Games-Triple-Check.json')
           $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
             $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$digest  $($_.Name)"
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Overview triple-check Windows preview 0.2.12',
+            'Game Grave Games multi-launcher Windows preview 0.2.13',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
           ) | Set-Content (Join-Path $taskBundle 'Build-Info.txt') -Encoding ascii
-      - name: Upload Overview Windows build
+      - name: Upload Games Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: GameGrave-Overview-Storage-Windows-Preview
-          path: _ci_temp/OverviewWindows/*
+          name: GameGrave-Games-Multi-Launcher-Windows-Preview
+          path: _ci_temp/GamesWindows/*
           if-no-files-found: error
           retention-days: 14
       - name: Upload Crimson screenshot and Windows engineering EXE

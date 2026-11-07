@@ -1,12 +1,8 @@
-"""Compatibility entrypoint for the owner-photo and safety-engine guard.
-
-The owner rejected the previous plain-table baseline. The original photographs,
-actual photo_ui_smoke geometry and rendered comparisons now define visual QA.
-"""
+"""Protect all twelve other tabs during Games work."""
 if __package__:
-    from .photo_reference_guard import main
+    from .games_tab_lock import main
 else:
-    from photo_reference_guard import main
+    from games_tab_lock import main
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())
