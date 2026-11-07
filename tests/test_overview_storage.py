@@ -1,10 +1,12 @@
 """Overview measures real file metadata without changing accepted scan evidence."""
 from copy import deepcopy
 from dataclasses import replace
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from core import ModFolder, OldFile, SteamGame
@@ -112,6 +114,25 @@ class StorageTests(unittest.TestCase):
         result = self.measure(inventory)
         self.assertEqual(result.totals, dict(Games=101, Mods=53, **{"Other Storage":29, "Captures":13, "Old Files":7}))
         self.assertEqual(sum(v/result.total for _, v, _ in result.segments), 1)
+
+    def test_windows_directory_entry_zero_identities_are_requeried(self):
+        game = self.game()
+        original_file = self.payload("Game/original", 71)
+        os.link(original_file, self.root / "Game/deployed")
+        scan = os.scandir
+        def without_identity(entry):
+            state = list(entry.stat(follow_symlinks=False))
+            state[1] = state[2] = state[3] = 0
+            return SimpleNamespace(path=entry.path, stat=lambda **_: os.stat_result(state))
+        @contextmanager
+        def windows_entries(path):
+            with scan(path) as entries:
+                yield (without_identity(entry) for entry in entries)
+        with patch("gg_desktop.overview_storage.os.scandir", side_effect=windows_entries):
+            result = self.measure(Inventory(games=[game]))
+        self.assertEqual(result.total, 71)
+        self.assertEqual(result.files, 1)
+        self.assertEqual(result.shared_files, 1)
 
     def test_missing_and_empty_are_distinct(self):
         game = self.game()

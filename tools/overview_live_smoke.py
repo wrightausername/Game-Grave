@@ -24,6 +24,7 @@ def main():
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PIL import Image
     from PySide6.QtCore import QCoreApplication, QEvent, QPoint, Qt, QTimer
+    from PySide6.QtGui import QFontMetrics
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit, QListWidget, QPushButton, QTableWidget
     from core import OldFile, SteamGame, default_settings
@@ -312,6 +313,9 @@ def main():
                 QTest.qWait(80)
                 window.page.verticalScrollBar().setValue(0)
                 settle()
+                for metric in window.overview_metrics.values():
+                    value=metric.value_label
+                    assert QFontMetrics(value.font()).horizontalAdvance(value.text()) <= value.width()+1, "Clipped Overview value"
                 assert window.grab().save(str(args.output/f"overview-functional-{width}.png"))
             summary=dict(totals=control.snapshot.totals,total=control.snapshot.total,
                          files=control.snapshot.files,hardlinks=control.snapshot.shared_files,

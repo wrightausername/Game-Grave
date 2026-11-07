@@ -185,6 +185,11 @@ class OverviewStorageController(QObject):
                 value.setToolTip(self.message)
             if w.inventory.scanned_at:
                 w.overview_metrics["Mods"].set_value("…" if self.storage_busy else "Unknown", "Mods")
+                for i in range(w.overview_library.count()):
+                    item = w.overview_library.item(i)
+                    data = dict(item.data(CARD_ROLE))
+                    data["size"] = "Measuring…" if self.storage_busy else "Unknown"
+                    item.setData(CARD_ROLE, data)
         else:
             unavailable = bool(s.roots) and not any(r.valid for r in s.roots)
             title = "Unavailable" if unavailable else human_size(s.total)

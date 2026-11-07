@@ -23,7 +23,7 @@ search results, complete shelf paging, scan busy/cancel states, source coverage,
 validated scan-location edits, and event-specific activity details. All existing
 metrics, quick actions, history and cleanup-review links retain their routes.
 
-Validation: 16 new measurement tests; the full 511-test suite passes (one skip).
+Validation: 17 new measurement tests; the full 512-test suite passes (one skip).
 The actual Overview Qt smoke covers controlled bytes and hardlinks, refresh,
 cancel/error retention, all existing controls, 513 installations and four sizes.
 The twelve other tabs pass 72 baseline pixel comparisons against approved
@@ -33,3 +33,8 @@ runtime source, artwork and data engines match that baseline.
 
 Preview version: 0.2.10. Ready Room remains owner-approved and locked at 0.2.9.
 Overview remains pending owner signoff; this work does not authorize another tab.
+
+Windows directory-entry metadata omits file IDs and link counts; measurement
+re-queries lstat before identifying files. A dedicated zero-ID regression test
+and native NTFS hardlink fixtures cover this distinction. Overview metric
+values fit their existing available width at the narrow viewport.

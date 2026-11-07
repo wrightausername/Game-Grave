@@ -237,6 +237,11 @@ def measure_storage(inventory, *, canceled=lambda: False, progress=lambda checke
     directories, explicit_seen, seen_files = set(), set(), {}
     last_progress = 0.0
     def file(path, info):
+        # Windows DirEntry.stat() deliberately supplies zero for st_ino,
+        # st_dev and st_nlink. Query the path itself before identifying links;
+        # a path fallback would otherwise charge Vortex deployments twice.
+        if os.name == "nt" or not info.st_ino:
+            info = path.lstat()
         key = path_key(path)
         if key in explicit_files:
             if key in explicit_seen:

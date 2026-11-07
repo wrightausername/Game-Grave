@@ -4,8 +4,8 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QRectF, QSize, Signal
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
+from PySide6.QtCore import Qt, QRectF, QSize, Signal, QEvent
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen, QFontMetrics
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
     QGridLayout, QLabel, QLayout, QListWidget, QPushButton, QSizePolicy, QWidget,
@@ -93,6 +93,8 @@ class OverviewMetric(QPushButton):
         words = column(spacing=3)
         self.caption_label = label(title, "overviewMetricCaption")
         self.value_label = label(value, "overviewMetricValue")
+        self._value_pixels = 25
+        self.value_label.installEventFilter(self)
         words.addWidget(self.caption_label)
         words.addWidget(self.value_label)
         box.addLayout(words, 1)
@@ -106,6 +108,23 @@ class OverviewMetric(QPushButton):
         self.value_label.setText(value)
         self.caption_label.setText(caption or self.title)
         self.setAccessibleName(self.caption_label.text() + ": " + value)
+        self._fit_value()
+
+    def eventFilter(self, target, event):
+        if target is self.value_label and event.type() == QEvent.Resize:
+            self._fit_value()
+        return super().eventFilter(target, event)
+
+    def _fit_value(self):
+        font = self.value_label.font()
+        pixels = 25
+        font.setPixelSize(pixels)
+        while pixels > 12 and QFontMetrics(font).horizontalAdvance(self.value_label.text()) > self.value_label.width():
+            pixels -= 1
+            font.setPixelSize(pixels)
+        if pixels != self._value_pixels:
+            self._value_pixels = pixels
+            self.value_label.setStyleSheet(f"font-size:{pixels}px;")
 
     def minimumSizeHint(self):
         return QSize(0, 76)
