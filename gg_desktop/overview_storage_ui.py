@@ -50,6 +50,7 @@ class OverviewStorageController(QObject):
         page.destroyed.connect(lambda: (active.clear(), cancel.set()))
         self.storage_busy = False
         self.snapshot = None
+        self.logged_moves = window.overview_storage_note.toolTip()
         self.message = "Scan PC to detect your game libraries and mod locations."
         self.legend_targets = {}
 
@@ -170,7 +171,7 @@ class OverviewStorageController(QObject):
     def snapshot_message(self):
         s = self.snapshot
         state = "Partial measurement" if s.partial else "Measured files"
-        return f"{state} · {s.files:,} unique files · {s.shared_files:,} shared links counted once."
+        return f"{state} · {s.files:,} unique files · {s.shared_files:,} shared links counted once." + (" Scan sources incomplete." if s.source_warnings else "")
 
     def render(self):
         if not self.valid():
@@ -198,9 +199,10 @@ class OverviewStorageController(QObject):
             detail = ("Measured logical file bytes in detected locations, across all detected drives. "
                 "Nested paths and hardlinks count once. Mods deployed as hardlinks are attributed to Mods. "
                 "Old files already inside a game/mod count in their owning category. "
-                "Captures cover accepted screenshot/recording findings. Saves and other unscanned folders are outside this chart. "
+                "Captures cover accepted screenshot/recording findings. Save folders outside detected roots and other unscanned locations are outside this chart. "
                 "Compressed/sparse physical allocation and reclaimable space are not inferred.\n"
-                + self.message + "\nChecked: " + s.measured_at)
+                + self.message + "\nChecked: " + s.measured_at + "\n" + self.logged_moves
+                + "\n" + "\n".join(dict.fromkeys(warning for warnings in s.source_warnings.values() for warning in warnings)))
             w.overview_ring.setToolTip(detail + "\nClick for folders, coverage and drive readings.")
             w.overview_ring._base_tip = w.overview_ring.toolTip()
             w.overview_storage_note.setToolTip(detail)
@@ -209,7 +211,7 @@ class OverviewStorageController(QObject):
                 percentage = "<0.1%" if s.total and 0 < amount/s.total < .001 else f"{amount/s.total:.1%}" if s.total else "0%"
                 partial = s.category_partial(name)
                 category_roots = [r for r in s.roots if r.category == name]
-                unknown = bool(category_roots) and not any(r.valid for r in category_roots)
+                unknown = (bool(category_roots) and not any(r.valid for r in category_roots)) or (not category_roots and bool(s.source_warnings.get(name)))
                 value.setText("Unknown" if unknown else human_size(amount) + " · " + percentage + (" *" if partial else ""))
                 tip = (f"{name}: {amount:,} measured bytes. " + ("Incomplete coverage. " if partial else "")
                        + "Percentage of measured files, not total drive capacity. Click to inspect folders.")
@@ -230,7 +232,7 @@ class OverviewStorageController(QObject):
                     ". Includes mod files inside this folder; the pie attributes shared mod files once to Mods. * indicates incomplete coverage.")
             for category in ("Old Files", "Other Storage"):
                 roots = [r for r in s.roots if r.category == category]
-                unknown = bool(roots) and not any(r.valid for r in roots)
+                unknown = (bool(roots) and not any(r.valid for r in roots)) or (not roots and bool(s.source_warnings.get(category)))
                 # Metrics describe accepted findings, including overlaps. Pie
                 # shows disjoint bytes; the dialog explains the difference.
                 paths = {r.key: r.listed_bytes for r in roots}
@@ -238,8 +240,9 @@ class OverviewStorageController(QObject):
                 w.overview_metrics[category].set_value(text)
                 w.overview_metrics[category].setToolTip("Measured bytes in detected findings; overlapping categories are deduplicated in the pie. * indicates partial coverage. Click to inspect.")
             captures = {path_key(f.path) for f in (*w.inventory.screenshots, *w.inventory.recordings)}
-            w.overview_metrics["Captures"].set_value(str(len(captures)))
-            w.overview_metrics["Captures"].setToolTip("Accepted capture findings within the scan's age and folder settings. Click to inspect Captures.")
+            capture_partial = bool(s.source_warnings.get("Captures"))
+            w.overview_metrics["Captures"].set_value("Unknown" if capture_partial and not captures else str(len(captures)) + (" *" if capture_partial else ""))
+            w.overview_metrics["Captures"].setToolTip("Accepted capture findings within the scan's age and folder settings. * indicates incomplete source coverage. Click to inspect Captures.")
         self.changed.emit()
 
     def storage_details(self, category=""):
@@ -299,6 +302,8 @@ class OverviewStorageController(QObject):
                 offset[0] = 0
             status.setText(self.message)
             s = self.snapshot
+            if s and s.source_warnings:
+                status.setText(self.message + "\n" + "\n".join(dict.fromkeys(warning for warnings in s.source_warnings.values() for warning in warnings)))
             rows = [] if s is None else [r for r in s.roots if
                 (choice.currentIndex() == 0 or r.category == choice.currentText()) and
                 search.text().casefold() in (r.name + " " + r.path).casefold()]

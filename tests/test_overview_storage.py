@@ -243,6 +243,15 @@ class StorageTests(unittest.TestCase):
         inventory.scanned_at = "New accepted scan"
         self.assertNotEqual(before, inventory_key(inventory))
 
+    def test_failed_scan_sources_remain_partial_even_without_detected_roots(self):
+        result = self.measure(Inventory(warnings=["Screenshots partially unavailable (OSError).", "Old Files folder unavailable (PermissionError). "]))
+        self.assertTrue(result.partial)
+        self.assertTrue(result.category_partial("Captures"))
+        self.assertTrue(result.category_partial("Old Files"))
+        self.assertTrue(result.category_partial("Other Storage"))
+        self.assertFalse(result.category_partial("Games"))
+        self.assertIn("Screenshots partially unavailable (OSError).", result.source_warnings["Captures"])
+
 
 if __name__ == "__main__":
     unittest.main()

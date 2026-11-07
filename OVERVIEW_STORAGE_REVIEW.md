@@ -23,7 +23,7 @@ search results, complete shelf paging, scan busy/cancel states, source coverage,
 validated scan-location edits, and event-specific activity details. All existing
 metrics, quick actions, history and cleanup-review links retain their routes.
 
-Validation: 18 new measurement tests; the full 513-test suite passes (one skip).
+Validation: 19 new measurement tests; the full 514-test suite passes (one skip).
 The actual Overview Qt smoke covers controlled bytes and hardlinks, refresh,
 cancel/error retention, all existing controls, 513 installations and four sizes.
 The twelve other tabs pass 72 baseline pixel comparisons against approved

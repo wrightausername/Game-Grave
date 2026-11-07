@@ -312,6 +312,16 @@ def main():
             assert window.inventory is inventory and not window.scanning
             assert window.overview_hero.scan.isEnabled()
             mode[0]="success"
+            # A failed capture/old-file source must not become a convincing 0.
+            window.inventory=replace(inventory,files=[],screenshots=[],recordings=[],warnings=[
+                "Screenshots partially unavailable (OSError).", "Old Files folder unavailable (PermissionError)."])
+            control=overview()
+            assert window.overview_metrics["Captures"].value_label.text()=="Unknown"
+            assert window.overview_metrics["Old Files"].value_label.text()=="Unknown"
+            assert window.overview_legend["Captures"][1].text()=="Unknown"
+            assert control.snapshot.partial
+            window.inventory=inventory
+            control=overview()
             window.status.setText("DISPOSABLE QA FIXTURE · Actual measured file bytes · No personal data")
             control=overview()
             for width,height in ((1450,900),(1280,720),(1536,864),(960,650)):

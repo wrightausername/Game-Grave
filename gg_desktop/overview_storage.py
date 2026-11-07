@@ -83,6 +83,7 @@ class StorageSnapshot:
     mod_count_partial: bool = False
     catalog: object = None
     volumes: tuple[VolumeReading, ...] = ()
+    source_warnings: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def total(self):
@@ -90,14 +91,14 @@ class StorageSnapshot:
 
     @property
     def partial(self):
-        return self.limited or any(root.problems for root in self.roots)
+        return self.limited or bool(self.source_warnings) or any(root.problems for root in self.roots)
 
     @property
     def segments(self):
         return [(name, self.totals[name], color) for name, color in CATEGORIES]
 
     def category_partial(self, category):
-        return self.limited or any(root.category == category and root.problems for root in self.roots)
+        return self.limited or bool(self.source_warnings.get(category)) or any(root.category == category and root.problems for root in self.roots)
 
 
 class RootIndex:
@@ -121,7 +122,7 @@ class RootIndex:
 
 def inventory_key(inventory):
     """A cache key that changes when accepted scan findings change."""
-    return (id(inventory), inventory.scanned_at,
+    return (id(inventory), inventory.scanned_at, tuple(inventory.warnings),
             tuple((g.key, g.install_path, g.size_bytes) for g in inventory.games),
             tuple((m.path, m.source, m.apparent_bytes) for m in inventory.mods),
             tuple((f.path, f.size, f.modified_ns) for f in inventory.files),
@@ -193,6 +194,13 @@ def measure_storage(inventory, *, canceled=lambda: False, progress=lambda checke
     progress(0, "Reading detected mod locations and package metadata…")
     catalog = catalog_reader(inventory, canceled=canceled)
     result = StorageSnapshot(catalog=catalog)
+    for warning in inventory.warnings:
+        text = str(warning)
+        categories = (("Old Files", "Other Storage") if text.casefold().startswith("old files") else
+                      ("Captures",) if text.casefold().startswith(("recordings", "screenshots")) else
+                      tuple(name for name, _ in CATEGORIES))
+        for category in categories:
+            result.source_warnings.setdefault(category, []).append(text)
     result.roots = measurement_roots(inventory, catalog, canceled)
     result.game_count = len({path_key(g.install_path) for g in inventory.games if g.install_path})
     individuals = {path_key(e.path) for e in catalog.entries if e.kind == "mod"}
@@ -200,7 +208,7 @@ def measure_storage(inventory, *, canceled=lambda: False, progress=lambda checke
                and (Path(key).is_dir() or Path(key).is_file())}
     result.mod_count = len(present) if individuals else len({path_key(e.path) for e in catalog.entries})
     result.mod_unit = "Mods" if individuals else "Mod locations"
-    result.mod_count_partial = catalog.limited
+    result.mod_count_partial = catalog.limited or bool(result.source_warnings.get("Mods"))
     index = RootIndex(result.roots)
     valid, explicit_files = [], set()
     def problem(path, message, descendants=False):
