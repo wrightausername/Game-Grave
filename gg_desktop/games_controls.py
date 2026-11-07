@@ -164,7 +164,11 @@ class GamesActions(GamesController):
         if not self._valid():
             return
         self.window.game_filter.blockSignals(True)
-        self.window.game_filter.setCurrentIndex(0)
+        index = self.window.game_filter.findData(bucket) if bucket else 0
+        if index < 0:
+            self.window.game_filter.addItem(bucket + " games", bucket)
+            index = self.window.game_filter.count() - 1
+        self.window.game_filter.setCurrentIndex(index)
         self.window.game_filter.blockSignals(False)
         self.bucket = bucket
         self.window.game_search.setPlaceholderText("Search " + (bucket or "your") + " games…")
@@ -176,8 +180,8 @@ class GamesActions(GamesController):
         self.fill()
 
     def launcher_changed(self):
-        self.bucket = None
-        self.window.game_search.setPlaceholderText("Search your games…")
+        self.bucket = self.window.game_filter.currentData()
+        self.window.game_search.setPlaceholderText("Search " + (self.bucket or "your") + " games…")
         self.fill()
 
     def refresh_sources(self):
@@ -194,7 +198,11 @@ class GamesActions(GamesController):
             self.window.game_filter.blockSignals(True)
             self.window.game_filter.clear()
             self.window.game_filter.addItems(["All launchers"] + sorted({game.launcher for game in self.records}))
-            self.window.game_filter.setCurrentText(selected)
+            if self.bucket:
+                self.window.game_filter.addItem(self.bucket + " games", self.bucket)
+                self.window.game_filter.setCurrentIndex(self.window.game_filter.count() - 1)
+            else:
+                self.window.game_filter.setCurrentText(selected)
             self.window.game_filter.blockSignals(False)
             metrics = self.window.game_metrics
             metrics.set_value(0, len(self.records))

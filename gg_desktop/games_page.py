@@ -124,7 +124,7 @@ class GamesScreens:
         favorites = set(self.settings.get("desktop_favorites", []))
         current = self._current_game()
         rows = [g for g in self.page.games.records
-                if (launcher == "All launchers" or g.launcher == launcher)
+                if (launcher == "All launchers" or self.page.games.bucket is not None or g.launcher == launcher)
                 and (not self.page.games.bucket or launcher_bucket(g.launcher) == self.page.games.bucket)
                 and all(word in (g.name + " " + g.launcher + " " + g.install_path).casefold() for word in query.split())
                 and ("Favorites" not in active or g.key in favorites)

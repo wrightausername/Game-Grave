@@ -43,7 +43,7 @@ Steam verify/DLC/uninstall, non-Steam guidance, correct context selection,
 artwork choose/reset/download/offline/corrupt/cancel, failed preference writes,
 stale manifests, folders, Save Vault entry, Game DNA/Mods navigation, grid/list,
 the final game in a 1,003-game library, Scan PC and the narrow Details drawer.
-There are 64 journeys per process, run in three fresh processes (192 checks).
+There are 65 journeys per process, run in three fresh processes (195 checks).
 The existing local unit suite passes 527 tests with one platform skip.
 The existing photo functionality and all-route geometry smoke also pass.
 Native Windows repeats the matrix and locked-tab comparisons before packaging.

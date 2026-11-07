@@ -42,6 +42,7 @@ def walkthrough(output):
     checks = []
     def passed(name):
         checks.append(dict(name=name, result="passed"))
+        (output/"games-human-journeys.json").write_text(json.dumps(checks, indent=2), encoding="utf-8")
     def settle():
         QTest.qWait(30)
         QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
@@ -53,7 +54,14 @@ def walkthrough(output):
         settle()
     def idle(window):
         settle()
-        wait_for(lambda: not window.workers and not window.page.game_artwork.busy and not window.page.game_artwork.queue)
+        try:
+            wait_for(lambda: not window.workers and not window.page.game_artwork.busy and not window.page.game_artwork.queue)
+        except AssertionError:
+            art = window.page.game_artwork
+            window.grab().save(str(output/"games-timeout.png"))
+            raise AssertionError(json.dumps(dict(workers=len(window.workers), busy=art.busy,
+                queue=len(art.queue), pending=list(art.pending), downloading=window.page.games.downloading,
+                status=window.status.text(), last_case=checks[-1] if checks else None)))
     def click(control):
         assert control.isEnabled(), control.text()
         QTest.mouseClick(control, Qt.LeftButton)
@@ -150,6 +158,12 @@ def walkthrough(output):
                 assert {game.key for game in window._shown_games} == {game.key for game in expected}
                 assert int(window.game_metrics.values[index].text()) == len(expected)
                 passed("Launcher card filters and count: " + (handler.bucket or "Total Games"))
+            click(window.game_metrics.values[3])
+            assert window.page.games.bucket == "EA"
+            window.game_filter.setCurrentText("All launchers")
+            assert len(window._shown_games) == 13 and window.page.games.bucket is None
+            passed("All launchers visibly clears a previously clicked launcher card")
+            click(window.game_metrics.values[3])
             window.game_filter.setCurrentText("Steam")
             assert all(game.launcher == "Steam" for game in window._shown_games) and window._shown_games
             passed("Exact launcher chooser clears the previous launcher-card filter")
