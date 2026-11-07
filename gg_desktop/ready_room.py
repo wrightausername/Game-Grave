@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 import shutil
 
-from PySide6.QtCore import QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QPoint, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import (
     QColor, QFont, QFontDatabase, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QShortcut,
 )
@@ -395,7 +395,7 @@ class ReadyRoomContent(ScrollPage):
         elif hasattr(window, "global_search"):
             header.hide()
             window.global_search.textChanged.connect(self.filter_rows)
-        self.search_shortcut = QShortcut(QKeySequence("Ctrl+K"), self.search)
+        self.search_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
         self.search_shortcut.activated.connect(window.global_search.setFocus if hasattr(window, "global_search") else self.search.setFocus)
         if search is not None:
             self.search_shortcut.setEnabled(False)
@@ -486,8 +486,7 @@ class ReadyRoomContent(ScrollPage):
         for index, notice in enumerate(patches[:5]):
             control = item_button(lambda _=False, p=notice: self.window_owner.ready_patch_details(p),
                                   notice.game + ": " + notice.status)
-            if len(patches) < 5:
-                control.setFixedHeight(41)
+            control.setFixedHeight(41)
             contents = row(spacing=12)
             control.setLayout(contents)
             contents.addWidget(thumbnail(notice.artwork, "logo", 140, 38))
@@ -508,8 +507,7 @@ class ReadyRoomContent(ScrollPage):
         for index, game in enumerate(games[:5]):
             control = item_button(lambda _=False, g=game: self.window_owner.ready_game_details(g),
                                   game.name + ": " + game.status)
-            if len(games) < 5:
-                control.setFixedHeight(41)
+            control.setFixedHeight(41)
             contents = row(spacing=9)
             control.setLayout(contents)
             contents.addWidget(thumbnail(game.artwork, "portrait", 74, 36))
@@ -529,9 +527,9 @@ class ReadyRoomContent(ScrollPage):
             self.games.body_layout.addWidget(control, 1)
             if index < len(games[:5]) - 1:
                 self._separator(self.games.body_layout)
-        if 0 < len(patches) < 5:
+        if patches:
             self.patches.body_layout.addStretch()
-        if 0 < len(games) < 5:
+        if games:
             self.games.body_layout.addStretch()
         if not patches:
             self._empty(self.patches.body_layout,
@@ -572,6 +570,7 @@ class ReadyRoomContent(ScrollPage):
         state_box = QWidget()
         state_box.setFixedWidth(146)
         state = column(spacing=0)
+        state.setAlignment(Qt.AlignVCenter)
         state_box.setLayout(state)
         reviewed = self.data.reference or self.data.mod_state == "Reviewed"
         state.addWidget(icon_label("check" if reviewed else "scan",
@@ -587,6 +586,7 @@ class ReadyRoomContent(ScrollPage):
         divider.setStyleSheet("background:#30373D;")
         summary.addWidget(divider)
         stats = column(spacing=5)
+        stats.setAlignment(Qt.AlignVCenter)
         for (value, caption), glyph in zip(self.data.mod_stats, ("cube", "sync", "warning")):
             line = row(spacing=8)
             line.addWidget(icon_label(glyph, "#F1C13E" if glyph == "warning" else "#D6DAE0", 16))
@@ -637,12 +637,12 @@ class ReadyRoomContent(ScrollPage):
         summary.addWidget(HealthGauge(self.data.health_score, caption=self.data.health_caption,
                                       note=self.data.health_note, action=self.window_owner.ready_health_details))
         checks = column(spacing=10, margins=(0, 10, 0, 15))
+        checks.setAlignment(Qt.AlignVCenter)
         for title, tone in self.data.health:
             line = row(spacing=8)
             line.addWidget(icon_label("check" if tone == "green" else "help", TONES[tone], 17))
             line.addWidget(fitted_text(title, "readyDetail"), 1)
             checks.addLayout(line)
-        checks.addStretch()
         summary.addLayout(checks, 1)
         card.body_layout.addLayout(summary, 1)
         return card
@@ -668,7 +668,35 @@ class ReadyRoomContent(ScrollPage):
         super().resizeEvent(event)
 
 
-from gg_desktop.ready_room_shell import ReadyRoomPage
+class ReadyRoomPage(ReadyRoomContent):
+    """Use the app's native shell and scale, like every other tab."""
+    def __init__(self, window, data):
+        super().__init__(window, data, window.global_search)
+        self._released = False
+        self.reference_note = None
+        if data.reference:
+            self.reference_note = QLabel("REFERENCE PREVIEW · SAMPLE DATA", self.body)
+            self.reference_note.setStyleSheet("font-size:9px;color:#72808c;background:transparent;")
+            self.reference_note.setAttribute(Qt.WA_TransparentForMouseEvents)
+            self._position_reference_note()
+
+    def _position_reference_note(self):
+        if self.reference_note is not None:
+            self.reference_note.setGeometry(12, max(0, self.body.height()-18), 220, 13)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "reference_note"):
+            self._position_reference_note()
+
+    def release_ready_shell(self):
+        # The shell never moves. Disconnect only this page's search listener.
+        if not self._released:
+            self._released = True
+            self.search.textChanged.disconnect(self.filter_rows)
+
+    def reference_point(self, widget, point=QPoint()):
+        return widget.mapTo(self.window_owner, point)
 
 
 class ReadyRoomMethods(ReadyRoomActions):
@@ -683,10 +711,6 @@ class ReadyRoomMethods(ReadyRoomActions):
             self.inventory, disk_free_percent=free_percent, state=self._ready_state,
             evidence=self._ready_evidence if self._ready_evidence_inventory is self.inventory else {})
         self.page_for("Ready Room", page=ReadyRoomPage(self, data))
-        self.page.enter_ready_shell()
-        if self.reference_preview and not getattr(self, "_ready_preview_sized", False):
-            self._ready_preview_sized = True
-            self.resize(1536, 864)
         self.page.setFocusPolicy(Qt.StrongFocus)
         self.page.setFocus()
 

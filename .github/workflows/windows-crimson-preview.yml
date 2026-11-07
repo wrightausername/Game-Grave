@@ -107,7 +107,7 @@ jobs:
           python tools/photo_ui_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Photo-layout functionality or reference geometry failed.' }
           python tools/ready_room_ui_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Ready Room scaled reference or native mouse targets failed.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Ready Room native scale, navigation or controls failed.' }
           python tools/ready_room_scope_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Another tab changed while repairing Ready Room.' }
           python tools/ready_room_live_smoke.py --output _ci_temp
@@ -231,7 +231,7 @@ jobs:
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Ready Room Windows preview 0.2.8',
+            'Game Grave Ready Room native scale Windows preview 0.2.9',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
@@ -239,7 +239,7 @@ jobs:
       - name: Upload Ready Room Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: GameGrave-Ready-Room-Reference-Windows-Preview
+          name: GameGrave-Ready-Room-Native-Scale-Windows-Preview
           path: _ci_temp/ReadyRoomWindows/*
           if-no-files-found: error
           retention-days: 14
