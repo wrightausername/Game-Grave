@@ -50,6 +50,9 @@ def walkthrough(output):
         end = time.monotonic() + 15
         while not predicate() and time.monotonic() < end:
             QTest.qWait(20)
+            # Qt's Windows test wait can retain the GIL. Yield explicitly so
+            # Python artwork workers can finish, as in the Overview harness.
+            time.sleep(.004)
         assert predicate(), "Timed out waiting for Games"
         settle()
     def idle(window):
