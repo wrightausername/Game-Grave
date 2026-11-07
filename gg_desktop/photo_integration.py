@@ -122,36 +122,38 @@ class ResponsiveInspector(QObject):
 
 class PhotoIntegration:
     def _game_details(self, *_):
-        LibraryScreens._game_details(self)
-        control = getattr(self.page, "games", None)
-        game = self._current_game()
-        if control and game:
-            for play in self.game_details.findChildren(QPushButton):
-                if play.text() == "Play":
-                    play.setEnabled("open_folder" in game.capabilities)
+        from gg_desktop.games_page import GamesScreens
+        GamesScreens._game_details(self)
 
     def _photo_game_dna(self, game):
         self._pending_dna_game_key = game.key
         self.navigate("Game DNA")
 
     def games_page(self):
-        LibraryScreens.games_page(self)
-        self.game_table = self.game_grid
-        self.game_count.hide()
-        self.game_artwork_status.parentWidget().hide()
-        self.page.games = PhotoGameActions(self, self.page)
-        self.game_grid.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.game_grid.customContextMenuRequested.connect(lambda point: self.page.games.options(
-            self._current_game(), self.game_grid.viewport().mapToGlobal(point)) if self._current_game() else None)
-        self._game_details()
-        self.page.photo_inspector = ResponsiveInspector(self.page, self.game_details.parentWidget().parentWidget())
+        from gg_desktop.games_page import GamesScreens
+        GamesScreens.games_page(self)
+
+    def _fill_games(self, *_):
+        from gg_desktop.games_page import GamesScreens
+        GamesScreens._fill_games(self)
+
+    def _toggle_favorite(self, game):
+        from gg_desktop.games_page import GamesScreens
+        GamesScreens._toggle_favorite(self, game)
+
+    def _update_game_artwork_status(self):
+        from gg_desktop.games_page import GamesScreens
+        GamesScreens._update_game_artwork_status(self)
+
+    def _steam_game_action(self, game, action):
+        self.page.games.launcher_action(game, action)
 
     def _launch_game(self, game):
         self.page.games.launch(game)
 
     def _steam_uninstall(self, game):
         if self.current_route == "Games" and hasattr(self.page, "games"):
-            self.page.games.uninstall(game)
+            self.page.games.launcher_action(game, "uninstall")
 
     def _reload_game_artwork(self):
         if hasattr(self.page, "games"):
