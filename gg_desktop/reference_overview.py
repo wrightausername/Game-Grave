@@ -4,15 +4,16 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QRectF, QSize
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
+from PySide6.QtCore import Qt, QRectF, QSize, Signal, QEvent
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen, QFontMetrics
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
     QGridLayout, QLabel, QLayout, QListWidget, QPushButton, QSizePolicy, QWidget,
 )
 from core import get_activity, friendly_activity, human_size, save_settings
 from recovery import get_records
-from gg_desktop.insight_models import storage_items, overview_storage_segments
+from gg_desktop.insight_models import storage_items
+from gg_desktop.overview_storage import CATEGORIES
 from gg_desktop.insight_widgets import FootprintRing
 from gg_desktop.artwork import game_app_id
 from gg_desktop.reference_library import _table, _text, _widget
@@ -76,7 +77,7 @@ class OverviewHero(QWidget):
 class OverviewMetric(QPushButton):
     def __init__(self, title, value, symbol, color, action):
         super().__init__()
-        self.color = color
+        self.color, self.title = color, title
         self.setObjectName("overviewMetric")
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
@@ -90,14 +91,40 @@ class OverviewMetric(QPushButton):
         glyph.setPixmap(icon(symbol, color, 32).pixmap(32, 32))
         box.addWidget(glyph)
         words = column(spacing=3)
-        words.addWidget(label(title, "overviewMetricCaption"))
-        words.addWidget(label(value, "overviewMetricValue"))
+        self.caption_label = label(title, "overviewMetricCaption")
+        self.value_label = label(value, "overviewMetricValue")
+        self._value_pixels = 25
+        self.value_label.installEventFilter(self)
+        words.addWidget(self.caption_label)
+        words.addWidget(self.value_label)
         box.addLayout(words, 1)
         for child in self.findChildren(QWidget):
             child.setAttribute(Qt.WA_TransparentForMouseEvents)
 
     def sizeHint(self):
         return QSize(140, 76)
+
+    def set_value(self, value, caption=None):
+        self.value_label.setText(value)
+        self.caption_label.setText(caption or self.title)
+        self.setAccessibleName(self.caption_label.text() + ": " + value)
+        self._fit_value()
+
+    def eventFilter(self, target, event):
+        if target is self.value_label and event.type() == QEvent.Resize:
+            self._fit_value()
+        return super().eventFilter(target, event)
+
+    def _fit_value(self):
+        font = self.value_label.font()
+        pixels = 25
+        font.setPixelSize(pixels)
+        while pixels > 12 and QFontMetrics(font).horizontalAdvance(self.value_label.text()) > self.value_label.width():
+            pixels -= 1
+            font.setPixelSize(pixels)
+        if pixels != self._value_pixels:
+            self._value_pixels = pixels
+            self.value_label.setStyleSheet(f"font-size:{pixels}px;")
 
     def minimumSizeHint(self):
         return QSize(0, 76)
@@ -121,14 +148,32 @@ class OverviewMetric(QPushButton):
 
 
 class OverviewRing(FootprintRing):
+    activated = Signal(str)
+
     def __init__(self, segments, *, scanned=False):
         super().__init__(caption="DETECTED STORAGE")
         self.setMinimumSize(170, 178)
         self.setMaximumWidth(190)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setCursor(Qt.PointingHandCursor)
         total = sum(size for _, size, _ in segments)
         self.set_segments(segments, human_size(total) if total else "No size data" if scanned else "Not scanned")
         self.setToolTip("Detected storage by reported bytes; nested locations count once.\n" +
             "\n".join(f"{name}: {human_size(size)} ({size / total:.1%})" for name, size, _ in segments if total))
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.activated.emit("")
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space):
+            self.activated.emit("")
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 def section(title, symbol, trailing=None):
@@ -224,10 +269,12 @@ class OverviewScreens:
             ("Captures", str(len(self.inventory.screenshots) + len(self.inventory.recordings)), "camera", "#cb95e4", "Captures"),
         ]
         metric_row = row(spacing=0)
+        self.overview_metrics = {}
         for title, value, symbol, color, route in values:
             metric = OverviewMetric(title, value if found else "—", symbol, color, lambda _=False, route=route: self.navigate(route))
             metric.setToolTip("Detected results from the last scan. Click to inspect " + title.lower() + ".")
             metric_row.addWidget(metric, 1)
+            self.overview_metrics[title] = metric
         metric_band = _widget(metric_row)
         metric_band.setFixedHeight(76)
         page.content.addWidget(metric_band)
@@ -242,14 +289,17 @@ class OverviewScreens:
 
         activity, recent = section("Recent Activity", "clock", button("View History →", lambda: self.navigate("Undo Center"), kind="link"))
         events = get_activity(limit=4)
+        self.overview_activity = []
         for event in events:
             info = friendly_activity(event)
-            entry = button(info["title"], lambda: self.navigate("Undo Center"), kind="overviewActivity")
+            entry = button(info["title"], lambda _=False, event=event: self.page.overview.activity_details(event), kind="overviewActivity")
             entry.setToolTip(str(event.get("details", "")))
             entry.setIcon(icon("check" if info["status"] == "Done" else "clock", "#62d3bc", 22))
             entry.setMinimumHeight(37)
             recent.addWidget(entry)
-            recent.addWidget(label(info["date"], "caption"))
+            date_label = label(info["date"], "caption")
+            recent.addWidget(date_label)
+            self.overview_activity.append((entry, date_label, event))
         if not events:
             recent.addWidget(label("Your local scan and review history will appear here.", "subtle", wrap=True))
             recent.addWidget(button("Scan your library →", self.start_scan, kind="link"))
@@ -268,25 +318,30 @@ class OverviewScreens:
             except (ValueError, TypeError):
                 continue
         chart = row(spacing=9)
-        segments = overview_storage_segments(self.inventory)
+        segments = [(name, 0, color) for name, color in CATEGORIES]
         total = sum(size for _, size, _ in segments)
         self.overview_ring = OverviewRing(segments, scanned=found)
         chart.addWidget(self.overview_ring)
         legend = column(spacing=12)
+        self.overview_legend = {}
         for name, size, color in segments:
             line = row(spacing=6)
             swatch = label("●")
             swatch.setStyleSheet("color:" + color + ";font-size:14px;")
             line.addWidget(swatch)
-            line.addWidget(label(name, "caption"), 1)
+            name_label = label(name, "caption")
+            line.addWidget(name_label, 1)
             percent = "<0.1%" if total and 0 < size / total < .001 else f"{size / total:.1%}" if total else "0%"
             value_label = label((human_size(size) + " · " + percent) if found else "Not scanned", "subtle")
             value_label.setStyleSheet("color:" + color + ";font-size:11px;")
             line.addWidget(value_label)
             legend.addWidget(_widget(line))
+            self.overview_legend[name] = (name_label, value_label, color)
         chart.addLayout(legend, 1)
         contents.addWidget(_widget(chart), 1)
-        contents.addWidget(label("Logged moves this month: " + human_size(amount) + ". Not confirmed free space.", "caption", wrap=True))
+        self.overview_storage_note = label("Measure detected game and mod folders after Scan PC.", "caption", wrap=True)
+        self.overview_storage_note.setToolTip("Logged moves this month: " + human_size(amount) + ". Not confirmed free space.")
+        contents.addWidget(self.overview_storage_note)
         contents.addWidget(tool("Review Cleanup", "sparkles", lambda: self.navigate("Graveyard"), kind="primary"))
 
         actions, quick = section("Quick Actions", "sparkles")
@@ -310,7 +365,8 @@ class OverviewScreens:
             item = QListWidgetItem(game.name)
             item.setToolTip(game.name + " · " + game.launcher)
             item.setData(CARD_ROLE, {"name": game.name, "source": game.launcher, "steam_app_id": game_app_id(game),
-                "size": human_size(game.size_bytes) if game.size_bytes is not None else "Unknown"})
+                "size": "Measuring…" if found else "Not measured",
+                "favorite": game.key in self.settings.get("desktop_favorites", [])})
             self.overview_library.addItem(item)
         self.overview_library.itemActivated.connect(self._overview_inspect_game)
         self.overview_library.itemClicked.connect(self._overview_inspect_game)
@@ -327,6 +383,9 @@ class OverviewScreens:
             shelf.addWidget(label("No games detected yet. Scan PC, or add a missing library in Scan Locations.", "subtle", wrap=True))
         page.content.addWidget(library)
         self.overview_library.doItemsLayout()
+        from gg_desktop.overview_storage_ui import OverviewStorageController
+        page.overview = OverviewStorageController(self, page)
+        page.overview.bind_native()
         self._sync_scan_controls()
 
     def _overview_library_move(self, direction):
@@ -334,12 +393,14 @@ class OverviewScreens:
         bar.setValue(bar.value() + direction * self.overview_library.viewport().width())
 
     def _overview_inspect_game(self, item):
+        if self.current_route != "Overview":
+            return
         index = self.overview_library.row(item)
         if not 0 <= index < len(self._overview_games):
             return
         game = self._overview_games[index]
         self.navigate("Games")
-        self.game_search.setText(game.name)
+        self.game_search.setText(game.install_path)
         match = next((i for i, g in enumerate(self._shown_games) if g.key == game.key), -1)
         if match >= 0:
             self.game_grid.setCurrentRow(match)
@@ -354,7 +415,8 @@ class OverviewScreens:
         contents.addWidget(label("Add missing libraries here. Steam and Xbox folders are verified from their local installation metadata; other custom folders stay labeled unverified.", "subtle", wrap=True))
         table = _table(["Source", "Status", "Found", "Locations / Coverage"])
         table.setMinimumHeight(180)
-        reports = self.inventory.source_reports
+        from gg_desktop.overview_storage_ui import coverage_reports
+        reports = self.inventory.source_reports or coverage_reports(self.inventory, self.settings)
         table.setRowCount(len(reports))
         for i, result in enumerate(reports):
             for c, value in enumerate((result["source"], result["status"], str(result["count"]),

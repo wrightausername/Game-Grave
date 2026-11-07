@@ -438,20 +438,6 @@ class PhotoIntegration:
 
     def overview_page(self):
         OverviewScreens.overview_page(self)
-        from gg_desktop.overview import OverviewController
-        from gg_desktop.widgets import StorageRing
-        control = self.page.overview = OverviewController(self, self.page)
-        for shortcut in control.shortcuts:
-            shortcut.setEnabled(False)
-        disk, summary = StorageRing(), QLabel()
-        disk.hide()
-        summary.hide()
-        control.bind_storage(disk, summary)
-        self.overview_ring.installEventFilter(control)
-        control.targets[self.overview_ring] = control.storage_details
-        self.overview_ring.setCursor(Qt.PointingHandCursor)
-        self.overview_ring.setToolTip("Open live system-drive details")
-        QTimer.singleShot(0, control.refresh_storage)
 
     def _sync_scan_controls(self):
         self.scan_button.setEnabled(not self.scanning and not self.cleaning)
