@@ -7,14 +7,26 @@ import threading
 import weakref
 
 from PySide6.QtCore import QObject, QEvent, Qt, QTimer, Signal
-from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QListWidget, QListWidgetItem, QTableWidget
+from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QTableWidget
 from shiboken6 import isValid
 
 from core import friendly_activity, human_size, save_settings
 from gg_desktop.overview_storage import CATEGORIES, inventory_key, measure_storage, path_key
 from gg_desktop.reference_library import _table, _text
 from gg_desktop.reference_widgets import CARD_ROLE
+from gg_desktop.insight_widgets import ActionFlow
 from gg_desktop.widgets import button, column, label, row
+
+
+class OverviewDialog(QDialog):
+    """Keep Overview's own dialogs readable without changing shared styling."""
+    def __init__(self, parent, title, size):
+        super().__init__(parent)
+        self.setObjectName("overviewDialog")
+        self.setWindowTitle(title)
+        self.setStyleSheet("QDialog#overviewDialog { background:#020609; color:#F4F7FC; }")
+        bounds = self.screen().availableGeometry()
+        self.resize(min(size[0], max(480, bounds.width()-40)), min(size[1], max(360, bounds.height()-60)))
 
 
 def coverage_reports(inventory, settings):
@@ -63,12 +75,14 @@ class OverviewStorageController(QObject):
         w.overview_ring.activated.connect(self.storage_details)
         w.overview_ring.setAccessibleName("Measured game and mod storage; press Enter for breakdown")
         for name, (caption, value, _) in w.overview_legend.items():
-            for widget in (caption, value):
+            legend_row = caption.parentWidget()
+            for widget in (legend_row, *legend_row.findChildren(QLabel)):
                 widget.setCursor(Qt.PointingHandCursor)
-                widget.setFocusPolicy(Qt.StrongFocus)
+                widget.setFocusPolicy(Qt.StrongFocus if widget is caption else Qt.NoFocus)
                 widget.setAccessibleName("Inspect " + name + " storage")
                 widget.installEventFilter(self)
                 self.legend_targets[widget] = name
+        QApplication.instance().installEventFilter(self)
         w.scan_button.installEventFilter(self)
         w.cancel_button.installEventFilter(self)
         w.overview_library.favoriteRequested.connect(self.favorite)
@@ -88,6 +102,17 @@ class OverviewStorageController(QObject):
         QTimer.singleShot(0, self.refresh_storage)
 
     def eventFilter(self, target, event):
+        if (event.type() == QEvent.Close and target is self.window and self.valid()
+                and not self.window.scanning and not self.window.cleaning):
+            self.cancel.set()
+            self.active.clear()
+        if (event.type() in (QEvent.Polish, QEvent.Show) and isinstance(target, QMessageBox)
+                and self.valid() and target.parentWidget() is self.window
+                and not target.property("overviewReadable")):
+            # Only this Overview-owned message instance is styled. The shared
+            # header/helpers and messages opened on locked tabs stay untouched.
+            target.setProperty("overviewReadable", True)
+            target.setStyleSheet("QMessageBox { background:#020609; color:#F4F7FC; }")
         category = self.legend_targets.get(target)
         if category and ((event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton)
                 or (event.type() == QEvent.KeyPress and event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space))):
@@ -104,9 +129,29 @@ class OverviewStorageController(QObject):
         for control in (w.overview_hero.scan, w.overview_quick_scan):
             control.setEnabled(not w.scanning and not w.cleaning)
         w.overview_hero.locations.setEnabled(not w.cleaning)
-        w.overview_cancel.setVisible(w.scanning)
-        w.overview_cancel.setEnabled(w.scanning and not w.cancel.is_set())
-        w.overview_scan_status.setText(w.status.text())
+        w.overview_cancel.setVisible(w.scanning or self.storage_busy)
+        w.overview_cancel.setText("Cancel Scan" if w.scanning else "Cancel measurement")
+        w.overview_cancel.setAccessibleName(w.overview_cancel.text())
+        w.overview_cancel.setEnabled((w.scanning and not w.cancel.is_set()) or
+            (not w.scanning and self.storage_busy and not self.cancel.is_set()))
+        status = self.message if self.storage_busy and not w.scanning else w.status.text()
+        if w.global_search.text().strip() and not w.scanning and not self.storage_busy:
+            status = w.overview_search_hint.text()
+        w.overview_scan_status.setText(status)
+
+    def cancel_current(self):
+        if self.window.scanning:
+            self.window.cancel_scan()
+        else:
+            self.cancel_measurement()
+
+    def cancel_measurement(self):
+        if self.storage_busy:
+            self.cancel.set()
+            self.message = "Stopping storage measurement… Previous totals will be kept."
+            self.window.overview_storage_note.setText(self.message)
+            self.sync_controls()
+            self.changed.emit()
 
     def sync_pager(self, *_):
         if self.valid():
@@ -177,6 +222,7 @@ class OverviewStorageController(QObject):
         if not self.valid():
             return
         w, s = self.window, self.snapshot
+        self.sync_controls()
         w.overview_storage_note.setText(self.message)
         if s is None:
             title = "Measuring…" if self.storage_busy else "Unavailable" if w.inventory.scanned_at else "Not scanned"
@@ -248,9 +294,7 @@ class OverviewStorageController(QObject):
     def storage_details(self, category=""):
         if not self.valid():
             return
-        dialog = QDialog(self.window)
-        dialog.setWindowTitle("Game Grave · Measured Storage Breakdown")
-        dialog.resize(1000, 650)
+        dialog = OverviewDialog(self.window, "Game Grave · Measured Storage Breakdown", (1000, 650))
         box = column(margins=(18, 18, 18, 18))
         dialog.setLayout(box)
         box.addWidget(label("Storage Overview", "sectionTitle"))
@@ -266,6 +310,7 @@ class OverviewStorageController(QObject):
             choice.setCurrentText(category)
         search = QLineEdit()
         search.setPlaceholderText("Filter folder or game…")
+        search.setAccessibleName("Filter measured storage folders")
         filters.addWidget(choice)
         filters.addWidget(search, 1)
         box.addLayout(filters)
@@ -277,15 +322,19 @@ class OverviewStorageController(QObject):
         box.addWidget(page_line)
         box.addWidget(volumes)
         actions = row()
+        flow = ActionFlow(spacing=6)
         previous, following = button("Previous"), button("Next")
         refresh = button("Refresh measurement", lambda: self.refresh_storage(force=True))
-        cancel = button("Cancel measurement", self.cancel.set)
+        cancel = button("Cancel measurement", self.cancel_measurement)
         folder = button("Open folder")
         inspect = button("Inspect selected")
         for control in (previous, following, refresh, cancel, folder, inspect):
-            actions.addWidget(control)
-        actions.addStretch()
-        actions.addWidget(button("Close", dialog.accept))
+            control.setAutoDefault(False)
+            flow.addWidget(control)
+        actions.addLayout(flow, 1)
+        close = button("Close", dialog.accept)
+        close.setAutoDefault(False)
+        actions.addWidget(close)
         box.addLayout(actions)
         offset, shown = [0], []
         def selected():
@@ -349,7 +398,12 @@ class OverviewStorageController(QObject):
         following.clicked.connect(lambda: move(1))
         folder.clicked.connect(open_folder)
         inspect.clicked.connect(inspect_selected)
-        table.itemDoubleClicked.connect(lambda _: inspect_selected())
+        table.itemActivated.connect(lambda _: inspect_selected())
+        def filter_enter():
+            if table.rowCount():
+                table.selectRow(0)
+                table.setFocus()
+        search.returnPressed.connect(filter_enter)
         table.itemSelectionChanged.connect(selection)
         choice.currentTextChanged.connect(lambda _: populate(True))
         search.textChanged.connect(lambda _: populate(True))
@@ -365,7 +419,7 @@ class OverviewStorageController(QObject):
             return
         w = self.window
         game = w._overview_games[index]
-        favorites = set(w.settings.get("desktop_favorites", []))
+        favorites = set(w._overview_favorites)
         favorites.symmetric_difference_update({game.key})
         updated = dict(w.settings, desktop_favorites=sorted(favorites))
         try:
@@ -374,6 +428,7 @@ class OverviewStorageController(QObject):
             w.error("Favorite not saved", str(exc))
             return
         w.settings = updated
+        w._overview_favorites = favorites
         item = w.overview_library.item(index)
         data = dict(item.data(CARD_ROLE))
         data["favorite"] = game.key in favorites
@@ -390,6 +445,11 @@ class OverviewStorageController(QObject):
             visible = query in (entry.text()+" "+str(event)).casefold()
             entry.setVisible(visible)
             date.setVisible(visible)
+        matching = sum(not w.overview_library.item(i).isHidden() for i in range(w.overview_library.count()))
+        hint = (f"{matching} matching game{'s' if matching != 1 else ''}. " if matching else "No matching games in your library. ")
+        w.overview_search_hint.setText(hint + "Press Enter to search games, mods and file findings.")
+        w.overview_search_hint.setVisible(bool(query))
+        self.sync_controls()
         w.overview_library.doItemsLayout()
         self.sync_pager()
 
@@ -405,15 +465,17 @@ class OverviewStorageController(QObject):
         records += [(Path(f.path).name, f.path, category, "") for category, files in
             (("Old Files", self.window.inventory.files), ("Captures", [*self.window.inventory.screenshots, *self.window.inventory.recordings])) for f in files]
         matches = [r for r in records if query in " ".join(r[:3]).casefold()]
-        dialog = QDialog(self.window)
-        dialog.setWindowTitle("Game Grave · Overview Search")
-        dialog.resize(740, 480)
+        dialog = OverviewDialog(self.window, "Game Grave · Overview Search", (740, 480))
         box = column(margins=(18, 18, 18, 18))
         dialog.setLayout(box)
         box.addWidget(label(f"{len(matches):,} matching scan findings", "sectionTitle"))
         entries = QListWidget()
         entries.setAccessibleName("Overview search results")
         box.addWidget(entries, 1)
+        selected_path = label("Select a result to see its folder." if matches else "No matching findings. Close and try another search.", "subtle", wrap=True)
+        selected_path.setTextFormat(Qt.PlainText)
+        selected_path.setAccessibleName("Selected search result path")
+        box.addWidget(selected_path)
         # Keep very large accepted inventories responsive; users can narrow the
         # query. No hidden first-500 limit on the library itself.
         for record in matches[:2000]:
@@ -432,11 +494,18 @@ class OverviewStorageController(QObject):
         entries.itemActivated.connect(inspect)
         actions = row()
         open_button = button("Inspect selected", inspect)
+        open_button.setAutoDefault(False)
         open_button.setEnabled(False)
-        entries.currentRowChanged.connect(lambda i: open_button.setEnabled(i >= 0))
+        def selection(i):
+            open_button.setEnabled(i >= 0)
+            item = entries.currentItem()
+            selected_path.setText(item.data(Qt.UserRole)[1] if item else "No result selected.")
+        entries.currentRowChanged.connect(selection)
         actions.addWidget(open_button)
         actions.addStretch()
-        actions.addWidget(button("Close", dialog.accept))
+        close = button("Close", dialog.accept)
+        close.setAutoDefault(False)
+        actions.addWidget(close)
         box.addLayout(actions)
         dialog.exec()
         dialog.deleteLater()
@@ -458,9 +527,7 @@ class OverviewStorageController(QObject):
         if not self.valid():
             return
         info = friendly_activity(event)
-        dialog = QDialog(self.window)
-        dialog.setWindowTitle("Game Grave · Activity Details")
-        dialog.resize(640, 370)
+        dialog = OverviewDialog(self.window, "Game Grave · Activity Details", (640, 370))
         box = column(margins=(18, 18, 18, 18))
         dialog.setLayout(box)
         for text, role in ((info["title"], "sectionTitle"), (info["date"]+" · "+info["status"], "subtle"),

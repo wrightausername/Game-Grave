@@ -1,4 +1,31 @@
-GAME GRAVE - OVERVIEW MEASURED STORAGE WINDOWS PREVIEW 0.2.10
+GAME GRAVE - OVERVIEW TRIPLE-CHECK WINDOWS PREVIEW 0.2.12
+
+The expanded check runs 66 mouse, keyboard and state journeys in three fresh
+processes. This version fixes the additional problems it found: every part of
+a chart legend row is clickable; Overview Help/status/error messages have a
+readable background; closing Overview stops its storage measurement; Remove
+Selected is disabled without a selection; favorite stars restore after a
+restart and survive saving scan locations. Saved favorites also remain visible
+when opening the corresponding game details. The shared settings loader and
+locked-tab source remain unchanged.
+
+The checks use real Qt events, real temporary preference files and fresh app
+windows. Folder-opening URLs are checked at the OS dispatch boundary; game
+launches and cleanup are prevented during the checks. The Windows workflow
+repeats all three passes and the existing 78 image comparisons.
+
+This version fixes problems found while using Overview as a person would:
+Overview dialogs now have readable dark backgrounds; chart slices open their
+own category; Enter and double-click inspect a selected storage row once;
+typing a mod/file search explains how to reach all results; search selection
+shows the folder so equal game names can be distinguished. The dashboard's
+existing Cancel control remains available during storage measurement.
+
+The default Overview dashboard layout, artwork and typography are preserved
+against 0.2.10 with six pixel comparisons. All twelve other tabs, including
+the locked Ready Room, retain their 72 pixel comparisons. The click-through
+uses real Qt mouse/keyboard events and disposable files, and is repeated in
+native Windows. This is an agent review, not a participant usability study.
 
 This update changes Overview only. Ready Room stays locked at the owner's
 approved native-scale version. The shared shell, artwork, styles and every

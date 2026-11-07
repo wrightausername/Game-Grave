@@ -56,3 +56,9 @@ instructed work to move back to Overview. Ready Room is no longer open for edits
 Active tab: Overview. Correct its storage accounting and complete all existing
 Overview functionality without redesigning the UI or changing another tab.
 Overview is awaiting owner signoff; do not move on automatically.
+
+The owner has authorized a human-focused Overview click-through review and
+implementation of the resulting fixes. Preserve the default Overview dashboard
+from preview 0.2.10 (8733e55505e1500c74646e540fcd2f7ba565ec0f); confine
+usability changes to its dialogs, chart interactions, keyboard actions,
+search feedback and scan/measurement cancellation. Other tabs remain locked.

@@ -16,14 +16,15 @@ import tempfile
 from unittest.mock import patch
 
 BASELINE = "471eb2bb088915573d99e7010f8472a28a274b9a"
+OVERVIEW_FOUNDATION = "8733e55505e1500c74646e540fcd2f7ba565ec0f"
 
 
-def probe(root, fixtures, output):
+def probe(root, fixtures, output, foundation=False):
     sys.path.insert(0, str(root))
     if sys.platform.startswith("linux"):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtCore import QCoreApplication, QEvent, Qt
-    from PySide6.QtGui import QImage
+    from PySide6.QtGui import QCursor, QImage
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication
     from core import SteamGame, ModFolder, OldFile, default_settings
@@ -46,7 +47,7 @@ def probe(root, fixtures, output):
     steam = SteamGame("1091500", "Cyberpunk 2077", str(fixtures/"Steam"), str(install), 120000000, None, "Scope fixture")
     mod = ModFolder("Scope fixture", str(mods_path), "", "Installed: possible mods", (), 12000, 1, False, "Manual / Other", "Protected scope fixture")
     settings = default_settings()
-    settings.update(scan_on_launch=False, scan_folder=str(download.parent))
+    settings.update(scan_on_launch=False, scan_folder=str(download.parent), desktop_favorites=[])
     hashes = {}
     usage = namedtuple("usage", "total used free")(8*1024**4, 5*1024**4, 3*1024**4)
     with ExitStack() as stack:
@@ -66,7 +67,11 @@ def probe(root, fixtures, output):
         stack.enter_context(patch.object(CrimsonWindow, "error", side_effect=AssertionError("Unexpected UI error")))
         for populated in (False, True):
             window = CrimsonWindow()
+            # Capture a neutral, reproducible state on Windows; placement and
+            # a cursor left by a preceding click-through must not add hover.
+            window.move(20, 20)
             window.show()
+            QCursor.setPos(window.screen().geometry().topLeft())
             if populated:
                 window.inventory = Inventory(steam=[steam], games=merge_games([steam], []), mods=[mod], files=[file], scanned_at="2026-11-06 12:00")
                 window.inventory.graveyard = build_graveyard([steam], [mod], [file], 365)
@@ -74,7 +79,7 @@ def probe(root, fixtures, output):
             for width, height in ((1280,720), (1536,864), (960,650)):
                 window.resize(width, height)
                 for route, _ in ROUTES:
-                    if route == "Overview":
+                    if (foundation and route != "Overview") or (not foundation and route == "Overview"):
                         continue
                     window.navigate("Overview")
                     window.navigate(route)
@@ -89,7 +94,15 @@ def probe(root, fixtures, output):
                     app.processEvents()
                     window.page.setFocusPolicy(Qt.StrongFocus)
                     window.page.setFocus()
-                    QTest.qWait(10)
+                    if foundation:
+                        # Native Windows can queue the responsive grid's paint
+                        # after the resize/layout events. Record the transition
+                        # and compare the settled user-visible dashboard.
+                        if not populated and width == 960:
+                            assert window.grab().save(str(output/"transition-empty-960-overview.png"))
+                        QTest.qWait(180)
+                    else:
+                        QTest.qWait(10)
                     assert window.nav_rail.isVisible() and window.top_bar.isVisible(), route
                     image = window.grab().toImage().convertToFormat(QImage.Format_RGBA8888)
                     key = f"{'populated' if populated else 'empty'}-{width}-{route.lower().replace(' ', '-')}"
@@ -100,12 +113,12 @@ def probe(root, fixtures, output):
     (output/"hashes.json").write_text(json.dumps(hashes, indent=2), encoding="utf-8")
 
 
-def source_guard(root):
-    if subprocess.run(["git","cat-file","-e",BASELINE],cwd=root,capture_output=True).returncode:
-        subprocess.run(["git","fetch","--no-tags","--depth=1","origin",BASELINE],cwd=root,check=True)
+def source_guard(root, baseline=BASELINE):
+    if subprocess.run(["git","cat-file","-e",baseline],cwd=root,capture_output=True).returncode:
+        subprocess.run(["git","fetch","--no-tags","--depth=1","origin",baseline],cwd=root,check=True)
     allowed = {"gg_desktop/reference_overview.py", "gg_desktop/overview_storage.py", "gg_desktop/overview_storage_ui.py"}
     shared_path = "gg_desktop/photo_integration.py"
-    original = subprocess.check_output(["git", "show", BASELINE+":"+shared_path], cwd=root).decode()
+    original = subprocess.check_output(["git", "show", baseline+":"+shared_path], cwd=root).decode()
     current = (root/shared_path).read_text(encoding="utf-8")
     def protected_ast(source):
         tree = ast.parse(source)
@@ -119,11 +132,11 @@ def source_guard(root):
     expected = ast.parse("def overview_page(self):\n    OverviewScreens.overview_page(self)\n").body[0]
     assert ast.dump(method, include_attributes=False) == ast.dump(expected, include_attributes=False), "Overview must use its isolated builder"
     allowed.add(shared_path)
-    paths = subprocess.check_output(["git","ls-tree","-r","--name-only",BASELINE,"gg_desktop"],cwd=root).decode().splitlines()
+    paths = subprocess.check_output(["git","ls-tree","-r","--name-only",baseline,"gg_desktop"],cwd=root).decode().splitlines()
     for path in paths:
         if path in allowed:
             continue
-        before = subprocess.check_output(["git","show",BASELINE+":"+path],cwd=root)
+        before = subprocess.check_output(["git","show",baseline+":"+path],cwd=root)
         after = (root/path).read_bytes()
         # Git converts these text files to CRLF on Windows checkouts.
         if Path(path).suffix in {".py", ".svg", ".md", ".json", ".txt"}:
@@ -136,36 +149,43 @@ def main():
     parser.add_argument("--output",type=Path,default=Path("_ci_temp"))
     parser.add_argument("--probe-root",type=Path)
     parser.add_argument("--fixtures",type=Path)
+    parser.add_argument("--foundation",action="store_true",help="Also protect Overview's unchanged default dashboard against preview 0.2.10")
     args = parser.parse_args()
     if args.probe_root:
-        probe(args.probe_root,args.fixtures,args.output)
+        probe(args.probe_root,args.fixtures,args.output,args.foundation)
         return 0
     root = Path(__file__).resolve().parents[1]
-    source_guard(root)
-    output = args.output.resolve()/"overview-tab-lock"
+    reference = OVERVIEW_FOUNDATION if args.foundation else BASELINE
+    expected = 6 if args.foundation else 72
+    source_guard(root,reference)
+    output = args.output.resolve()/("overview-foundation-lock" if args.foundation else "overview-tab-lock")
     output.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="GG-Overview-Only-") as temp:
         temp = Path(temp)
         baseline = temp/"Baseline"
         baseline.mkdir()
-        archive = subprocess.check_output(["git","archive","--format=tar",BASELINE],cwd=root)
+        archive = subprocess.check_output(["git","archive","--format=tar",reference],cwd=root)
         with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
             assert all((baseline/m.name).resolve().is_relative_to(baseline.resolve()) for m in tar.getmembers())
             tar.extractall(baseline)
         for label,source in (("baseline",baseline),("current",root)):
-            result = subprocess.run([sys.executable,str(Path(__file__).resolve()),"--probe-root",str(source),
-                "--fixtures",str(temp/"Fixtures"),"--output",str(output/label)],
+            command = [sys.executable,str(Path(__file__).resolve()),"--probe-root",str(source),
+                "--fixtures",str(temp/"Fixtures"),"--output",str(output/label)]
+            if args.foundation:
+                command.append("--foundation")
+            result = subprocess.run(command,
                 cwd=source,capture_output=True,text=True,timeout=180)
             if result.returncode:
                 print(result.stdout[-4000:]+result.stderr[-6000:])
                 raise AssertionError(label+" tab-lock render failed")
-            print("Captured "+label+": twelve other tabs, empty/populated, three sizes.",flush=True)
+            print("Captured "+label+": "+("Overview foundation" if args.foundation else "twelve other tabs")+", empty/populated, three sizes.",flush=True)
         before = json.loads((output/"baseline/hashes.json").read_text())
         after = json.loads((output/"current/hashes.json").read_text())
         differences = [n for n in before if before[n]!=after.get(n)]
-        assert len(before)==len(after)==72
+        assert len(before)==len(after)==expected
         assert not differences, "Locked tab pixels changed: "+", ".join(differences)
-    print("PASS: twelve other tabs are pixel-identical after Overview: 72 comparisons. Ready Room and every other desktop source, artwork, data and safety engine are unchanged.")
+    print("PASS: Overview's default dashboard matches the 0.2.10 foundation in six pixel comparisons." if args.foundation else
+          "PASS: twelve other tabs are pixel-identical after Overview: 72 comparisons. Ready Room and every other desktop source, artwork, data and safety engine are unchanged.")
     return 0
 
 

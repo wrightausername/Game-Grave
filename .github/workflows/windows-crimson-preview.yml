@@ -12,7 +12,11 @@ on:
       - 'tests/test_ready_room_services.py'
       - 'tests/test_overview_data.py'
       - 'tests/test_overview_storage.py'
+      - 'tests/test_overview_preferences.py'
+      - 'tools/overview_all_controls.py'
+      - 'tools/overview_triple_check.py'
       - 'tools/overview_tab_lock.py'
+      - 'tools/overview_human_walkthrough.py'
       - 'tests/test_games_functionality.py'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -46,7 +50,11 @@ on:
       - 'tests/test_ready_room_services.py'
       - 'tests/test_overview_data.py'
       - 'tests/test_overview_storage.py'
+      - 'tests/test_overview_preferences.py'
+      - 'tools/overview_all_controls.py'
+      - 'tools/overview_triple_check.py'
       - 'tools/overview_tab_lock.py'
+      - 'tools/overview_human_walkthrough.py'
       - 'tests/test_games_functionality.py'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -104,7 +112,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_games_functionality tests.test_mods_functionality tests.test_old_files_functionality -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_old_files_functionality -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -116,8 +124,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room native scale, navigation or controls failed.' }
           python tools/overview_scope_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room or another locked tab changed while repairing Overview.' }
+          python tools/overview_scope_smoke.py --foundation --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Overview default dashboard changed during usability fixes.' }
           python tools/overview_live_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Overview measurements or live controls failed.' }
+          python tools/overview_human_walkthrough.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Overview human click-through or dialog readability failed.' }
+          python tools/overview_triple_check.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Overview full-control triple-check failed.' }
           python tools/ready_room_live_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room live news or verified backup checks failed.' }
           python tools/render_reference_previews.py --output _ci_temp
@@ -138,7 +152,13 @@ jobs:
             _ci_temp/photo-*.png
             _ci_temp/*-1280.png
             _ci_temp/overview-tab-lock/**/hashes.json
+            _ci_temp/overview-foundation-lock/**/hashes.json
+            _ci_temp/overview-foundation-lock/**/*.png
             _ci_temp/overview-measurement.json
+            _ci_temp/overview-human-journeys.json
+            _ci_temp/overview-triple-check/report.json
+            _ci_temp/overview-triple-check/**/overview-human-journeys.json
+            _ci_temp/overview-triple-check/pass-1/overview-triple-*.png
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -232,13 +252,16 @@ jobs:
           Copy-Item '_ci_temp/overview-functional-1450.png' (Join-Path $taskBundle 'Overview-Preview.png')
           Copy-Item '_ci_temp/overview-functional-1280.png' (Join-Path $taskBundle 'Overview-Preview-1280.png')
           Copy-Item '_ci_temp/overview-functional-960.png' (Join-Path $taskBundle 'Overview-Preview-960.png')
+          Copy-Item '_ci_temp/overview-human-storage.png' (Join-Path $taskBundle 'Overview-Storage-Details.png')
+          Copy-Item '_ci_temp/overview-human-search-results.png' (Join-Path $taskBundle 'Overview-Search-Results.png')
+          Copy-Item '_ci_temp/overview-triple-check/pass-1/overview-triple-help.png' (Join-Path $taskBundle 'Overview-Help.png')
           $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
             $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$digest  $($_.Name)"
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Overview measured storage Windows preview 0.2.10',
+            'Game Grave Overview triple-check Windows preview 0.2.12',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
