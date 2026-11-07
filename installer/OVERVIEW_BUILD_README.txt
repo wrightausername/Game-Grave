@@ -1,4 +1,17 @@
-GAME GRAVE - OVERVIEW MEASURED STORAGE WINDOWS PREVIEW 0.2.10
+GAME GRAVE - OVERVIEW CLICK-THROUGH FIXES WINDOWS PREVIEW 0.2.11
+
+This version fixes problems found while using Overview as a person would:
+Overview dialogs now have readable dark backgrounds; chart slices open their
+own category; Enter and double-click inspect a selected storage row once;
+typing a mod/file search explains how to reach all results; search selection
+shows the folder so equal game names can be distinguished. The dashboard's
+existing Cancel control remains available during storage measurement.
+
+The default Overview dashboard layout, artwork and typography are preserved
+against 0.2.10 with six pixel comparisons. All twelve other tabs, including
+the locked Ready Room, retain their 72 pixel comparisons. The click-through
+uses real Qt mouse/keyboard events and disposable files, and is repeated in
+native Windows. This is an agent review, not a participant usability study.
 
 This update changes Overview only. Ready Room stays locked at the owner's
 approved native-scale version. The shared shell, artwork, styles and every

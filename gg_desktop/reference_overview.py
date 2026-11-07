@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from math import atan2, degrees, hypot
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QRectF, QSize, Signal, QEvent
@@ -163,7 +164,18 @@ class OverviewRing(FootprintRing):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self.activated.emit("")
+            dx, dy = event.position().x()-self.width()/2, event.position().y()-self.height()/2
+            scale = min(self.width(), self.height())/220
+            total = sum(value for _, value, _ in self.segments)
+            category = ""
+            if total and 78 <= hypot(dx, dy)/max(scale, .01) <= 101:
+                angle, end = degrees(atan2(dx, -dy)) % 360, 0
+                for name, value, _ in self.segments:
+                    end += value/total*360
+                    if value and angle < end:
+                        category = name
+                        break
+            self.activated.emit(category)
             event.accept()
         else:
             super().mouseReleaseEvent(event)
@@ -283,7 +295,7 @@ class OverviewScreens:
         self.overview_scan_status.setStyleSheet("color:#bfccd9;font-size:12px;")
         scanline.addWidget(self.overview_scan_status, 1)
         scanline.addWidget(button("Scan Results & Locations", self.open_scan_locations, kind="link"))
-        self.overview_cancel = tool("Cancel Scan", "close", self.cancel_scan)
+        self.overview_cancel = tool("Cancel Scan", "close", lambda: self.page.overview.cancel_current())
         scanline.addWidget(self.overview_cancel)
         page.content.addWidget(_widget(scanline))
 
@@ -371,6 +383,10 @@ class OverviewScreens:
         self.overview_library.itemActivated.connect(self._overview_inspect_game)
         self.overview_library.itemClicked.connect(self._overview_inspect_game)
         shelf.addWidget(self.overview_library)
+        self.overview_search_hint = label("", "subtle", wrap=True)
+        self.overview_search_hint.setAccessibleName("Overview search help")
+        self.overview_search_hint.hide()
+        shelf.addWidget(self.overview_search_hint)
         pager = row(spacing=6)
         pager.addStretch()
         self.overview_previous = tool("Previous", "minus", lambda: self._overview_library_move(-1))
@@ -406,16 +422,14 @@ class OverviewScreens:
             self.game_grid.setCurrentRow(match)
 
     def open_scan_locations(self):
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Scan Results & Locations")
-        dialog.resize(840, 650)
+        from gg_desktop.overview_storage_ui import OverviewDialog, coverage_reports
+        dialog = OverviewDialog(self, "Scan Results & Locations", (840, 650))
         contents = column(spacing=10, margins=(16, 16, 16, 16))
         dialog.setLayout(contents)
         contents.addWidget(label("Scan Results & Locations", "sectionTitle"))
         contents.addWidget(label("Add missing libraries here. Steam and Xbox folders are verified from their local installation metadata; other custom folders stay labeled unverified.", "subtle", wrap=True))
         table = _table(["Source", "Status", "Found", "Locations / Coverage"])
         table.setMinimumHeight(180)
-        from gg_desktop.overview_storage_ui import coverage_reports
         reports = self.inventory.source_reports or coverage_reports(self.inventory, self.settings)
         table.setRowCount(len(reports))
         for i, result in enumerate(reports):

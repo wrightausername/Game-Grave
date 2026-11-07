@@ -13,6 +13,7 @@ on:
       - 'tests/test_overview_data.py'
       - 'tests/test_overview_storage.py'
       - 'tools/overview_tab_lock.py'
+      - 'tools/overview_human_walkthrough.py'
       - 'tests/test_games_functionality.py'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -47,6 +48,7 @@ on:
       - 'tests/test_overview_data.py'
       - 'tests/test_overview_storage.py'
       - 'tools/overview_tab_lock.py'
+      - 'tools/overview_human_walkthrough.py'
       - 'tests/test_games_functionality.py'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -116,8 +118,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room native scale, navigation or controls failed.' }
           python tools/overview_scope_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room or another locked tab changed while repairing Overview.' }
+          python tools/overview_scope_smoke.py --foundation --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Overview default dashboard changed during usability fixes.' }
           python tools/overview_live_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Overview measurements or live controls failed.' }
+          python tools/overview_human_walkthrough.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Overview human click-through or dialog readability failed.' }
           python tools/ready_room_live_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room live news or verified backup checks failed.' }
           python tools/render_reference_previews.py --output _ci_temp
@@ -138,7 +144,9 @@ jobs:
             _ci_temp/photo-*.png
             _ci_temp/*-1280.png
             _ci_temp/overview-tab-lock/**/hashes.json
+            _ci_temp/overview-foundation-lock/**/hashes.json
             _ci_temp/overview-measurement.json
+            _ci_temp/overview-human-journeys.json
           if-no-files-found: error
           retention-days: 14
       - name: Build standalone unsigned Qt EXE
@@ -232,13 +240,15 @@ jobs:
           Copy-Item '_ci_temp/overview-functional-1450.png' (Join-Path $taskBundle 'Overview-Preview.png')
           Copy-Item '_ci_temp/overview-functional-1280.png' (Join-Path $taskBundle 'Overview-Preview-1280.png')
           Copy-Item '_ci_temp/overview-functional-960.png' (Join-Path $taskBundle 'Overview-Preview-960.png')
+          Copy-Item '_ci_temp/overview-human-storage.png' (Join-Path $taskBundle 'Overview-Storage-Details.png')
+          Copy-Item '_ci_temp/overview-human-search-results.png' (Join-Path $taskBundle 'Overview-Search-Results.png')
           $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
             $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$digest  $($_.Name)"
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Overview measured storage Windows preview 0.2.10',
+            'Game Grave Overview usability Windows preview 0.2.11',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
