@@ -94,7 +94,15 @@ def probe(root, fixtures, output, foundation=False):
                     app.processEvents()
                     window.page.setFocusPolicy(Qt.StrongFocus)
                     window.page.setFocus()
-                    QTest.qWait(10)
+                    if foundation:
+                        # Native Windows can queue the responsive grid's paint
+                        # after the resize/layout events. Record the transition
+                        # and compare the settled user-visible dashboard.
+                        if not populated and width == 960:
+                            assert window.grab().save(str(output/"transition-empty-960-overview.png"))
+                        QTest.qWait(180)
+                    else:
+                        QTest.qWait(10)
                     assert window.nav_rail.isVisible() and window.top_bar.isVisible(), route
                     image = window.grab().toImage().convertToFormat(QImage.Format_RGBA8888)
                     key = f"{'populated' if populated else 'empty'}-{width}-{route.lower().replace(' ', '-')}"
