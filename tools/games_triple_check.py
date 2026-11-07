@@ -360,6 +360,15 @@ def walkthrough(output):
                 click(button(window, "Mods"))
                 assert destination.call_args.args == ("Mods",)
             passed("Game DNA carries the selected game key; Mods opens the existing tab")
+            rockstar_game = next(game for game in records if game.launcher == "Rockstar Games")
+            select(window, rockstar_game.key)
+            with patch.object(window, "navigate") as destination, patch.object(window, "info") as info:
+                click(button(window, "Game DNA"))
+                destination.assert_not_called()
+                assert rockstar_game.install_path in info.call_args.args[1]
+                assert "Rockstar Games" in info.call_args.args[1]
+            passed("Additional Rockstar Game DNA shows that game's profile instead of another game's default")
+            select(window, ea.key)
             original_records = window.page.games.records
             many = [replace(ea, key="large-"+str(index), name=f"Large library {index:04}") for index in range(1003)]
             window.page.games.records = many

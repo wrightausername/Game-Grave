@@ -218,7 +218,7 @@ class GamesScreens:
         ):
             detail_line(contents, symbol, title, value)
         actions = row(spacing=5)
-        actions.addWidget(tile_action("Game DNA", "dna", lambda: self._photo_game_dna(game)))
+        actions.addWidget(tile_action("Game DNA", "dna", lambda: self.page.games.show_dna(game)))
         actions.addWidget(tile_action("Mods", "mods", lambda: self.navigate("Mods")))
         actions.addWidget(tile_action("Save Vault", "storage", self._create_save_backup))
         contents.addWidget(_widget(actions))

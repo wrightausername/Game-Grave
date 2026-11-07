@@ -261,7 +261,21 @@ class GamesActions(GamesController):
             self.window.error("Game action unavailable", str(exc))
 
     def show_dna(self, game):
-        self.current(game)
+        game = self.current(game)
+        if not any(row.key == game.key for row in self.window.inventory.games):
+            # Additional Games-only installs must never fall through to an
+            # unrelated default selection in the unchanged Game DNA tab.
+            from game_intelligence import build_game_dna
+            profile = build_game_dna(other_games=(game,), mods=self.window.inventory.mods,
+                                     saves=self.window.inventory.saves)["games"][0]
+            locations = [asset["path"] for asset in profile["assets"]]
+            details = "\n".join(locations[:20]) if locations else "No associated mod locations verified in the current scan."
+            self.window.info("Game DNA · " + game.name,
+                game.launcher + "\n\nInstallation: " + game.install_path + "\n\n" +
+                game.install_evidence + "\n\nAssociated locations:\n" + details +
+                "\n\nProfile generated from this game's detected installation and the current local scan."
+                "\nRelationships do not authorize file removal. Save ownership remains unverified.")
+            return
         self.window._pending_dna_game_key = game.key
         self.window.navigate("Game DNA")
 

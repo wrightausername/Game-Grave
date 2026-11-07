@@ -10,6 +10,8 @@ folders; the launcher filter can select each detected launcher separately.
 Counts represent local installation records, not online account ownership.
 Games additionally reads game-specific Rockstar / legacy EA registry records
 in both Windows registry views. These extra records remain local to Games.
+Their Game DNA button shows a profile of the selected installation within
+Games, retaining the other tabs' accepted inventory.
 
 Each game has a cover card with its launcher badge. Local covers, chosen
 artwork and cached official art work offline across launchers. Game options

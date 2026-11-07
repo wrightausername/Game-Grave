@@ -16,6 +16,9 @@ Rockstar and legacy EA registry keys in both Windows views, validates ordinary
 existing install directories, excludes launcher/social-club entries and counts
 an already accepted install directory once. Extra Games records do not mutate
 the common inventory or change the data shown by another tab.
+Their Game DNA entry builds a local profile for the selected installation
+within Games, so it cannot open an unrelated default game in the unchanged
+Game DNA tab. Records already present in the common scan retain that tab link.
 
 Cards preserve launcher identities when downloading artwork. Exact public Steam
 title matches can supply covers for EA, Rockstar, Epic, Ubisoft, GOG, Xbox,
@@ -43,7 +46,7 @@ Steam verify/DLC/uninstall, non-Steam guidance, correct context selection,
 artwork choose/reset/download/offline/corrupt/cancel, failed preference writes,
 stale manifests, folders, Save Vault entry, Game DNA/Mods navigation, grid/list,
 the final game in a 1,003-game library, Scan PC and the narrow Details drawer.
-There are 65 journeys per process, run in three fresh processes (195 checks).
+There are 66 journeys per process, run in three fresh processes (198 checks).
 The existing local unit suite passes 527 tests with one platform skip.
 The existing photo functionality and all-route geometry smoke also pass.
 Native Windows repeats the matrix and locked-tab comparisons before packaging.
