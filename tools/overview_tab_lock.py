@@ -24,7 +24,7 @@ def probe(root, fixtures, output, foundation=False):
     if sys.platform.startswith("linux"):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtCore import QCoreApplication, QEvent, Qt
-    from PySide6.QtGui import QImage
+    from PySide6.QtGui import QCursor, QImage
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication
     from core import SteamGame, ModFolder, OldFile, default_settings
@@ -67,7 +67,11 @@ def probe(root, fixtures, output, foundation=False):
         stack.enter_context(patch.object(CrimsonWindow, "error", side_effect=AssertionError("Unexpected UI error")))
         for populated in (False, True):
             window = CrimsonWindow()
+            # Capture a neutral, reproducible state on Windows; placement and
+            # a cursor left by a preceding click-through must not add hover.
+            window.move(20, 20)
             window.show()
+            QCursor.setPos(window.screen().geometry().topLeft())
             if populated:
                 window.inventory = Inventory(steam=[steam], games=merge_games([steam], []), mods=[mod], files=[file], scanned_at="2026-11-06 12:00")
                 window.inventory.graveyard = build_graveyard([steam], [mod], [file], 365)
