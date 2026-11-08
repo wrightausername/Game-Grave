@@ -118,6 +118,7 @@ def main():
              patch("gg_desktop.undo_page.get_activity", return_value=[]), \
              patch("gg_desktop.assistant_page.get_records", return_value=undo_rows), \
              patch("gg_desktop.assistant_page.get_activity", return_value=[]), \
+             patch("gg_desktop.settings_page.get_records", return_value=[]), \
              patch("gg_desktop.reference_overview.get_records", return_value=undo_rows), \
              patch("gg_desktop.reference_overview.get_activity", return_value=[
                  {"kind": name, "details": "Synthetic design fixture", "date": datetime.now().astimezone().isoformat()}

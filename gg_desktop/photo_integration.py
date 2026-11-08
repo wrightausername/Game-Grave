@@ -400,6 +400,10 @@ class PhotoIntegration:
         from gg_desktop import assistant_page
         assistant_page.build(self)
 
+    def settings_page(self):
+        from gg_desktop import settings_page
+        settings_page.build(self)
+
     def graveyard_page(self):
         from gg_desktop import grave_page
         self._merge_manual_reviews()

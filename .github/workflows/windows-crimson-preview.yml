@@ -45,6 +45,9 @@ on:
       - 'tools/assistant_tab_lock.py'
       - 'tools/assistant_page_smoke.py'
       - 'tests/test_assistant.py'
+      - 'tools/settings_tab_lock.py'
+      - 'tools/settings_page_smoke.py'
+      - 'tests/test_settings.py'
       - 'tools/mods_tab_lock.py'
       - 'tools/mods_page_smoke.py'
       - 'tools/fixtures/games-covers/**'
@@ -113,6 +116,9 @@ on:
       - 'tools/assistant_tab_lock.py'
       - 'tools/assistant_page_smoke.py'
       - 'tests/test_assistant.py'
+      - 'tools/settings_tab_lock.py'
+      - 'tools/settings_page_smoke.py'
+      - 'tests/test_settings.py'
       - 'tools/mods_tab_lock.py'
       - 'tools/mods_page_smoke.py'
       - 'tools/fixtures/games-covers/**'
@@ -144,7 +150,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write # only used to publish review screenshots to claude/old-files-screenshots, claude/other-storage-screenshots, claude/captures-screenshots, claude/graveyard-screenshots, claude/dna-screenshots, claude/undo-screenshots and claude/assistant-screenshots
+  contents: write # only used to publish review screenshots to claude/old-files-screenshots, claude/other-storage-screenshots, claude/captures-screenshots, claude/graveyard-screenshots, claude/dna-screenshots, claude/undo-screenshots, claude/assistant-screenshots and claude/settings-screenshots
 
 jobs:
   desktop:
@@ -172,7 +178,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -186,8 +192,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Undo Center filters, status, restore, hide or layout failed in native Qt.' }
           python tools/assistant_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'AI Assistant answers, sources, saved chats, hand-offs or layout failed in native Qt.' }
-          python tools/assistant_tab_lock.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Undo Center, Game DNA, Graveyard, Captures, Other Storage, Old Files, Mods, Games, Overview, Ready Room or another tab changed during AI Assistant work.' }
+          python tools/settings_page_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Settings preferences, saves, excluded folders, protection, export/import or layout failed in native Qt.' }
+          python tools/settings_tab_lock.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'AI Assistant, Undo Center, Game DNA, Graveyard, Captures, Other Storage, Old Files, Mods, Games, Overview, Ready Room or another tab changed during Settings work.' }
           python tools/mods_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Mods status, tabs, bulk actions or sources failed in native Qt.' }
           python tools/old_files_page_smoke.py --output _ci_temp
@@ -370,6 +378,28 @@ jobs:
           git commit -q -m "AI Assistant screenshots from run $env:GITHUB_RUN_ID"
           git push -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" HEAD:refs/heads/claude/assistant-screenshots
           Pop-Location
+      - name: Publish Settings screenshots to a review branch
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $shots = @(Get-ChildItem _ci_temp -Filter 'settings-*.png') + @(Get-ChildItem _ci_temp -Filter 'photo-settings-*.png')
+          if (-not $shots) { Write-Host 'No Settings screenshots to publish.'; exit 0 }
+          $dir = Join-Path $env:RUNNER_TEMP 'settings-shots'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item $shots.FullName $dir
+          Set-Content -Path (Join-Path $dir 'README.md') -Value "Rendered by Windows CI run $env:GITHUB_RUN_ID from $env:GITHUB_SHA. Review only; not part of the app."
+          Push-Location $dir
+          git init -q
+          git config user.name 'Game Grave CI'
+          git config user.email 'ci@users.noreply.github.com'
+          git checkout -q -b claude/settings-screenshots
+          git add -A
+          git commit -q -m "Settings screenshots from run $env:GITHUB_RUN_ID"
+          git push -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" HEAD:refs/heads/claude/settings-screenshots
+          Pop-Location
       - name: Upload actual Qt screen captures for design review
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -391,6 +421,8 @@ jobs:
             _ci_temp/undo-*.png
             _ci_temp/assistant-*.png
             _ci_temp/assistant-tab-lock/**/*game-dna*.png
+            _ci_temp/settings-*.png
+            _ci_temp/settings-tab-lock/**/*game-dna*.png
             _ci_temp/photo-*.png
             _ci_temp/*-1280.png
             _ci_temp/overview-tab-lock/**/hashes.json
