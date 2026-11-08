@@ -126,6 +126,7 @@ def build(window):
     self._old_entries_key = None
     self._old_entries = []
     self._shown_old_files = []
+    self._shown_old_entries = []
     self._shown_old_groups = []
     self._old_view = "files"
     self._old_tab = "File Scan"
