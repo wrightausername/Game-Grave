@@ -60,64 +60,22 @@ layout, tabs, controls, statuses or behavior, or anything that reaches it throug
 styles, widgets, navigation, controllers or backend code, unless the owner explicitly
 reopens it. The next tab's lock must freeze Mods against this commit.
 
-Active tab: none until the owner names the next one. Do not start another tab on your own.
+Active tab: Old Files. The owner named it ("Let's work on old files next... have it look
+exactly like this... needs complete functionality"). Work is confined to the Old Files
+methods of `PhotoIntegration`, new Old Files modules and the existing Old Files modules.
+Mods is locked at the commit above and Games is frozen at commit
+593354b0e24b1ad03b513b04e6902b44fe511b1a. Nothing in Old Files permanently deletes;
+removal is Recycle Bin only, after confirmation and the existing identity, age, scope and
+protection re-checks. Show only what a scan can prove: no invented "safe to remove" claims.
+The owner has not signed off on Old Files.
 
-Previous active tab (Mods, now locked):
- The owner directed work to the Mods section ("Mods section needs
-full functionality right now... we are working each section 1 at a time"). Games is not
-signed off but is frozen at commit 593354b0e24b1ad03b513b04e6902b44fe511b1a; do not change it, its controllers or its
-artwork until the owner says. Mods work is confined to the Mods methods of
-`PhotoIntegration`, `gg_desktop/mods_page.py`, `gg_desktop/mods_insight.py` and the
-existing Mods modules; `tools/mods_tab_lock.py` enforces this. Mod managers' files are never
-modified, and nothing in Mods deletes anything: managed mods, profiles and saves stay protected.
+Earlier history (kept for context; none of these tabs is open):
 
-Previous active tab (Games). The owner explicitly reopened Games to triple-check its
-functionality and ensure launcher cards and game artwork cover Steam, EA,
-Rockstar, Epic and other launchers. Preserve the locked Games photo layout.
-Confine fixes to Games, its own controllers, artwork and launcher adapters.
-The owner has not signed off on Games or authorized moving to the next tab.
-The owner has now explicitly authorized finishing the remaining Games gaps:
-real launcher management actions, ownership/update/playtime integration, and
-automatic artwork coverage. Account connections, their private storage and
-provider adapters must remain Games-only. Show accurate capabilities and data
-sources; never substitute fake ownership, playtime or completion messages.
+Games: the owner reopened it to finish launcher management, ownership/update/playtime
+integration and artwork coverage, then fixed its banner artwork. Not signed off; frozen at
+the commit above. Account connections, private storage and provider adapters stay Games-only.
+Show accurate capabilities and data sources; never substitute fake ownership, playtime or
+completion messages.
 
-Preserve Overview exactly as it stands in Windows preview 0.2.12, commit
-df6bd6628adf6dd9713fe41235acb618da594574. The owner moved the current work to
-Games; this does not authorize further Overview edits or imply new signoff.
-Protect all twelve other tabs, including Overview and the locked Ready Room,
-against this source and rendered baseline during Games work.
-
-Latest request: fix the Games banner artwork only. Preserve its geometry,
-title, subtitle, header controls, library layout and existing functionality.
-Use the original artwork; align its header rendering without changing shared
-TitleBar/PageBanner implementations or any other tab.
- The owner directed work to the Mods section ("Mods section needs
-full functionality right now... we are working each section 1 at a time"). Games is not
-signed off but is frozen at commit 593354b0e24b1ad03b513b04e6902b44fe511b1a; do not change it, its controllers or its
-artwork until the owner says. Mods work is confined to the Mods methods of
-`PhotoIntegration`, `gg_desktop/mods_page.py`, `gg_desktop/mods_insight.py` and the
-existing Mods modules; `tools/mods_tab_lock.py` enforces this. Mod managers' files are never
-modified, and nothing in Mods deletes anything: managed mods, profiles and saves stay protected.
-
-Previous active tab (Games). The owner explicitly reopened Games to triple-check its
-functionality and ensure launcher cards and game artwork cover Steam, EA,
-Rockstar, Epic and other launchers. Preserve the locked Games photo layout.
-Confine fixes to Games, its own controllers, artwork and launcher adapters.
-The owner has not signed off on Games or authorized moving to the next tab.
-The owner has now explicitly authorized finishing the remaining Games gaps:
-real launcher management actions, ownership/update/playtime integration, and
-automatic artwork coverage. Account connections, their private storage and
-provider adapters must remain Games-only. Show accurate capabilities and data
-sources; never substitute fake ownership, playtime or completion messages.
-
-Preserve Overview exactly as it stands in Windows preview 0.2.12, commit
-df6bd6628adf6dd9713fe41235acb618da594574. The owner moved the current work to
-Games; this does not authorize further Overview edits or imply new signoff.
-Protect all twelve other tabs, including Overview and the locked Ready Room,
-against this source and rendered baseline during Games work.
-
-Latest request: fix the Games banner artwork only. Preserve its geometry,
-title, subtitle, header controls, library layout and existing functionality.
-Use the original artwork; align its header rendering without changing shared
-TitleBar/PageBanner implementations or any other tab.
+Overview: preserve exactly as in Windows preview 0.2.12, commit
+df6bd6628adf6dd9713fe41235acb618da594574. No further Overview edits and no new signoff.
