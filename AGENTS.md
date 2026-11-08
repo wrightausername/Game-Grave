@@ -118,16 +118,22 @@ the activity log. "Restore to Custom Location" is not built because the engine r
 path only; adding it needs the owner's explicit approval to change `recovery.py`. The next tab's lock
 must freeze Undo Center against this commit.
 
-Active tab: AI Assistant. The owner approved the AI Assistant and Settings mockups (stored as
-`gg_desktop/assets/references/assistant.jpg` and `settings.jpg`) and asked for them to be made
-functional, one tab at a time. Work is confined to `assistant_data.py`, `assistant_engine.py`,
-`assistant_actions.py`, `assistant_page.py`, the `assistant_page` method in `photo_integration.py`
-and the assistant tests and tools. It is a local, rule-based, read-only assistant over scanned data
-the owner switches on; it never says anything is safe to remove, reports sizes as reported (never
-freed) and hands off to the owning tab. Every locked tab above stays frozen.
+AI Assistant: OWNER SIGNED OFF AND LOCKED ("Lock in ai assistant for now and move on"). The approved
+baseline is commit 040951c7c85c367d23841c091573e1610fe11e67 on branch `claude/old-files-full-functionality`,
+Windows run https://github.com/wrightausername/Game-Grave/actions/runs/42512547513. Do not change its
+layout, controls or behavior, or anything that reaches it through shared code, unless the owner
+explicitly reopens it. Its honest-claims rules stay: a local, rule-based, read-only assistant over
+scanned data the owner switches on; it answers only from enabled sources and names sources that are off
+or empty; sizes are "reported", never freed; it never says anything is safe to remove; it hands off to
+the owning tab. The next tab's lock must freeze AI Assistant against this commit.
 
-Next tabs: Settings follows only after the owner locks AI Assistant and says to move on. More Tools
-waits for the owner (its photo is saved as `references/more_tools.jpg`). Do not start either until then.
+Active tab: Settings. The owner approved the Settings mockup (stored as
+`gg_desktop/assets/references/settings.jpg`) and asked for it to be made functional. Work is confined to
+new `settings_*.py` modules, a `settings_page` delegation in `photo_integration.py` and the settings
+tests and tools. Every locked tab above stays frozen.
+
+Next tab: More Tools waits for the owner (its photo is saved as `references/more_tools.jpg`). Do not
+start it until the owner says so.
 
 Earlier history (kept for context; none of these tabs is open):
 
