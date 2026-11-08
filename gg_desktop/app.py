@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QProgressBar, QVBoxLayout, QWidget, QScrollArea, QLineEdit,
 )
-from core import load_settings
+from gg_desktop.settings_store import load_settings
 from gg_desktop.backend import Inventory, scan_inventory, ScanCanceled
 from gg_desktop.theme import STYLE
 from gg_desktop.widgets import label, button, row, column, ScrollPage
@@ -391,5 +391,8 @@ def main() -> int:
     app.setStyleSheet(STYLE)
     app.setQuitOnLastWindowClosed(True)
     win = CrimsonWindow(reference_preview="--ready-room-reference" in sys.argv)
-    win.show()
+    if win.settings.get("start_minimized") is True and not win.reference_preview:
+        win.showMinimized()
+    else:
+        win.show()
     return app.exec()

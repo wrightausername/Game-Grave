@@ -86,6 +86,10 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
             extra_steam_roots=list(settings.get("steam_extra_roots", [])), cancel=canceled)
     except (OSError, ValueError) as exc:
         staged.warnings.append("Screenshots partially unavailable (" + type(exc).__name__ + ").")
+    excluded = settings.get("excluded_folders", [])
+    if excluded:
+        from gg_desktop.settings_rules import filter_inventory
+        filter_inventory(staged, list(excluded))
     stage(4, STAGES[4])
     from save_discovery import discover_saves
     staged.saves = discover_saves()

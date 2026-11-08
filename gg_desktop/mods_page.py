@@ -348,7 +348,12 @@ TABS = {
 
 
 def set_tab(window, name):
-    window._mod_tab = name if name in TAB_NAMES else "Library"
+    tab = name if name in TAB_NAMES else "Library"
+    if tab != getattr(window, "_mod_tab", None):
+        # Rows from the tab being left carry that tab's payloads. Drop them so a selection signal that fires
+        # while the table is rebuilt cannot read them as the new tab's rows.
+        window._mod_tab_rows = []
+    window._mod_tab = tab
     window._fill_mods()
 
 
@@ -523,7 +528,7 @@ def profile_details(window, control, contents, item):
 
 
 def conflict_details(window, control, contents, item):
-    if not item:
+    if not item or not isinstance(item.payload, dict) or "finding" not in item.payload:
         contents.addWidget(label("Conflicts", "detailTitle", wrap=True))
         contents.addWidget(plain_label(control.message if control.busy else
                                        "Select a finding to see the mods and files involved."))
