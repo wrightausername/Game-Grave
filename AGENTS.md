@@ -85,12 +85,19 @@ explicitly reopens it. Its honest-claims rules stay: ownership only from proof, 
 delete" claim, Recycle Bin only after confirmation and per-file re-checks. The next tab's lock must
 freeze Captures against this commit.
 
-Active tab: Graveyard. The owner named it ("now move on to the graveyard"). Work is confined to the
-Graveyard methods of `PhotoIntegration`, new Graveyard modules and the existing Graveyard UI code.
-Every other tab is frozen: Captures, Other Storage, Old Files and Mods at the commits above, Games at
-commit 593354b0e24b1ad03b513b04e6902b44fe511b1a. The protected engines (`graveyard.py`,
-`graveyard_protection.py`, core, recovery) are byte-guarded; changing them needs the owner's explicit
-approval. Show only what the data proves. The owner has not signed off on Graveyard.
+Graveyard: OWNER SIGNED OFF AND LOCKED ("Yes lock it in"). The approved baseline is commit
+1202b47cad0103c3a8aed61d2c13b67cdbf2de15 on branch `claude/old-files-full-functionality`, Windows run
+https://github.com/wrightausername/Game-Grave/actions/runs/42478374434. Do not change its layout,
+tabs, controls or behavior, or anything that reaches it through shared code, unless the owner
+explicitly reopens it. Its honest-claims rules stay: the Evidence column (Direct, Location, Name hint,
+Age only, Yours) replaces any confidence claim, "Reviewable" never means safe to remove, leftover
+scanning only runs when the owner presses Scan Leftovers, and removal is only single archives or
+recordings to the Recycle Bin through the existing verified path (screenshots one at a time after
+preview; games via Steam; mods via Mods; folders via Other Storage). The next tab's lock must freeze
+Graveyard against this commit.
+
+Active tab: none. The owner has not named the next tab. Do not start one on your own; wait for the
+owner to name it, acknowledge it in chat, then record it here.
 
 Earlier history (kept for context; none of these tabs is open):
 
