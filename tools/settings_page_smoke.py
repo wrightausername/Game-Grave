@@ -288,7 +288,7 @@ def main():
             window.navigate("Overview")
             window.navigate("Settings")
             settle()
-            assert window.settings_window.settings_controls["scan_on_launch"][0].isChecked() and window.settings_apply.isEnabled()
+            assert window.settings_controls["scan_on_launch"][0].isChecked() and window.settings_apply.isEnabled()
             window.settings_cancel.click()
 
             # Layout at the supported sizes on every tab: no sideways scrolling.
