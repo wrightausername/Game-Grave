@@ -439,7 +439,7 @@ def update_facets(window):
     update_sources(window)
     hidden = len([e for e in state.entries if e.key in state.hidden])
     window.undo_hidden_row.name.setText(f"Show hidden rows ({hidden})")
-    window.undo_hidden_row.set_count(None)
+    window.undo_hidden_row.count.setText("")
 
 
 # ------------------------------------------------------------------ table
