@@ -16,7 +16,7 @@ import uuid
 from PySide6.QtCore import QRect, QRectF, QSignalBlocker, QSize, Qt, QUrl, QProcess
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QPainter
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFrame, QHeaderView, QLabel, QListWidget,
-                               QListWidgetItem, QMenu, QStyle, QStyledItemDelegate, QStyleOptionViewItem)
+                               QListWidgetItem, QMenu, QSizePolicy, QStyle, QStyledItemDelegate, QStyleOptionViewItem)
 from shiboken6 import isValid
 
 from core import human_size, is_protected_path, save_settings
@@ -348,7 +348,10 @@ def refresh(window):
             dot = QLabel("■")
             dot.setStyleSheet(f"color:{STORAGE_COLORS[STORAGE_TYPES.index(kind)]}; font-size:10px;")
             cell.addWidget(dot)
-            cell.addWidget(label(f"{insight.PILLS[kind]}  {percent}", "caption"))
+            text = label(f"{insight.PILLS[kind]}  {percent}", "caption")
+            text.setMinimumWidth(0)
+            text.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            cell.addWidget(text)
             cell.addStretch()
             line.addWidget(_widget(cell), 1)
         window.storage_legend.addWidget(_widget(line))

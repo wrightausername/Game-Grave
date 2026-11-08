@@ -257,6 +257,11 @@ def main():
             for width, height in ((1280, 720), (1440, 900), (960, 650)):
                 window.resize(width, height)
                 settle()
+                if window.page.horizontalScrollBar().maximum() != 0:
+                    from PySide6.QtWidgets import QWidget
+                    wide = sorted(((w.minimumSizeHint().width(), type(w).__name__, w.objectName(), getattr(w, "text", lambda: "")() if hasattr(w, "text") else "")
+                                   for w in window.page.findChildren(QWidget)), reverse=True)[:12]
+                    print("Horizontal overflow at", (width, height), "viewport", window.page.viewport().width(), "widest minimum sizes:", wide)
                 assert window.page.horizontalScrollBar().maximum() == 0, (width, height)
                 assert window.grab().save(str(args.output / f"other-storage-page-{width}.png"))
             errors.assert_not_called()
