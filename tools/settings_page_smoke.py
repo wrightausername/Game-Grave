@@ -110,7 +110,7 @@ def main():
                 was = switch.isChecked()
                 switch.click()
                 assert switch.isChecked() == was
-            assert sum(1 for s in window.findChildren(settings_page.Switch) if s.locked and s.isChecked()) == 3
+            assert sum(1 for s in window.findChildren(settings_page.Switch) if s.locked and s.isChecked()) == 6, "three locked switches on each of the two pages that show Protection"
             update = next(s for s in window.findChildren(settings_page.Switch) if s.accessibleName() == "Check for updates on launch")
             assert not update.isEnabled() and not update.isChecked()
             assert not window.settings_apply.isEnabled()
