@@ -65,7 +65,6 @@ PATHS = {
 }
 
 
-@lru_cache(maxsize=192)
 LAUNCHER_ASSETS = Path(__file__).parent / "assets" / "launchers"
 # Original monogram badges. Official launcher artwork dropped into assets/launchers/<name>.png or .svg is used instead.
 LAUNCHER_MARKS = {"epic": ("E", "#e2e4e7"), "ea": ("EA", "#fa284a"), "battlenet": ("B", "#3ba9ed"),
@@ -110,6 +109,7 @@ def launcher_pixmap(name: str, size: int = 22, dpr: int = 4) -> QPixmap:
     return pix
 
 
+@lru_cache(maxsize=192)
 def icon(name: str, color="#e1e3e7", size=22) -> QIcon:
     if name in LAUNCHER_MARKS:
         return QIcon(launcher_pixmap(name, max(size, 22), 4))
