@@ -241,89 +241,48 @@ class PhotoIntegration:
         self.navigate("More Tools")
 
     def old_files_page(self):
-        LibraryScreens.old_files_page(self)
-        page = self.page
-        page.content.itemAt(0).widget().setFixedHeight(74)
-        self.old_search.hide()  # The photo uses the global search above this workspace.
-        self.old_age_controls[0].hide()
-        holder = QWidget(page)
-        contents = column()
-        holder.setLayout(contents)
-        holder.hide()
-        page.old_files = OldFilesController(self, page, contents)
-        control = page.old_files
-        for shortcut in control.shortcuts:
-            shortcut.setEnabled(False)
-        page.photo_search_shortcut = QShortcut(QKeySequence("Ctrl+F"), page)
-        page.photo_search_shortcut.activated.connect(self.global_search.setFocus)
-        page.photo_page_shortcuts = []
-        for sequence, direction in (("Ctrl+PgDown", 1), ("Ctrl+PgUp", -1)):
-            shortcut = QShortcut(QKeySequence(sequence), page)
-            shortcut.activated.connect(lambda direction=direction: self._fill_old_files(requested_page=self.old_pager.page + direction))
-            page.photo_page_shortcuts.append(shortcut)
-        filters = self.old_filters.layout()
-        # The location selector replaces the old textual location line.
-        filters.itemAt(2).widget().hide()
-        for index in range(filters.count()):
-            widget = filters.itemAt(index).widget()
-            if isinstance(widget, QLabel) and widget.text().startswith("Scan includes files"):
-                widget.hide()
-        self.photo_drives = DrivePicker(self._refresh_photo_drives)
-        self.photo_drives.setAccessibleName("Old Files scan drive or selected folder")
-        self.photo_drives.setToolTip("Choose a scan drive. Opening this list refreshes connected drives.")
-        for index in range(control.drives.count()):
-            self.photo_drives.addItem(control.drives.itemText(index), control.drives.itemData(index))
-        self.photo_drives.setCurrentIndex(control.drives.currentIndex())
-        filters.insertWidget(3, self.photo_drives)
-        self.photo_full = QCheckBox("Full scan (optional)")
-        self.photo_full.setChecked(control.state.full)
-        self.photo_full.setEnabled(bool(self.photo_drives.currentData()))
-        filters.insertWidget(4, self.photo_full)
-        self.photo_drives.currentIndexChanged.connect(lambda index: self._photo_choose_drive(index))
-        self.photo_full.toggled.connect(control.full.setChecked)
-        self.photo_cancel = tool("Cancel Scan", "close", control.state.cancel)
-        filters.insertWidget(filters.count() - 1, self.photo_cancel)
-        control.state.changed.connect(lambda: self._photo_old_changed(page) if isValid(page) and self.page is page else None)
-        self._photo_old_changed(page)
-        page.photo_inspector = ResponsiveInspector(page, self.old_details.parentWidget().parentWidget())
+        from gg_desktop import old_files_page
+        old_files_page.build(self)
 
     def _refresh_photo_drives(self):
-        control = self.page.old_files
-        control.refresh_drives()
-        with QSignalBlocker(self.photo_drives):
-            self.photo_drives.clear()
-            for index in range(control.drives.count()):
-                self.photo_drives.addItem(control.drives.itemText(index), control.drives.itemData(index))
-            self.photo_drives.setCurrentIndex(control.drives.currentIndex())
-        self.photo_full.setChecked(control.state.full)
-        self._photo_old_changed(self.page)
+        from gg_desktop import old_files_page
+        old_files_page.refresh_drives(self)
 
     def _photo_choose_drive(self, index):
-        control = self.page.old_files
-        control.drives.setCurrentIndex(index)
-        self.photo_full.setEnabled(bool(control.drives.currentData()))
+        from gg_desktop import old_files_page
+        old_files_page.choose_drive(self, index)
 
     def _photo_old_changed(self, page):
-        if not isValid(page) or self.page is not page:
-            return
-        state = page.old_files.state
-        self.photo_cancel.setVisible(state.busy)
-        self.photo_drives.setEnabled(not state.busy and not self.cleaning)
-        self.photo_full.setEnabled(not state.busy and bool(state.location))
-        if state.result:
-            self._old_source = list(state.result.files)
-            self._old_root, self._old_days = state.result.plan.root, state.result.plan.days
-            metrics = page.findChild(MetricStrip)
-            metrics.set_value(0, f"{len(self._old_source):,}")
-            metrics.set_value(1, human_size(sum(file.size for file in self._old_source)))
-            downloads = sum(file_kind(file.path) in {"Archives", "Installers"} for file in self._old_source)
-            metrics.set_value(4, downloads)
-            metrics.set_value(5, len(self._old_source) - downloads)
-            metrics.setToolTip(f"{state.result.plan.mode.capitalize()} scan: {state.result.plan.root}\n{state.result.summary()}")
-        self._fill_old_files()
-        self.old_notice.setText(state.message)
-        self.old_notice.setTextFormat(Qt.PlainText)
-        self.old_notice.setVisible(state.busy or bool(state.result and state.result.limited) or "failed" in state.message.lower())
+        from gg_desktop import old_files_page
+        old_files_page.changed(self, page)
+
+    def _fill_old_files(self, *args, requested_page=0, **kwargs):
+        from gg_desktop import old_files_page
+        old_files_page.fill(self, *args, requested_page=requested_page, **kwargs)
+
+    def _set_old_tab(self, name):
+        from gg_desktop import old_files_page
+        old_files_page.set_tab(self, name)
+
+    def _select_old_visible(self, selected):
+        from gg_desktop import old_files_page
+        old_files_page.select_visible(self, selected)
+
+    def _selected_old(self):
+        from gg_desktop import old_files_page
+        return old_files_page.selected_files(self)
+
+    def _old_selection_count(self, *_):
+        from gg_desktop import old_files_page
+        old_files_page.selection_count(self)
+
+    def _old_details(self):
+        from gg_desktop import old_files_page
+        old_files_page.details(self)
+
+    def _protect_old_selected(self):
+        from gg_desktop import old_files_page
+        old_files_page.protect_selected(self)
 
     def _old_scan(self):
         if hasattr(self.page, "old_files"):
