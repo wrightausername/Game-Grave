@@ -595,6 +595,19 @@ jobs:
             release/GameGrave-Crimson-Preview-Setup.sha256
           if-no-files-found: error
           retention-days: 14
+      - name: Publish the preview EXE to a draft release (visible only to repo collaborators)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "preview-run-$env:GITHUB_RUN_ID"
+          gh release create $tag --repo $env:GITHUB_REPOSITORY --draft --prerelease --target $env:GITHUB_SHA `
+            --title "Game Grave preview (unsigned) run $env:GITHUB_RUN_ID" `
+            --notes "Unsigned Windows preview built by CI run $env:GITHUB_RUN_ID from $env:GITHUB_SHA. Draft: only collaborators can see or download it. Not a signed 1.0 release." `
+            release/GameGrave-Crimson-Preview-Setup.exe release/GameGrave-Crimson-Preview-Setup.sha256 dist/GameGrave-Crimson-Preview.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Draft release was not created.' }
 
 # NOT a signed 1.0 release; LGPL/Qt redistributable obligations,
 # full UI feature parity, physical Windows human tests and beta remain open.
