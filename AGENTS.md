@@ -67,16 +67,22 @@ Other Storage after the banner fix, so Old Files stays locked unless the owner r
 no separate "lock it in" message, so treat that as not formally signed off. Nothing in Old Files
 permanently deletes; removal is Recycle Bin only after the existing re-checks.
 
-Active tab: Other Storage. The owner named it ("work on other storage and make sure it has full
-functionality"). Work is confined to the Other Storage methods of `PhotoIntegration`, the
-`other_storage_*` modules and `header_banner.py` use from that page. Old Files, Mods (locked at the
-commit above), Games (frozen at commit 593354b0e24b1ad03b513b04e6902b44fe511b1a) and every other tab
-are frozen at commit 9410e0ec496b1ee794d54cd43ecf2db480a0ea66 by `tools/other_storage_tab_lock.py`.
-Show only what a scan can prove: no invented "safe to clear" claims. Driver and Steam library caches
-are review only; settings and saves are never removable; launcher cache and log folders of 200 files or
-fewer can go to the Recycle Bin after confirmation and per-file re-checks. Core's protected engine
-(`core.py`, `cleanup_actions.py`) is byte-guarded and must not be changed to widen deletion without the
-owner's explicit approval. The owner has not signed off on Other Storage.
+Other Storage: OWNER SIGNED OFF AND LOCKED ("good lock it in"). The approved baseline is commit
+0689695ee5ada524f0c96eaa674488b8c2e180be on branch `claude/old-files-full-functionality`, Windows run
+https://github.com/wrightausername/Game-Grave/actions/runs/42469660937. Do not change its layout,
+tabs, controls or behavior, or anything that reaches it through shared code, unless the owner
+explicitly reopens it. Its honest-claims rules stay: no invented "safe to clear"; driver and Steam
+library caches are review only; settings and saves are never removable; launcher cache and log folders
+of 200 files or fewer go to the Recycle Bin only after confirmation and per-file re-checks. Widening
+deletion (core is byte-guarded) needs the owner's explicit approval, which has not been given. The
+next tab's lock must freeze Other Storage against this commit.
+
+Active tab: Captures. The owner named it ("lets move on to captures now"). Work is confined to the
+Captures methods of `PhotoIntegration`, new Captures modules and the existing Captures modules.
+Every other tab is frozen: Other Storage, Old Files and Mods at the commits above, Games at commit
+593354b0e24b1ad03b513b04e6902b44fe511b1a. Show only what a scan can prove. Nothing in Captures
+permanently deletes; removal is Recycle Bin only, after confirmation and the existing re-checks.
+The owner has not signed off on Captures.
 
 Earlier history (kept for context; none of these tabs is open):
 
