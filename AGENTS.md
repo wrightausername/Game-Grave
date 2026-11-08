@@ -106,14 +106,20 @@ the owner links), saves and configs are never matched by name, Cleanup Suggestio
 owning tab and never delete, and nothing is called safe to remove. The next tab's lock must freeze Game
 DNA against this commit.
 
-Active tab: Undo Center. The owner asked for full functionality on the last five tabs (Game DNA, Undo
-Center, AI Assistant, Settings, More Tools), chose sidebar order and one tab at a time, and said AI
-Assistant, Settings and More Tools wait for the owner's photos. Work is confined to the Undo Center
-methods of `PhotoIntegration`, new Undo Center modules and the existing Undo Center UI code. Every other
-tab is frozen: Game DNA at the commit above, Graveyard, Captures, Other Storage, Old Files and Mods at
-the commits above, Games at commit 593354b0e24b1ad03b513b04e6902b44fe511b1a. Protected engines stay
-byte-guarded (restoring must go through the existing recovery engine). Show only what the data proves.
-The owner has not signed off on Undo Center. Do not start AI Assistant until the owner locks it in.
+Undo Center: OWNER SIGNED OFF AND LOCKED ("lock it in"). The approved baseline is commit
+e96fd44bf86d79a882e42f34b210a4783fe7ce63 on branch `claude/old-files-full-functionality`, Windows run
+https://github.com/wrightausername/Game-Grave/actions/runs/42505113783. Do not change its layout,
+filters, controls or behavior, or anything that reaches it through shared code, unless the owner
+explicitly reopens it. Its honest-claims rules stay: recycled bytes are "Recycled Size", never freed
+space; no reversibility percentage; restore only through the protected recovery engine after a fresh
+check and confirmation (one matching Recycle Bin item, free original path, never overwrite, batch of
+20 at most); "Hide from History" only hides a row through settings and never edits recovery records or
+the activity log. "Restore to Custom Location" is not built because the engine restores to the original
+path only; adding it needs the owner's explicit approval to change `recovery.py`. The next tab's lock
+must freeze Undo Center against this commit.
+
+Next tabs: AI Assistant, Settings and More Tools wait for the owner's photos. Do not start any of them
+until the owner sends the photo for that tab and names it. Every locked tab above stays frozen.
 
 Earlier history (kept for context; none of these tabs is open):
 
