@@ -162,7 +162,8 @@ def fill(window, *args, **kwargs):
 
 def chrome(window, control):
     # The first fill runs while the page is still being built; a combo left by the previous visit is deleted.
-    if not isValid(getattr(window, "mod_profile", None)):
+    combo = getattr(window, "mod_profile", None)
+    if combo is None or not isValid(combo):
         return
     tab = window._mod_tab
     visible = control is not None and tab in {"Load Order", "Conflicts"}
