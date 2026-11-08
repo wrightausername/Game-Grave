@@ -39,6 +39,9 @@ on:
       - 'tools/dna_tab_lock.py'
       - 'tools/dna_page_smoke.py'
       - 'tests/test_dna.py'
+      - 'tools/undo_tab_lock.py'
+      - 'tools/undo_page_smoke.py'
+      - 'tests/test_undo.py'
       - 'tools/mods_tab_lock.py'
       - 'tools/mods_page_smoke.py'
       - 'tools/fixtures/games-covers/**'
@@ -101,6 +104,9 @@ on:
       - 'tools/dna_tab_lock.py'
       - 'tools/dna_page_smoke.py'
       - 'tests/test_dna.py'
+      - 'tools/undo_tab_lock.py'
+      - 'tools/undo_page_smoke.py'
+      - 'tests/test_undo.py'
       - 'tools/mods_tab_lock.py'
       - 'tools/mods_page_smoke.py'
       - 'tools/fixtures/games-covers/**'
@@ -132,7 +138,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write # only used to publish review screenshots to claude/old-files-screenshots, claude/other-storage-screenshots, claude/captures-screenshots, claude/graveyard-screenshots and claude/dna-screenshots
+  contents: write # only used to publish review screenshots to claude/old-files-screenshots, claude/other-storage-screenshots, claude/captures-screenshots, claude/graveyard-screenshots, claude/dna-screenshots and claude/undo-screenshots
 
 jobs:
   desktop:
@@ -160,7 +166,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -170,8 +176,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Photo-layout functionality or reference geometry failed.' }
           python tools/ready_room_ui_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room native scale, navigation or controls failed.' }
-          python tools/dna_tab_lock.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Graveyard, Captures, Other Storage, Old Files, Mods, Games, Overview, Ready Room or another tab changed during Game DNA work.' }
+          python tools/undo_tab_lock.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Game DNA, Graveyard, Captures, Other Storage, Old Files, Mods, Games, Overview, Ready Room or another tab changed during Undo Center work.' }
           python tools/mods_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Mods status, tabs, bulk actions or sources failed in native Qt.' }
           python tools/old_files_page_smoke.py --output _ci_temp
@@ -184,6 +190,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Graveyard evidence, filters, leftover scan, protection or verified Recycle Bin path failed in native Qt.' }
           python tools/dna_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Game DNA proven locations, Analyze, linking or hand-offs failed in native Qt.' }
+          python tools/undo_page_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Undo Center filters, status, restore, hide or layout failed in native Qt.' }
           python -m unittest tests.test_games_sources tests.test_games_integrations -v
           if ($LASTEXITCODE -ne 0) { throw 'Mixed-launcher records, artwork or source identity checks failed.' }
           python tools/games_triple_check.py --output _ci_temp
@@ -310,6 +318,28 @@ jobs:
           git commit -q -m "Game DNA screenshots from run $env:GITHUB_RUN_ID"
           git push -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" HEAD:refs/heads/claude/dna-screenshots
           Pop-Location
+      - name: Publish Undo Center screenshots to a review branch
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $shots = @(Get-ChildItem _ci_temp -Filter 'undo-*.png') + @(Get-ChildItem _ci_temp -Filter 'photo-undo-*.png')
+          if (-not $shots) { Write-Host 'No Undo Center screenshots to publish.'; exit 0 }
+          $dir = Join-Path $env:RUNNER_TEMP 'undo-shots'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item $shots.FullName $dir
+          Set-Content -Path (Join-Path $dir 'README.md') -Value "Rendered by Windows CI run $env:GITHUB_RUN_ID from $env:GITHUB_SHA. Review only; not part of the app."
+          Push-Location $dir
+          git init -q
+          git config user.name 'Game Grave CI'
+          git config user.email 'ci@users.noreply.github.com'
+          git checkout -q -b claude/undo-screenshots
+          git add -A
+          git commit -q -m "Undo Center screenshots from run $env:GITHUB_RUN_ID"
+          git push -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" HEAD:refs/heads/claude/undo-screenshots
+          Pop-Location
       - name: Upload actual Qt screen captures for design review
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -328,6 +358,7 @@ jobs:
             _ci_temp/captures-*.png
             _ci_temp/graveyard-*.png
             _ci_temp/dna-*.png
+            _ci_temp/undo-*.png
             _ci_temp/photo-*.png
             _ci_temp/*-1280.png
             _ci_temp/overview-tab-lock/**/hashes.json
