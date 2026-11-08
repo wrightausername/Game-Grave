@@ -186,6 +186,18 @@ def main():
         after = json.loads((output/"current/hashes.json").read_text())
         differences = [n for n in before if before[n]!=after.get(n)]
         assert len(before)==len(after)==expected
+        for name in differences[:6]:
+            try:
+                from PySide6.QtGui import QImage
+                one, two = QImage(str(output/"baseline"/(name+".png"))), QImage(str(output/"current"/(name+".png")))
+                changed = [(x, y) for y in range(one.height()) for x in range(one.width()) if one.pixel(x, y) != two.pixel(x, y)]
+                if changed:
+                    xs, ys = [c[0] for c in changed], [c[1] for c in changed]
+                    print(f"DIFF {name}: {len(changed)} pixels in box x {min(xs)}-{max(xs)}, y {min(ys)}-{max(ys)}", flush=True)
+                else:
+                    print(f"DIFF {name}: pixel data identical but size or format differs", flush=True)
+            except Exception as exc:
+                print("DIFF", name, "could not be compared:", exc, flush=True)
         assert not differences, "Locked tab pixels changed: "+", ".join(differences)
     print("PASS: twelve other tabs are pixel-identical after Undo Center: 72 comparisons. Ready Room, Games and every other desktop source, artwork, data and safety engine are unchanged.")
     return 0

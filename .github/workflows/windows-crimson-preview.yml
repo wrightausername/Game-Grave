@@ -359,6 +359,7 @@ jobs:
             _ci_temp/graveyard-*.png
             _ci_temp/dna-*.png
             _ci_temp/undo-*.png
+            _ci_temp/undo-tab-lock/**/*game-dna*.png
             _ci_temp/photo-*.png
             _ci_temp/*-1280.png
             _ci_temp/overview-tab-lock/**/hashes.json
