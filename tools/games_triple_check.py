@@ -75,7 +75,9 @@ def walkthrough(output):
         window.game_grid.scrollToItem(window.game_grid.currentItem())
         settle()
     def button(window, name):
-        return next(control for control in window.game_details.findChildren(QAbstractButton) if control.text() == name)
+        action = {"Verify Files…": "validate", "Manage DLC…": "details", "Uninstall…": "uninstall"}.get(name)
+        return next(control for control in window.game_details.findChildren(QAbstractButton)
+                    if control.text() == name or action and control.property("gameNativeAction") == action)
     def menu_action(window, name, *, context=False, row=None):
         def choose():
             menu = app.activePopupWidget()
@@ -113,8 +115,9 @@ def walkthrough(output):
             if crop:
                 assert reference("games").copy(*crop).save(str(install/"cover.png"))
             else:
-                # Explicit synthetic test picture, not a claimed official cover.
-                Image.new("RGB", (120, 180), "#17364c").save(install/"cover.png")
+                fixture = "assassins-creed-odyssey.jpg" if launcher == "Ubisoft Connect" else "valorant.jpg"
+                with Image.open(Path(__file__).parent/"fixtures/games-covers"/fixture) as image:
+                    image.save(install/"cover.png")
             if launcher == "Steam":
                 steam.append(SteamGame(ident, name, str(steam_root), str(install), (index + 1)*12*1024**3, 1700000000 + index, "Disposable QA"))
                 (steam_root/"steamapps"/("appmanifest_"+ident+".acf")).write_text('"AppState" { "appid" "'+ident+'" "StateFlags" "4" "installdir" "'+ident+'" }')
@@ -131,7 +134,7 @@ def walkthrough(output):
         with patch("core.config_dir", return_value=settings_root), \
              patch("gg_desktop.app.load_settings", side_effect=lambda: dict(core.load_settings(), scan_on_launch=False)), \
              patch("gg_desktop.game_artwork.artwork_dir", return_value=settings_root/"Games"), \
-             patch("gg_desktop.games_controls.registered_games", return_value=[rockstar]), \
+             patch("gg_desktop.games_live.registered_games", return_value=[rockstar]), \
              patch("gg_desktop.game_artwork._request", side_effect=AssertionError("No network while rendering")) as network, \
              patch("gg_desktop.games.QDesktopServices.openUrl", return_value=True) as launch, \
              patch.object(CrimsonWindow, "error") as errors:
@@ -179,7 +182,7 @@ def walkthrough(output):
             for name in ("Installed", "Recently Played", "Not Installed", "Updates", "Library"):
                 click(window.game_tabs.buttons[name])
                 if name in ("Not Installed", "Updates"):
-                    assert not window._shown_games and "not available" in window.game_empty.text()
+                    assert not window._shown_games and window.game_empty.isVisible()
                 elif name == "Recently Played":
                     assert len(window._shown_games) == len(steam)
                 else:
@@ -251,11 +254,14 @@ def walkthrough(output):
                         assert launch.call_args.args[0].toString() == "steam://uninstall/" + steam_game.app_id
                 passed("Steam uninstall confirmation: " + ("proceed" if answer else "cancel"))
             select(window, ea.key)
-            with patch.object(window, "info") as info:
+            client = root/"EADesktop.exe"
+            client.write_bytes(b"MZ DISPOSABLE CLIENT - NEVER RUN")
+            with patch("gg_desktop.games_native.client_path", return_value=str(client)), patch("gg_desktop.games_controls.execute_native") as dispatch:
                 for name in ("Verify Files…", "Manage DLC…", "Uninstall…"):
                     click(button(window, name))
-                    assert "EA" in info.call_args.args[1]
-                    passed("EA native-action guidance: " + name)
+                    plan = dispatch.call_args.args[0]
+                    assert plan.argv == (str(client),) and plan.handoff
+                    passed("EA real client handoff: " + name)
             select(window, epic.key)
             menu_action(window, "Copy installation path", context=True,
                         row=next(i for i, game in enumerate(window._shown_games) if game.key == ea.key))
@@ -332,28 +338,29 @@ def walkthrough(output):
             manifest.write_bytes(original_manifest)
             passed("Changed Steam installation blocks stale verification requests")
             select(window, ea.key)
-            def slow_art(_game, *, canceled, **_kwargs):
+            def slow_art(_game, _facts=None, *, canceled, **_kwargs):
                 end = time.monotonic() + 5
                 while not canceled() and time.monotonic() < end:
                     time.sleep(.01)
                 return Artwork()
-            with patch("gg_desktop.games_controls.official_artwork", side_effect=slow_art):
+            with patch("gg_desktop.games_controls.remote_artwork", side_effect=slow_art):
                 menu_action(window, "Download official artwork")
                 wait_for(lambda: window.page.games.downloading)
                 menu_action(window, "Cancel artwork downloads")
                 idle(window)
             assert "canceled" in window.status.text() and local_artwork(ea).image is not None
             passed("Cancel artwork downloads stops the worker and retains existing covers")
-            # Actual Games-owned message, including scoped readable styling.
-            def dismiss_info():
-                message = app.activeModalWidget()
-                assert isinstance(message, QMessageBox) and message.property("gamesReadable")
-                assert "#020609" in message.styleSheet()
-                message.grab().save(str(output/"games-launcher-guidance.png"))
-                click(message.button(QMessageBox.Ok))
-            QTimer.singleShot(50, dismiss_info)
-            click(button(window, "Manage DLC…"))
-            passed("Non-Steam launcher guidance opens a readable Games-owned dialog")
+            # The account dialog is a real Games-owned window, using the
+            # original library options location rather than an instruction box.
+            window.page.games.connections()
+            settle()
+            connection_dialog = window.page.games.connections_dialog
+            assert connection_dialog.isVisible() and "#020609" in connection_dialog.styleSheet()
+            assert set(connection_dialog.status) == {"Steam", "Epic Games", "EA", "GOG"}
+            connection_dialog.grab().save(str(output/"games-library-connections.png"))
+            connection_dialog.close()
+            settle()
+            passed("Library connections opens a readable Games-owned account dialog")
             with patch.object(window, "navigate") as destination:
                 click(button(window, "Game DNA"))
                 assert destination.call_args.args == ("Game DNA",) and window._pending_dna_game_key == ea.key
@@ -427,6 +434,10 @@ def main():
     args = parser.parse_args()
     if args.once:
         walkthrough(args.output.resolve())
+        from tools.games_connected_walkthrough import walkthrough as connected_walkthrough
+        cases = connected_walkthrough(args.output.resolve())
+        report = args.output.resolve()/"games-human-journeys.json"
+        report.write_text(json.dumps(json.loads(report.read_text()) + cases, indent=2), encoding="utf-8")
         return 0
     output = args.output.resolve()/"games-triple-check"
     report = []

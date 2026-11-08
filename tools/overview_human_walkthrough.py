@@ -32,6 +32,7 @@ def main():
     from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QLineEdit, QListWidget, QPushButton, QTableWidget
     from core import default_settings
     from gg_desktop.app import CrimsonWindow
+    from gg_desktop.game_artwork import Artwork
     from tests.test_mods_functionality import mo2_fixture
     native_error = CrimsonWindow.error
 
@@ -95,11 +96,14 @@ def main():
         preferences["scan_on_launch"] = False
         preferences["desktop_favorites"] = []
         event = dict(kind="Scan completed", date="2026-11-06T12:00:00+00:00", details="Disposable walkthrough scan")
+        # This walkthrough opens Games to check installation identity. Isolate
+        # its new network adapter; Games' own journeys cover artwork downloads.
         with patch("gg_desktop.app.load_settings", return_value=preferences), \
              patch("gg_desktop.reference_overview.get_activity", return_value=[event]), \
              patch("gg_desktop.reference_overview.get_records", return_value=[]), \
              patch("gg_desktop.ready_room_services.config_dir", return_value=root/"Preferences"), \
              patch("gg_desktop.game_artwork.artwork_dir", return_value=root/"Artwork"), \
+             patch("gg_desktop.games_controls.remote_artwork", return_value=Artwork()), \
              patch("gg_desktop.game_artwork._request", side_effect=AssertionError("Automatic network")) as network, \
              patch.object(CrimsonWindow, "error") as error, \
              patch.object(CrimsonWindow, "_approve_recycle") as recycle:
