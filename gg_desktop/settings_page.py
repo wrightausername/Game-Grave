@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
-from PySide6.QtCore import QRectF, QSignalBlocker, Qt, QUrl
+from PySide6.QtCore import QEvent, QObject, QRectF, QSignalBlocker, Qt, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QPainter, QPen
 from PySide6.QtWidgets import (QAbstractButton, QComboBox, QFileDialog, QFrame, QLabel, QListWidget, QPushButton,
                                QScrollArea, QSizePolicy, QStackedWidget, QWidget)
@@ -189,11 +189,33 @@ class TabButton(QPushButton):
             part.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
             words.addWidget(part)
         lay.addLayout(words, 1)
+        self.glyph_visible = True
         self.setStyleSheet(
             "QPushButton{background:#08101a;border:1px solid #1d2a38;border-radius:8px;text-align:left;}"
             "QPushButton:hover{border-color:#44566b;}"
             "QPushButton:checked{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #ff254a,stop:1 #b3112b);"
             "border:1px solid #ff6b81;}")
+
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Narrow windows keep the tab names readable by dropping the caption, then the icon.
+        self.sub.setVisible(self.width() >= 150)
+        self.glyph.setVisible(self.width() >= 128)
+
+
+class NarrowText(QObject):
+    """Swaps a button's text for a shorter one when its panel gets narrow."""
+
+    def __init__(self, panel_box, control, wide, short, limit):
+        super().__init__(panel_box)
+        self.control, self.wide, self.short, self.limit = control, wide, short, limit
+        panel_box.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Resize:
+            self.control.setText(self.short if watched.width() < self.limit else self.wide)
+        return False
 
 
 # ------------------------------------------------------------------ state
@@ -344,7 +366,7 @@ def old_files_folder(window):
         sync(window)
 
 
-def scanning_panel(window):
+def scanning_panel(window, compact=False):
     box, body = frame("settingsScanning", "purple", "Scanning Defaults", "search")
     folder = ElideLabel("", Qt.ElideMiddle)
     folder.setObjectName("settingsFolder")
@@ -362,7 +384,15 @@ def scanning_panel(window):
     body.addWidget(line("Files idle after", "", day_combo(window, "files_stale_days", data.FILE_DAYS, "Files idle after")))
     body.addWidget(line("Graveyard age signal", "", day_combo(window, "graveyard_days", data.GRAVE_DAYS, "Graveyard age signal")))
     counts = {}
-    for key in data.LIBRARY_KEYS:
+    total = label("", "detailValue")
+    if compact:
+        summary = QWidget()
+        inner = row(spacing=6, margins=(0, 1, 0, 1))
+        summary.setLayout(inner)
+        inner.addWidget(label("Scan locations", "caption"), 1)
+        inner.addWidget(total)
+        body.addWidget(summary)
+    for key in () if compact else data.LIBRARY_KEYS:
         item = QWidget()
         inner = row(spacing=6, margins=(0, 1, 0, 1))
         item.setLayout(inner)
@@ -385,6 +415,8 @@ def scanning_panel(window):
         for key, value in counts.items():
             found = window.settings.get(key, [])
             value.setText(str(len(found) if isinstance(found, list) else 0))
+        total.setText(str(sum(len(window.settings.get(k, [])) if isinstance(window.settings.get(k, []), list) else 0
+                              for k in data.LIBRARY_KEYS)) + " folders")
     register(window, "scan_locations", folder, refresh)
     refresh()
     return box
@@ -396,6 +428,7 @@ def excluded_panel(window):
     add = tool("Add Folder", "plus", lambda: add_excluded(window), tip="Leave a folder out of scan results")
     add.setFixedHeight(28)
     box.layout().itemAt(0).layout().addWidget(add)
+    NarrowText(box, add, "Add Folder", "Add", 300)
     scroller = QScrollArea()
     scroller.setWidgetResizable(True)
     scroller.setFrameShape(QFrame.NoFrame)
@@ -559,7 +592,7 @@ def appearance_panel(window):
     body.addWidget(line("Interface scale", "", pill("100% native")))
     body.addWidget(label("The look is fixed so every tab keeps its approved layout. Older themes stay in the classic tools.",
                          "caption", wrap=True))
-    classic = tool("Classic Appearance & Advanced…", "more", window._launch_classic_tools,
+    classic = tool("Classic Appearance and Advanced…", "more", window._launch_classic_tools,
                    tip="Open the classic tools, which hold the older appearance themes")
     classic.setFixedHeight(28)
     body.addWidget(classic)
@@ -790,7 +823,7 @@ def build(window):
 
     self.settings_stack = QStackedWidget()
     self.settings_stack.addWidget(columns((1, [startup_panel(self), language_panel(self)]),
-                                          (1, [scanning_panel(self), excluded_panel(self)]),
+                                          (1, [scanning_panel(self, compact=True), excluded_panel(self)]),
                                           (1, [protection_panel(self), appearance_panel(self)])))
     self.settings_stack.addWidget(columns((1, [scanning_panel(self)]), (1, [excluded_panel(self)]),
                                           (1, [scan_behavior_panel(self)])))
@@ -798,7 +831,14 @@ def build(window):
     self.settings_stack.addWidget(columns((1, [appearance_panel(self)]), (1, [language_panel(self)]), (1, [])))
     self.settings_stack.addWidget(columns((1, [notifications_panel(self)]), (2, [])))
     self.settings_stack.addWidget(columns((1, [privacy_panel(self)]), (1, [facts_panel(self)]), (1, [])))
-    page.content.addWidget(self.settings_stack, 1)
+    scroller = QScrollArea()
+    scroller.setWidgetResizable(True)
+    scroller.setFrameShape(QFrame.NoFrame)
+    scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    scroller.setMinimumHeight(120)
+    scroller.setStyleSheet("QScrollArea{background:transparent;} QScrollArea > QWidget > QWidget{background:transparent;}")
+    scroller.setWidget(self.settings_stack)
+    page.content.addWidget(scroller, 1)
 
     strip_box, strip_body = frame("settingsData", "cyan", "", "storage", header=False)
     data_row = row(spacing=12, margins=(4, 2, 4, 2))
