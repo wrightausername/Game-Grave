@@ -133,7 +133,7 @@ def main():
             combo.setCurrentIndex(combo.findData(90))
             graveyard = window.settings_controls["graveyard_days"][0]
             graveyard.setCurrentIndex(graveyard.findData(180))
-            assert "2 unapplied changes" in window.settings_footer.text()
+            assert "3 unapplied changes" in window.settings_footer.text()
             window.settings_apply.click()
             settle()
             saved = on_disk()
