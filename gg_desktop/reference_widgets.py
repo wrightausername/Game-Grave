@@ -8,7 +8,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QRect, QRectF, QSize, Signal, Slot
+from PySide6.QtCore import Qt, QPointF, QRect, QRectF, QSize, Signal, Slot
 from PySide6.QtGui import (
     QColor, QFont, QIcon, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
 )
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from gg_desktop.widgets import button, column, label, row
 
 ASSETS = Path(__file__).parent / "assets" / "references"
+BRAND = Path(__file__).parent / "assets" / "brand"
 RED = "#ff183b"
 
 # Consistent 24px outline icons; no platform-dependent chess/emoji glyphs.
@@ -139,17 +140,58 @@ def draw_crop(painter, target, source, crop, *, fill=True):
     painter.drawPixmap(target, pix, src)
 
 
+@lru_cache(maxsize=None)
+def brand_source(name):
+    """A full-resolution brand PNG (transparent logo or backdrop), loaded once."""
+    return QPixmap(str(BRAND / name))
+
+
+@lru_cache(maxsize=32)
+def brand_scaled(name, width, height, dpr, cover):
+    """The brand art resampled once to this widget's real pixel size so it stays sharp on any screen.
+
+    `cover` fills the box and crops from the bottom-left; otherwise the whole picture fits inside it.
+    """
+    source = brand_source(name)
+    if source.isNull() or width < 1 or height < 1:
+        return QPixmap()
+    pixel_w, pixel_h = max(1, round(width * dpr)), max(1, round(height * dpr))
+    if cover:
+        scale = max(pixel_w / source.width(), pixel_h / source.height())
+        sized = source.scaled(max(pixel_w, round(source.width() * scale)), max(pixel_h, round(source.height() * scale)),
+                              Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        out = sized.copy(0, sized.height() - pixel_h, pixel_w, pixel_h)
+    else:
+        out = source.scaled(pixel_w, pixel_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    out.setDevicePixelRatio(dpr)
+    return out
+
+
 class Brand(QWidget):
+    """The Game Grave logo: a transparent HD PNG, resampled to the screen so it never looks soft."""
+
+    CANVAS = (1600, 384)       # the PNG's size
+    CONTENT = (31, 49, 1515, 351)  # where the artwork sits inside it
+
     def __init__(self):
         super().__init__()
         self.setFixedHeight(65)
         self.setAccessibleName("Game Grave")
 
     def paintEvent(self, event):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.SmoothPixmapTransform)
-        size = min(self.width() - 34, 248)
-        draw_crop(p, QRectF(27, 12, size, size * 44 / 183), "games", (26, 14, 184, 45), fill=False)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        canvas_w, canvas_h = self.CANVAS
+        left, top, right, bottom = self.CONTENT
+        content_w = min(self.width() - 34, 248)
+        scale = content_w / (right - left)
+        width, height = canvas_w * scale, canvas_h * scale
+        x = 27 - left * scale
+        y = (self.height() - (bottom - top) * scale) / 2 - top * scale
+        dpr = self.devicePixelRatioF()
+        pix = brand_scaled("game_grave_logo.png", round(width), round(height), dpr, False)
+        if not pix.isNull():
+            painter.drawPixmap(QPointF(x, y), pix)
 
 
 class NavRail(QFrame):
@@ -164,7 +206,9 @@ class NavRail(QFrame):
         p.setRenderHint(QPainter.SmoothPixmapTransform)
         height = min(205, self.height() * .29)
         area = QRectF(0, self.height() - height, self.width(), height)
-        draw_crop(p, area, "games", (0, 541, 217, 179))
+        pix = brand_scaled("forest_hd.png", self.width(), round(height), self.devicePixelRatioF(), True)
+        if not pix.isNull():
+            p.drawPixmap(area.topLeft(), pix)
         shade = QLinearGradient(0, area.top(), 0, area.bottom())
         shade.setColorAt(0, QColor("#03080b"))
         shade.setColorAt(.4, QColor(3, 8, 11, 0))

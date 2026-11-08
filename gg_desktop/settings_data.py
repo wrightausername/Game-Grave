@@ -26,6 +26,7 @@ OWNED = {
     "graveyard_days": 365,
     "excluded_folders": [],
     "steam_artwork_downloads": True,
+    "assistant_enabled": False,   # the AI Assistant tab is optional and starts switched off
 }
 LIBRARY_KEYS = ("steam_extra_roots", "other_library_roots", "mod_extra_roots", "screenshot_roots", "recording_roots")
 LIBRARY_NAMES = {"steam_extra_roots": "Steam libraries", "other_library_roots": "Other / Xbox libraries",
@@ -66,6 +67,7 @@ def current(settings):
         "graveyard_days": pick_days(settings.get("graveyard_days"), GRAVE_DAYS, 365),
         "excluded_folders": clean_folders(settings.get("excluded_folders", [])),
         "steam_artwork_downloads": settings.get("steam_artwork_downloads", True) is not False,
+        "assistant_enabled": settings.get("assistant_enabled") is True,
     }
 
 

@@ -102,6 +102,8 @@ def main():
         chooser = stack.enter_context(patch.object(QInputDialog, "getItem", return_value=("All games", True)))
         with stack:
             window = CrimsonWindow()
+            window.settings = dict(window.settings, assistant_enabled=True)  # the tab is optional and starts off
+            window._sync_assistant_nav()
             window.show()
             window.resize(1280, 720)
             window.inventory = Inventory(steam=steam, games=merge_games(steam, []), mods=mods, files=files,

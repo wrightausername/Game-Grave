@@ -9,7 +9,7 @@ import sys
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
+from PySide6.QtCore import QEvent, QObject, QRunnable, QThreadPool, Signal, Qt, QTimer, QSize
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut, QFontDatabase
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
@@ -37,8 +37,8 @@ ROUTES = (
     ("Game DNA", "dna"),
     ("Undo Center", "undo"),
     ("AI Assistant", "sparkles"),
-    ("Settings", "settings"),
     ("More Tools", "grid"),
+    ("Settings", "settings"),
 )
 
 ROUTE_ALIASES = {
@@ -48,6 +48,38 @@ ROUTE_ALIASES = {
     "Cleanup History": "More Tools", "Automation": "More Tools",
     "Make Room": "More Tools", "Storage History": "More Tools",
 }
+
+
+class EdgeProgress(QProgressBar):
+    """A thin progress bar laid over the bottom edge of its parent. It takes no layout space."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setObjectName("scanProgress")
+        self.setFixedHeight(4)
+        self.setTextVisible(False)
+        self.setRange(0, 100)
+        self.setValue(0)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setStyleSheet("QProgressBar#scanProgress{background:rgba(2,7,10,160);border:none;border-radius:0;}"
+                           "QProgressBar#scanProgress::chunk{background:#ff2a4d;border-radius:0;}")
+        parent.installEventFilter(self)
+        self.hide()
+
+    def place(self):
+        parent = self.parentWidget()
+        if parent is not None:
+            self.setGeometry(0, parent.height() - self.height(), parent.width(), self.height())
+            self.raise_()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.place()
+
+    def eventFilter(self, target, event):
+        if event.type() == QEvent.Resize and target is self.parentWidget():
+            self.place()
+        return False
 
 
 class JobSignals(QObject):
@@ -123,6 +155,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             control.setFocusPolicy(Qt.StrongFocus)
             r.addWidget(control)
             self.nav_buttons[route] = control
+        self._sync_assistant_nav()
         r.addStretch()
         outer.addWidget(rail)
 
@@ -184,13 +217,9 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             control.setFixedWidth(28)
             topbox.addWidget(control)
         base.addWidget(top)
-        self.progress = QProgressBar()
-        self.progress.setFixedHeight(5)
-        self.progress.setTextVisible(False)
-        self.progress.setRange(0, 100)
-        self.progress.setValue(0)
-        self.progress.hide()
-        base.addWidget(self.progress)
+        # The scan bar floats along the bottom edge instead of sitting between the top bar and the page, so it never
+        # splits the banner artwork or shifts the layout when a scan starts.
+        self.progress = EdgeProgress(main)
         self.stack_holder = QWidget()
         self.stack_layout = column(spacing=0)
         self.stack_holder.setLayout(self.stack_layout)
@@ -267,10 +296,22 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             control.style().polish(control)
         return self.page
 
+    def assistant_enabled(self) -> bool:
+        """The AI Assistant tab is optional and off until the owner turns it on in Settings."""
+        return self.settings.get("assistant_enabled") is True
+
+    def _sync_assistant_nav(self):
+        control = self.nav_buttons.get("AI Assistant")
+        if control is not None:
+            control.setVisible(self.assistant_enabled())
+
     def navigate(self, route: str):
         route = ROUTE_ALIASES.get(route, route)
         if route not in self.nav_buttons:
             route = "More Tools"
+        if route == "AI Assistant" and not self.assistant_enabled():
+            route = "Settings"
+            self.status.setText("The AI Assistant is off. Turn it on in Settings to use it.")
         methods = {
             "Overview": self.overview_page,
             "Ready Room": self.ready_room_page,

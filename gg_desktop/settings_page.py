@@ -39,7 +39,7 @@ FOOTER = "Changes save to this PC when you press Apply. Reset to Defaults never 
 NAMES = {"start_minimized": "Start minimized", "scan_on_launch": "Scan when Game Grave starts",
          "files_stale_days": "Files idle after", "graveyard_days": "Graveyard age signal",
          "excluded_folders": "Excluded folders", "steam_artwork_downloads": "Steam artwork downloads",
-         "autostart": "Launch with Windows"}
+         "autostart": "Launch with Windows", "assistant_enabled": "AI Assistant tab"}
 
 
 # ------------------------------------------------------------------ small widgets
@@ -256,6 +256,7 @@ def persist(window, updated):
         window.error("Settings not saved", str(exc))
         return False
     window.settings = updated
+    window._sync_assistant_nav()
     return True
 
 
@@ -334,6 +335,8 @@ def startup_panel(window):
     body.addWidget(bool_switch(window, "start_minimized", "Start minimized", "Opens in the taskbar instead of on screen."))
     body.addWidget(bool_switch(window, "scan_on_launch", "Scan when Game Grave starts",
                                "Runs a read-only scan each time the app opens."))
+    body.addWidget(bool_switch(window, "assistant_enabled", "AI Assistant tab",
+                               "Adds the AI Assistant to the sidebar. It is local, read only and off until you turn it on."))
     body.addWidget(fixed_switch("Check for updates on launch", "Update service not connected in this preview. Nothing is contacted.",
                                 on=False, enabled=False))
     body.addStretch()

@@ -64,6 +64,13 @@ class Prefs(unittest.TestCase):
         self.assertEqual(got["excluded_folders"], ["/a"] if Path("/a").is_absolute() else [])
         self.assertIs(got["steam_artwork_downloads"], True)
 
+    def test_assistant_tab_is_optional_and_off_by_default(self):
+        self.assertIs(data.OWNED["assistant_enabled"], False)
+        self.assertIs(data.current({})["assistant_enabled"], False)
+        self.assertIs(data.current({"assistant_enabled": "yes"})["assistant_enabled"], False)
+        self.assertIs(data.current({"assistant_enabled": True})["assistant_enabled"], True)
+        self.assertIs(data.defaults()["assistant_enabled"], False)
+
     def test_apply_changes_only_owned_keys(self):
         saved = {"never_touch": ["/p"], "assistant_chats": [1], "start_minimized": False}
         out = data.apply(saved, dict(data.current(saved), start_minimized=True))

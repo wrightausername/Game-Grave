@@ -49,6 +49,8 @@ on:
       - 'tools/settings_page_smoke.py'
       - 'tests/test_settings.py'
       - 'tools/tools_tab_lock.py'
+      - 'tools/shell_polish_smoke.py'
+      - 'tools/make_forest_art.py'
       - 'tools/tools_page_smoke.py'
       - 'tests/test_tools.py'
       - 'tools/mods_tab_lock.py'
@@ -123,6 +125,8 @@ on:
       - 'tools/settings_page_smoke.py'
       - 'tests/test_settings.py'
       - 'tools/tools_tab_lock.py'
+      - 'tools/shell_polish_smoke.py'
+      - 'tools/make_forest_art.py'
       - 'tools/tools_page_smoke.py'
       - 'tests/test_tools.py'
       - 'tools/mods_tab_lock.py'
@@ -202,8 +206,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Settings preferences, saves, excluded folders, protection, export/import or layout failed in native Qt.' }
           python tools/tools_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'More Tools tiles, reports, hash checker, health, tasks, log or layout failed in native Qt.' }
-          python tools/tools_tab_lock.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Settings, AI Assistant, Undo Center, Game DNA, Graveyard, Captures, Other Storage, Old Files, Mods, Games, Overview, Ready Room or another tab changed during More Tools work.' }
+          python tools/shell_polish_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Shell polish (HD logo, nav order, optional AI Assistant, floating scan bar) failed in native Qt.' }
           python tools/mods_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Mods status, tabs, bulk actions or sources failed in native Qt.' }
           python tools/old_files_page_smoke.py --output _ci_temp
@@ -453,6 +457,7 @@ jobs:
             _ci_temp/assistant-tab-lock/**/*game-dna*.png
             _ci_temp/settings-*.png
             _ci_temp/tools-*.png
+            _ci_temp/shell-*.png
             _ci_temp/tools-tab-lock/**/*game-dna*.png
             _ci_temp/photo-*.png
             _ci_temp/*-1280.png

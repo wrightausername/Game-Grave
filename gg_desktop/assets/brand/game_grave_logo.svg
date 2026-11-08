@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="384" viewBox="0 0 1600 384">
+<defs>
+ <linearGradient id="r" x1="0" y1="0" x2="0.35" y2="1">
+  <stop offset="0" stop-color="#ff5a68"/><stop offset=".5" stop-color="#e5162d"/><stop offset="1" stop-color="#8a0c1c"/>
+ </linearGradient>
+ <linearGradient id="r2" x1="0" y1="0" x2="0.35" y2="1">
+  <stop offset="0" stop-color="#ff4558"/><stop offset=".55" stop-color="#d8112a"/><stop offset="1" stop-color="#7d0a19"/>
+ </linearGradient>
+ <path id="g" d="M170 46 H82 Q24 46 24 104 V134 Q24 192 82 192 H120 Q168 192 168 144 V114 H102" fill="none" stroke-width="42" stroke-linejoin="miter" stroke-miterlimit="4"/>
+</defs>
+<g transform="translate(62 24) skewX(-13)">
+  <use href="#g" stroke="url(#r)"/>
+</g>
+<g transform="translate(204 138) skewX(-13)">
+  <use href="#g" stroke="#04070a" stroke-width="58"/>
+  <use href="#g" stroke="url(#r2)"/>
+</g>
+<text x="470" y="238" font-family="Inter" font-weight="700" font-size="150" letter-spacing="3" fill="#ffffff">GAME GRAVE</text>
+<text x="1490" y="130" font-family="Inter" font-weight="600" font-size="40" fill="#cfd6de">®</text>
+</svg>

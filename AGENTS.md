@@ -139,6 +139,16 @@ faked. Shared code changed with the owner's approval: `settings_store.load_setti
 restart) used by `app.py`, start minimized in `app.py` main(), the excluded-folder filter in `backend.py`,
 and the Mods stale-row guard in `mods_page.py`. The next tab's lock must freeze Settings against this commit.
 
+Polish pass (owner instruction, 2026-11-08): the owner explicitly reopened the shared shell (sidebar logo,
+bottom-left backdrop, nav order, scan bar), Ready Room (banner, live Steam news), Games (HD launcher marks and art),
+Mods (banner, sorting), Old Files (banner), AI Assistant (optional, off by default), Settings (the AI switch) and More
+Tools (implement the seven dimmed tools). Tab pixel locks do not run during this pass; each change is covered by a
+native smoke instead. Owner decisions: the logo and backdrop are rebuilt as HD PNGs (`gg_desktop/assets/brand/`,
+`tools/make_forest_art.py`); Ready Room auto-refreshes official Steam news only; the owner approved fully
+implementing the seven More Tools tiles, which is the one approved exception to "Game Grave never changes Windows or
+runs commands": every such action must name exactly what it will change, ask first, and be recorded in the activity
+log. Protected engines still need explicit approval before any edit.
+
 Active tab: More Tools. The owner's photo is `gg_desktop/assets/references/more_tools.jpg`. Work is confined
 to new `tools_*.py` modules, a `tools_page` delegation in `photo_integration.py` and the More Tools tests and
 tools. Every locked tab above stays frozen.
