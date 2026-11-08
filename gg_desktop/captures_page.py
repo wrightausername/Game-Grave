@@ -211,7 +211,7 @@ def build(window):
 
     # --- Filters
     filters, side = panel(kind="fileFilterPanel", padding=8, spacing=4)
-    filters.setMinimumWidth(176)
+    filters.setMinimumWidth(158)
     filters.setMaximumWidth(215)
     head = row(spacing=4)
     head.addWidget(label("Filters", "sectionTitle"), 1)
@@ -268,7 +268,7 @@ def build(window):
 
     # --- Results
     results, contents = panel(kind="fileResults", padding=7, spacing=5)
-    header = row(spacing=5)
+    header = row(spacing=4)
     glyph = QLabel()
     glyph.setPixmap(icon("camera", "#ff3b57", 18).pixmap(18, 18))
     header.addWidget(glyph)
@@ -278,21 +278,21 @@ def build(window):
         shrinkable.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
     header.addWidget(self.capture_heading, 1)
     self.capture_month = _combo([insight.ALL_MONTHS], "Timeline month")
-    self.capture_month.setFixedWidth(104)
+    self.capture_month.setFixedWidth(92)
     header.addWidget(self.capture_month)
     header.addWidget(label("Sort By:", "caption"))
     self.capture_sort = _combo(list(insight.SORTS), "Sort captures")
-    self.capture_sort.setFixedWidth(112)
+    self.capture_sort.setFixedWidth(92)
     header.addWidget(self.capture_sort)
     self.capture_view_grid = tool("", "grid", lambda: set_compact(self, False), active=not state.compact, tip="Thumbnails")
     self.capture_view_list = tool("", "list", lambda: set_compact(self, True), active=state.compact, tip="List")
     for control in (self.capture_view_grid, self.capture_view_list):
-        control.setFixedSize(30, 28)
+        control.setFixedSize(26, 28)
         header.addWidget(control)
     self.capture_zoom = QSlider(Qt.Horizontal)
     self.capture_zoom.setRange(110, 230)
     self.capture_zoom.setValue(150)
-    self.capture_zoom.setFixedWidth(64)
+    self.capture_zoom.setFixedWidth(50)
     self.capture_zoom.setAccessibleName("Capture tile size")
     header.addWidget(self.capture_zoom)
     contents.addWidget(_widget(header))
