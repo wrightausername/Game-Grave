@@ -223,7 +223,8 @@ def build(window):
 
     # --- Storage Overview
     filters, scan = panel(kind="fileFilterPanel", padding=9, spacing=6)
-    filters.setFixedWidth(250 if self.width() >= 1100 else 190)
+    filters.setMinimumWidth(176)
+    filters.setMaximumWidth(250)
     scan.addWidget(label("Storage Overview", "sectionTitle"))
     self.storage_categories = QListWidget()
     self.storage_categories.setObjectName("sourceFilters")
@@ -271,7 +272,7 @@ def build(window):
     self.storage_table = _table(["", "Name", "Related Game / App", "Size", "Items", "Type"])
     self.storage_table.setItemDelegateForColumn(1, NameDelegate(self.storage_table))
     self.storage_table.setItemDelegateForColumn(5, PillDelegate(self.storage_table))
-    for c, width in enumerate((24, 178, 112, 62, 58, 62)):
+    for c, width in enumerate((24, 150, 96, 60, 50, 58)):
         self.storage_table.setColumnWidth(c, width)
     self.storage_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
     self.storage_table.setSelectionMode(QAbstractItemView.SingleSelection)
