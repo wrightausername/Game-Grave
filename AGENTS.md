@@ -96,8 +96,13 @@ recordings to the Recycle Bin through the existing verified path (screenshots on
 preview; games via Steam; mods via Mods; folders via Other Storage). The next tab's lock must freeze
 Graveyard against this commit.
 
-Active tab: none. The owner has not named the next tab. Do not start one on your own; wait for the
-owner to name it, acknowledge it in chat, then record it here.
+Active tab: Game DNA. The owner asked for full functionality on the last five tabs (Game DNA, Undo
+Center, AI Assistant, Settings, More Tools), chose sidebar order and one tab at a time, and said AI
+Assistant, Settings and More Tools wait for the owner's photos. Work is confined to the Game DNA methods
+of `PhotoIntegration`, new Game DNA modules and the existing Game DNA UI code. Every other tab is frozen:
+Graveyard, Captures, Other Storage, Old Files and Mods at the commits above, Games at commit
+593354b0e24b1ad03b513b04e6902b44fe511b1a. Protected engines stay byte-guarded. Show only what the data
+proves. The owner has not signed off on Game DNA. Do not start Undo Center until the owner locks it in.
 
 Earlier history (kept for context; none of these tabs is open):
 
