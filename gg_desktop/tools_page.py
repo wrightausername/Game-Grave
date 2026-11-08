@@ -22,7 +22,7 @@ from gg_desktop.header_banner import HeaderBannerArtwork
 from gg_desktop.reference_widgets import icon, tool
 from gg_desktop.widgets import button, column, label, panel, row
 
-SUBTITLE = "Game-focused utilities to maintain, back up, report on and manage your gaming storage."
+SUBTITLE = "Back up, report on and manage your games."
 TONES = {"red": "255,37,74", "cyan": "19,188,245", "purple": "180,85,255", "magenta": "223,80,200",
          "blue": "40,140,255", "yellow": "246,190,36", "green": "50,214,122"}
 HEX = {"red": "#ff3b57", "cyan": "#13bcf5", "purple": "#b455ff", "magenta": "#df50c8", "blue": "#288cff",
@@ -234,13 +234,13 @@ def build(window):
     page = self._insight_page("More Tools", SUBTITLE, "more_tools", "settings", 66)
     banner = page.content.itemAt(0).widget()
     page.banner_artwork = HeaderBannerArtwork(self, page, banner, route="More Tools", scene="more_tools",
-                                              source=(940, 0, 732, 150), excluded=((1425, 0, 247, 50),))
+                                              source=(1012, 0, 660, 150), excluded=((1425, 0, 247, 50),))
     try:  # the TOOLKIT chip sits beside the title, as in the photo
         text_column = banner.layout().itemAt(1).layout()
         title = text_column.takeAt(0).widget()
         line = row(spacing=10)
         line.addWidget(title)
-        line.addWidget(chip("TOOLKIT", "red"))
+        line.addWidget(chip("TOOLKIT", "red"), 0, Qt.AlignVCenter)
         line.addStretch()
         text_column.insertLayout(0, line)
     except (AttributeError, RuntimeError):
@@ -312,15 +312,14 @@ def health_panel(window):
         mark.setPixmap(icon(symbol, "#e8eef5", 16).pixmap(16, 16))
         line.addWidget(mark)
         caption = label(name, "subtle")
-        caption.setFixedWidth(52)
+        caption.setFixedWidth(46)
         line.addWidget(caption)
         meter = Meter(color)
         meter.setAccessibleName(name + " in use")
         line.addWidget(meter, 1)
         value = label("…", "detailValue")
-        value.setFixedWidth(78)
+        value.setFixedWidth(88)
         value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        value.setMinimumWidth(0)
         line.addWidget(value)
         window.tools_meters[key], window.tools_values[key] = meter, value
         stack.addLayout(line)

@@ -115,6 +115,17 @@ def probe(root, fixtures, output, foundation=False):
                         QTest.qWait(180)
                     else:
                         QTest.qWait(10)
+                    # Lazy panels and background scans can finish painting after the first grab on a busy CI machine.
+                    # Capture only once two grabs in a row are identical (bounded, so a live-updating page cannot hang).
+                    settled = None
+                    for _ in range(14):
+                        QTest.qWait(70)
+                        app.processEvents()
+                        frame = window.grab().toImage().convertToFormat(QImage.Format_RGBA8888)
+                        digest = hashlib.sha256(bytes(frame.constBits())).digest()
+                        if digest == settled:
+                            break
+                        settled = digest
                     assert window.nav_rail.isVisible() and window.top_bar.isVisible(), route
                     image = window.grab().toImage().convertToFormat(QImage.Format_RGBA8888)
                     key = f"{'populated' if populated else 'empty'}-{width}-{route.lower().replace(' ', '-')}"
@@ -184,7 +195,7 @@ def main():
                 "--fixtures",str(temp/"Fixtures"),"--output",str(output/label)]
             
             result = subprocess.run(command,
-                cwd=source,capture_output=True,text=True,timeout=180)
+                cwd=source,capture_output=True,text=True,timeout=600)
             if result.returncode:
                 print(result.stdout[-4000:]+result.stderr[-6000:])
                 raise AssertionError(label+" tab-lock render failed")
