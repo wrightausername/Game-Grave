@@ -46,7 +46,7 @@ def build(window, control):
     window._mod_updates = {}
     window._mod_updates_for = None
     window._mod_updates_scanned = False
-    window._mod_profile_key = ""
+    window._mod_profile_keys = {}
     window._mod_tab_rows = []
     table = window.mod_table
     contents = window.mod_notice.parentWidget().layout()
@@ -73,7 +73,7 @@ def sync_profiles(window, control, include_all):
             combo.clear()
             for text, key in want:
                 combo.addItem(text, key)
-    key = window._mod_profile_key
+    key = window._mod_profile_keys.get(window._mod_tab, "")
     index = combo.findData(key)
     if index < 0:
         chosen = next((p.key for p in profiles if p.selected), "")
@@ -82,12 +82,12 @@ def sync_profiles(window, control, include_all):
             index = 0
     with QSignalBlocker(combo):
         combo.setCurrentIndex(index)
-    window._mod_profile_key = combo.itemData(index) or ""
+    window._mod_profile_keys[window._mod_tab] = combo.itemData(index) or ""
     combo.setEnabled(combo.count() > 0)
 
 
 def profile_changed(window):
-    window._mod_profile_key = window.mod_profile.currentData() or ""
+    window._mod_profile_keys[window._mod_tab] = window.mod_profile.currentData() or ""
     if window._mod_tab in {"Load Order", "Conflicts"}:
         window._fill_mods()
 
@@ -284,7 +284,7 @@ def radar_tab(window, control):
 
 
 def order_tab(window, control):
-    rows_, note = mi.load_order(control.catalog, window._mod_profile_key)
+    rows_, note = mi.load_order(control.catalog, window._mod_profile_keys.get("Load Order", ""))
     out = []
     for pos, entry, marker in rows_:
         state = {"+": "Enabled", "-": "Disabled"}.get(marker, "Unknown")
@@ -315,7 +315,7 @@ def conflicts_tab(window, control):
         return [], (control.message if control.busy else
                     "Conflict check has not completed. Use Actions ▸ Check conflicts.")
     out = []
-    for item in mi.conflict_rows(control.catalog, control.report, window._mod_profile_key):
+    for item in mi.conflict_rows(control.catalog, control.report, window._mod_profile_keys.get("Conflicts", "")):
         f = item["finding"]
         out.append(TabRow(f"{f.kind}|{f.profile}|{'|'.join(f.mods)}",
                           (f.kind, item["profile"], str(len(f.mods)), str(f.count or len(f.paths))), item,
@@ -583,7 +583,7 @@ def details(window):
 # ---------------------------------------------------------------- actions
 def goto(window, tab, profile_key=""):
     if profile_key:
-        window._mod_profile_key = profile_key
+        window._mod_profile_keys[tab] = profile_key
     window.mod_tabs.select(tab)
     set_tab(window, tab)
 
