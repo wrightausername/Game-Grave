@@ -77,12 +77,20 @@ of 200 files or fewer go to the Recycle Bin only after confirmation and per-file
 deletion (core is byte-guarded) needs the owner's explicit approval, which has not been given. The
 next tab's lock must freeze Other Storage against this commit.
 
-Active tab: Captures. The owner named it ("lets move on to captures now"). Work is confined to the
-Captures methods of `PhotoIntegration`, new Captures modules and the existing Captures modules.
-Every other tab is frozen: Other Storage, Old Files and Mods at the commits above, Games at commit
-593354b0e24b1ad03b513b04e6902b44fe511b1a. Show only what a scan can prove. Nothing in Captures
-permanently deletes; removal is Recycle Bin only, after confirmation and the existing re-checks.
-The owner has not signed off on Captures.
+Captures: OWNER SIGNED OFF AND LOCKED ("good lock it in"). The approved baseline is commit
+8402ac06a190b3e7164a21c48322c17043f190bf on branch `claude/old-files-full-functionality`, Windows run
+https://github.com/wrightausername/Game-Grave/actions/runs/42475554496. Do not change its layout,
+tabs, controls or behavior, or anything that reaches it through shared code, unless the owner
+explicitly reopens it. Its honest-claims rules stay: ownership only from proof, never a "safe to
+delete" claim, Recycle Bin only after confirmation and per-file re-checks. The next tab's lock must
+freeze Captures against this commit.
+
+Active tab: Graveyard. The owner named it ("now move on to the graveyard"). Work is confined to the
+Graveyard methods of `PhotoIntegration`, new Graveyard modules and the existing Graveyard UI code.
+Every other tab is frozen: Captures, Other Storage, Old Files and Mods at the commits above, Games at
+commit 593354b0e24b1ad03b513b04e6902b44fe511b1a. The protected engines (`graveyard.py`,
+`graveyard_protection.py`, core, recovery) are byte-guarded; changing them needs the owner's explicit
+approval. Show only what the data proves. The owner has not signed off on Graveyard.
 
 Earlier history (kept for context; none of these tabs is open):
 
