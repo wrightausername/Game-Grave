@@ -107,6 +107,34 @@ def main():
             labels = " ".join(w.text() for w in window.mod_details.findChildren(QLabel))
             assert "(relative)" in labels and "2.5" in labels, labels
 
+            # Sorting: every option reorders the Library, header clicks toggle direction, Size and Modified are shown.
+            from gg_desktop import mods_sort
+            assert [window.mod_table.horizontalHeaderItem(i).text() for i in (4, 6)] == ["Size", "Modified"]
+            def library_names():
+                return [window.mod_table.item(i, 1).text() for i in range(window.mod_table.rowCount())]
+            for option in mods_sort.OPTIONS:
+                window.mod_sort.setCurrentText(option)
+                settle()
+                expected = [v.name for v in mods_sort.sort_views(window._mod_views, option)
+                            if v in [x for x in window._mod_views]]
+                shown = library_names()
+                assert shown == expected[:len(shown)], (option, shown, expected)
+            window.mod_sort.setCurrentText("Name (A–Z)")
+            settle()
+            first_az = library_names()
+            window.mod_table.horizontalHeader().sectionClicked.emit(1)
+            settle()
+            assert window.mod_sort.currentText() == "Name (Z–A)" and library_names() == sorted(first_az, key=str.casefold, reverse=True)
+            window.mod_table.horizontalHeader().sectionClicked.emit(4)
+            settle()
+            assert window.mod_sort.currentText() == "Size (Largest)"
+            window.mod_table.horizontalHeader().sectionClicked.emit(6)
+            settle()
+            assert window.mod_sort.currentText() == "Date (Newest)"
+            assert window.grab().save(str(args.output / "mods-page-sorted-1280.png"))
+            window.mod_sort.setCurrentText("Name (A–Z)")
+            settle()
+
             # Every in-page tab fills from real data.
             open_tab(window, "Mod Radar")
             assert window.mod_table.rowCount() >= 3 and headers(window)[1].casefold() == "source"

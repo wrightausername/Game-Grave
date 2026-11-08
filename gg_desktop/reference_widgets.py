@@ -66,12 +66,53 @@ PATHS = {
 
 
 @lru_cache(maxsize=192)
+LAUNCHER_ASSETS = Path(__file__).parent / "assets" / "launchers"
+# Original monogram badges. Official launcher artwork dropped into assets/launchers/<name>.png or .svg is used instead.
+LAUNCHER_MARKS = {"epic": ("E", "#e2e4e7"), "ea": ("EA", "#fa284a"), "battlenet": ("B", "#3ba9ed"),
+                  "ubisoft": ("U", "#d9e2f0"), "xbox": ("X", "#33d34d"), "gog": ("G", "#bc64ee"),
+                  "rockstar": ("R", "#ffc329")}
+
+
+@lru_cache(maxsize=64)
+def launcher_pixmap(name: str, size: int = 22, dpr: int = 4) -> QPixmap:
+    """A launcher mark rendered once at real pixel size (vector or supplied HD art), never a photo crop."""
+    pixels = max(1, size * dpr)
+    pix = QPixmap(pixels, pixels)
+    pix.fill(Qt.transparent)
+    painter = QPainter(pix)
+    painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform | QPainter.TextAntialiasing)
+    supplied = next((f for f in (LAUNCHER_ASSETS / (name + ".svg"), LAUNCHER_ASSETS / (name + ".png")) if f.is_file()), None)
+    if supplied is not None and supplied.suffix == ".svg":
+        QSvgRenderer(str(supplied)).render(painter, QRectF(0, 0, pixels, pixels))
+    elif supplied is not None:
+        source = QPixmap(str(supplied))
+        if not source.isNull():
+            fitted = source.scaled(pixels, pixels, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            painter.drawPixmap((pixels - fitted.width()) // 2, (pixels - fitted.height()) // 2, fitted)
+    else:
+        text, tone = LAUNCHER_MARKS[name]
+        accent = QColor(tone)
+        box = QRectF(pixels * .04, pixels * .04, pixels * .92, pixels * .92)
+        fill = QLinearGradient(box.topLeft(), box.bottomRight())
+        fill.setColorAt(0, QColor("#1b2733"))
+        fill.setColorAt(1, QColor("#0a1017"))
+        painter.setBrush(fill)
+        painter.setPen(QPen(accent, max(1.0, pixels * .055)))
+        painter.drawRoundedRect(box, pixels * .24, pixels * .24)
+        font = QFont("Segoe UI")
+        font.setBold(True)
+        font.setPixelSize(round(pixels * (.42 if len(text) > 1 else .56)))
+        painter.setFont(font)
+        painter.setPen(accent)
+        painter.drawText(box, Qt.AlignCenter, text)
+    painter.end()
+    pix.setDevicePixelRatio(dpr)
+    return pix
+
+
 def icon(name: str, color="#e1e3e7", size=22) -> QIcon:
-    logos = {"epic": (501, 154, 32, 34), "ea": (600, 153, 36, 36),
-             "battlenet": (699, 154, 36, 35), "ubisoft": (818, 154, 36, 35),
-             "xbox": (922, 154, 36, 36), "gog": (1043, 154, 35, 35)}
-    if name in logos:
-        return QIcon(reference("games").copy(QRect(*logos[name])))
+    if name in LAUNCHER_MARKS:
+        return QIcon(launcher_pixmap(name, max(size, 22), 4))
     paths = PATHS.get(name, PATHS["game"])
     data = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
             f'fill="none" stroke="{color}" stroke-width="1.6" '
@@ -457,14 +498,38 @@ def cover_crop(name):
                  if any(part in name.casefold() for part in names)), None)
 
 
+PHOTO_COVERS = {"on": False}  # True only in the design-reference preview, which may borrow crops from the owner's photo
+_COVER_CACHE: dict = {}
+
+
+def _cover_fit(pixmap, width, height, dpr):
+    """The picture cover-fitted to this box at real device pixels, so it is never stretched or blurred by Qt."""
+    key = (pixmap.cacheKey(), width, height, dpr)
+    hit = _COVER_CACHE.get(key)
+    if hit is None:
+        pw, ph = max(1, round(width * dpr)), max(1, round(height * dpr))
+        scaled = pixmap.scaled(pw, ph, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        hit = scaled.copy((scaled.width() - pw) // 2, (scaled.height() - ph) // 2, pw, ph)
+        hit.setDevicePixelRatio(dpr)
+        if len(_COVER_CACHE) > 400:
+            _COVER_CACHE.clear()
+        _COVER_CACHE[key] = hit
+    return hit
+
+
+def _monogram(name):
+    words = [w for w in "".join(c if c.isalnum() else " " for c in name).split() if w]
+    return ("".join(w[0] for w in words[:2]) or "GG").upper()
+
+
 def draw_cover(painter, area, name, *, wide=False, pixmap=None):
     painter.fillRect(area, QColor("#101b25"))
+    dpr = max(1.0, painter.device().devicePixelRatioF())
     if pixmap is not None and not pixmap.isNull():
-        scaled = pixmap.scaled(area.size().toSize(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-        painter.drawPixmap(area.toRect(), scaled, QRect((scaled.width() - int(area.width())) // 2,
-            (scaled.height() - int(area.height())) // 2, int(area.width()), int(area.height())))
+        fitted = _cover_fit(pixmap, max(1, round(area.width())), max(1, round(area.height())), round(dpr, 2))
+        painter.drawPixmap(area.topLeft(), fitted)
         return
-    crop = cover_crop(name)
+    crop = cover_crop(name) if PHOTO_COVERS["on"] else None
     if crop:
         if wide and "cyberpunk" in name.casefold():
             draw_crop(painter, area, "games", (997, 217, 273, 104))
@@ -476,21 +541,26 @@ def draw_cover(painter, area, name, *, wide=False, pixmap=None):
         gradient.setColorAt(.6, QColor("#11131d"))
         gradient.setColorAt(1, QColor("#590e23"))
         painter.fillRect(area, gradient)
-        painter.setPen(QPen(QColor("#ff284a"), 2))
-        x, y = area.center().x(), area.center().y()
-        painter.drawLine(int(x - 20), int(y + 15), int(x + 4), int(y - 20))
-        painter.drawLine(int(x - 3), int(y + 15), int(x + 21), int(y - 20))
+        painter.save()
+        painter.setRenderHint(QPainter.TextAntialiasing)
+        font = QFont("Segoe UI")
+        font.setBold(True)
+        font.setPixelSize(max(10, int(min(area.width(), area.height()) * .34)))
+        painter.setFont(font)
+        painter.setPen(QColor(255, 255, 255, 215))
+        painter.drawText(area, Qt.AlignCenter, _monogram(name))
+        painter.restore()
 
 
 @lru_cache(maxsize=128)
 def cover_icon(name):
-    pix = QPixmap(112, 64)
+    pix = QPixmap(112 * 3, 64 * 3)
     pix.fill(Qt.transparent)
+    pix.setDevicePixelRatio(3)
     p = QPainter(pix)
     p.setRenderHint(QPainter.SmoothPixmapTransform)
     draw_cover(p, QRectF(0, 0, 112, 64), name, wide=True)
     p.end()
-    pix.setDevicePixelRatio(2)
     return QIcon(pix)
 
 

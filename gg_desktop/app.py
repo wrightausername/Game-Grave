@@ -107,6 +107,9 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
     def __init__(self, *, reference_preview=False):
         super().__init__()
         self.reference_preview = reference_preview
+        from gg_desktop import reference_widgets as _rw
+        _rw.PHOTO_COVERS["on"] = bool(reference_preview)
+        _rw.cover_icon.cache_clear()
         self.settings = load_settings()
         self.inventory = Inventory()
         self.scanning = False

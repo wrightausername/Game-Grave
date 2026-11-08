@@ -147,6 +147,29 @@ def old_files():
     return svg(2420, h, '<g transform="translate(570 0)">' + "".join(parts) + "</g>")
 
 
+def games():
+    w, h = 2420, 550
+    r = random.Random(6)
+    parts = ['<rect width="2420" height="550" fill="url(#wall)"/>',
+             '<ellipse cx="1750" cy="250" rx="760" ry="340" fill="url(#haze)"/>',
+             '<ellipse cx="2150" cy="340" rx="360" ry="240" fill="url(#cyan)" opacity=".55"/>',
+             '<rect width="2420" height="550" filter="url(#fog)" opacity=".4"/>']
+    # fanned game cases
+    for i, (x, y, rot, tone) in enumerate(((1330, 120, -9, "#2a1015"), (1530, 90, -3, "#321218"),
+                                           (1730, 80, 4, "#3a141b"), (1930, 105, 10, "#2a1015"))):
+        parts.append(f'<g transform="rotate({rot} {x + 90} {y + 190})"><rect x="{x}" y="{y}" width="180" height="380" rx="14" fill="{tone}" stroke="#ff2a4d" stroke-opacity=".6" stroke-width="5"/>'
+                     f'<rect x="{x + 14}" y="{y + 14}" width="152" height="250" rx="8" fill="url(#screen)"/>'
+                     + "".join(f'<ellipse cx="{x + r.uniform(40, 140):.0f}" cy="{y + r.uniform(50, 230):.0f}" rx="{r.uniform(14, 40):.0f}" ry="{r.uniform(10, 30):.0f}" fill="#ff2a4d" opacity="{r.uniform(.25, .6):.2f}"/>' for _ in range(5))
+                     + f'<rect x="{x + 22}" y="{y + 290}" width="136" height="12" rx="6" fill="#ff5a68" opacity=".55"/><rect x="{x + 22}" y="{y + 316}" width="90" height="10" rx="5" fill="#ff8d99" opacity=".35"/></g>')
+    # controller
+    parts.append('<g transform="translate(900 160)"><path d="M120 0 H400 Q470 0 500 90 L540 230 Q560 300 500 300 Q450 300 420 240 L390 190 H130 L100 240 Q70 300 20 300 Q-40 300 -20 230 L20 90 Q50 0 120 0Z" fill="url(#metal)" stroke="url(#red)" stroke-width="8"/>'
+                 '<circle cx="110" cy="95" r="50" fill="#080b0f" stroke="#ff2a4d" stroke-width="5"/><path d="M110 70 V120 M85 95 H135" stroke="#ff5a68" stroke-width="10" stroke-linecap="round"/>'
+                 '<circle cx="410" cy="55" r="17" fill="#e5162d"/><circle cx="455" cy="97" r="17" fill="#13bcf5"/><circle cx="365" cy="97" r="17" fill="#ffb46a"/><circle cx="410" cy="140" r="17" fill="#ff8d99"/>'
+                 '<circle cx="190" cy="150" r="30" fill="#080b0f" stroke="#ff2a4d" stroke-opacity=".7" stroke-width="4"/><circle cx="330" cy="150" r="30" fill="#080b0f" stroke="#ff2a4d" stroke-opacity=".7" stroke-width="4"/></g>')
+    parts.append('<g filter="url(#blur40)" opacity=".45"><ellipse cx="1170" cy="320" rx="260" ry="100" fill="#ff2a4d"/></g>')
+    return svg(w, h, "".join(parts))
+
+
 def render(name, text, width):
     src = OUT / (name + ".svg")
     src.write_text(text)
@@ -158,5 +181,6 @@ def render(name, text, width):
 
 if __name__ == "__main__":
     render("banner_ready_room", ready_room(), 4000)
+    render("banner_games", games(), 2420)
     render("banner_mods", mods(), 2420)
     render("banner_old_files", old_files(), 2420)

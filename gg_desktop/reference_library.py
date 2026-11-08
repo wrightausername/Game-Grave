@@ -18,6 +18,7 @@ from cleanup_actions import recycle_old_files
 from screenshots import looks_like_screenshot
 from ui_paging import page_window
 from gg_desktop.backend import refresh_graveyard
+from gg_desktop import mods_sort
 from gg_desktop.artwork import game_app_id
 from gg_desktop.library_models import launcher_bucket, file_kind, mod_view, old_file_rows
 from gg_desktop.models import readable_bytes, _path_key
@@ -462,7 +463,7 @@ class LibraryScreens:
         library, contents = panel(kind="libraryPanel", padding=8, spacing=6)
         toolbar = row(spacing=6)
         toolbar.addWidget(label("Sort by", "caption"))
-        self.mod_sort = _combo(["Name (A–Z)", "Size (Largest)", "Game", "Manager"], "Sort mod locations")
+        self.mod_sort = _combo(list(mods_sort.OPTIONS), "Sort mod locations")
         toolbar.addWidget(self.mod_sort, 1)
         toolbar.addWidget(label("Filter", "caption"))
         self.mod_type = _combo(["All Types", "Manager storage", "Game folders"], "Filter mod source type")
@@ -470,10 +471,12 @@ class LibraryScreens:
         contents.addWidget(_widget(toolbar))
         self.mod_notice = label("", "caption", wrap=True)
         contents.addWidget(self.mod_notice)
-        self.mod_table = _table(["", "Name", "Game", "Manager", "Version", "Status"])
+        self.mod_table = _table(["", "Name", "Game", "Manager", "Size", "Status", "Modified"])
         self.mod_table.setIconSize(QSize(48, 30))
-        for i, width in enumerate([25, 180, 90, 63, 48, 65]):
+        for i, width in enumerate([25, 170, 80, 62, 56, 62, 74]):
             self.mod_table.setColumnWidth(i, width)
+        self.mod_table.horizontalHeader().setSectionsClickable(True)
+        self.mod_table.horizontalHeader().sectionClicked.connect(self._sort_mods_by_header)
         self.mod_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         contents.addWidget(self.mod_table, 1)
         self.mod_pager = InventoryPager()
@@ -504,12 +507,20 @@ class LibraryScreens:
         self._mod_tab = name
         self._fill_mods()
 
+    def _sort_mods_by_header(self, column):
+        if self._mod_tab != "Library":
+            return
+        option = mods_sort.header_option(column, self.mod_sort.currentText())
+        if option:
+            self.mod_sort.setCurrentText(option)
+
     def _clear_mod_filters(self):
         self.mod_search.clear()
         self.mod_game_filters.setCurrentRow(0)
         for control in self.mod_manager_checks:
             control.setChecked(False)
         self.mod_type.setCurrentIndex(0)
+        self.mod_sort.setCurrentIndex(0)
         self._fill_mods()
 
     def _fill_mods(self, *_, requested_page=0):
@@ -523,11 +534,7 @@ class LibraryScreens:
                 and (not managers or m.manager in managers)
                 and (not query or query in (m.name + " " + m.manager + " " + m.game + " " + str(m.record.path)).casefold())
                 and (kind == "All Types" or (kind == "Game folders") == (m.game != "Unverified"))]
-        sort = self.mod_sort.currentText()
-        rows.sort(key=(lambda m: (m.size is None, -(m.size or 0), m.name.casefold())) if sort == "Size (Largest)"
-                  else (lambda m: (m.game.casefold(), m.name.casefold())) if sort == "Game"
-                  else (lambda m: (m.manager.casefold(), m.name.casefold())) if sort == "Manager"
-                  else (lambda m: m.name.casefold()))
+        rows = mods_sort.sort_views(rows, self.mod_sort.currentText())
         tab = self._mod_tab
         notice = {"Library": "", "Mod Radar": "Read-only source evidence · All detected storage remains protected.",
                   "Load Order": "Load order is not verified by this scan. Open your mod manager to inspect or change it.",
@@ -551,8 +558,9 @@ class LibraryScreens:
                 item = _text(self.mod_table, i, 1, m.name)
                 item.setIcon(cover_icon(m.game if m.game != "Unverified" else m.name))
                 manager = "MO2" if m.manager == "Mod Organizer 2" else m.manager
-                for c, value in enumerate((m.game, manager, m.version, "Protected"), 2):
+                for c, value in enumerate((m.game, manager, mods_sort.size_text(m.size), "Protected"), 2):
                     _text(self.mod_table, i, c, value)
+                _text(self.mod_table, i, 6, mods_sort.date_text(mods_sort.modified_time(str(m.record.path))))
                 self.mod_table.setRowHeight(i, 40)
             if rows:
                 self.mod_table.selectRow(0)

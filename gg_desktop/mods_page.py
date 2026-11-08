@@ -24,8 +24,8 @@ from gg_desktop.reference_widgets import CoverArt, MetricStrip, detail_line, det
 from gg_desktop.widgets import label, row
 from ui_paging import page_window
 
-LIBRARY_HEADERS = ("", "Name", "Game", "Manager", "Version", "Status")
-LIBRARY_WIDTHS = (25, 180, 90, 63, 48, 65)
+LIBRARY_HEADERS = ("", "Name", "Game", "Manager", "Size", "Status", "Modified")
+LIBRARY_WIDTHS = (25, 170, 80, 62, 56, 62, 74)
 COLORS = {"green": "#27dc74", "amber": "#f7b737", "muted": "#9ca8bd", "": "#d7dfe7"}
 TAB_NAMES = ("Library", "Mod Radar", "Load Order", "Profiles", "Conflicts", "Cleanup")
 
