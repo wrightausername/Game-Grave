@@ -227,7 +227,7 @@ def build(window):
 
     # --- Filters
     filters, side = panel(kind="fileFilterPanel", padding=8, spacing=4)
-    filters.setMinimumWidth(158)
+    filters.setMinimumWidth(148)
     filters.setMaximumWidth(215)
     head = row(spacing=4)
     head.addWidget(label("Filters", "sectionTitle"), 1)
@@ -382,7 +382,7 @@ def build(window):
                     self.capture_month):
         control.currentTextChanged.connect(lambda *_: fill(self))
     for box in self.capture_types:
-        box.toggled.connect(lambda *_: fill(self))
+        box.toggled.connect(lambda *_: (rebuild_game_list(self, refill=False), fill(self)))
     self.capture_game.currentRowChanged.connect(lambda *_: fill(self))
     self.capture_game_search.textChanged.connect(lambda *_: rebuild_game_list(self))
     self.capture_search.textChanged.connect(lambda *_: fill(self))
@@ -453,8 +453,19 @@ def refresh(window):
     fill(window)
 
 
+def counted(window):
+    """The captures the Game / Source counts describe: this tab's kind, limited to the checked Capture Types."""
+    tab = state_of(window).tab
+    kinds = {b.property("kind") for b in window.capture_types if b.isChecked()}
+    if tab == "Screenshots":
+        kinds &= {"Screenshots"}
+    elif tab == "Recordings":
+        kinds &= {"Recordings"}
+    return [c for c in universe(window) if c.kind in kinds]
+
+
 def rebuild_game_list(window, refill=True):
-    captures = universe(window)
+    captures = counted(window)
     wanted = window.capture_game_search.text().strip().casefold()
     current = window.capture_game.currentItem()
     keep = current.data(Qt.UserRole) if current else insight.ALL_GAMES
@@ -513,6 +524,7 @@ def rows_now(window):
 def set_tab(window, name):
     state = state_of(window)
     state.tab = name
+    rebuild_game_list(window, refill=False)
     fill(window)
 
 

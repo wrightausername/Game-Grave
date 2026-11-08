@@ -391,6 +391,8 @@ def main():
             for width, height in ((1280, 720), (1440, 900), (960, 650)):
                 window.resize(width, height)
                 settle()
+                QTest.qWait(40)  # the header drops its optional zoom signs in response to the resize
+                settle()
                 if height >= 720:
                     bottom = window.capture_more.mapTo(window, QPoint(0, window.capture_more.height())).y()
                     assert bottom <= window.height(), ("Footer actions are cut off", (width, height), bottom)
