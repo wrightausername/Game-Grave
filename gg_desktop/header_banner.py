@@ -29,6 +29,8 @@ class _HeaderBackground(QWidget):
 
 
 class HeaderBannerArtwork(QObject):
+    INSET = 175  # width of the window-control strip the HD art stays clear of
+
     def __init__(self, window, page, banner, *, route, scene=None, source=(0, 0, 1, 1), excluded=(), art=None):
         super().__init__(page)
         self.art = art
@@ -84,7 +86,14 @@ class HeaderBannerArtwork(QObject):
         if not source.isNull() and height > 0:
             art_width = max(1, round(source.width() * height / source.height()))
             picture = brand_scaled(self.art, art_width, height, round(widget.devicePixelRatioF(), 2), False)
-            painter.drawPixmap(banner_origin.x() - origin.x() + width - art_width, header_top - origin.y(), picture)
+            # Keep the picture clear of the window controls: it ends INSET px before the right edge, and its last
+            # pixel column is stretched over that strip so there is no hard edge.
+            right = banner_origin.x() - origin.x() + width
+            left = right - self.INSET - art_width
+            painter.drawPixmap(left, header_top - origin.y(), picture)
+            strip = picture.copy(picture.width() - 1, 0, 1, picture.height())
+            painter.drawPixmap(QRectF(right - self.INSET, header_top - origin.y(), self.INSET, height), strip,
+                               QRectF(strip.rect()))
         fade = QLinearGradient(banner_origin.x() - origin.x(), 0, banner_origin.x() - origin.x() + width, 0)
         fade.setColorAt(0, BACKGROUND)
         fade.setColorAt(.22, QColor(2, 7, 10, 235))

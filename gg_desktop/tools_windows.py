@@ -172,6 +172,7 @@ def game_optimizer(window):
         while holder.count():
             item = holder.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
         checks.clear()
         for state in winpc.read_optimizer(reg, runner):

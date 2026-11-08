@@ -30,6 +30,14 @@ def main():
 
     app = QApplication.instance() or QApplication([])
 
+    def snap(dialog, name):
+        """Show the dialog for real (the tests open them without blocking) so the picture has its true styling."""
+        dialog.show()
+        QTest.qWait(80)
+        app.processEvents()
+        assert dialog.grab().save(str(args.output / name))
+        dialog.hide()
+
     def wait_for(test, seconds=8):
         end = time.time() + seconds
         while time.time() < end:
@@ -103,7 +111,7 @@ def main():
             assert asked[-1][0] == "Delete temporary files" and str(temp_root) in asked[-1][1] and "Recycle Bin" in asked[-1][1]
             assert fresh.exists() and outside.exists() and temp_root.exists()
             assert logged[-1][0] == "Windows Cleanup" and "Deleted 1 files" in logged[-1][1]
-            dialog.grab().save(str(args.output / "tools-windows-cleanup.png"))
+            snap(dialog, "tools-windows-cleanup.png")
 
             # 2. Game Optimizer: names the registry values, applies, then Undo restores them.
             dialog = open_tool("game_optimizer")
@@ -117,7 +125,7 @@ def main():
             dialog.undo_button.click()
             assert reg.read(*winpc.GAME_MODE) is None and reg.read(*winpc.DVR_STORE) is None
             assert not dialog.undo_button.isEnabled()
-            dialog.grab().save(str(args.output / "tools-windows-optimizer.png"))
+            snap(dialog, "tools-windows-optimizer.png")
 
             # 3. Memory Optimizer: lists user apps only, asks politely, never forces.
             dialog = open_tool("memory_optimizer")
@@ -129,7 +137,7 @@ def main():
             assert all("/F" not in c for c in runner.calls if c and c[0] == "taskkill")
             assert "chrome.exe" in asked[-1][1] and "not forced" in asked[-1][1]
             wait_for(lambda: logged and logged[-1][0] == "Memory Optimizer")
-            dialog.grab().save(str(args.output / "tools-windows-memory.png"))
+            snap(dialog, "tools-windows-memory.png")
 
             # 4. Startup Manager: flips the approval switch, never deletes the entry.
             dialog = open_tool("startup_manager")
@@ -143,7 +151,7 @@ def main():
             dialog.table.item(0).setSelected(True)
             dialog.enable_button.click()
             assert reg.read(winpc.HKCU, winpc.APPROVED + "\\Run", "Discord")[0][0] == 2
-            dialog.grab().save(str(args.output / "tools-windows-startup.png"))
+            snap(dialog, "tools-windows-startup.png")
 
             # 5. Command Runner: shows the exact line before running it, shows the output, logs it.
             dialog = open_tool("command_runner")
@@ -154,7 +162,7 @@ def main():
             wait_for(lambda: "hello from the fake shell" in dialog.output.toPlainText())
             assert "echo hello" in asked[-1][1] and ["cmd.exe", "/d", "/s", "/c", "echo hello"] in runner.calls
             assert logged[-1][0] == "Command Runner" and "echo hello" in logged[-1][1]
-            dialog.grab().save(str(args.output / "tools-windows-command.png"))
+            snap(dialog, "tools-windows-command.png")
 
             # 6. File Associations: read-only lookup.
             reg.write(winpc.HKCR, ".zip", "", "CompressedFolder", winpc.REG_SZ)
@@ -165,7 +173,7 @@ def main():
             dialog.kind.setCurrentText("not valid!")
             dialog.lookup.click()
             assert "Type an extension" in dialog.answer.text()
-            dialog.grab().save(str(args.output / "tools-windows-associations.png"))
+            snap(dialog, "tools-windows-associations.png")
 
             # 7. Junction Manager: lists links, removes only the link, keeps the target.
             games, real = root / "Games", root / "Elsewhere"
@@ -189,7 +197,7 @@ def main():
                 assert logged[-1][0] == "Junction Manager"
             else:
                 wait_for(lambda: "No junctions" in dialog.result_line.text())
-            dialog.grab().save(str(args.output / "tools-windows-junctions.png"))
+            snap(dialog, "tools-windows-junctions.png")
 
             assert errors.call_count == 0, errors.call_args_list
             window.close()

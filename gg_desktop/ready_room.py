@@ -85,7 +85,7 @@ def fitted_text(text, role, *, wrap=False):
 class ReadyRoomBackground(QWidget):
     """Gaming-room illustration behind the title: one HD picture, uniformly scaled and resampled to real pixels."""
     ART = "banner_ready_room.png"
-    ART_HEIGHT = 112
+    ART_HEIGHT = 98
 
     def __init__(self):
         super().__init__()
@@ -110,10 +110,10 @@ class ReadyRoomBackground(QWidget):
             shade.setColorAt(.7, QColor(5, 9, 12, 205))
             shade.setColorAt(1, QColor(5, 9, 12, 0))
             painter.fillRect(QRectF(0, 0, self.width(), 104), shade)
-        bottom = QLinearGradient(0, 80, 0, 113)
+        bottom = QLinearGradient(0, 60, 0, 99)
         bottom.setColorAt(0, QColor(5, 9, 12, 0))
         bottom.setColorAt(1, QColor("#05090C"))
-        painter.fillRect(QRectF(0, 80, self.width(), 34), bottom)
+        painter.fillRect(QRectF(0, 60, self.width(), 40), bottom)
 
 
 class ReadyPanel(QFrame):
