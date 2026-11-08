@@ -145,7 +145,9 @@ def main():
             assert "Cyberpunk 2077" in transcript(window) and "never remove anything" in transcript(window)
             ask(window, "tell me a joke")
             assert "can't answer that from your scan data" in transcript(window)
-            low = transcript(window).lower()
+            # The only allowed "safe to remove" is the refusal itself and the user's own question.
+            low = transcript(window).lower().replace("i can't tell you that something is safe to remove", "")
+            low = low.replace("is it safe to remove", "")
             assert "safe to remove" not in low and "freed" not in low and "reclaimed" not in low, low
 
             # Hand-off buttons open the owning tab; nothing is changed by asking.
