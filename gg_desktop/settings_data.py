@@ -35,7 +35,7 @@ EXPORT_KEYS = tuple(OWNED) + LIBRARY_KEYS + ("scan_folder", "never_touch")
 
 
 def _path_ok(value):
-    return type(value) is str and 0 < len(value) <= MAX_PATH and "\0" not in value and os.path.isabs(value)
+    return type(value) is str and 0 < len(value) <= MAX_PATH and "\0" not in value and Path(value).is_absolute()
 
 
 def clean_folders(values, limit=MAX_FOLDERS):

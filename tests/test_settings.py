@@ -61,7 +61,7 @@ class Prefs(unittest.TestCase):
         got = data.current(bad)
         self.assertIs(got["start_minimized"], False)
         self.assertEqual((got["files_stale_days"], got["graveyard_days"]), (180, 365))
-        self.assertEqual(got["excluded_folders"], [os.path.abspath("/a")] if os.path.isabs("/a") else [])
+        self.assertEqual(got["excluded_folders"], ["/a"] if Path("/a").is_absolute() else [])
         self.assertIs(got["steam_artwork_downloads"], True)
 
     def test_apply_changes_only_owned_keys(self):
