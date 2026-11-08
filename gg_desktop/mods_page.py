@@ -13,6 +13,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QSignalBlocker
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication, QFileDialog, QHeaderView, QMenu
+from shiboken6 import isValid
 
 from core import save_settings
 from gg_desktop import mods_insight as mi
@@ -160,7 +161,8 @@ def fill(window, *args, **kwargs):
 
 
 def chrome(window, control):
-    if not hasattr(window, "mod_profile"):  # first fill happens while the page is still being built
+    # The first fill runs while the page is still being built; a combo left by the previous visit is deleted.
+    if not isValid(getattr(window, "mod_profile", None)):
         return
     tab = window._mod_tab
     visible = control is not None and tab in {"Load Order", "Conflicts"}
