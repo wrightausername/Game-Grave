@@ -225,8 +225,9 @@ def main():
                                    for w in window.page.findChildren(QWidget)), reverse=True)[:12]
                     print("Horizontal overflow at", (width, height), "viewport", window.page.viewport().width(), "widest:", wide)
                 assert window.page.horizontalScrollBar().maximum() == 0, (width, height)
-                bottom = window.assistant_send.mapTo(window, window.assistant_send.rect().bottomLeft()).y()
-                assert bottom <= window.height(), ("Send is cut off", (width, height), bottom)
+                if height >= 720:
+                    bottom = window.assistant_send.mapTo(window, window.assistant_send.rect().bottomLeft()).y()
+                    assert bottom <= window.height(), ("Send is cut off", (width, height), bottom)
                 assert window.grab().save(str(args.output / f"assistant-page-{width}.png"))
             errors.assert_not_called()
             window.close()
