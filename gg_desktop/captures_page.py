@@ -210,7 +210,7 @@ def build(window):
     page.content.addWidget(self.capture_tabs)
 
     # --- Filters
-    filters, scan = panel(kind="fileFilterPanel", padding=8, spacing=4)
+    filters, side = panel(kind="fileFilterPanel", padding=8, spacing=4)
     filters.setMinimumWidth(176)
     filters.setMaximumWidth(215)
     head = row(spacing=4)
@@ -219,7 +219,7 @@ def build(window):
     clear.setObjectName("link")
     clear.clicked.connect(lambda: clear_filters(self))
     head.addWidget(clear)
-    scan.addLayout(head)
+    side.addLayout(head)
     holder = QWidget()
     stack = column(spacing=4)
     holder.setLayout(stack)
@@ -264,7 +264,7 @@ def build(window):
     scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     scroller.setStyleSheet("QScrollArea{background:transparent;} QScrollArea > QWidget > QWidget{background:transparent;}")
     scroller.setWidget(holder)
-    scan.addWidget(scroller, 1)
+    side.addWidget(scroller, 1)
 
     # --- Results
     results, contents = panel(kind="fileResults", padding=7, spacing=5)
