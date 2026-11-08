@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gg_desktop.reference_widgets import brand_scaled, brand_source
 from gg_desktop.ready_room_icons import icon, icon_label
 from gg_desktop.ready_room_data import live_ready_room, reference_ready_room
 from gg_desktop.ready_room_actions import ReadyRoomActions
@@ -82,28 +83,27 @@ def fitted_text(text, role, *, wrap=False):
 
 
 class ReadyRoomBackground(QWidget):
-    """Gaming-room illustration behind the title and the real search controls."""
+    """Gaming-room illustration behind the title: one HD picture, uniformly scaled and resampled to real pixels."""
+    ART = "banner_ready_room.png"
+    ART_HEIGHT = 112
+
     def __init__(self):
         super().__init__()
         self.setObjectName("mainCanvas")
-        self.art = QPixmap(str(ASSETS / "gaming_room.png"))
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor("#05090C"))
-        art_width = max(self.art.width(), self.width() * .59)
-        target = QRectF(self.width() - art_width, -46, art_width, 150)
-        # The reference's search and window chrome are excluded from the art.
-        painter.save()
-        clip = QPainterPath()
-        clip.addRect(QRectF(0, 0, self.width(), 104))
-        painter.setClipPath(clip)
-        painter.drawPixmap(target, self.art, QRectF(self.art.rect()))
-        painter.restore()
-        fade = QLinearGradient(target.left(), 0, target.left() + 180, 0)
-        fade.setColorAt(0, QColor("#05090C"))
-        fade.setColorAt(1, QColor(5, 9, 12, 0))
-        painter.fillRect(target, fade)
+        source = brand_source(self.ART)
+        if not source.isNull():
+            art_width = round(source.width() * self.ART_HEIGHT / source.height())
+            picture = brand_scaled(self.ART, art_width, self.ART_HEIGHT, round(self.devicePixelRatioF(), 2), False)
+            left = self.width() - art_width
+            painter.drawPixmap(left, 0, picture)
+            fade = QLinearGradient(left, 0, left + 220, 0)
+            fade.setColorAt(0, QColor("#05090C"))
+            fade.setColorAt(1, QColor(5, 9, 12, 0))
+            painter.fillRect(QRectF(left, 0, 220, self.ART_HEIGHT), fade)
         if self.width() < 900:
             shade = QLinearGradient(0, 0, self.width() * .85, 0)
             shade.setColorAt(0, QColor(5, 9, 12, 250))
@@ -337,6 +337,10 @@ class HealthGauge(QWidget):
                          self.caption if self.score is not None else "Not verified")
 
 
+def data_is_reference(data):
+    return bool(getattr(data, "reference", False))
+
+
 class ReadyRoomContent(ScrollPage):
     def __init__(self, window, data, search=None):
         super().__init__()
@@ -444,7 +448,25 @@ class ReadyRoomContent(ScrollPage):
             self.metrics_grid.addWidget(metric, 0, len(self.metric_buttons) - 1)
             self.metrics_grid.setColumnStretch(len(self.metric_buttons) - 1, stretch)
         self.content.addWidget(self.metrics)
-        self.content.addSpacing(11)
+        self.news_bar = None
+        if data.reference:
+            self.content.addSpacing(11)
+        else:
+            self.news_bar = QWidget()
+            self.news_bar.setFixedHeight(26)
+            news_row = row(spacing=10, margins=(2, 3, 2, 0))
+            self.news_bar.setLayout(news_row)
+            self.news_status = label("", "readyWhen")
+            self.news_status.setTextFormat(Qt.PlainText)
+            self.news_status.setMinimumWidth(0)
+            self.news_status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            news_row.addWidget(self.news_status, 1)
+            self.news_refresh = button("Refresh", window.ready_refresh_news, kind="readyLink")
+            self.news_refresh.setAccessibleName("Refresh official Steam news")
+            news_row.addWidget(self.news_refresh)
+            self.content.addWidget(self.news_bar)
+            self.content.addSpacing(4)
+            self.update_news_status()
 
         self.middle = QHBoxLayout()
         self.middle.setSpacing(12)
@@ -470,6 +492,16 @@ class ReadyRoomContent(ScrollPage):
             self.bottom.addWidget(card, stretch)
         self.content.addLayout(self.bottom, 5)
         self.filter_rows("")
+
+    def update_news_status(self):
+        owner = self.window_owner
+        if self.news_bar is None:
+            return
+        text, busy = owner.ready_news_status()
+        self.news_status.setText(text)
+        self.news_status.setToolTip(text)
+        self.news_refresh.setEnabled(not busy)
+        self.news_refresh.setText("Checking…" if busy else "Refresh")
 
     def filter_rows(self, query):
         for layout in (self.patches.body_layout, self.games.body_layout):
@@ -717,3 +749,4 @@ class ReadyRoomMethods(ReadyRoomActions):
         if (not self.reference_preview and self.inventory.scanned_at
                 and self._ready_evidence_inventory is not self.inventory and not self._ready_checks_busy):
             QTimer.singleShot(0, self.ready_refresh_checks)
+        self.ready_start_live_news()

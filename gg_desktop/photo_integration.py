@@ -162,6 +162,9 @@ class PhotoIntegration:
     def mods_page(self):
         LibraryScreens.mods_page(self)
         page = self.page
+        from gg_desktop.header_banner import HeaderBannerArtwork
+        page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Mods",
+                                                  art="banner_mods.png")
         holder = QWidget(page)
         layout = column()
         holder.setLayout(layout)

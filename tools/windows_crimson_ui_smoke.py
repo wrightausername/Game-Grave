@@ -52,6 +52,10 @@ def main():
                          str(synthetic / "EA" / "Sample"),
                          "ea11", None, "Registry installation record"),
         ]
+        # Ready Room now fetches official Steam news on its own; this smoke must never reach the network.
+        from unittest.mock import patch as _patch
+        _no_news = _patch("gg_desktop.ready_room_services.fetch_one", side_effect=OSError("offline QA"))
+        _no_news.start()
         window = CrimsonWindow()
         window.show()
         app.processEvents()

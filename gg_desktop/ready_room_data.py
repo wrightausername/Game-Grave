@@ -119,6 +119,9 @@ def live_ready_room(inventory, *, disk_free_percent: float | None = None,
         minutes = playtimes.get(steam_id)
         latest = next((p for p in patches if p.app_id == steam_id), None)
         status, tone, glyph = ("Recorded install", "muted", "shield")
+        launcher = getattr(game, "launcher", "")
+        if launcher and launcher != "Steam":
+            status = "No official feed"
         if latest:
             status = {"update": "Patch news", "hotfix": "Hotfix news", "mod": "Mod news",
                       "maintenance": "Service news", "release": "Release news"}.get(latest.kind, "Game news")

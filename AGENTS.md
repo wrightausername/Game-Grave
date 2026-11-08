@@ -147,7 +147,9 @@ native smoke instead. Owner decisions: the logo and backdrop are rebuilt as HD P
 `tools/make_forest_art.py`); Ready Room auto-refreshes official Steam news only; the owner approved fully
 implementing the seven More Tools tiles, which is the one approved exception to "Game Grave never changes Windows or
 runs commands": every such action must name exactly what it will change, ask first, and be recorded in the activity
-log. Protected engines still need explicit approval before any edit.
+log. Protected engines still need explicit approval before any edit, except where the owner's polish message names
+the feature: `ready_room_actions.py`, `ready_room_data.py` and `ready_room_services.py` were released from the byte
+guard for live Steam news (auto-refresh on open and every 30 minutes while open, Last checked, manual Refresh).
 
 Active tab: More Tools. The owner's photo is `gg_desktop/assets/references/more_tools.jpg`. Work is confined
 to new `tools_*.py` modules, a `tools_page` delegation in `photo_integration.py` and the More Tools tests and

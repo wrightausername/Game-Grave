@@ -2,19 +2,20 @@
 from __future__ import annotations
 
 from datetime import datetime
+import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QTimer, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFileDialog, QLineEdit,
+    QApplication, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QLineEdit,
     QListWidget, QListWidgetItem,
 )
 
 from gg_desktop.ready_room_data import reference_ready_room
 from gg_desktop.ready_room_services import (
     backup_receipt, backup_status, inspect_local, load_state, news_targets,
-    news_url, refresh_news, save_state,
+    news_is_stale, news_status_text, news_url, refresh_news, save_state,
 )
 from gg_desktop.widgets import button, column, label, row
 
@@ -27,6 +28,9 @@ class ReadyRoomActions:
             self._ready_evidence_stamp = ""
             self._ready_evidence_inventory = None
             self._ready_checks_busy = self._ready_news_busy = False
+            self._ready_news_attempt = 0
+            self._ready_news_failed = False
+            self._ready_news_timer = None
 
     def ready_reload(self):
         if self.current_route == "Ready Room":
@@ -95,27 +99,64 @@ class ReadyRoomActions:
                 done()
         self._ready_task("Ready Room local checks", lambda: inspect_local(inventory, roots), finish)
 
-    def ready_refresh_news(self, done=None):
+    def ready_news_status(self):
+        self.ready_init()
+        return (news_status_text(self._ready_state, self.inventory.games, busy=self._ready_news_busy,
+                                 failed=self._ready_news_failed), self._ready_news_busy)
+
+    def _ready_news_bar(self):
+        page = getattr(self, "page", None)
+        if self.current_route == "Ready Room" and hasattr(page, "update_news_status"):
+            page.update_news_status()
+
+    def ready_start_live_news(self):
+        """Fetch official Steam news when the page opens (if stale) and every 30 minutes while it stays open."""
+        self.ready_init()
+        if self.reference_preview:
+            return
+        if self._ready_news_timer is None:
+            self._ready_news_timer = QTimer(self)
+            self._ready_news_timer.setInterval(30 * 60 * 1000)
+            self._ready_news_timer.timeout.connect(self._ready_news_tick)
+        self._ready_news_timer.start()
+        self._ready_news_tick()
+
+    def _ready_news_tick(self):
+        if (self.current_route != "Ready Room" or self.reference_preview or self._ready_news_busy
+                or QApplication.activeModalWidget() is not None):
+            return
+        if news_is_stale(self._ready_state, self._ready_news_attempt):
+            self.ready_refresh_news(quiet=True)
+
+    def ready_refresh_news(self, _checked=False, done=None, quiet=False):
         self.ready_init()
         if self.reference_preview or self._ready_news_busy:
             return
         if not news_targets(self.inventory.games, self._ready_state["followed"]):
-            self.info("Choose a Steam game", "Scan your installed games first, then refresh Patch Watch. "
-                      "News for other launchers is not available from Steam.")
+            if not quiet:
+                self.info("Choose a Steam game", "Scan your installed games first, then refresh Patch Watch. "
+                          "News for other launchers is not available from Steam.")
+            self._ready_news_bar()
             return
         self._ready_news_busy = True
+        self._ready_news_attempt = int(time.time())
+        self._ready_news_bar()
         games, state = tuple(self.inventory.games), dict(self._ready_state)
         def finish(result, error):
             self._ready_news_busy = False
+            self._ready_news_failed = bool(error) or (result is not None and result["succeeded"] == 0)
             if error:
-                self.error("Patch Watch could not refresh", error)
+                if not quiet:
+                    self.error("Patch Watch could not refresh", error)
+                self._ready_news_bar()
             else:
                 updated = {**self._ready_state, **{key: result[key] for key in (
                     "news", "news_checked", "news_warnings")}}
                 if self._ready_write(updated):
-                    self.status.setText(f"Patch Watch refreshed {result['succeeded']} Steam games. "
-                                        + ("Some feeds are unavailable; cached news is retained."
-                                           if result["news_warnings"] else "Official news is saved for offline use."))
+                    if not quiet:
+                        self.status.setText(f"Patch Watch refreshed {result['succeeded']} Steam games. "
+                                            + ("Some feeds are unavailable; cached news is retained."
+                                               if result["news_warnings"] else "Official news is saved for offline use."))
                     self.ready_reload()
             if done:
                 done()

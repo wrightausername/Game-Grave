@@ -9,7 +9,7 @@ from PySide6.QtCore import QObject, QEvent, QPoint, QRectF, Qt
 from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import QWidget
 
-from gg_desktop.reference_widgets import reference
+from gg_desktop.reference_widgets import brand_scaled, brand_source, reference
 
 BACKGROUND = QColor("#02070a")
 
@@ -29,8 +29,9 @@ class _HeaderBackground(QWidget):
 
 
 class HeaderBannerArtwork(QObject):
-    def __init__(self, window, page, banner, *, route, scene, source, excluded):
+    def __init__(self, window, page, banner, *, route, scene=None, source=(0, 0, 1, 1), excluded=(), art=None):
         super().__init__(page)
+        self.art = art
         self.window, self.page, self.banner = window, page, banner
         self.route, self.scene = route, scene
         self.source = QRectF(*source)
@@ -70,7 +71,37 @@ class HeaderBannerArtwork(QObject):
                 return True
         return False
 
+    def paint_art(self, widget, *, top=False):
+        """Draw the HD banner picture once across top bar and banner: uniform scale, resampled to real pixels."""
+        origin = widget.mapTo(self.window, QPoint())
+        banner_origin = self.banner.mapTo(self.window, QPoint())
+        header_top = self.window.top_bar.mapTo(self.window, QPoint()).y()
+        height = banner_origin.y() + self.banner.height() - header_top
+        width = self.banner.width()
+        source = brand_source(self.art)
+        painter = QPainter(widget)
+        painter.fillRect(widget.rect(), BACKGROUND)
+        if not source.isNull() and height > 0:
+            art_width = max(1, round(source.width() * height / source.height()))
+            picture = brand_scaled(self.art, art_width, height, round(widget.devicePixelRatioF(), 2), False)
+            painter.drawPixmap(banner_origin.x() - origin.x() + width - art_width, header_top - origin.y(), picture)
+        fade = QLinearGradient(banner_origin.x() - origin.x(), 0, banner_origin.x() - origin.x() + width, 0)
+        fade.setColorAt(0, BACKGROUND)
+        fade.setColorAt(.22, QColor(2, 7, 10, 235))
+        fade.setColorAt(.5, QColor(2, 7, 10, 70))
+        fade.setColorAt(1, QColor(2, 7, 10, 0))
+        painter.fillRect(widget.rect(), fade)
+        if not top:
+            bottom = QLinearGradient(0, 0, 0, self.banner.height())
+            bottom.setColorAt(0, QColor(2, 7, 10, 0))
+            bottom.setColorAt(.8, QColor(2, 7, 10, 0))
+            bottom.setColorAt(1, BACKGROUND)
+            painter.fillRect(widget.rect(), bottom)
+        painter.end()
+
     def paint(self, widget, *, top=False):
+        if self.art:
+            return self.paint_art(widget, top=top)
         source = self.source
         origin = widget.mapTo(self.window, QPoint())
         banner_origin = self.banner.mapTo(self.window, QPoint())

@@ -209,7 +209,9 @@ def main():
                 window.navigate(route)
                 idle(window)
                 wait_for(lambda: window.page.isVisible())
-                assert window.current_route == route, (route, window.current_route)
+                # The AI Assistant is optional and off by default: its route sends people to Settings.
+                expected = "Settings" if route == "AI Assistant" and not window.assistant_enabled() else route
+                assert window.current_route == expected, (route, window.current_route)
             window.reference_preview = True
             window.navigate("Ready Room")
             window.resize(1280, 720)

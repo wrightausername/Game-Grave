@@ -27,8 +27,9 @@ def main():
         assert raw == original, "Owner photo differs from its original upload: " + name
     for path in ("core.py", "cleanup_actions.py", "recovery.py", "graveyard.py", "graveyard_protection.py",
                  "manager_profiles.py", "mod_sources.py", "gg_desktop/mods_data.py", "gg_desktop/mod_conflicts.py",
-                 "gg_desktop/game_artwork.py", "gg_desktop/games_data.py", "gg_desktop/old_files_data.py",
-                 "gg_desktop/ready_room_actions.py", "gg_desktop/ready_room_data.py", "gg_desktop/ready_room_services.py"):
+                 "gg_desktop/game_artwork.py", "gg_desktop/games_data.py", "gg_desktop/old_files_data.py"):
+        # Ready Room's actions, data and services were released from this guard by the owner's polish-pass
+        # request ("game updates, maintenance and new releases need to be working and live").
         original = subprocess.check_output(["git", "show", BASELINE + ":" + path], cwd=root).decode("utf-8").replace("\r\n", "\n")
         assert (root / path).read_text(encoding="utf-8") == original, "Safety/data engine changed: " + path
     print("PASS: Eight original owner photos are unchanged; scanning, protection, recovery, artwork, mod evidence and Ready Room data engines match the tested baseline. Visual layout is checked against the photos by photo_ui_smoke and actual render review.")

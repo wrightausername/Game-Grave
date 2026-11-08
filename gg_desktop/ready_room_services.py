@@ -152,6 +152,43 @@ def refresh_news(games, state, *, fetcher=None):
             "news_checked": checked, "news_warnings": warnings[:45], "succeeded": len(succeeded)}
 
 
+NEWS_INTERVAL = 30 * 60
+
+
+def last_checked(state):
+    """Newest time Steam answered for any game, or 0 when it has never answered."""
+    return max((v for v in state.get("news_checked", {}).values() if type(v) is int), default=0)
+
+
+def news_is_stale(state, last_attempt=0, *, now=None, interval=NEWS_INTERVAL):
+    """True when it is time to ask Steam again. A failed attempt also counts, so an offline PC is not hammered."""
+    now = time.time() if now is None else now
+    return now - max(last_checked(state), last_attempt or 0) >= interval
+
+
+def news_status_text(state, games, *, busy=False, failed=False, now=None):
+    """The one honest line shown above Patch Watch: what was checked, when, and what has no feed."""
+    now = time.time() if now is None else now
+    targets = news_targets(games, state.get("followed", []))
+    if busy:
+        return "Checking Steam for official news…"
+    if not targets:
+        others = any(getattr(g, "launcher", "Steam") != "Steam" for g in games)
+        return ("No official news feed is available for these games. Only Steam publishes one."
+                if others else "Scan your games to follow official Steam news.")
+    stamp = last_checked(state)
+    when = "not checked yet" if not stamp else (
+        "just now" if now - stamp < 60 else f"{int((now - stamp) // 60)} min ago" if now - stamp < 3600
+        else datetime.fromtimestamp(stamp).strftime("today %H:%M" if now - stamp < 86400 else "%d %b %H:%M"))
+    text = f"Official Steam news · last checked {when} · updates every 30 minutes while this page is open"
+    if failed:
+        text = f"Steam could not be reached · showing saved posts · last checked {when}"
+    non_steam = sum(1 for g in games if getattr(g, "launcher", "Steam") != "Steam")
+    if non_steam and not failed:
+        text += f" · {non_steam} non-Steam game{'s have' if non_steam != 1 else ' has'} no official feed"
+    return text
+
+
 def _empty_state():
     return {"schema": 1, "followed": [], "news": [], "news_checked": {}, "news_warnings": [], "backups": []}
 

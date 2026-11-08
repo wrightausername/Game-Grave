@@ -91,7 +91,16 @@ def main():
             window.navigate("Ready Room")
             settle()
             wait_for(lambda: bool(window._ready_evidence))
-            fetch.assert_not_called()  # Rendering and local checks never fetch online.
+            # Opening Ready Room fetches official Steam news once on its own (owner-approved live feed).
+            wait_for(lambda: fetch.call_count == 1 and not window._ready_news_busy)
+            settle()
+            status = window.page.news_status.text()
+            assert "last checked just now" in status and "30 minutes" in status, status
+            assert window._ready_news_timer.isActive() and window._ready_news_timer.interval() == 30 * 60 * 1000
+            window._ready_news_tick()  # fresh news: another tick inside the interval must not fetch again
+            settle()
+            assert fetch.call_count == 1 and not window._ready_news_busy
+            assert window.page.data.counts[0] == "2" and window.page.data.counts[2] == "1" and window.page.data.counts[3] == "1"
             assert window.page.data.health_caption == "Local checks"
             assert window.page.data.games[0].hours == "— hrs"
 
@@ -118,7 +127,12 @@ def main():
                     assert browser.call_args[0][0].toString().startswith("https://store.steampowered.com/news/")
                 dialog.accept()
             drive_dialog(window.ready_updates, refresh)
-            fetch.assert_called_once()
+            assert fetch.call_count == 2  # the manual button still works on top of the automatic fetch
+            window._ready_state["news_checked"] = {k: 1000 for k in window._ready_state["news_checked"]}
+            window._ready_news_attempt = 0  # thirty minutes later: the timer tick fetches again
+            window._ready_news_tick()
+            wait_for(lambda: fetch.call_count == 3 and not window._ready_news_busy)
+            settle()
             assert window.page.data.counts == ("2", "0", "1", "1", "1")
             assert len(window.page.visible_patches) == 4
             assert window.page.visible_games[0].status == "Patch news"
@@ -161,7 +175,7 @@ def main():
             assert not window.workers
             window.close()
             settle()
-    print("PASS: live news refresh/filter/browser action, follow persistence, real ZIP backup and history, "
+    print("PASS: live news auto-refresh/refresh/filter/browser action, follow persistence, real ZIP backup and history, "
           "local health/mod dialogs and exact game selection. No automatic network requests or source-save changes.")
     return 0
 
