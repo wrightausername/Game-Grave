@@ -19,6 +19,7 @@ from shiboken6 import isValid
 
 from core import human_size, is_protected_path
 from gg_desktop import old_files_insight as oi
+from gg_desktop.header_banner import HeaderBannerArtwork
 from gg_desktop.old_files import OldFilesController
 from gg_desktop.old_files_data import protected_roots
 from gg_desktop.reference_library import (_check, _checked, _combo, _detail_scroll, _search, _split, _table, _text,
@@ -118,6 +119,9 @@ def build(window):
     self = window
     page = self._reference_page("Old Files", "Find and manage old, unused, and forgotten files taking up space on your drives.", "old_files")
     page.content.itemAt(0).widget().setFixedHeight(74)
+    page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Old Files",
+                                              scene="old_files", source=(655, 0, 625, 126),
+                                              excluded=((655, 0, 62, 46), (1090, 0, 190, 40)))
     current_root = str(self.settings.get("scan_folder", ""))
     inventory_root = self.inventory.file_scan_root
     self._old_root = inventory_root or current_root
