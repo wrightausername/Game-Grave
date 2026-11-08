@@ -120,7 +120,7 @@ def main():
             assert default_index >= 0
             window.mod_profile.setCurrentIndex(default_index)
             settle()
-            assert window.mod_table.rowCount() == 5
+            assert window.mod_table.rowCount() == 5, (window.mod_table.rowCount(), window.mod_profile.currentText(), window.mod_notice.text())
             assert window.mod_table.item(0, 1).text() == "MissingFolder" and window.mod_table.item(0, 2).text() == "1"
             assert window.grab().save(str(args.output / "mods-page-load-order-1280.png"))
 

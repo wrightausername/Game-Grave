@@ -156,6 +156,10 @@ def fill(window, *args, **kwargs):
     if window._mod_tab == "Library" or control is None:
         library_fill(window, control, *args, **kwargs)
     else:
+        # The profile choice must exist before the rows that depend on it are built.
+        combo = getattr(window, "mod_profile", None)
+        if window._mod_tab in {"Load Order", "Conflicts"} and combo is not None and isValid(combo):
+            sync_profiles(window, control, include_all=window._mod_tab == "Conflicts")
         tab_fill(window, control, kwargs.get("requested_page", 0))
     chrome(window, control)
 
@@ -172,8 +176,6 @@ def chrome(window, control):
     window.mod_type.setEnabled(tab == "Library")
     if control is None:
         return
-    if visible:
-        sync_profiles(window, control, include_all=tab == "Conflicts")
     if control.busy:
         text = control.message
         window.mod_notice.setText((window.mod_notice.text() + "\n" if window.mod_notice.text() else "") + text)
