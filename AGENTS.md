@@ -69,3 +69,8 @@ df6bd6628adf6dd9713fe41235acb618da594574. The owner moved the current work to
 Games; this does not authorize further Overview edits or imply new signoff.
 Protect all twelve other tabs, including Overview and the locked Ready Room,
 against this source and rendered baseline during Games work.
+
+Latest request: fix the Games banner artwork only. Preserve its geometry,
+title, subtitle, header controls, library layout and existing functionality.
+Use the original artwork; align its header rendering without changing shared
+TitleBar/PageBanner implementations or any other tab.

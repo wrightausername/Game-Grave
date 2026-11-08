@@ -13,6 +13,7 @@ from gg_desktop.games import artwork_roots
 from gg_desktop.games_sources import LAUNCHERS, launcher_bucket
 from gg_desktop.games_data import launch_uri
 from gg_desktop.games_controls import GamesActions, GamesArtwork, GamesCoverDelegate
+from gg_desktop.games_banner import GamesBannerArtwork
 from gg_desktop.photo_integration import ResponsiveInspector
 from gg_desktop.reference_library import _search, _combo, _view_switch, _widget, _split, _detail_scroll, destroy_layout
 from gg_desktop.reference_widgets import CARD_ROLE, CoverArt, CoverGrid, DetailPanel, MetricStrip, TabStrip, detail_line, detail_section, icon, tool, tile_action
@@ -22,6 +23,7 @@ from gg_desktop.widgets import label, panel, row
 class GamesScreens:
     def games_page(self):
         page = self._reference_page("Games", "Your complete game library. All launchers, one place. Manage, clean, and\nkeep your games running at their best.", "games")
+        page.banner_artwork = GamesBannerArtwork(self, page, page.content.itemAt(0).widget())
         page.games = GamesActions(self, page)
         page.game_artwork = GamesArtwork(self, page)
         page.game_artwork.set_library(page.games.records, artwork_roots(self.inventory, self.settings))

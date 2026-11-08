@@ -1,4 +1,8 @@
-GAME GRAVE - GAMES MULTI-LAUNCHER WINDOWS PREVIEW 0.2.14
+GAME GRAVE - GAMES MULTI-LAUNCHER WINDOWS PREVIEW 0.2.15
+
+This revision fixes only the Games banner artwork: the original scene aligns
+continuously across the header, with its aspect ratio preserved. The banner
+size, labels, controls, cover grid and library functionality are unchanged.
 
 Only Games is reopened. Overview remains at preview 0.2.12; Ready Room and
 all twelve other tabs retain their protected source and rendered baselines.
