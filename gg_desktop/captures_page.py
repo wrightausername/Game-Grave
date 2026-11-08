@@ -373,7 +373,7 @@ def build(window):
 def build_menu(window):
     menu = window.capture_menu
     menu.clear()
-    for text, action in (
+    for entry in (
         ("Open File", lambda: open_file(window)), ("Open Containing Folder", lambda: open_folder(window)),
         ("View Larger", lambda: open_viewer(window, current_index(window))), None,
         ("Copy To Folder…", lambda: copy_selected(window)), ("Copy File Paths", lambda: copy_paths(window)),
@@ -383,10 +383,10 @@ def build_menu(window):
         ("Select Extra Copies", lambda: select_extra_copies(window)), None,
         ("Rescan Capture Folders", lambda: scan(window)),
     ):
-        if action is None:
+        if entry is None:
             menu.addSeparator()
         else:
-            menu.addAction(text, action)
+            menu.addAction(entry[0], entry[1])
 
 
 # ------------------------------------------------------------------ filters, counts, summary
