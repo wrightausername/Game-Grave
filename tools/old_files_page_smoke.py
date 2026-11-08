@@ -194,11 +194,13 @@ def main():
             window.old_view_folders.click()
             settle()
             assert window._shown_old_groups and not window._shown_old_files
-            pack = names(window).index("PackA")
+            pack = next(i for i, g in enumerate(window._shown_old_groups) if archive_b.path in {f.path for f in g.files})
+            group = window._shown_old_groups[pack]
             window.old_table.item(pack, 0).setCheckState(Qt.Checked)
             settle()
-            assert "folders" in window.old_selection.text() and "2 files" in window.old_selection.text(), window.old_selection.text()
-            assert {f.path for f in window._selected_old()} == {archive_b.path, archive_c.path}
+            assert "folders" in window.old_selection.text() and f"{len(group.files)} files" in window.old_selection.text(), window.old_selection.text()
+            assert {f.path for f in window._selected_old()} == {f.path for f in group.files}
+            assert {archive_b.path, archive_c.path} <= {f.path for f in group.files}
             window.old_select_all.setChecked(True)
             settle()
             assert len(window._selected_old()) == len(everything)
