@@ -172,6 +172,8 @@ class PhotoIntegration:
         page.mods = control
         control.bind(layout)
         self.mod_table.itemDoubleClicked.connect(lambda *_: self._photo_mod_explain())
+        from gg_desktop import mods_page
+        mods_page.build(self, control)
         self._photo_mod_catalog(control)
         page.photo_inspector = ResponsiveInspector(page, self.mod_details.parentWidget().parentWidget())
 
@@ -208,79 +210,29 @@ class PhotoIntegration:
         metrics.set_value(1, sum(any(marker == "+" for marker in entry.profiles.values()) for entry in individuals), "Enabled (saved)")
         if control.report:
             metrics.set_value(3, len(control.report.findings), "Findings · partial" if control.report.limited else "Conflict Findings")
+        from gg_desktop import mods_page
+        mods_page.catalog_changed(self, control)
         self._fill_mods(requested_page=self.mod_pager.page)
 
     def _fill_mods(self, *args, **kwargs):
-        if not hasattr(self, "mod_table") or self.current_route != "Mods":
-            return
-        current = self.mod_table.currentRow()
-        prior = self._shown_mods[current].record.path if 0 <= current < len(getattr(self, "_shown_mods", [])) else None
-        LibraryScreens._fill_mods(self, *args, **kwargs)
-        if prior:
-            selected = next((index for index, view in enumerate(self._shown_mods) if view.record.path == prior), -1)
-            if selected >= 0:
-                self.mod_table.selectRow(selected)
-        control = getattr(self.page, "mods", None)
-        if control:
-            for index, view in enumerate(self._shown_mods):
-                entry = getattr(view.record, "catalog_entry", None)
-                if entry:
-                    for col in range(self.mod_table.columnCount()):
-                        cell = self.mod_table.item(index, col)
-                        if cell:
-                            cell.setToolTip(control.tooltip(entry))
+        from gg_desktop import mods_page
+        mods_page.fill(self, *args, **kwargs)
 
     def _mod_details(self):
-        control = getattr(self.page, "mods", None)
-        index = self.mod_table.currentRow()
-        view = self._shown_mods[index] if 0 <= index < len(getattr(self, "_shown_mods", [])) else None
-        entry = getattr(view.record, "catalog_entry", None) if view else None
-        if not entry or not control:
-            return LibraryScreens._mod_details(self)
-        contents = self.mod_details.content
-        destroy_layout(contents)
-        contents.addWidget(CoverArt(view.game if view.game != "Unverified" else entry.name, height=84))
-        title = label(entry.name, "detailTitle", wrap=True)
-        title.setTextFormat(Qt.PlainText)
-        contents.addWidget(title)
-        description = label(entry.description, "subtle", wrap=True)
-        description.setTextFormat(Qt.PlainText)
-        contents.addWidget(description)
-        for symbol, title, value in (("game", "Game", view.game), ("mods", "Manager", entry.source),
-            ("file", "Version", entry.version), ("help", "Author", entry.author), ("folder", "Location", entry.path)):
-            detail_line(contents, symbol, title, value)
-        contents.addWidget(tool("Open Folder", "folder", lambda: control.open_folder(entry), kind="primary"))
-        actions = row(spacing=4)
-        actions.addWidget(tool("Details", "file", lambda: control.explain(entry)))
-        actions.addWidget(tool("Mod Page", "search", lambda: control.open_page(entry)))
-        actions.addWidget(tool("Manager", "mods", lambda: control.open_folder(entry, True)))
-        contents.addWidget(_widget(actions))
-        detail_section(contents, "Saved Profile Evidence")
-        contents.addWidget(label(entry.state, "subtle", wrap=True))
-        detail_section(contents, "Dependencies & Conflicts")
-        findings = control.findings(entry)
-        for finding in findings[:4]:
-            text = label(finding.kind + ": " + finding.detail, "caption", wrap=True)
-            text.setTextFormat(Qt.PlainText)
-            contents.addWidget(text)
-        if not findings:
-            contents.addWidget(label("No findings in the completed checks. Runtime compatibility is unverified." if control.report
-                                    else "Checks pending. Runtime compatibility is unverified.", "caption", wrap=True))
-        contents.addWidget(tool("Open Mod Radar Tools", "radio", control.open_tools))
-        contents.addStretch()
+        from gg_desktop import mods_page
+        mods_page.details(self)
+
+    def _mod_selection_count(self, *_):
+        from gg_desktop import mods_page
+        mods_page.selection_count(self)
 
     def _photo_mod_explain(self):
-        index = self.mod_table.currentRow()
-        if 0 <= index < len(self._shown_mods):
-            entry = getattr(self._shown_mods[index].record, "catalog_entry", None)
-            if entry:
-                self.page.mods.explain(entry)
+        from gg_desktop import mods_page
+        mods_page.activate(self)
 
     def _set_mod_tab(self, name):
-        self._mod_tab = "Library" if name in {"Conflicts", "Profiles", "Load Order"} else name
-        self._fill_mods()
-        if name in {"Conflicts", "Profiles", "Load Order"} and hasattr(self.page, "mods"):
-            self.page.mods.open_tools()
+        from gg_desktop import mods_page
+        mods_page.set_tab(self, name)
 
     def _launch_classic_tools(self):
         if self.current_route == "Mods" and hasattr(self.page, "mods"):

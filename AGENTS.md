@@ -53,7 +53,15 @@ Only the owner's explicit instruction to change Ready Room can unlock it.
 The owner explicitly approved and locked the native-scale correction, then
 instructed work to move back to Overview. Ready Room is no longer open for edits.
 
-Active tab: Games. The owner explicitly reopened Games to triple-check its
+Active tab: Mods. The owner directed work to the Mods section ("Mods section needs
+full functionality right now... we are working each section 1 at a time"). Games is not
+signed off but is frozen at commit 593354b0e24b1ad03b513b04e6902b44fe511b1a; do not change it, its controllers or its
+artwork until the owner says. Mods work is confined to the Mods methods of
+`PhotoIntegration`, `gg_desktop/mods_page.py`, `gg_desktop/mods_insight.py` and the
+existing Mods modules; `tools/mods_tab_lock.py` enforces this. Mod managers' files are never
+modified, and nothing in Mods deletes anything: managed mods, profiles and saves stay protected.
+
+Previous active tab (Games). The owner explicitly reopened Games to triple-check its
 functionality and ensure launcher cards and game artwork cover Steam, EA,
 Rockstar, Epic and other launchers. Preserve the locked Games photo layout.
 Confine fixes to Games, its own controllers, artwork and launcher adapters.

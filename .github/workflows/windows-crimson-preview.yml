@@ -24,6 +24,8 @@ on:
       - 'tools/games_browser_smoke.py'
       - 'tools/games_triple_check.py'
       - 'tools/games_tab_lock.py'
+      - 'tools/mods_tab_lock.py'
+      - 'tools/mods_page_smoke.py'
       - 'tools/fixtures/games-covers/**'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -69,6 +71,8 @@ on:
       - 'tools/games_browser_smoke.py'
       - 'tools/games_triple_check.py'
       - 'tools/games_tab_lock.py'
+      - 'tools/mods_tab_lock.py'
+      - 'tools/mods_page_smoke.py'
       - 'tools/fixtures/games-covers/**'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -126,7 +130,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_old_files_functionality -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -136,8 +140,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Photo-layout functionality or reference geometry failed.' }
           python tools/ready_room_ui_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room native scale, navigation or controls failed.' }
-          python tools/games_tab_lock.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Overview, Ready Room or another locked tab changed during Games work.' }
+          python tools/mods_tab_lock.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Games, Overview, Ready Room or another tab changed during Mods work.' }
+          python tools/mods_page_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Mods status, tabs, bulk actions or sources failed in native Qt.' }
           python -m unittest tests.test_games_sources tests.test_games_integrations -v
           if ($LASTEXITCODE -ne 0) { throw 'Mixed-launcher records, artwork or source identity checks failed.' }
           python tools/games_triple_check.py --output _ci_temp
@@ -166,6 +172,7 @@ jobs:
             _ci_temp/overview-*.png
             _ci_temp/games-*.png
             _ci_temp/mods-*.png
+            _ci_temp/mods-page-*.png
             _ci_temp/old-files-*.png
             _ci_temp/photo-*.png
             _ci_temp/*-1280.png
