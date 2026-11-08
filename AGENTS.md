@@ -60,14 +60,23 @@ layout, tabs, controls, statuses or behavior, or anything that reaches it throug
 styles, widgets, navigation, controllers or backend code, unless the owner explicitly
 reopens it. The next tab's lock must freeze Mods against this commit.
 
-Active tab: Old Files. The owner named it ("Let's work on old files next... have it look
-exactly like this... needs complete functionality"). Work is confined to the Old Files
-methods of `PhotoIntegration`, new Old Files modules and the existing Old Files modules.
-Mods is locked at the commit above and Games is frozen at commit
-593354b0e24b1ad03b513b04e6902b44fe511b1a. Nothing in Old Files permanently deletes;
-removal is Recycle Bin only, after confirmation and the existing identity, age, scope and
-protection re-checks. Show only what a scan can prove: no invented "safe to remove" claims.
-The owner has not signed off on Old Files.
+Old Files: built with full functionality on branch `claude/old-files-full-functionality`
+(latest verified Windows run for its content:
+https://github.com/wrightausername/Game-Grave/actions/runs/42465551781). The owner moved on to
+Other Storage after the banner fix, so Old Files stays locked unless the owner reopens it. There was
+no separate "lock it in" message, so treat that as not formally signed off. Nothing in Old Files
+permanently deletes; removal is Recycle Bin only after the existing re-checks.
+
+Active tab: Other Storage. The owner named it ("work on other storage and make sure it has full
+functionality"). Work is confined to the Other Storage methods of `PhotoIntegration`, the
+`other_storage_*` modules and `header_banner.py` use from that page. Old Files, Mods (locked at the
+commit above), Games (frozen at commit 593354b0e24b1ad03b513b04e6902b44fe511b1a) and every other tab
+are frozen at commit 9410e0ec496b1ee794d54cd43ecf2db480a0ea66 by `tools/other_storage_tab_lock.py`.
+Show only what a scan can prove: no invented "safe to clear" claims. Driver and Steam library caches
+are review only; settings and saves are never removable; launcher cache and log folders of 200 files or
+fewer can go to the Recycle Bin after confirmation and per-file re-checks. Core's protected engine
+(`core.py`, `cleanup_actions.py`) is byte-guarded and must not be changed to widen deletion without the
+owner's explicit approval. The owner has not signed off on Other Storage.
 
 Earlier history (kept for context; none of these tabs is open):
 

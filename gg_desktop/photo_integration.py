@@ -240,6 +240,42 @@ class PhotoIntegration:
             return
         self.navigate("More Tools")
 
+    def other_storage_page(self):
+        from gg_desktop import other_storage_page
+        other_storage_page.build(self)
+
+    def _scan_other_storage(self):
+        from gg_desktop import other_storage_page
+        other_storage_page.scan(self)
+
+    def _fill_storage(self, *args, requested_page=0, **kwargs):
+        from gg_desktop import other_storage_page
+        other_storage_page.fill(self, *args, requested_page=requested_page, **kwargs)
+
+    def _set_storage_tab(self, name):
+        from gg_desktop import other_storage_page
+        other_storage_page.set_tab(self, name)
+
+    def _selected_storage(self):
+        from gg_desktop import other_storage_page
+        return other_storage_page.checked_entries(self)
+
+    def _storage_selection_count(self, *_):
+        from gg_desktop import other_storage_page
+        other_storage_page.selection_count(self)
+
+    def _storage_details(self):
+        from gg_desktop import other_storage_page
+        other_storage_page.details(self)
+
+    def _watch_storage(self):
+        from gg_desktop import other_storage_page
+        other_storage_page.add_to_graveyard(self)
+
+    def _review_storage(self):
+        from gg_desktop import other_storage_page
+        other_storage_page.delete_selected(self)
+
     def old_files_page(self):
         from gg_desktop import old_files_page
         old_files_page.build(self)
