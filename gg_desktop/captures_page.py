@@ -96,6 +96,22 @@ class CountDelegate(QStyledItemDelegate):
         return QSize(option.rect.width(), 21)
 
 
+class Adaptive(QWidget):
+    """A header row that shows its optional parts only when there is room for them."""
+
+    def __init__(self, extras, threshold):
+        super().__init__()
+        self.extras, self.threshold = extras, threshold
+        self.setMinimumWidth(0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        room = event.size().width() >= self.threshold
+        for control in self.extras:
+            if control.isVisibleTo(self) != room:
+                control.setVisible(room)
+
+
 class Section(QWidget):
     """A collapsible filter section with a chevron, like the photo."""
 
@@ -229,8 +245,9 @@ def build(window):
     self.capture_game.setObjectName("sourceFilters")
     self.capture_game.setItemDelegate(CountDelegate(self.capture_game))
     self.capture_game.setAccessibleName("Filter captures by game")
-    self.capture_game.setFixedHeight(126)
+    self.capture_game.setFixedHeight(76)
     self.capture_game.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+    self.capture_game.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     game_body = QWidget()
     game_layout = column(spacing=4)
     game_body.setLayout(game_layout)
@@ -278,11 +295,13 @@ def build(window):
         shrinkable.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
     header.addWidget(self.capture_heading, 1)
     self.capture_month = _combo([insight.ALL_MONTHS], "Timeline month")
-    self.capture_month.setFixedWidth(92)
+    self.capture_month.setMinimumWidth(92)
+    self.capture_month.setMaximumWidth(120)
     header.addWidget(self.capture_month)
     header.addWidget(label("Sort By:", "caption"))
     self.capture_sort = _combo(list(insight.SORTS), "Sort captures")
-    self.capture_sort.setFixedWidth(92)
+    self.capture_sort.setMinimumWidth(92)
+    self.capture_sort.setMaximumWidth(150)
     header.addWidget(self.capture_sort)
     self.capture_view_grid = tool("", "grid", lambda: set_compact(self, False), active=not state.compact, tip="Thumbnails")
     self.capture_view_list = tool("", "list", lambda: set_compact(self, True), active=state.compact, tip="List")
@@ -290,12 +309,21 @@ def build(window):
         control.setFixedSize(26, 28)
         header.addWidget(control)
     self.capture_zoom = QSlider(Qt.Horizontal)
-    self.capture_zoom.setRange(110, 230)
-    self.capture_zoom.setValue(150)
-    self.capture_zoom.setFixedWidth(50)
+    self.capture_zoom.setRange(100, 230)
+    self.capture_zoom.setValue(125)
+    self.capture_zoom.setFixedWidth(54)
     self.capture_zoom.setAccessibleName("Capture tile size")
+    minus, plus = QLabel("\u2212"), QLabel("+")
+    for sign in (minus, plus):
+        sign.setStyleSheet("color:#d3dae3;font-size:15px;font-weight:600;")
+        sign.setAlignment(Qt.AlignCenter)
+        sign.setFixedWidth(12)
+    header.addWidget(minus)
     header.addWidget(self.capture_zoom)
-    contents.addWidget(_widget(header))
+    header.addWidget(plus)
+    top = Adaptive([minus, plus], 440)
+    top.setLayout(header)
+    contents.addWidget(top)
     self.capture_search = _search("Search games, captures, recordings, or folders…", "Search captures")
     self.capture_search.hide()  # the shared search above the page drives this field
     contents.addWidget(self.capture_search)
@@ -441,6 +469,7 @@ def rebuild_game_list(window, refill=True):
             window.capture_game.addItem(item)
         row_ = next((i for i, (n, _) in enumerate(entries) if n == keep), 0)
         window.capture_game.setCurrentRow(row_)
+    window.capture_game.setFixedHeight(min(max(window.capture_game.count(), 1), 6) * 22 + 6)
     window.capture_game.viewport().update()
     if refill:
         fill(window)
@@ -648,7 +677,7 @@ def update_notice(window, rows):
         if state.duplicates is None:
             notice, action = "Exact duplicates are found by comparing file contents. Nothing is read until you ask.", "Find Duplicates"
         else:
-            notice = f"{len(state.duplicates):,} groups of identical files from the last check." if state.duplicates else \
+            notice = f"{len(state.duplicates):,} {'group' if len(state.duplicates) == 1 else 'groups'} of identical files from the last check." if state.duplicates else \
                 "No identical files were found in the last check."
             action = "Check Again"
     elif state.tab == "Similar":
@@ -656,7 +685,7 @@ def update_notice(window, rows):
             notice, action = ("Similar screenshots are found by comparing a small image fingerprint. "
                               f"Up to {analysis.MAX_SIMILAR_IMAGES:,} of the newest are compared."), "Find Similar"
         else:
-            notice = (f"{len(state.similar):,} groups of similar screenshots ({state.similar_compared:,} compared). "
+            notice = (f"{len(state.similar):,} {'group' if len(state.similar) == 1 else 'groups'} of similar screenshots ({state.similar_compared:,} compared). "
                       "Similar is not identical; review each one.") if state.similar else \
                 f"No similar screenshots were found among {state.similar_compared:,} compared."
             action = "Check Again"
