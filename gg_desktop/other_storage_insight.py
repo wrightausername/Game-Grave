@@ -63,7 +63,7 @@ def selection_state(selected, never_touch_hit):
     if not selected:
         return False, "Check a launcher cache or log folder to clear it. Other items are review only."
     if never_touch_hit:
-        return False, "A checked item is on your Never Touch list."
+        return False, "A checked item is protected by Game Grave or your Never Touch list."
     if any(e.protected_kind for e in selected):
         return False, "Settings and save folders are never removed by Game Grave."
     if not all(e.cleanable for e in selected):

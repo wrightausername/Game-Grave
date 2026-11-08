@@ -197,7 +197,7 @@ def main():
             # Settings folders can be protected or reviewed, never cleared.
             check(window, "Skyrim")
             assert not window.storage_delete.isEnabled()
-            assert "never removed" in window.storage_delete.toolTip()
+            assert "protected" in window.storage_delete.toolTip().lower(), window.storage_delete.toolTip()
             check(window, "Skyrim", False)
             check(window, "DirectX Shader Cache")
             assert not window.storage_delete.isEnabled() and "launcher cache and log" in window.storage_delete.toolTip()
