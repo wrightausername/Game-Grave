@@ -37,6 +37,7 @@ class LiveGames:
         self.snapshots = load_snapshots()
         self.sync_cancel = threading.Event()
         self.syncing = self.local_loading = False
+        self.pending_sync, self.provider_cancels = set(), {}
         self.connections_dialog = None
         self.provider_errors = {}
         self.tracker = tracker_for(self.window)
@@ -192,9 +193,13 @@ class LiveGames:
             self._compose()
 
     def sync_libraries(self, providers=None, *, automatic=False):
-        if not self._valid() or self.syncing:
+        if not self._valid():
             return
         providers = [provider for provider in (providers or PROVIDERS) if provider in FETCHERS and load_secret(provider)]
+        if self.syncing:
+            if not automatic:
+                self.pending_sync.update(providers)
+            return
         if not providers:
             if not automatic:
                 self.connections()
@@ -206,20 +211,26 @@ class LiveGames:
         stopped, closed = self.sync_cancel, self.closed
         previous = self.snapshots
         inputs = {provider: load_secret(provider) for provider in providers}
+        cancels = self.provider_cancels = {provider: threading.Event() for provider in providers}
         def work(progress):
             results, errors = {}, {}
             for provider in providers:
                 if stopped.is_set() or closed.is_set():
                     break
                 try:
-                    snapshot, secret = FETCHERS[provider](inputs[provider], canceled=lambda: stopped.is_set() or closed.is_set(),
+                    if cancels[provider].is_set():
+                        continue
+                    snapshot, secret = FETCHERS[provider](inputs[provider], canceled=lambda: stopped.is_set() or closed.is_set() or cancels[provider].is_set(),
                         previous=previous.get(provider), progress=lambda amount, stage: progress(min(100, amount), stage),
                         on_credentials=lambda secret, provider=provider: update_secret_if_current(provider, secret, inputs[provider].get("connection_id")))
                     if stopped.is_set() or closed.is_set():
                         break
-                    results[provider] = (snapshot, secret)
+                    if not cancels[provider].is_set():
+                        results[provider] = (snapshot, secret)
                 except InterruptedError:
-                    break
+                    if stopped.is_set() or closed.is_set():
+                        break
+                    continue
                 except (ValueError, OSError, TypeError, KeyError) as exc:
                     # Provider errors are intentionally generic and never echo
                     # token responses, cookie contents or authenticated URLs.
@@ -260,6 +271,7 @@ class LiveGames:
             if self.connections_dialog is not None and isValid(self.connections_dialog):
                 self.connections_dialog.refresh_status()
             if stopped.is_set():
+                self.pending_sync.clear()
                 self.window.status.setText("Library refresh canceled. Previous libraries retained.")
             elif errors:
                 self.window.status.setText("Library refresh incomplete: " + "; ".join(provider + ": " + message for provider, message in errors.items()))
@@ -267,7 +279,16 @@ class LiveGames:
                 self.window.status.setText("Libraries refreshed: " + ", ".join(committed) + ".")
             self.page.game_artwork.failed.clear()
             self.window.game_grid.viewport().update()
+            pending = tuple(self.pending_sync)
+            self.pending_sync.clear()
+            if pending and not stopped.is_set():
+                QTimer.singleShot(0, lambda: self.sync_libraries(pending))
         self._task(work, finish, progress=progress)
+
+    def cancel_provider(self, provider):
+        self.pending_sync.discard(provider)
+        if provider in self.provider_cancels:
+            self.provider_cancels[provider].set()
 
     def tracking_changed(self):
         if not self._valid():
@@ -328,8 +349,11 @@ class LiveGames:
         options = read_document("options.json", {})
         options.setdefault("links", {})[game.key] = dict(provider=provider, account_id=snapshot["account_id"],
             product_id=item["id"], install_key=_path_key(game.install_path))
-        write_document("options.json", options)
-        self._compose()
+        try:
+            write_document("options.json", options)
+            self._compose()
+        except (OSError, ValueError):
+            self.window.error("Link not saved", "The account link could not be saved. Try again.")
 
     def library_options(self, position=None):
         menu = QMenu(self.page)
@@ -345,9 +369,12 @@ class LiveGames:
         def toggle(checked):
             options = read_document("options.json", {})
             options["automatic_artwork"] = checked
-            write_document("options.json", options)
-            self.page.game_artwork.automatic_paused = not checked
-            self.page.game_artwork.retry()
+            try:
+                write_document("options.json", options)
+                self.page.game_artwork.automatic_paused = not checked
+                self.page.game_artwork.retry()
+            except (OSError, ValueError):
+                self.window.error("Preference not saved", "The artwork preference could not be saved. Try again.")
         auto.toggled.connect(toggle)
         menu.addAction("Download missing artwork now", lambda: self.download_artwork(tuple(self.records), missing_only=True))
         menu.exec(position or self.window.game_grid.mapToGlobal(self.window.game_grid.rect().topRight()))

@@ -18,6 +18,13 @@ on:
       - 'tools/overview_tab_lock.py'
       - 'tools/overview_human_walkthrough.py'
       - 'tests/test_games_functionality.py'
+      - 'tests/test_games_integrations.py'
+      - 'tests/test_games_sources.py'
+      - 'tools/games_connected_walkthrough.py'
+      - 'tools/games_browser_smoke.py'
+      - 'tools/games_triple_check.py'
+      - 'tools/games_tab_lock.py'
+      - 'tools/fixtures/games-covers/**'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
       - 'tools/old_files_live_smoke.py'
@@ -56,6 +63,13 @@ on:
       - 'tools/overview_tab_lock.py'
       - 'tools/overview_human_walkthrough.py'
       - 'tests/test_games_functionality.py'
+      - 'tests/test_games_integrations.py'
+      - 'tests/test_games_sources.py'
+      - 'tools/games_connected_walkthrough.py'
+      - 'tools/games_browser_smoke.py'
+      - 'tools/games_triple_check.py'
+      - 'tools/games_tab_lock.py'
+      - 'tools/fixtures/games-covers/**'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
       - 'tools/old_files_live_smoke.py'
@@ -124,10 +138,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room native scale, navigation or controls failed.' }
           python tools/games_tab_lock.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Overview, Ready Room or another locked tab changed during Games work.' }
-          python -m unittest tests.test_games_sources -v
+          python -m unittest tests.test_games_sources tests.test_games_integrations -v
           if ($LASTEXITCODE -ne 0) { throw 'Mixed-launcher records, artwork or source identity checks failed.' }
           python tools/games_triple_check.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Games mouse, keyboard, artwork or launcher triple-check failed.' }
+          python tools/games_browser_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Games embedded sign-in browser rendering or cancellation failed.' }
           python tools/overview_live_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Overview measurements or live controls failed.' }
           python tools/overview_human_walkthrough.py --output _ci_temp
@@ -164,6 +180,8 @@ jobs:
             _ci_temp/games-tab-lock/**/hashes.json
             _ci_temp/games-triple-check/report.json
             _ci_temp/games-triple-check/**/games-human-journeys.json
+            _ci_temp/games-triple-check/**/games-connected-journeys.json
+            _ci_temp/games-browser-check.json
             _ci_temp/games-triple-check/pass-1/*.png
           if-no-files-found: error
           retention-days: 14
@@ -256,7 +274,9 @@ jobs:
             'installer/GAMES_BUILD_README.txt'
           ) -Destination $taskBundle
           Copy-Item '_ci_temp/games-triple-check/pass-1/games-mixed-launchers-1450.png' (Join-Path $taskBundle 'Games-Mixed-Launchers.png')
-          Copy-Item '_ci_temp/games-triple-check/pass-1/games-launcher-guidance.png' (Join-Path $taskBundle 'Games-Launcher-Guidance.png')
+          Copy-Item '_ci_temp/games-triple-check/pass-1/games-library-connections.png' (Join-Path $taskBundle 'Games-Library-Connections.png')
+          Copy-Item '_ci_temp/games-triple-check/pass-1/games-owned-not-installed-1450.png' (Join-Path $taskBundle 'Games-Owned-Not-Installed.png')
+          Copy-Item '_ci_temp/games-browser-check.json' $taskBundle
           Copy-Item '_ci_temp/games-triple-check/report.json' (Join-Path $taskBundle 'Games-Triple-Check.json')
           $checksums = Get-ChildItem $taskBundle -Filter '*.exe' | ForEach-Object {
             $digest = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -264,7 +284,7 @@ jobs:
           }
           Set-Content (Join-Path $taskBundle 'SHA256SUMS.txt') -Value $checksums -Encoding ascii
           @(
-            'Game Grave Games multi-launcher Windows preview 0.2.13',
+            'Game Grave Games multi-launcher Windows preview 0.2.14',
             'Source commit: ${{ github.event.pull_request.head.sha || github.sha }}',
             'Checkout commit: ${{ github.sha }}',
             'Build run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'

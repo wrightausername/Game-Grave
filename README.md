@@ -178,14 +178,26 @@ conflict evidence and inspection limits. No network request is needed for Mods.
 
 Games uses the locked cover grid, filters, counters and right-side details panel.
 
-- Every game has a visible title-specific local fallback immediately. Known
-  Steam library caches and named game-folder covers replace it when present.
-  Fallbacks are labeled and are not presented as official publisher artwork.
+- **Library options (…) → Connect game libraries…** opens official-site sign-in
+  for Steam, Epic, EA and GOG. Connected libraries supply owned, uninstalled
+  games; **Play** becomes **Install** for those entries. Account switching,
+  disconnect, refresh and cancellation retain local installations. Ownership
+  merges by exact provider IDs or an explicit installation link, never by title.
+- Steam, Epic and GOG import available account playtime. Steam also reads its
+  selected local profile. Game Grave tracks observed game processes on this PC
+  while open, including other launchers, and names the source in the inspector.
+  It does not fabricate historical totals for providers that do not expose them.
+- **Updates** uses Steam client update flags and connected Epic live asset
+  versions. Other clients manage their updates. A plus sign in the unknown
+  update count and its tooltip identify installations without a verified status.
+- Every game immediately has a local cover, game icon or labeled fallback.
+  Missing posters download automatically from its connected catalogue, an exact
+  Steam title match, or an exact Wikipedia game page. Local/chosen covers take
+  priority. Disable automatic downloads in Library options if desired.
 - Right-click a game or choose **Game options… → Download official artwork**.
   **Download missing artwork for all games** fills missing covers in bulk and
-  can be canceled from the same menu. Requests happen only on this action;
-  ordinary navigation and rendering never contact a server. Cached artwork
-  remains available offline.
+  can be canceled from the same menu. Downloads run on a worker and cached
+  artwork remains available offline. Image requests carry no account tokens.
 - Steam artwork uses exact AppIDs, including modern hashed CDN paths.
   Non-Steam lookups require an exact title match and never change launcher or
   install evidence. **Use a Steam artwork app ID…** lets you select an artwork
@@ -196,20 +208,27 @@ Games uses the locked cover grid, filters, counters and right-side details panel
 - All search results are reachable through Previous/Next pages, including
   libraries beyond 500 games. Search accepts multiple words; filtering and
   sorting retain the selected installation when it still matches.
-- Steam and Epic use their registered game launch shortcuts. Other verified
-  installations can use **Choose game launch EXE…**, restricted to an ordinary
+- Steam, Epic, EA, Ubisoft, GOG and Rockstar use verified native launch
+  identities when available. Other installations can use **Choose game launch EXE…**, restricted to an ordinary
   EXE inside that installation. Selecting a file only saves a preference;
   **Launch game** sends the separate launch request.
-- Steam uninstall revalidates the current manifest and installation before and
-  after confirmation, then opens Steam's own dialog. Game Grave does not delete
-  game files. Game DNA opens the selected installation's relationship record.
+- Repair, DLC and uninstall open the provider's native control or its launcher
+  library when no direct command exists. GOG and matching Windows game records
+  can invoke their exact native uninstallers. Uninstall requires confirmation
+  and installation revalidation; Game Grave does not delete game files or claim
+  the launcher completed a request. Game DNA carries the selected installation.
 
 `Ctrl+K` focuses Games search, `Escape` clears it, and `Ctrl+PageUp/PageDown`
 switch pages. `Shift+F10` opens the selected game's options. No launch or
 uninstall happens on row selection or artwork loading.
 
 Artwork and optional launch preferences are private local files under the
-existing Game Grave configuration directory's `Games` subfolder. Official
+existing Game Grave configuration directory's `Games` subfolder. Windows
+account credentials use current-user DPAPI; other platforms keep connections
+only in memory. Sign-in browsers are off the record. Disconnect erases that
+provider's saved credentials and owned catalogue. Rockstar, Ubisoft, Battle.net,
+Xbox and custom folders currently supply installed games and native controls;
+account-wide ownership is limited to the four connected providers above. Official
 artwork availability depends on the publisher/service; local fallbacks ensure
 every entry continues to display artwork when offline or unavailable.
 

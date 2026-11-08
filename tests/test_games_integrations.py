@@ -13,7 +13,8 @@ from unittest.mock import Mock, patch
 from PIL import Image
 from core import SteamGame
 from gg_desktop.game_artwork import Artwork
-from gg_desktop.games_account_store import forget, load_secret, load_snapshots, read_document, save_secret, save_snapshot, write_document
+from gg_desktop.games_account_store import forget, load_secret, load_snapshots, read_document, save_secret, save_snapshot, update_secret_if_current, write_document
+from gg_desktop.games_connections import login_url, parse_login_document
 from gg_desktop.games_catalogue_artwork import cached_artwork, checked_media, remote_artwork
 from gg_desktop.games_http import ProviderError, SignInRequired, checked_url, cookie_header
 from gg_desktop.games_library_data import PlaytimeLedger, compose, local_facts, running_games
@@ -83,6 +84,41 @@ class GamesIntegrationTests(unittest.TestCase):
         save_snapshot("Steam", self.snapshot())
         save_secret("Steam", dict(self.secret(), account_id="76561198000000002"))
         self.assertNotIn("Steam", load_snapshots())
+
+    def test_rotated_tokens_are_saved_only_for_the_same_connection(self):
+        old = self.secret()
+        new = dict(old, access_token="FAKE-ROTATED")
+        self.assertTrue(update_secret_if_current("Steam", new, old["connection_id"]))
+        self.assertEqual(load_secret("Steam")["access_token"], "FAKE-ROTATED")
+        save_secret("Steam", dict(old, connection_id="another-sign-in"))
+        self.assertFalse(update_secret_if_current("Steam", new, old["connection_id"]))
+        forget("Steam")
+        self.assertFalse(update_secret_if_current("Steam", new, old["connection_id"]))
+        self.assertEqual(load_secret("Steam"), {})
+
+    def test_sign_in_document_is_bound_to_official_origin_and_request_state(self):
+        value = json.dumps(dict(user=dict(logged_in=True, steamid=SID), config=dict(webapi_token="FAKE")))
+        self.assertEqual(parse_login_document("Steam", "https://store.steampowered.com/explore/", value, "state")["account_id"], SID)
+        self.assertIsNone(parse_login_document("Steam", "https://store.steampowered.com.evil.invalid/explore/", value, "state"))
+        self.assertIsNone(parse_login_document("Steam", "http://store.steampowered.com/explore/", value, "state"))
+        from gg_desktop.games_providers import EPIC_CLIENT
+        url = f"https://www.epicgames.com/id/api/redirect?clientId={EPIC_CLIENT}&responseType=code&state=good"
+        self.assertEqual(parse_login_document("Epic Games", url, '{"authorizationCode":"FAKE"}', "good"), {"authorization_code": "FAKE"})
+        self.assertIsNone(parse_login_document("Epic Games", url, '{"authorizationCode":"FAKE"}', "wrong"))
+
+    def test_sign_in_rejects_logged_out_and_malformed_site_documents(self):
+        for value in ('null', '[]', '{"user":[],"config":{}}', '{"user":{"logged_in":false},"config":{}}'):
+            self.assertIsNone(parse_login_document("Steam", "https://store.steampowered.com/explore/", value, "state"))
+        self.assertIsNone(parse_login_document("EA", "https://www.ea.com/login", '{"access_token":"FAKE"}', "state"))
+        self.assertIsNotNone(parse_login_document("EA", "https://accounts.ea.com/connect/auth", '{"access_token":"FAKE"}', "state"))
+
+    def test_sign_in_start_urls_are_official_https_pages(self):
+        from urllib.parse import urlsplit
+        expected = {"Steam": "store.steampowered.com", "Epic Games": "www.epicgames.com", "EA": "www.ea.com", "GOG": "www.gog.com"}
+        for provider, host in expected.items():
+            value = urlsplit(login_url(provider, "state"))
+            self.assertEqual(value.scheme, "https")
+            self.assertEqual(value.hostname, host)
 
     def test_linked_connection_storage_is_not_followed(self):
         outside = self.root/"outside.json"
@@ -295,6 +331,57 @@ class GamesIntegrationTests(unittest.TestCase):
         self.assertEqual(split_command('"C:\\Games\\My Game\\unins000.exe" /uninstall "Game id"'), [r"C:\Games\My Game\unins000.exe", "/uninstall", "Game id"])
         self.assertEqual(split_command(r"C:\Games\My Game\unins000.exe"), [])
         self.assertEqual(split_command('"x.exe"\n evil'), [])
+
+    def registry(self, entries):
+        from contextlib import nullcontext
+        registry = Mock(HKEY_LOCAL_MACHINE=1, HKEY_CURRENT_USER=2, KEY_WOW64_32KEY=32, KEY_WOW64_64KEY=64, KEY_READ=128)
+        registry.OpenKey.side_effect = lambda parent, name, *args: nullcontext(name)
+        def enum(_parent, index):
+            if index >= len(entries):
+                raise OSError()
+            return list(entries)[index]
+        def query(key, field):
+            if field not in entries[key]:
+                raise OSError()
+            return entries[key][field], 1
+        registry.EnumKey.side_effect = enum
+        registry.QueryValueEx.side_effect = query
+        return registry
+
+    def test_registered_uninstaller_requires_exact_title_and_installation(self):
+        game = self.other(launcher="Battle.net", name="Fixture Game")
+        program = self.install/"uninstall.exe"
+        program.write_bytes(b"MZ fixture")
+        entry = dict(DisplayName=game.name, InstallLocation=str(self.install), UninstallString='"'+str(program)+'" /uninstall')
+        self.assertEqual(registered_uninstaller(game, registry=self.registry({"game": entry})), (str(program), "/uninstall"))
+        entry["DisplayName"] = "Another game"
+        self.assertIsNone(registered_uninstaller(game, registry=self.registry({"game": entry})))
+        entry["DisplayName"], entry["InstallLocation"] = game.name, str(self.root/"Other")
+        self.assertIsNone(registered_uninstaller(game, registry=self.registry({"game": entry})))
+
+    def test_registered_uninstaller_refuses_shells_and_conflicting_commands(self):
+        game = self.other(name="Fixture Game")
+        for name in ("cmd.exe", "powershell.exe", "uninstall.exe", "another.exe"):
+            (self.install/name).write_bytes(b"MZ fixture")
+        entry = dict(DisplayName=game.name, InstallLocation=str(self.install), UninstallString='"'+str(self.install/"cmd.exe")+'" /c anything')
+        self.assertIsNone(registered_uninstaller(game, registry=self.registry({"shell": entry})))
+        entry["UninstallString"] = '"'+str(self.install/"uninstall.exe")+'"'
+        other = {**entry, "UninstallString": '"'+str(self.install/"another.exe")+'"'}
+        self.assertIsNone(registered_uninstaller(game, registry=self.registry({"first": entry, "second": other})))
+
+    def test_msi_uninstall_uses_verified_product_and_system_executable(self):
+        game = self.other(name="Fixture Game")
+        windows = self.root/"Windows"
+        (windows/"System32").mkdir(parents=True)
+        program = windows/"System32/msiexec.exe"
+        program.write_bytes(b"MZ fixture")
+        guid = "{12345678-1234-1234-1234-123456789ABC}"
+        entry = dict(DisplayName=game.name, InstallLocation=str(self.install), UninstallString="msiexec.exe /I"+guid)
+        with patch.dict(os.environ, {"SystemRoot": str(windows)}):
+            self.assertEqual(registered_uninstaller(game, registry=self.registry({guid: entry})), (str(program), "/x", guid))
+            self.assertIsNone(registered_uninstaller(game, registry=self.registry({"unrelated-guid": entry})))
+            entry.pop("InstallLocation")
+            self.assertIsNone(registered_uninstaller(game, registry=self.registry({guid: entry})))
 
     def test_steam_local_update_and_playtime_are_read_from_selected_profile(self):
         (self.steam_root/"steamapps/appmanifest_1091500.acf").write_text('"AppState" {"appid" "1091500" "installdir" "Game" "StateFlags" "6" "buildid" "100" "TargetBuildID" "101"}')

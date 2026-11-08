@@ -20,9 +20,12 @@ LOGIN_ROOTS = {"Steam": ("steampowered.com", "steamcommunity.com"), "Epic Games"
 def parse_login_document(provider, url, text, state):
     """Accept tokens only from that sign-in window's exact official origin."""
     import re
-    parsed = urlsplit(url)
-    if (parsed.scheme != "https" or parsed.port not in (443, None) or parsed.username or parsed.password
-            or not isinstance(text, str) or len(text) > 100000):
+    try:
+        parsed = urlsplit(url)
+        if (parsed.scheme != "https" or parsed.port not in (443, None) or parsed.username or parsed.password
+                or not isinstance(text, str) or len(text) > 100000):
+            return None
+    except (ValueError, TypeError):
         return None
     try:
         result = json.loads(text)
@@ -110,6 +113,7 @@ class SignIn(QDialog):
         self.browser_page.newWindowRequested.connect(self.open_popup)
         self.browser_page.windowCloseRequested.connect(self.check)
         self.profile.cookieStore().cookieAdded.connect(self.cookie_added)
+        self.profile.cookieStore().cookieRemoved.connect(self.cookie_removed)
         self.view.loadFinished.connect(lambda _ok: self.check())
         self.view.urlChanged.connect(lambda url: self.address.setText(url.host()+url.path()))
         layout.addWidget(self.view, 1)
@@ -163,6 +167,12 @@ class SignIn(QDialog):
             return
         self.cookies[(name, domain, cookie.path())] = dict(name=name, value=value, domain=cookie.domain(), path=cookie.path(),
                                                         secure=cookie.isSecure(), http_only=cookie.isHttpOnly())
+
+    def cookie_removed(self, cookie):
+        try:
+            self.cookies.pop((bytes(cookie.name()).decode("ascii"), cookie.domain().lstrip(".").casefold(), cookie.path()), None)
+        except UnicodeError:
+            pass
 
     def check(self, page=None):
         if self.cancelled or self.finishing or not self.isVisible():
@@ -267,6 +277,7 @@ class Connections(QDialog):
         intro.setWordWrap(True)
         layout.addWidget(intro)
         self.status = {}
+        self.buttons = {}
         for provider in PROVIDERS:
             row = QHBoxLayout()
             title = QLabel(provider)
@@ -281,12 +292,20 @@ class Connections(QDialog):
             sign_in.clicked.connect(lambda _=False, provider=provider: self.connect_provider(provider))
             row.addWidget(sign_in)
             sync = QPushButton("Refresh")
+            sync.setAccessibleName("Refresh " + provider + " library")
             sync.clicked.connect(lambda _=False, provider=provider: control.sync_libraries([provider]))
             row.addWidget(sync)
             disconnect = QPushButton("Disconnect")
+            disconnect.setAccessibleName("Disconnect " + provider)
             disconnect.clicked.connect(lambda _=False, provider=provider: self.disconnect(provider))
             row.addWidget(disconnect)
+            self.buttons[provider] = (sign_in, sync, disconnect)
             layout.addLayout(row)
+        native_note = QLabel("Other launchers use detected installations and their native controls. "
+            "Playtime is tracked on this PC while Game Grave is open. Repair, DLC and update controls "
+            "that a provider does not expose directly open in that provider's launcher.")
+        native_note.setWordWrap(True)
+        layout.addWidget(native_note)
         layout.addStretch()
         self.refresh_status()
         native = QPushButton("Choose a launcher executable…")
@@ -310,6 +329,10 @@ class Connections(QDialog):
                 label.setText(f"{name} · {count} owned games" if snapshot else f"{name} · ready to refresh")
             else:
                 label.setText("Not connected")
+            if self.control.provider_errors.get(provider):
+                label.setText(label.text() + " · " + self.control.provider_errors[provider])
+            self.buttons[provider][1].setEnabled(bool(secret) and not self.control.syncing)
+            self.buttons[provider][2].setEnabled(bool(secret))
 
     def connect_provider(self, provider):
         dialog = SignIn(self.control, provider)
@@ -318,6 +341,7 @@ class Connections(QDialog):
 
     def save_connection(self, provider, secret):
         try:
+            self.control.cancel_provider(provider)
             save_secret(provider, secret)
         except (ValueError, OSError):
             self.control.window.error("Connection not saved", "Windows could not save the account connection. Try connecting again.")
@@ -327,7 +351,11 @@ class Connections(QDialog):
         self.control.sync_libraries([provider])
 
     def disconnect(self, provider):
-        self.control.sync_cancel.set()
-        forget(provider)
+        self.control.cancel_provider(provider)
+        try:
+            forget(provider)
+        except (OSError, ValueError):
+            self.control.window.error("Disconnect incomplete", "The connection data could not be removed. Close the app and try again.")
+            return
         self.control.reload_libraries()
         self.refresh_status()
