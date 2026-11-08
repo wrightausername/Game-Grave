@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -191,6 +192,8 @@ def main():
                 from PySide6.QtGui import QImage
                 one, two = QImage(str(output/"baseline"/(name+".png"))), QImage(str(output/"current"/(name+".png")))
                 changed = [(x, y) for y in range(one.height()) for x in range(one.width()) if one.pixel(x, y) != two.pixel(x, y)]
+                for label in ("baseline", "current"):
+                    shutil.copyfile(output/label/(name+".png"), args.output.resolve()/f"undo-diff-{name}-{label}.png")
                 if changed:
                     xs, ys = [c[0] for c in changed], [c[1] for c in changed]
                     print(f"DIFF {name}: {len(changed)} pixels in box x {min(xs)}-{max(xs)}, y {min(ys)}-{max(ys)}", flush=True)

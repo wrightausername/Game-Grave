@@ -176,6 +176,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Photo-layout functionality or reference geometry failed.' }
           python tools/ready_room_ui_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room native scale, navigation or controls failed.' }
+          python tools/undo_page_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Undo Center filters, status, restore, hide or layout failed in native Qt.' }
           python tools/undo_tab_lock.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Game DNA, Graveyard, Captures, Other Storage, Old Files, Mods, Games, Overview, Ready Room or another tab changed during Undo Center work.' }
           python tools/mods_page_smoke.py --output _ci_temp
@@ -190,8 +192,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Graveyard evidence, filters, leftover scan, protection or verified Recycle Bin path failed in native Qt.' }
           python tools/dna_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Game DNA proven locations, Analyze, linking or hand-offs failed in native Qt.' }
-          python tools/undo_page_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Undo Center filters, status, restore, hide or layout failed in native Qt.' }
           python -m unittest tests.test_games_sources tests.test_games_integrations -v
           if ($LASTEXITCODE -ne 0) { throw 'Mixed-launcher records, artwork or source identity checks failed.' }
           python tools/games_triple_check.py --output _ci_temp
