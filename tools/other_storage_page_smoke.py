@@ -257,6 +257,10 @@ def main():
             for width, height in ((1280, 720), (1440, 900), (960, 650)):
                 window.resize(width, height)
                 settle()
+                if height >= 720:
+                    from PySide6.QtCore import QPoint
+                    bottom = window.storage_scan.mapTo(window, QPoint(0, window.storage_scan.height())).y()
+                    assert bottom <= window.height(), ("Footer actions are cut off", (width, height), bottom)
                 if window.page.horizontalScrollBar().maximum() != 0:
                     from PySide6.QtWidgets import QWidget
                     wide = sorted(((w.minimumSizeHint().width(), type(w).__name__, w.objectName(), getattr(w, "text", lambda: "")() if hasattr(w, "text") else "")

@@ -145,7 +145,7 @@ class CategoryDelegate(QStyledItemDelegate):
         painter.restore()
 
     def sizeHint(self, option, index):
-        return QSize(option.rect.width(), 24)
+        return QSize(option.rect.width(), 20)
 
 
 def set_active(button, on):
@@ -219,6 +219,9 @@ def build(window):
         compact=True)
     page.content.addWidget(self.storage_metrics)
     self.storage_tabs = TabStrip(TABS)
+    for button in self.storage_tabs.buttons.values():
+        button.setStyleSheet("font-size:11px; padding:4px 3px;")
+        button.setIconSize(QSize(15, 15))
     page.content.addWidget(self.storage_tabs)
 
     # --- Storage Overview
@@ -230,8 +233,7 @@ def build(window):
     self.storage_categories.setObjectName("sourceFilters")
     self.storage_categories.setItemDelegate(CategoryDelegate(self.storage_categories))
     self.storage_categories.setAccessibleName("Filter other storage category")
-    self.storage_categories.setMinimumHeight(158)
-    self.storage_categories.setMaximumHeight(170)
+    self.storage_categories.setFixedHeight(146)
     self.storage_categories.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     for kind, symbol, color in [("All Other Storage", "storage", "#e474e7")] + list(zip(STORAGE_TYPES, TILE_SYMBOLS[1:], STORAGE_COLORS)):
         item = QListWidgetItem(icon(symbol, color, 16), kind)
@@ -243,7 +245,6 @@ def build(window):
     scan.addWidget(self.storage_ring, 1)
     self.storage_legend = column(spacing=2)
     scan.addWidget(_widget(self.storage_legend))
-    scan.addWidget(caption("Reported bytes. Hardlinks can share physical space, and nothing here is assumed removable.", "caption"))
 
     # --- Storage Items
     results, contents = panel(kind="fileResults", padding=8, spacing=6)
@@ -333,7 +334,8 @@ def refresh(window):
     for i, kind in enumerate(STORAGE_TYPES[:5], 1):
         strip.set_value(i, human_size(totals[kind]))
     report = state_of(window).report
-    strip.setToolTip(report.summary() if report else "Run Scan Other Storage to measure known locations.")
+    strip.setToolTip((report.summary() if report else "Run Scan Other Storage to measure known locations.") +
+                     "\nReported bytes. Hardlinks can share physical space, and nothing here is assumed removable.")
     cats = window.storage_categories
     with QSignalBlocker(cats):
         for index in range(cats.count()):
@@ -351,10 +353,7 @@ def refresh(window):
             dot = QLabel("■")
             dot.setStyleSheet(f"color:{STORAGE_COLORS[STORAGE_TYPES.index(kind)]}; font-size:10px;")
             cell.addWidget(dot)
-            text = label(f"{insight.PILLS[kind]}  {percent}", "caption")
-            text.setMinimumWidth(0)
-            text.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-            cell.addWidget(text)
+            cell.addWidget(label(f"{insight.PILLS[kind]}  {percent}", "caption", wrap=True))
             cell.addStretch()
             line.addWidget(_widget(cell), 1)
         window.storage_legend.addWidget(_widget(line))
@@ -475,7 +474,7 @@ def details(window):
     header.addWidget(badge("Protected" if on_list else entry.badge))
     contents.addWidget(_widget(header))
     directx = entry.category == "Shader Cache" and any(word in entry.name for word in ("DirectX", "Direct3D"))
-    contents.addWidget(ReferenceArt("other_storage", (998, 295, 262, 73) if directx else (870, 15, 330, 105), height=83))
+    contents.addWidget(ReferenceArt("other_storage", (998, 295, 262, 73) if directx else (880, 46, 340, 80), height=83))
     detail_section(contents, "Details")
     newest = datetime.fromtimestamp(entry.newest).strftime("%b %d, %Y") if entry.newest else "Unknown"
     protection = ("On your Never Touch list" if on_list else "Settings and saves are never removed" if entry.protected_kind
