@@ -45,15 +45,17 @@ class BarDelegate(QStyledItemDelegate):
         share = index.data(Qt.UserRole)
         if not isinstance(share, (int, float)) or share <= 0:
             return
-        rect = option.rect.adjusted(6, 0, -6, -4)
+        rect = option.rect.adjusted(78, 0, -8, 0)
+        if rect.width() < 20:
+            return
         painter.save()
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setPen(Qt.NoPen)
         painter.setBrush(QColor("#1b2733"))
-        track = QRect(rect.left(), rect.bottom() - 2, rect.width(), 3)
-        painter.drawRoundedRect(track, 1.5, 1.5)
+        track = QRect(rect.left(), rect.center().y() - 3, rect.width(), 6)
+        painter.drawRoundedRect(track, 3, 3)
         painter.setBrush(QColor("#ff2346"))
-        painter.drawRoundedRect(QRect(track.left(), track.top(), max(2, int(track.width() * min(1.0, share))), 3), 1.5, 1.5)
+        painter.drawRoundedRect(QRect(track.left(), track.top(), max(4, int(track.width() * min(1.0, share))), 6), 3, 3)
         painter.restore()
 
 
@@ -144,9 +146,9 @@ def build(window):
     self = window
     state = state_of(self)
     state.tab = state.tab if state.tab in {n for n, _ in data.TABS} else "Storage DNA"
-    page = self._insight_page("Game DNA", SUBTITLE, "dna", None, 74)
+    page = self._insight_page("Game DNA", SUBTITLE, "dna", None, 66)
     page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Game DNA",
-                                              scene="dna", source=(700, 0, 580, 126), excluded=((1090, 0, 190, 40),))
+                                              scene="dna", source=(868, 0, 412, 126), excluded=((1090, 0, 190, 40),))
     self.dna_metrics = MetricStrip([
         ("game", "—", "Game DNA Profile", "#ff2245"), ("storage", "—", "Total Footprint", "#16c9eb"),
         ("folder", "—", "Locations", "#eac329"), ("box", "—", "Total Items", "#dd73e6"),
@@ -172,6 +174,8 @@ def build(window):
     for control in self.dna_tabs.buttons.values():
         control.setStyleSheet("font-size:11px; padding:4px 3px;")
         control.setIconSize(QSize(15, 15))
+    for name, control in self.dna_tabs.buttons.items():
+        control.setText(name.replace("&", "&&"))  # a lone ampersand would be eaten as a keyboard mnemonic
     right.layout().addWidget(self.dna_tabs)
 
     footprint, chart = panel(kind="fileResults", padding=10, spacing=7)
@@ -187,6 +191,7 @@ def build(window):
     self.dna_chart_stack.addWidget(_widget(ringbox))
     listing = column(spacing=5)
     self.dna_asset_table = _table(["Location", "Evidence", "Items", "Size"])
+    self.dna_asset_table.setMinimumHeight(60)
     self.dna_asset_table.setSelectionBehavior(QAbstractItemView.SelectRows)
     self.dna_asset_table.setSelectionMode(QAbstractItemView.SingleSelection)
     self.dna_asset_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
@@ -209,38 +214,44 @@ def build(window):
     page.content.addWidget(_split(sidebar, right, [205, 820]), 1)
 
     bottom = row(spacing=8)
-    locations, loc = panel(kind="fileResults", padding=8, spacing=5)
+    locations, loc = panel(kind="fileResults", padding=6, spacing=3)
     title = row(spacing=5)
     self.dna_locations_heading = label("Top Locations", "sectionTitle")
     title.addWidget(self.dna_locations_heading, 1)
     title.addWidget(button("View All Locations", lambda: set_tab(self, "Files & Locations"), kind="link"))
     loc.addWidget(_widget(title))
     self.dna_locations = _table(["", "Location", "Reported Size"])
-    self.dna_locations.setMinimumHeight(90)
-    self.dna_locations.setMaximumHeight(112)
+    self.dna_locations.setMinimumHeight(60)
+    self.dna_locations.horizontalHeader().hide()
     self.dna_locations.setColumnWidth(0, 24)
     self.dna_locations.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-    self.dna_locations.setColumnWidth(2, 120)
+    self.dna_locations.setColumnWidth(2, 200)
     self.dna_locations.setItemDelegateForColumn(2, BarDelegate(self.dna_locations))
     loc.addWidget(self.dna_locations)
     bottom.addWidget(locations, 5)
 
-    suggestions, suggest = panel(kind="fileResults", padding=9, spacing=5)
-    suggest.addWidget(label("Cleanup Suggestions", "sectionTitle"))
+    suggestions, suggest = panel(kind="fileResults", padding=6, spacing=3)
+    self.dna_suggest_title = label("Cleanup Suggestions", "sectionTitle")
+    self.dna_suggest_title.setToolTip("Nothing is removed from this page, and nothing here is called safe to remove. "
+                                      "Review & Clean opens the tab that owns removal, filtered to this game.")
+    suggest.addWidget(self.dna_suggest_title)
     self.dna_suggest_body = _widget(column(spacing=1))
     suggest.addWidget(self.dna_suggest_body)
-    self.dna_suggest_note = label("", "caption", wrap=True)
-    suggest.addWidget(self.dna_suggest_note)
-    buttons = row(spacing=6)
-    self.dna_review_button = tool("Review & Clean", "sparkles", lambda: review_and_clean(self), kind="primary",
+    suggest.addStretch(1)
+    bottom.addWidget(suggestions, 4)
+    actions_panel, act = panel(kind="fileResults", padding=6, spacing=6)
+    self.dna_review_button = tool("Review && Clean", "sparkles", lambda: review_and_clean(self), kind="primary",
                                   tip="Opens the tab that owns removal, filtered to this game. Nothing is removed here")
     self.dna_graveyard_button = tool("Add to Graveyard", "grave", lambda: add_to_graveyard(self),
                                      tip="Opens this game's Graveyard entry")
-    buttons.addWidget(self.dna_review_button)
-    buttons.addWidget(self.dna_graveyard_button)
-    suggest.addWidget(_widget(buttons))
-    bottom.addWidget(suggestions, 3)
-    page.content.addWidget(_widget(bottom))
+    act.addWidget(self.dna_review_button)
+    act.addWidget(self.dna_graveyard_button)
+    act.addStretch(1)
+    actions_panel.setMaximumWidth(190)
+    bottom.addWidget(actions_panel, 2)
+    bottom_box = _widget(bottom)
+    bottom_box.setMaximumHeight(156)
+    page.content.addWidget(bottom_box)
 
     page.dna_ready = True
     self.dna_search.textChanged.connect(lambda *_: fill_games(self))
@@ -340,7 +351,7 @@ def render_header(window, game):
     header = window.dna_game_header_content
     from gg_desktop.artwork import game_app_id
     intro = row(spacing=10)
-    art = CoverArt(game.name, height=80, artwork=window.artwork, app_id=game_app_id(game))
+    art = CoverArt(game.name, height=62, artwork=window.artwork, app_id=game_app_id(game))
     art.setMaximumWidth(270)
     intro.addWidget(art, 1)
     text = column(spacing=4)
@@ -487,7 +498,7 @@ def render_top_locations(window, profile, total):
         _text(table, i, 1, loc.path)
         size = _text(table, i, 2, "Not measured" if loc.size is None else readable_bytes(loc.size))
         size.setData(Qt.UserRole, 0 if not total or loc.size is None else loc.size / total)
-        table.setRowHeight(i, 24)
+        table.setRowHeight(i, 22)
     if table.rowCount():
         table.selectRow(0)
 
@@ -507,9 +518,6 @@ def render_suggestions(window, profile):
     if not suggestions:
         body.addWidget(label("Nothing is suggested for this game. Game Grave only lists items it can tie to the game.",
                              "caption", wrap=True))
-    window.dna_suggest_note.setText(
-        "Review & Clean opens the tab that owns removal, filtered to this game. Nothing is removed from this page, "
-        "and nothing here is called safe to remove." if suggestions else "")
     entry = next((s for s in suggestions if s.route == "Graveyard"), None)
     window.dna_review_button.setEnabled(bool(suggestions))
     window.dna_graveyard_button.setEnabled(entry is not None)
