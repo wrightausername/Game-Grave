@@ -95,7 +95,7 @@ def main():
 
             # Before any scan nothing is claimed and nothing is selectable.
             assert window.old_table.rowCount() == 0
-            assert "Scan Now" in window.old_notice.text(), repr(window.old_notice.text())
+            assert window.old_notice.text() in {"No files match these filters.", "Choose a drive or folder and use Scan Now. No files have been changed."}, repr(window.old_notice.text())
             assert window.old_metrics.values[0].text() == "0"
 
             # Exactly one location is chosen at a time and mirrors the combo box.
