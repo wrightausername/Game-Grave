@@ -21,8 +21,21 @@ from gg_desktop.widgets import button, column, label, row
 BACKUP_NAME = "game-optimizer-backup.json"
 
 
+DARK = ("QDialog{background:#05090c;color:#e8eef5;} QLabel{color:#e8eef5;background:transparent;} "
+        "QCheckBox{color:#e8eef5;spacing:8px;} "
+        "QCheckBox::indicator,QListView::indicator{width:15px;height:15px;border:1px solid #6b7788;background:#0a1118;border-radius:3px;} "
+        "QCheckBox::indicator:checked,QListView::indicator:checked{background:#ff284a;border-color:#ff284a;} "
+        "QListWidget,QPlainTextEdit,QComboBox,QLineEdit{background:#0a1118;color:#e8eef5;border:1px solid #243242;border-radius:5px;} "
+        "QListWidget::item{padding:4px;} QListWidget::item:selected{background:#2a0f17;color:#ffffff;} "
+        "QPlainTextEdit{font-family:Consolas,monospace;} QComboBox QAbstractItemView{background:#0a1118;color:#e8eef5;}")
+
+
 class WinDialog(QDialog):
     """The one dialog class for these tools (also lets tests open them without blocking)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(DARK)
 
 
 def _text(widget_text, role="subtle", wrap=True):
