@@ -127,13 +127,21 @@ scanned data the owner switches on; it answers only from enabled sources and nam
 or empty; sizes are "reported", never freed; it never says anything is safe to remove; it hands off to
 the owning tab. The next tab's lock must freeze AI Assistant against this commit.
 
-Active tab: Settings. The owner approved the Settings mockup (stored as
-`gg_desktop/assets/references/settings.jpg`) and asked for it to be made functional. Work is confined to
-new `settings_*.py` modules, a `settings_page` delegation in `photo_integration.py` and the settings
-tests and tools. Every locked tab above stays frozen.
+Settings: OWNER SIGNED OFF AND LOCKED ("Yes", to locking it and moving on). The approved baseline is
+commit d4ec9782e66dad9e8f9b8f0f3c2bd2cf6b605e7c on branch `claude/old-files-full-functionality`, Windows run
+https://github.com/wrightausername/Game-Grave/actions/runs/42517152855. Do not change its layout, tabs,
+controls or behavior, or anything that reaches it through shared code, unless the owner explicitly reopens
+it. Its honest-claims rules stay: preferences are staged and saved only on Apply; Protection switches are
+always on and cannot be turned off; Never Touch rules are only added or removed one at a time with a
+confirmation, and Import and Reset never remove one; excluded folders only leave results out of scans and
+never touch a file; update checks, notifications, accent and scale are shown as unavailable or fixed, not
+faked. Shared code changed with the owner's approval: `settings_store.load_settings` (saved keys survive a
+restart) used by `app.py`, start minimized in `app.py` main(), the excluded-folder filter in `backend.py`,
+and the Mods stale-row guard in `mods_page.py`. The next tab's lock must freeze Settings against this commit.
 
-Next tab: More Tools waits for the owner (its photo is saved as `references/more_tools.jpg`). Do not
-start it until the owner says so.
+Active tab: More Tools. The owner's photo is `gg_desktop/assets/references/more_tools.jpg`. Work is confined
+to new `tools_*.py` modules, a `tools_page` delegation in `photo_integration.py` and the More Tools tests and
+tools. Every locked tab above stays frozen.
 
 Earlier history (kept for context; none of these tabs is open):
 
