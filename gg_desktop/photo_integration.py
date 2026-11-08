@@ -276,6 +276,14 @@ class PhotoIntegration:
         from gg_desktop import other_storage_page
         other_storage_page.delete_selected(self)
 
+    def captures_page(self):
+        from gg_desktop import captures_page
+        captures_page.build(self)
+
+    def _request_capture_preview(self, index):
+        from gg_desktop import captures_page
+        captures_page.request_preview(self, index)
+
     def old_files_page(self):
         from gg_desktop import old_files_page
         old_files_page.build(self)
