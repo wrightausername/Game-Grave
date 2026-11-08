@@ -396,6 +396,10 @@ class PhotoIntegration:
         from gg_desktop import undo_page
         undo_page.build(self)
 
+    def assistant_page(self):
+        from gg_desktop import assistant_page
+        assistant_page.build(self)
+
     def graveyard_page(self):
         from gg_desktop import grave_page
         self._merge_manual_reviews()

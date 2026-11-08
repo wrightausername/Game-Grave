@@ -118,8 +118,16 @@ the activity log. "Restore to Custom Location" is not built because the engine r
 path only; adding it needs the owner's explicit approval to change `recovery.py`. The next tab's lock
 must freeze Undo Center against this commit.
 
-Next tabs: AI Assistant, Settings and More Tools wait for the owner's photos. Do not start any of them
-until the owner sends the photo for that tab and names it. Every locked tab above stays frozen.
+Active tab: AI Assistant. The owner approved the AI Assistant and Settings mockups (stored as
+`gg_desktop/assets/references/assistant.jpg` and `settings.jpg`) and asked for them to be made
+functional, one tab at a time. Work is confined to `assistant_data.py`, `assistant_engine.py`,
+`assistant_actions.py`, `assistant_page.py`, the `assistant_page` method in `photo_integration.py`
+and the assistant tests and tools. It is a local, rule-based, read-only assistant over scanned data
+the owner switches on; it never says anything is safe to remove, reports sizes as reported (never
+freed) and hands off to the owning tab. Every locked tab above stays frozen.
+
+Next tabs: Settings follows only after the owner locks AI Assistant and says to move on. More Tools
+waits for the owner (its photo is saved as `references/more_tools.jpg`). Do not start either until then.
 
 Earlier history (kept for context; none of these tabs is open):
 
