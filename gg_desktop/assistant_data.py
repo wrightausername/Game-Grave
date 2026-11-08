@@ -84,10 +84,10 @@ def source_states(facts):
     scan = ("Full scan, " + facts.scanned_at) if facts.scanned_at else "Not scanned yet"
     rows = (
         ("library", len(games), f"{len(games):,} games, {_launchers(games)} launchers" if games else "No games found yet"),
-        ("storage", storage, f"{storage:,} items, {scan}" if storage else "Off: not scanned yet"),
+        ("storage", storage, f"{storage:,} items, {scan}" if storage else "Nothing scanned yet"),
         ("history", len(facts.history), f"{len(facts.history):,} records" if facts.history else "Nothing recorded yet"),
-        ("mods", len(facts.mods), f"{len(facts.mods):,} mod locations" if facts.mods else "Off: not scanned yet"),
-        ("captures", len(facts.captures), f"{len(facts.captures):,} captures" if facts.captures else "Off: not scanned yet"),
+        ("mods", len(facts.mods), f"{len(facts.mods):,} mod locations" if facts.mods else "Nothing scanned yet"),
+        ("captures", len(facts.captures), f"{len(facts.captures):,} captures" if facts.captures else "Nothing scanned yet"),
     )
     return [SourceState(key, SOURCE_NAMES[key], count, detail, key in facts.enabled) for key, count, detail in rows]
 
