@@ -90,7 +90,7 @@ def main():
             control = window.page.mods
 
             # Library: layout columns unchanged, status is real, metrics are real.
-            assert window.mod_table.columnCount() == 6
+            assert window.mod_table.columnCount() == 7
             assert not window.mod_profile.isVisible()
             statuses = {view.name: window.mod_table.item(i, 5).text() for i, view in enumerate(window._shown_mods)}
             assert statuses["Mountain Textures"] == "Enabled", statuses
@@ -170,7 +170,7 @@ def main():
             assert window.grab().save(str(args.output / "mods-page-cleanup-1280.png"))
 
             open_tab(window, "Library")
-            assert window.mod_table.columnCount() == 6 and window.mod_table.rowCount() >= 5
+            assert window.mod_table.columnCount() == 7 and window.mod_table.rowCount() >= 5
 
             # Bulk actions on checked rows: copy and export never touch mod folders.
             for name in ("Mountain Textures", "Snow Textures"):
