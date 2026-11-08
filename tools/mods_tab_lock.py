@@ -64,6 +64,8 @@ def probe(root, fixtures, output, foundation=False):
             # Games is part of what this lock protects: keep its launcher/registry/account reads on disposable fixtures.
             ("gg_desktop.games_live.registered_games", dict(return_value=[])),
             ("core.config_dir", dict(return_value=fixtures/"Config")),
+            # The 5-second process sampler is a recurring OS enumeration, not page content.
+            ("gg_desktop.games_tracking.GameTracker.sample", dict(return_value=None)),
         ):
             stack.enter_context(patch(target, **options))
         stack.enter_context(patch.object(CrimsonWindow, "info"))
