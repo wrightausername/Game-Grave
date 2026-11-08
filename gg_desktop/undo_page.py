@@ -130,18 +130,18 @@ def build(window):
     load(self)
     page = self._insight_page("Undo Center", SUBTITLE, "undo", "undo", 66)
     page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Undo Center",
-                                              scene="undo", source=(900, 0, 380, 126), excluded=((1090, 0, 190, 40),))
+                                              scene="undo", source=(900, 0, 380, 110), excluded=((1090, 0, 190, 40),))
     self.undo_metrics = MetricStrip([
         ("box", "0", "Total Actions", "#e175eb"), ("check", "0", "Recycled Files", "#30d76b"),
         ("warning", "0", "Needs Review", "#f6be24"), ("warning", "0", "Failed", "#ff254a"),
-        ("undo", "0", "Restored", "#13bcf5"), ("storage", "0 B", "Recycled (Not Freed)", "#f2a5b2"),
+        ("undo", "0", "Restored", "#13bcf5"), ("storage", "0 B", "Recycled Size", "#f2a5b2"),
         ("shield", "0", "Restore Available", "#32d67a")], compact=True)
     page.content.addWidget(self.undo_metrics)
 
     # --- Filters
     filters, side = panel(kind="fileFilterPanel", padding=8, spacing=4)
     filters.setMinimumWidth(165)
-    filters.setMaximumWidth(215)
+    filters.setMaximumWidth(190)
     head = row(spacing=4)
     glyph = QLabel()
     glyph.setPixmap(icon("filter", "#ff3b57", 17).pixmap(17, 17))
@@ -249,7 +249,7 @@ def build(window):
     self.undo_notice.setTextFormat(Qt.PlainText)
     contents.addWidget(self.undo_notice)
     self.undo_table = _table(COLUMNS)
-    for c, width in enumerate((24, 88, 150, 96, 62, 112, 88)):
+    for c, width in enumerate((24, 80, 150, 84, 54, 104, 80)):
         self.undo_table.setColumnWidth(c, width)
     self.undo_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
     self.undo_table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -456,7 +456,7 @@ def refresh(window):
     strip.set_value(5, human_size(m["bytes"]))
     strip.set_value(6, f"{m['available']:,}")
     strip.setToolTip("Recycled Files counts files Game Grave sent to the Windows Recycle Bin.\n"
-                     "Recycled (Not Freed) is the size of those still-restorable files. A recycled file still takes disk space "
+                     "Recycled Size is the size of those still-restorable files. A recycled file still takes disk space "
                      "until Windows empties the bin.\nRestore Available counts records Windows last reported as restorable. "
                      "Check Availability asks Windows again.")
     fill(window)

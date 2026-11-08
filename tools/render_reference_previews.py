@@ -114,6 +114,8 @@ def main():
         with patch.dict(os.environ, {"LOCALAPPDATA": str(root / "Local"), "APPDATA": str(root / "Roaming")}), \
              patch("gg_desktop.app.load_settings", return_value=settings), \
              patch("gg_desktop.recovery_screens.get_records", return_value=undo_rows), \
+             patch("gg_desktop.undo_page.get_records", return_value=undo_rows), \
+             patch("gg_desktop.undo_page.get_activity", return_value=[]), \
              patch("gg_desktop.reference_overview.get_records", return_value=undo_rows), \
              patch("gg_desktop.reference_overview.get_activity", return_value=[
                  {"kind": name, "details": "Synthetic design fixture", "date": datetime.now().astimezone().isoformat()}
@@ -159,7 +161,8 @@ def main():
                     if route == "Other Storage":
                         window.storage_table.item(0, 0).setCheckState(Qt.Checked)
                     if route == "Undo Center":
-                        window.undo_table.item(0, 0).setCheckState(Qt.Checked)
+                        if window.undo_table.item(0, 0):
+                            window.undo_table.item(0, 0).setCheckState(Qt.Checked)
                     app.processEvents()
                     path = args.output / f"{route.lower().replace(' ', '-')}-{args.width}.png"
                     if not window.grab().save(str(path)):
