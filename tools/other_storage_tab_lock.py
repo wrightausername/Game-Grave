@@ -122,7 +122,9 @@ def probe(root, fixtures, output, foundation=False):
 def source_guard(root, baseline=BASELINE):
     if subprocess.run(["git","cat-file","-e",baseline],cwd=root,capture_output=True).returncode:
         subprocess.run(["git","fetch","--no-tags","--depth=1","origin",baseline],cwd=root,check=True)
-    allowed = {"gg_desktop/photo_integration.py"}
+    # photo_integration.py is AST-checked below; the other_storage_* modules are the active tab itself.
+    allowed = {"gg_desktop/photo_integration.py", "gg_desktop/other_storage_data.py", "gg_desktop/other_storage_actions.py",
+               "gg_desktop/other_storage_insight.py", "gg_desktop/other_storage_page.py"}
     shared_path = "gg_desktop/photo_integration.py"
     original = subprocess.check_output(["git", "show", baseline+":"+shared_path], cwd=root).decode()
     current = (root/shared_path).read_text(encoding="utf-8")
