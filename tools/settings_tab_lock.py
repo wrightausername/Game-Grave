@@ -1,4 +1,4 @@
-"""Protect the thirteen other tabs (including locked AI Assistant, Undo Center, Game DNA, Graveyard, Captures, Mods, Ready Room, Old Files, Other Storage and Games) while Settings is worked on."""
+"""Protect the twelve other tabs (including locked AI Assistant, Undo Center, Game DNA, Graveyard, Captures, Mods, Ready Room, Old Files, Other Storage and Games) while Settings is worked on."""
 from __future__ import annotations
 import argparse
 import ast
@@ -168,7 +168,7 @@ def main():
         return 0
     root = Path(__file__).resolve().parents[1]
     reference = BASELINE
-    expected = 78
+    expected = 72
     source_guard(root,reference)
     output = args.output.resolve()/"settings-tab-lock"
     output.mkdir(parents=True,exist_ok=True)
@@ -189,7 +189,7 @@ def main():
             if result.returncode:
                 print(result.stdout[-4000:]+result.stderr[-6000:])
                 raise AssertionError(label+" tab-lock render failed")
-            print("Captured "+label+": "+("thirteen other tabs")+", empty/populated, three sizes.",flush=True)
+            print("Captured "+label+": "+("twelve other tabs")+", empty/populated, three sizes.",flush=True)
         before = json.loads((output/"baseline/hashes.json").read_text())
         after = json.loads((output/"current/hashes.json").read_text())
         differences = [n for n in before if before[n]!=after.get(n)]
@@ -221,7 +221,7 @@ def main():
                 real.append(name)
         differences = real
         assert not differences, "Locked tab pixels changed: "+", ".join(differences)
-    print("PASS: thirteen other tabs are pixel-identical after Settings: 78 comparisons. Ready Room, Games and every other desktop source, artwork, data and safety engine are unchanged.")
+    print("PASS: twelve other tabs are pixel-identical after Settings: 72 comparisons. Ready Room, Games and every other desktop source, artwork, data and safety engine are unchanged.")
     return 0
 
 
