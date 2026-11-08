@@ -134,7 +134,7 @@ def items_text(item):
     if item.items is None:
         return "Not counted"
     if item.is_folder_item and item.storage is not None:
-        return f"{item.items:,} files" + (" or more" if item.partial else "")
+        return f"{item.items:,} file{'s' if item.items != 1 else ''}" + (" or more" if item.partial else "")
     return "1 file"
 
 

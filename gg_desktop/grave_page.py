@@ -273,7 +273,7 @@ def build(window):
                                               scene="graveyard", source=(700, 0, 580, 126), excluded=((1090, 0, 190, 40),))
     self.grave_metrics = MetricStrip([
         ("storage", "0", "Items Found", "#df74e9"), ("storage", "0 B", "Total Size", "#15c7ed"),
-        ("clock", "0", "Not Touched 6+ Mo", "#f8c82c"), ("game", "0", "Related Games", "#ff2145"),
+        ("clock", "0", "Over 6 Months", "#f8c82c"), ("game", "0", "Related Games", "#ff2145"),
         ("mods", "0", "Mods / Addons", "#d76ce6"), ("download", "0", "Downloads", "#16baf1"),
         ("shield", "0", "Reviewable", "#2bd971")], compact=True)
     page.content.addWidget(self.grave_metrics)
