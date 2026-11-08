@@ -5,7 +5,7 @@ Shared builders, widgets, artwork services and other tabs remain unchanged.
 from collections import Counter
 from PySide6.QtCore import Qt, QSignalBlocker, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QListWidgetItem
+from PySide6.QtWidgets import QLabel, QListWidgetItem
 from core import age_text, save_settings
 from gg_desktop.models import readable_bytes
 from gg_desktop.artwork import game_app_id
@@ -71,7 +71,13 @@ class GamesScreens:
             (f"Favorites ({sum(g.key in favorites for g in games)})", "star"),
             ("Large (≥100 GB)", "storage"),
         ], framed=False)
-        contents.addWidget(self.game_chips)
+        library_options = row(spacing=4)
+        library_options.addWidget(self.game_chips, 1)
+        self.game_library_options = tool("", "more", page.games.library_options, tip="Library options and account connections")
+        self.game_library_options.setAccessibleName("Game library options")
+        self.game_library_options.setFixedSize(26, 28)
+        library_options.addWidget(self.game_library_options)
+        contents.addWidget(_widget(library_options))
         self.game_empty = label("", "emptyState", wrap=True)
         contents.addWidget(self.game_empty)
         contents.addWidget(self.game_grid, 1)
@@ -127,21 +133,20 @@ class GamesScreens:
                 if (launcher == "All launchers" or self.page.games.bucket is not None or g.launcher == launcher)
                 and (not self.page.games.bucket or launcher_bucket(g.launcher) == self.page.games.bucket)
                 and all(word in (g.name + " " + g.launcher + " " + g.install_path).casefold() for word in query.split())
-                and ("Favorites" not in active or g.key in favorites)
-                and ("Installed" not in active or g.status.startswith("Installed"))
-                and ("Recently Played" not in active or g.last_played_at is not None)
+                and ("Favorites" not in active or self.page.games.is_favorite(g))
+                and ("Installed" not in active or self.page.games.is_installed(g))
+                and ("Not Installed" not in active or self.page.games.fact(g).get("owned") and not self.page.games.is_installed(g))
+                and ("Updates" not in active or self.page.games.fact(g).get("update_available") is True)
+                and ("Recently Played" not in active or self.page.games.last_played(g) is not None)
                 and ("Large" not in active or (g.size_bytes is not None and g.size_bytes >= 100 * 1024 ** 3))]
-        unavailable = bool({"Not Installed", "Updates"} & active)
-        if unavailable:
-            rows = []
         sort = self.game_sort.currentText()
         if sort == "Name A to Z":
             rows.sort(key=lambda g: g.name.casefold())
         elif sort == "Launcher":
             rows.sort(key=lambda g: (g.launcher.casefold(), g.name.casefold()))
         elif sort in ("Recently played", "Oldest played"):
-            rows.sort(key=lambda g: (g.last_played_at is None,
-                                     -(g.last_played_at or 0) if sort == "Recently played" else g.last_played_at or 0,
+            rows.sort(key=lambda g: (self.page.games.last_played(g) is None,
+                                     -(self.page.games.last_played(g) or 0) if sort == "Recently played" else self.page.games.last_played(g) or 0,
                                      g.name.casefold()))
         else:
             rows.sort(key=lambda g: (g.size_bytes is None,
@@ -153,15 +158,16 @@ class GamesScreens:
                 item = QListWidgetItem(g.name)
                 item.setToolTip(g.name + "\n" + g.launcher + " · " + g.status)
                 item.setData(CARD_ROLE, {"name": g.name, "size": readable_bytes(g.size_bytes),
-                                        "source": g.launcher, "steam_app_id": game_app_id(g), "favorite": g.key in favorites,
+                                        "source": g.launcher, "steam_app_id": game_app_id(g), "favorite": self.page.games.is_favorite(g),
                                         "status_icon": "check" if g.status.startswith("Installed") else "shield"})
                 self.game_grid.addItem(item)
             selected = next((i for i, g in enumerate(rows) if current and g.key == current.key), 0)
             if rows:
                 self.game_grid.setCurrentRow(selected)
-        message = ("Launcher ownership and update status are not available from this local scan."
-                   if unavailable else "No games match these filters." if self.inventory.scanned_at
-                   else "Your library starts here. Use Scan PC (F5) to find your installed games.")
+        message = (("No uninstalled games were returned by the connected libraries. Refresh library data to check again." if self.page.games.snapshots else "Connect a library from the … menu to include owned games that are not installed.") if "Not Installed" in active else
+                   "No updates are reported by the current sources. Refresh library data from the … menu to check again." if "Updates" in active else
+                   "No games match these filters." if self.inventory.scanned_at or self.page.games.records else
+                   "Your library starts here. Scan PC (F5), or use the … menu to connect your game libraries.")
         self.game_empty.setText(message if not rows else "")
         self.game_empty.setVisible(not rows)
         self.game_count.setText(f"{len(rows):,} games shown · Local library" if self.inventory.scanned_at else "No scan yet · Nothing has been changed")
@@ -195,28 +201,42 @@ class GamesScreens:
         contents.addWidget(CoverArt(game.name, height=101, artwork=self.page.game_artwork, app_id=game_app_id(game)))
         heading = row(spacing=4)
         heading.addWidget(label(game.name, "detailTitle", wrap=True), 1)
-        favorite = game.key in self.settings.get("desktop_favorites", [])
+        favorite = self.page.games.is_favorite(game)
         fav = tool("", "star", lambda: self._toggle_favorite(game), tip="Remove favorite" if favorite else "Add favorite")
         fav.setIcon(icon("star", "#ffcb21" if favorite else "#a1a6ad"))
         fav.setAccessibleName("Remove favorite" if favorite else "Add favorite")
         heading.addWidget(fav)
         contents.addWidget(_widget(heading))
-        contents.addWidget(label("✓  Installed" if game.status.startswith("Installed") else game.status,
-                                 "successText" if game.status.startswith("Installed") else "warning", wrap=True))
-        play = tool("Play", "play", lambda: self._launch_game(game), kind="primary")
-        play.setEnabled("open_folder" in game.capabilities)
-        play.setToolTip("Launch via " + game.launcher if launch_uri(game) else "Choose this game's EXE to play" if play.isEnabled() else "This installation is unverified; scan again")
+        control = self.page.games
+        live = control.values(game)
+        status = label(live["status"], "successText" if control.is_installed(game) else "warning", wrap=True)
+        status.setProperty("gamesLiveField", "status")
+        status.setToolTip(control.source_text(game, "status"))
+        status.setTextFormat(Qt.PlainText)
+        contents.addWidget(status)
+        install = not control.is_installed(game) and control.fact(game).get("owned")
+        play = tool("Install" if install else "Play", "download" if install else "play", lambda: self._launch_game(game), kind="primary")
+        play.setEnabled(bool(install) or control.is_installed(game) and "open_folder" in game.capabilities)
+        play.setToolTip(("Install with " if install else "Launch with ") + game.launcher)
         play_row = row(spacing=6)
         play_row.addWidget(play, 1)
         play_row.addWidget(tool("", "more", lambda: self.page.games.options(game), tip="Game options"))
         contents.addWidget(_widget(play_row))
         for symbol, title, value in (
-            ("refresh", "Launcher", game.launcher), ("folder", "Install Location", game.install_path),
+            ("refresh", "Launcher", game.launcher), ("folder", "Install Location", game.install_path or "Not installed"),
             ("storage", "Install Size", readable_bytes(game.size_bytes)),
-            ("clock", "Last Played", age_text(game.last_played_at) if game.last_played_at is not None else "Unknown"),
-            ("clock", "Total Playtime", "Unknown"), ("sparkles", "Updates", "Unknown"),
+            ("clock", "Last Played", live["last_played"]),
+            ("clock", "Tracked Playtime" if control.fact(game).get("playtime_source", "").startswith("Tracked") or control.fact(game).get("playtime_seconds") is None else "Total Playtime", live["playtime"]),
+            ("sparkles", "Updates", live["updates"]),
         ):
             detail_line(contents, symbol, title, value)
+            field = {"Last Played": "last_played", "Total Playtime": "playtime", "Tracked Playtime": "playtime", "Updates": "updates"}.get(title)
+            if field:
+                row_widget = contents.itemAt(contents.count()-1).widget()
+                for item in row_widget.findChildren(QLabel) if row_widget else ():
+                    if item.objectName() == "detailValue":
+                        item.setProperty("gamesLiveField", field)
+                        item.setToolTip(control.source_text(game, field))
         actions = row(spacing=5)
         actions.addWidget(tile_action("Game DNA", "dna", lambda: self.page.games.show_dna(game)))
         actions.addWidget(tile_action("Mods", "mods", lambda: self.navigate("Mods")))
@@ -225,23 +245,29 @@ class GamesScreens:
         detail_section(contents, "Quick Actions")
         actions = row(spacing=5)
         folder = tile_action("Open Folder", "folder", lambda: self._open_folder(game.install_path))
-        folder.setEnabled("open_folder" in game.capabilities)
+        folder.setEnabled(control.is_installed(game) and "open_folder" in game.capabilities)
         actions.addWidget(folder)
         for text, symbol, action in (("Verify Files…", "check", "validate"), ("Manage DLC…", "box", "details")):
-            control = tile_action(text, symbol, lambda _=False, action=action: self._steam_game_action(game, action))
-            control.setEnabled("open_folder" in game.capabilities)
-            control.setToolTip("Open this game's Steam controls" if game.launcher == "Steam" else "Show how to manage this game in " + game.launcher)
-            actions.addWidget(control)
-        uninstall = tile_action("Uninstall…", "trash", lambda: self._steam_uninstall(game))
-        uninstall.setEnabled("open_folder" in game.capabilities)
-        uninstall.setToolTip("Open Steam's own uninstall confirmation" if game.launcher == "Steam" else "Show how to uninstall this game in " + game.launcher)
+            caption = text if game.launcher == "Steam" else ("Verify in launcher…" if action == "validate" else "DLC in launcher…")
+            quick = tile_action(caption, symbol, lambda _=False, action=action: self._steam_game_action(game, action))
+            quick.setProperty("gameNativeAction", action)
+            quick.setEnabled(control.is_installed(game) or action == "details" and control.fact(game).get("owned", False))
+            quick.setToolTip("Open this game's " + game.launcher + " controls")
+            actions.addWidget(quick)
+        uninstall = tile_action("Uninstall…" if game.launcher == "Steam" else "Uninstall in launcher…", "trash", lambda: self._steam_uninstall(game))
+        uninstall.setProperty("gameNativeAction", "uninstall")
+        uninstall.setEnabled(control.is_installed(game) and "open_folder" in game.capabilities)
+        uninstall.setToolTip("Open this game's native uninstall controls")
         actions.addWidget(uninstall)
         contents.addWidget(_widget(actions))
         contents.addStretch()
 
     def _toggle_favorite(self, game):
         values = set(self.settings.get("desktop_favorites", []))
-        values.discard(game.key) if game.key in values else values.add(game.key)
+        if self.page.games.is_favorite(game):
+            values.difference_update(self.page.games.favorite_aliases(game))
+        else:
+            values.add(game.key)
         updated = dict(self.settings, desktop_favorites=sorted(values))
         try:
             save_settings(updated)
@@ -249,7 +275,7 @@ class GamesScreens:
             self.error("Favorite not saved", str(exc))
             return
         self.settings = updated
-        count = sum(g.key in values for g in self.page.games.records)
+        count = sum(self.page.games.is_favorite(g) for g in self.page.games.records)
         for name, control in self.game_chips.buttons.items():
             if name.startswith("Favorites"):
                 control.setText(f"Favorites ({count})")

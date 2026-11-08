@@ -58,6 +58,11 @@ functionality and ensure launcher cards and game artwork cover Steam, EA,
 Rockstar, Epic and other launchers. Preserve the locked Games photo layout.
 Confine fixes to Games, its own controllers, artwork and launcher adapters.
 The owner has not signed off on Games or authorized moving to the next tab.
+The owner has now explicitly authorized finishing the remaining Games gaps:
+real launcher management actions, ownership/update/playtime integration, and
+automatic artwork coverage. Account connections, their private storage and
+provider adapters must remain Games-only. Show accurate capabilities and data
+sources; never substitute fake ownership, playtime or completion messages.
 
 Preserve Overview exactly as it stands in Windows preview 0.2.12, commit
 df6bd6628adf6dd9713fe41235acb618da594574. The owner moved the current work to
