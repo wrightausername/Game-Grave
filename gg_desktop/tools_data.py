@@ -2,8 +2,10 @@
 
 Honesty rules for this tab:
 * A tile is "go" (opens the tab that owns the work), "run" (a real action implemented in this tab) or "unavailable".
-* Unavailable tiles stay visible, dimmed, and say why. Game Grave scans, reviews and moves reviewed files to the
-  Recycle Bin after confirmation. It does not change Windows settings, tune the PC or run commands.
+* Owner-approved exception (polish pass): seven tiles change or inspect Windows (Windows Cleanup, Game Optimizer,
+  Memory Optimizer, Startup Manager, Command Runner, File Associations, Junction Manager). Each one names exactly what
+  it will change, asks first and writes the activity log. See `winpc.py` and `tools_windows.py`.
+* A tile that cannot work would stay visible, dimmed, and say why. Nothing else changes Windows or runs commands.
 * Reports carry only numbers the scan reported. Sizes are "reported", never "freed", and nothing is called safe.
 """
 from __future__ import annotations
@@ -16,8 +18,7 @@ import re
 
 GO, RUN, OFF = "go", "run", "unavailable"
 
-OFF_REASON = ("Game Grave scans, reviews and moves reviewed files to the Recycle Bin after you confirm. "
-              "It does not change Windows settings, tune the PC or run commands, so this tool is not offered.")
+OFF_REASON = "This tool is not available on this PC."
 
 
 @dataclass(frozen=True)
@@ -48,12 +49,12 @@ CATEGORIES = (
         Tile("disk_cleanup", "Disk Cleanup", "trash", GO, "Other Storage", "Review reported storage items in Other Storage."),
         Tile("temp_files", "Temp Files", "file", GO, "Other Storage", "Temporary files found by the scan are reviewed in Other Storage."),
         Tile("clear_caches", "Clear Caches", "refresh", GO, "Other Storage", "Cache folders found by the scan are reviewed in Other Storage."),
-        _off("windows_cleanup", "Windows Cleanup", "settings"))),
+        Tile("windows_cleanup", "Windows Cleanup", "settings", RUN, "windows_cleanup", "Delete temporary files older than 2 days from your Windows temp folders after you confirm."))),
     Category("optimization", "Optimization", "Reduce clutter that may slow down games.", "cyan", (
-        _off("game_optimizer", "Game Optimizer", "play"),
+        Tile("game_optimizer", "Game Optimizer", "play", RUN, "game_optimizer", "Turn on Game Mode, turn off background recording or switch the power plan. Undo restores your values."),
         Tile("shader_cache", "Shader Cache", "dna", GO, "Game DNA", "Shader caches proven per game are shown in Game DNA."),
-        _off("memory_optimizer", "Memory Optimizer", "storage"),
-        _off("startup_manager", "Startup Manager", "clock"))),
+        Tile("memory_optimizer", "Memory Optimizer", "storage", RUN, "memory_optimizer", "Choose open apps to close politely, largest memory first. Windows itself is never listed."),
+        Tile("startup_manager", "Startup Manager", "clock", RUN, "startup_manager", "Turn your startup programs off or on with the same switch Task Manager uses."))),
     Category("backup", "Backup and Recovery", "Back up and restore what matters most.", "purple", (
         Tile("game_backup", "Game Backup", "archive", RUN, "save_vault", "Back up a folder you choose into a verified Save Vault ZIP."),
         Tile("save_backup", "Save Backup", "shield", RUN, "save_vault", "Back up a save folder you choose into a verified Save Vault ZIP."),
@@ -70,9 +71,9 @@ CATEGORIES = (
         Tile("bulk_files", "Bulk File Manager", "folder", GO, "Old Files", "Review many files at once in Old Files."),
         Tile("hash_checker", "Hash Checker", "check", RUN, "hash", "Compute a SHA-256 checksum of any file you choose."))),
     Category("advanced", "Advanced Tools", "Powerful tools for experienced users.", "yellow", (
-        _off("command_runner", "Command Runner", "list"),
-        _off("file_associations", "File Associations", "file"),
-        _off("junction_manager", "Junction Manager", "folder"),
+        Tile("command_runner", "Command Runner", "list", RUN, "command_runner", "Run one command line you type or pick, after you see it and confirm."),
+        Tile("file_associations", "File Associations", "file", RUN, "file_associations", "Look up which app opens a file type and jump to Windows Default apps."),
+        Tile("junction_manager", "Junction Manager", "folder", RUN, "junction_manager", "List, create or remove folder junctions. Removing deletes only the link."),
         Tile("advanced_cleanup", "Advanced Cleanup", "grave", GO, "Graveyard", "Reviewed items and protected folders live in the Graveyard."))),
 )
 

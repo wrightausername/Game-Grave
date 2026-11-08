@@ -1,7 +1,7 @@
 """More Tools page: the approved toolkit mockup, built only from tools that really exist.
 
 Tiles that belong to another tab open that tab. Tiles that do a job here (reports, hash checker, backups, kits) do it.
-Tiles for things Game Grave does not do (changing Windows, tuning the PC, running commands) stay visible but dimmed and
+Tiles that cannot work would stay visible but dimmed and
 say why when clicked. System Health shows live readings only, and Active Tasks lists only work that is really running.
 """
 from __future__ import annotations

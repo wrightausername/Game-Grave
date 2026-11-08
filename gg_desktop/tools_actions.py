@@ -1,6 +1,7 @@
 """More Tools actions. Each one either hands off to the tab that owns the work or does one real, honest job here.
 
-Nothing in this module deletes, moves or edits an existing file. Reports are written to a new file the owner names, and
+The seven Windows tools live in `tools_windows.py` (owner-approved: each names what it changes and asks first).
+Nothing else in this module deletes, moves or edits an existing file. Reports are written to a new file the owner names, and
 the hash checker only reads. Backups and kits go through the existing, verified Save Vault and Resurrection Kit code.
 """
 from __future__ import annotations
@@ -50,6 +51,9 @@ def run_action(window, key):
                "mod_report": lambda: export_mods(window),
                "system_report": lambda: export_system(window),
                "hash": lambda: choose_hash_file(window)}.get(key)
+    if handler is None:
+        from gg_desktop import tools_windows
+        handler = (lambda: tools_windows.HANDLERS[key](window)) if key in tools_windows.HANDLERS else None
     if handler:
         handler()
 

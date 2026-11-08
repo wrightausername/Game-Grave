@@ -138,17 +138,18 @@ def main():
                 settle()
             assert errors.call_count == 0, errors.call_args_list
 
-            # Tiles Game Grave does not offer stay dimmed, explain themselves, and change nothing.
-            offered = [t for t in data.all_tiles() if t.kind == data.OFF]
-            assert len(offered) == 7
-            for tile in offered:
-                infos.reset_mock()
-                window.tools_tiles[tile.key].click()
-                settle()
-                assert window.current_route == "More Tools"
-                assert infos.call_count == 1 and "not offered" in infos.call_args[0][0], tile.key
-                assert "does not change Windows settings" in infos.call_args[0][1]
-                assert "not offered" in window.tools_tiles[tile.key].accessibleName()
+            # The seven Windows tools are real tiles: each click opens its own tool (covered in depth by tools_windows_smoke).
+            from unittest.mock import MagicMock
+            from gg_desktop import tools_windows
+            assert [t for t in data.all_tiles() if t.kind == data.OFF] == []
+            fakes = {key: MagicMock() for key in tools_windows.HANDLERS}
+            with patch.dict(tools_windows.HANDLERS, fakes):
+                for key in fakes:
+                    window.tools_tiles[key].click()
+                    settle()
+                    assert fakes[key].call_count == 1 and fakes[key].call_args[0][0] is window, key
+                    assert "not offered" not in window.tools_tiles[key].accessibleName()
+            assert window.current_route == "More Tools"
 
             # Save backups and the Resurrection Kit use the existing verified workflows.
             for key in ("game_backup", "save_backup", "mod_backup"):
@@ -363,7 +364,7 @@ def main():
             settle()
         assert tree_bytes(root / "Untouched") == before, "Nothing outside the chosen report files may change"
         assert small.read_bytes() == small_before and hashlib.sha256(big.read_bytes()).hexdigest() == big_before, "Hashing never edits a file"
-    print("PASS: More Tools page: six tabs and twenty-four tiles, hand-offs to the owning tabs, dimmed tiles that explain themselves, "
+    print("PASS: More Tools page: six tabs and twenty-four tiles, hand-offs to the owning tabs, the seven Windows tools wired to their own screens, "
           "reports, a real hash checker, live health readings, real Active Tasks, the Tool Log and no sideways scrolling.")
     return 0
 

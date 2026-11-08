@@ -38,12 +38,16 @@ class Registry(unittest.TestCase):
             elif t.kind == data.RUN:
                 self.assertTrue(t.target)
             else:
-                self.assertIn("does not change Windows settings", t.note)
+                self.assertTrue(t.note)
 
-    def test_things_game_grave_does_not_do_are_not_offered(self):
-        off = {t.key for t in data.all_tiles() if t.kind == data.OFF}
-        self.assertEqual(off, {"windows_cleanup", "game_optimizer", "memory_optimizer", "startup_manager",
-                               "command_runner", "file_associations", "junction_manager"})
+    def test_the_seven_windows_tools_are_real_actions_with_honest_notes(self):
+        keys = {"windows_cleanup", "game_optimizer", "memory_optimizer", "startup_manager",
+                "command_runner", "file_associations", "junction_manager"}
+        tiles = {t.key: t for t in data.all_tiles() if t.key in keys}
+        self.assertEqual(set(tiles), keys)
+        for t in tiles.values():
+            self.assertEqual((t.kind, t.target), (data.RUN, t.key))
+        self.assertEqual([t.key for t in data.all_tiles() if t.kind == data.OFF], [])
 
     def test_no_tile_text_claims_safety_or_freed_space(self):
         for t in data.all_tiles():
