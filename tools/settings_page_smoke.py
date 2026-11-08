@@ -270,7 +270,7 @@ def main():
 
             # Data folder opens through the system, and Notifications and Appearance say what is real.
             window.settings_open.click()
-            assert opened.call_count == 1 and opened.call_args[0][0].toLocalFile() == str(core.config_dir())
+            assert opened.call_count == 1 and Path(opened.call_args[0][0].toLocalFile()) == core.config_dir()
             window.settings_tab_buttons["Notifications"].click()
             settle()
             texts = " ".join(l.text() for l in window.findChildren(settings_page.QLabel))
