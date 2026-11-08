@@ -65,6 +65,7 @@ def main():
             ("gg_desktop.winpc.activity", dict(side_effect=lambda kind, details, **kw: logged.append((kind, details)))),
         ):
             stack.enter_context(patch(target, **options))
+        stack.enter_context(patch.dict(os.environ, {"APPDATA": str(root / "AppData"), "PROGRAMDATA": str(root / "ProgData")}))
         errors = stack.enter_context(patch.object(CrimsonWindow, "error"))
         infos = stack.enter_context(patch.object(CrimsonWindow, "info"))
         stack.enter_context(patch.object(CrimsonWindow, "confirm", side_effect=lambda t, m, **kw: asked.append((t, m)) or True))
