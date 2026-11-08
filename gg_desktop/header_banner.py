@@ -6,7 +6,7 @@ widgets draw the same image with the same transform, and the photo's own search 
 window controls are excluded so they never show under the app's real controls.
 """
 from PySide6.QtCore import QObject, QEvent, QPoint, QRectF, Qt
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QRegion
+from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import QWidget
 
 from gg_desktop.reference_widgets import reference
@@ -83,16 +83,19 @@ class HeaderBannerArtwork(QObject):
         painter = QPainter(widget)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         painter.fillRect(widget.rect(), BACKGROUND)
+        photo = reference(self.scene)
+        painter.drawPixmap(target, photo, source)
         if top:
-            safe = QRegion(widget.rect())
+            # The photo has its own search and window icons. Replace those areas with a heavily
+            # blurred patch of the same photo so the real controls sit on matching colour, not a box.
             for excluded in self.excluded:
                 mask = QRectF(target.left() + (excluded.left()-source.left())*scale,
                               target.top() + excluded.top()*scale,
                               excluded.width()*scale, excluded.height()*scale)
-                safe -= QRegion(mask.toAlignedRect())
-            painter.setClipRegion(safe)
-        painter.drawPixmap(target, reference(self.scene), source)
-        painter.setClipping(False)
+                piece = photo.copy(excluded.toAlignedRect())
+                small = piece.scaled(max(2, int(excluded.width() // 16)), max(2, int(excluded.height() // 16)),
+                                     Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+                painter.drawPixmap(mask, small, QRectF(small.rect()))
         edge = QLinearGradient(target.left(), 0, target.left()+110*scale, 0)
         edge.setColorAt(0, BACKGROUND)
         edge.setColorAt(1, QColor(2, 7, 10, 0))
