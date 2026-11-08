@@ -108,7 +108,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write # only used to publish Old Files review screenshots to claude/old-files-screenshots
 
 jobs:
   desktop:
@@ -168,6 +168,28 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Ready Room live news or verified backup checks failed.' }
           python tools/render_reference_previews.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Native photo comparison renders failed.' }
+      - name: Publish Old Files screenshots to a review branch
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $shots = @(Get-ChildItem _ci_temp -Filter 'old-files-*.png') + @(Get-ChildItem _ci_temp -Filter 'photo-old-files-*.png')
+          if (-not $shots) { Write-Host 'No Old Files screenshots to publish.'; exit 0 }
+          $dir = Join-Path $env:RUNNER_TEMP 'old-files-shots'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item $shots.FullName $dir
+          Set-Content -Path (Join-Path $dir 'README.md') -Value "Rendered by Windows CI run $env:GITHUB_RUN_ID from $env:GITHUB_SHA. Review only; not part of the app."
+          Push-Location $dir
+          git init -q
+          git config user.name 'Game Grave CI'
+          git config user.email 'ci@users.noreply.github.com'
+          git checkout -q -b claude/old-files-screenshots
+          git add -A
+          git commit -q -m "Old Files screenshots from run $env:GITHUB_RUN_ID"
+          git push -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" HEAD:refs/heads/claude/old-files-screenshots
+          Pop-Location
       - name: Upload actual Qt screen captures for design review
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
