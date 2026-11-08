@@ -473,7 +473,7 @@ def details(window):
     header.addLayout(titles, 1)
     header.addWidget(badge("Protected" if on_list else entry.badge))
     contents.addWidget(_widget(header))
-    directx = entry.category == "Shader Cache" and any(word in entry.name for word in ("DirectX", "Direct3D"))
+    directx = entry.name == "DirectX Shader Cache"
     contents.addWidget(ReferenceArt("other_storage", (998, 295, 262, 73) if directx else (880, 46, 340, 80), height=83))
     detail_section(contents, "Details")
     newest = datetime.fromtimestamp(entry.newest).strftime("%b %d, %Y") if entry.newest else "Unknown"
