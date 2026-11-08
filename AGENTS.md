@@ -96,13 +96,24 @@ recordings to the Recycle Bin through the existing verified path (screenshots on
 preview; games via Steam; mods via Mods; folders via Other Storage). The next tab's lock must freeze
 Graveyard against this commit.
 
-Active tab: Game DNA. The owner asked for full functionality on the last five tabs (Game DNA, Undo
+Game DNA: OWNER SIGNED OFF AND LOCKED ("yup lock it in"). The approved baseline is commit
+7936f7e73fe9d28295715a48b65ca8a0998659c9 on branch `claude/old-files-full-functionality`, Windows run
+https://github.com/wrightausername/Game-Grave/actions/runs/42498533084. Do not change its layout,
+tabs, controls or behavior, or anything that reaches it through shared code, unless the owner
+explicitly reopens it. Its honest-claims rules stay: only proven locations are counted (install folder,
+mods in it or tied by Steam Workshop ID, Steam shader cache by app ID, Steam per-game screenshots, folders
+the owner links), saves and configs are never matched by name, Cleanup Suggestions hand off to the
+owning tab and never delete, and nothing is called safe to remove. The next tab's lock must freeze Game
+DNA against this commit.
+
+Active tab: Undo Center. The owner asked for full functionality on the last five tabs (Game DNA, Undo
 Center, AI Assistant, Settings, More Tools), chose sidebar order and one tab at a time, and said AI
-Assistant, Settings and More Tools wait for the owner's photos. Work is confined to the Game DNA methods
-of `PhotoIntegration`, new Game DNA modules and the existing Game DNA UI code. Every other tab is frozen:
-Graveyard, Captures, Other Storage, Old Files and Mods at the commits above, Games at commit
-593354b0e24b1ad03b513b04e6902b44fe511b1a. Protected engines stay byte-guarded. Show only what the data
-proves. The owner has not signed off on Game DNA. Do not start Undo Center until the owner locks it in.
+Assistant, Settings and More Tools wait for the owner's photos. Work is confined to the Undo Center
+methods of `PhotoIntegration`, new Undo Center modules and the existing Undo Center UI code. Every other
+tab is frozen: Game DNA at the commit above, Graveyard, Captures, Other Storage, Old Files and Mods at
+the commits above, Games at commit 593354b0e24b1ad03b513b04e6902b44fe511b1a. Protected engines stay
+byte-guarded (restoring must go through the existing recovery engine). Show only what the data proves.
+The owner has not signed off on Undo Center. Do not start AI Assistant until the owner locks it in.
 
 Earlier history (kept for context; none of these tabs is open):
 
