@@ -389,9 +389,13 @@ class PhotoIntegration:
                 continue
 
     def graveyard_page(self):
-        from gg_desktop.recovery_screens import RecoveryScreens
+        from gg_desktop import grave_page
         self._merge_manual_reviews()
-        RecoveryScreens.graveyard_page(self)
+        grave_page.build(self)
+
+    def _select_eligible(self):
+        from gg_desktop import grave_page
+        grave_page.select_reviewable(self)
 
     def overview_page(self):
         OverviewScreens.overview_page(self)

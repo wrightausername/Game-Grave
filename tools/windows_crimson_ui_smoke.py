@@ -91,7 +91,7 @@ def main():
             from PySide6.QtWidgets import QPushButton
             window.grave_table.selectRow(0)
             app.processEvents()
-            unlock = window.grave_table.cellWidget(0, 3)
+            unlock = window.grave_table.cellWidget(0, 5)
             assert isinstance(unlock, QPushButton) and "Unprotect" in unlock.text(), (
                 "Missing the user's requested direct in-row Unprotect control")
             protected_image = root / "_ci_temp" / "crimson-unprotect-1440.png"
