@@ -61,6 +61,9 @@ def probe(root, fixtures, output, foundation=False):
             ("gg_desktop.recovery_screens.get_activity", dict(return_value=[])),
             ("gg_desktop.recovery_screens.get_records", dict(return_value=[])),
             ("shutil.disk_usage", dict(return_value=usage)),
+            # Games is part of what this lock protects: keep its launcher/registry/account reads on disposable fixtures.
+            ("gg_desktop.games_live.registered_games", dict(return_value=[])),
+            ("core.config_dir", dict(return_value=fixtures/"Config")),
         ):
             stack.enter_context(patch(target, **options))
         stack.enter_context(patch.object(CrimsonWindow, "info"))
@@ -84,12 +87,13 @@ def probe(root, fixtures, output, foundation=False):
                     window.navigate("Overview")
                     window.navigate(route)
                     QTest.qWait(35)
-                    for _ in range(200):
+                    for _ in range(1500):
                         app.processEvents()
                         if not window.workers and not window.artwork.busy and not window.artwork.queue:
                             break
                         QTest.qWait(10)
-                    assert not window.workers, route
+                    assert not window.workers, route + ": background jobs still running: " + ", ".join(
+                        getattr(getattr(job, "fn", None), "__qualname__", repr(job)) for job in window.workers.values())
                     QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
                     app.processEvents()
                     window.page.setFocusPolicy(Qt.StrongFocus)
