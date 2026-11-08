@@ -355,10 +355,6 @@ def changed(window, page):
         window._old_root, window._old_days = state.result.plan.root, state.result.plan.days
     update_metrics(window, state)
     fill(window)
-    extra = state.message if state.busy or (state.result and state.result.limited) or "failed" in state.message.lower() else ""
-    text = "\n".join(part for part in (window.old_notice.text(), extra) if part)
-    window.old_notice.setText(text)
-    window.old_notice.setVisible(bool(text))
 
 
 def entries_for(window):
@@ -445,6 +441,9 @@ def fill(window, *args, requested_page=0, **kwargs):
         if shown:
             pick = next((i for i in range(len(shown)) if row_key(window, i, shown[i]) == previous_key), 0)
             table.selectRow(pick)
+    state = window.page.old_files.state
+    if state.busy or (state.result and state.result.limited) or "failed" in state.message.lower():
+        notice = "\n".join(part for part in (notice, state.message) if part)
     window.old_notice.setText(notice)
     window.old_notice.setVisible(bool(notice))
     window._old_selection_count()
