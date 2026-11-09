@@ -174,3 +174,11 @@ completion messages.
 
 Overview: preserve exactly as in Windows preview 0.2.12, commit
 df6bd6628adf6dd9713fe41235acb618da594574. No further Overview edits and no new signoff.
+
+Polish pass, third message (owner instruction, 2026-11-08): the owner approved the Mods mockup ("better, implement it")
+and asked for more graphics, kept restrained. Implemented in `gg_desktop/mods_graphics.py` (painted display only, with
+pure helpers in `mods_visuals.py`): status pills with Update and Conflict badges, size bars, glowing stat tiles with a
+Turned On meter and a Space Used share bar, a ring beside the plain-words summary, a per-mod hero picture, a
+load-order stack, and conflict and update cards. Every picture is drawn from a number the tab already shows in words;
+no new claim, no "safe" language. `MetricStrip` only gained `glyphs` and `word_columns` lists, with no visual change.
+

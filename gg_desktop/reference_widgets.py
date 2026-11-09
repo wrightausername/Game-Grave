@@ -396,6 +396,8 @@ class MetricStrip(QFrame):
         self.values = []
         self.captions = []
         self.cells = []
+        self.glyphs = []
+        self.word_columns = []
         for i, metric in enumerate(metrics):
             symbol, value, caption, color, *extra = metric
             cell = QFrame()
@@ -407,7 +409,9 @@ class MetricStrip(QFrame):
             glyph = QLabel()
             glyph.setPixmap(icon(symbol, color, 29).pixmap(29, 29))
             box.addWidget(glyph)
+            self.glyphs.append(glyph)
             words = column(spacing=0)
+            self.word_columns.append(words)
             val_label = label(str(value), "stripValue")
             caption_label = label(caption, "stripCaption")
             self.values.append(val_label)

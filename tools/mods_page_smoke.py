@@ -113,6 +113,33 @@ def main():
             labels = " ".join(w.text() for w in window.mod_details.findChildren(QLabel))
             assert "#" in labels and " of " in labels and "2.5" in labels and "available" in labels, labels
 
+            # Graphics: pills, badges, size bars, tile meters, the ring, the hero picture, load-order stack and update card.
+            from gg_desktop import mods_graphics as graphics
+            table = window.mod_table
+            assert type(table.itemDelegateForColumn(5)).__name__ == "StatusDelegate"
+            assert type(table.itemDelegateForColumn(4)).__name__ == "SizeDelegate"
+            mountain = row_of(window, "Mountain Textures")
+            assert table.item(mountain, 5).data(graphics.PILL_ROLE) == "On" == table.item(mountain, 5).text()
+            assert "update" in table.item(mountain, 5).data(graphics.BADGE_ROLE), "Recorded update must show a badge"
+            frame = row_of(window, "Framework")
+            assert "update" not in table.item(frame, 5).data(graphics.BADGE_ROLE)
+            assert all(0 < (table.item(i, 4).data(graphics.BAR_ROLE) or 0) <= 1
+                       for i, v in enumerate(window._shown_mods) if v.size), "Known sizes get a bar"
+            assert window.mod_summary.ring.isVisible(), "Ring shows once on/off is known"
+            assert window.mod_meters[1].isVisible() and window.mod_meters[5].isVisible()
+            from PySide6.QtWidgets import QFrame
+            assert len(window.mod_details.findChildren(graphics.ModHero)) == 1
+            assert len(window.mod_details.findChildren(graphics.OrderStack)) == 1
+            assert any(f.objectName() == "modCard" for f in window.mod_details.findChildren(QFrame)), "Update card"
+            window.mod_table.selectRow(frame)
+            settle()
+            assert not any(f.objectName() == "modCard" and "newer version" in " ".join(
+                w.text() for w in f.findChildren(QLabel)) for f in window.mod_details.findChildren(QFrame)), \
+                "No update card for a mod without a recorded update"
+            window.mod_table.selectRow(mountain)
+            settle()
+            assert window.grab().save(str(args.output / "mods-graphics-1280.png"))
+
             # Sorting: every option reorders the Library, header clicks toggle direction, Size and Modified are shown.
             from gg_desktop import mods_sort
             assert [window.mod_table.horizontalHeaderItem(i).text() for i in (4, 6)] == ["Size", "Modified"]

@@ -56,6 +56,7 @@ on:
       - 'tests/test_tools.py'
       - 'tools/mods_tab_lock.py'
       - 'tools/mods_page_smoke.py'
+      - 'tests/test_mods_visuals.py'
       - 'tools/fixtures/games-covers/**'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -133,6 +134,7 @@ on:
       - 'tests/test_tools.py'
       - 'tools/mods_tab_lock.py'
       - 'tools/mods_page_smoke.py'
+      - 'tests/test_mods_visuals.py'
       - 'tools/fixtures/games-covers/**'
       - 'tests/test_mods_functionality.py'
       - 'tests/test_old_files_functionality.py'
@@ -190,7 +192,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }

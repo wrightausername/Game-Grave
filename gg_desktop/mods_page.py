@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QHeaderView, QMenu
 from shiboken6 import isValid
 
 from core import save_settings
+from gg_desktop import mods_graphics as graphics
 from gg_desktop import mods_insight as mi
 from gg_desktop import mods_words as words
 from gg_desktop.mods_data import identity, mod_page, ordinary
@@ -26,7 +27,7 @@ from gg_desktop.widgets import label, row
 from ui_paging import page_window
 
 LIBRARY_HEADERS = ("", "Name", "Game", "Manager", "Size", "Status", "Modified")
-LIBRARY_WIDTHS = (25, 170, 110, 100, 62, 92, 84)
+LIBRARY_WIDTHS = (25, 170, 100, 92, 62, 108, 84)
 COLORS = {"green": "#27dc74", "amber": "#f7b737", "muted": "#9ca8bd", "": "#d7dfe7"}
 TAB_NAMES = ("Library", "Mod Radar", "Load Order", "Profiles", "Conflicts", "Cleanup")
 
@@ -55,14 +56,17 @@ def build(window, control):
     window.mod_profile.currentIndexChanged.connect(lambda *_: profile_changed(window))
     contents.insertWidget(contents.indexOf(window.mod_notice) + 1, window.mod_profile)
     window.mod_profile.hide()
-    window.mod_summary = label("", "subtle", wrap=True)
+    window.mod_summary = graphics.SummaryBar()
     window.mod_summary.setObjectName("modSummary")
     window.mod_summary.setAccessibleName("Mods in plain words")
-    window.mod_summary.setStyleSheet("font-size:13px;color:#d7dfe7;padding:0 4px;")
     content = window.page.content
-    strip_at = next((i for i in range(content.count())
-                     if content.itemAt(i).widget() is window.page.findChild(MetricStrip)), 0)
+    strip = window.page.findChild(MetricStrip)
+    strip_at = next((i for i in range(content.count()) if content.itemAt(i).widget() is strip), 0)
     content.insertWidget(strip_at + 1, window.mod_summary)
+    window.mod_meters = graphics.decorate_strip(strip) if strip is not None else {}
+    graphics.install_delegates(table)
+    for column_index, width in enumerate(LIBRARY_WIDTHS):
+        table.setColumnWidth(column_index, width)
     footer = window.mod_selection.parentWidget().layout()
     window.mod_actions = tool("Actions", "list", lambda: show_menu(window, window.mod_actions))
     window.mod_actions.setToolTip("Refresh, check conflicts, export or copy the checked mods")
@@ -155,6 +159,9 @@ def apply_metrics(window, control):
     if summary is not None and isValid(summary):
         games = len({e.game_key for e in control.catalog.entries if e.game_key})
         summary.setText(words.summary(m, games=games))
+        known = m["enabled"] or m["mixed"] or m["disabled"]
+        summary.set_counts(m["enabled"] if known else 0, m["total"] if known else 0)
+    graphics.refresh_meters(window, m, getattr(window, "_mod_views", []))
 
 
 # ---------------------------------------------------------------- table filling
@@ -215,6 +222,7 @@ def library_fill(window, control, *args, **kwargs):
         if selected >= 0:
             table.selectRow(selected)
     if control is None:
+        graphics.decorate_library(window, None)
         return
     catalog = control.catalog
     with QSignalBlocker(table):
@@ -232,6 +240,7 @@ def library_fill(window, control, *args, **kwargs):
                 cell.setText(words.status_word(status.text))
                 cell.setToolTip(words.STATUS_TIPS.get(words.status_word(status.text), "") + "\n" + status.detail)
                 cell.setForeground(QColor(COLORS[status.kind]))
+    graphics.decorate_library(window, control)
 
 
 def tab_fill(window, control, requested_page=0):
@@ -396,8 +405,10 @@ def status_lines(window, control, contents, entry):
     contents.addWidget(note)
     selected = next((p for p in catalog.profiles if p.selected), None)
     position = "Not known"
+    hit, order = None, []
     if entry.kind == "mod" and selected:
         rows, _note = mi.load_order(catalog, selected.key)
+        order = rows
         hit = next((pos for pos, e, _m in rows if e.key == entry.key), None)
         if hit:
             position = words.order_text(hit, len(rows), selected.name)
@@ -406,11 +417,22 @@ def status_lines(window, control, contents, entry):
         else:
             position = "Not available for this manager"
     detail_line(contents, "list", "Load Order", position)
+    if hit:
+        shown, first, last = graphics.order_rows(order, hit)
+        contents.addWidget(graphics.OrderStack(shown, first, last))
     deps = entry.dependencies
     detail_line(contents, "help", "Needs", words.requires_text([d.name for d in deps[:5]], len(deps) > 5))
     found = control.findings(entry)
     detail_line(contents, "warning", "Conflicts",
                 words.conflicts_text(len(found), bool(control.report and control.report.limited), control.report is not None))
+    if found:
+        others = []
+        for finding in found:
+            for key in finding.mods:
+                name = control.entry_names.get(key, "Unknown mod") if key != entry.key else None
+                if name and name not in others:
+                    others.append(name)
+        contents.addWidget(graphics.conflict_card(found, others, bool(control.report and control.report.limited)))
     names = {p.key: p.name for p in catalog.profiles}
     listed = [names[k] for k in entry.profiles if k in names]
     detail_line(contents, "shield", "Used In", words.profiles_text(listed))
@@ -418,6 +440,8 @@ def status_lines(window, control, contents, entry):
     if info:
         detail_line(contents, "refresh", "Update", words.update_text(info.newest, info.installed, bool(info.outdated), info.note),
                     tone=COLORS["amber"] if info.outdated else "")
+        if info.outdated:
+            contents.addWidget(graphics.update_card(info.installed, info.newest))
     hint = label("Load order decides which mod wins when two change the same file. The one loaded later wins.", "caption", wrap=True)
     contents.addWidget(hint)
 
@@ -429,7 +453,9 @@ def library_details(window):
         return LibraryScreens._mod_details(window)
     contents = window.mod_details.content
     destroy_layout(contents)
-    contents.addWidget(CoverArt(view.game if view.game != "Unverified" else entry.name, height=84))
+    state = mi.entry_status(entry, control.catalog)
+    tone = {"green": "#3cda63", "amber": "#eab464"}.get(state.kind, "#8794a1")
+    contents.addWidget(graphics.ModHero(entry.name, entry.version, words.status_word(state.text), tone))
     title = label(entry.name, "detailTitle", wrap=True)
     title.setTextFormat(Qt.PlainText)
     contents.addWidget(title)
