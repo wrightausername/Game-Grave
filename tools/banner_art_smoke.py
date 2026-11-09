@@ -80,9 +80,13 @@ def main():
                         lights = [sum(shot.pixelColor(x + dx, y).getRgb()[:3]) / 3
                                   for y in range(top + 6, seam - 6, 4) for dx in (-6, 0, 6)]
                         assert sum(lights) / len(lights) > 11, f"{route} {width}px: the picture is missing at {fraction:.0%} of the width"
-                    x = left + int(span * .8)
-                    above, below = shot.pixelColor(x, seam - 2).getRgb(), shot.pixelColor(x, seam + 2).getRgb()
-                    assert max(abs(a - b) for a, b in zip(above[:3], below[:3])) < 28, f"{route} {width}px: visible seam in the header picture"
+                    # A real seam would show in every column; buttons and text on the banner only break a few of them.
+                    diffs = []
+                    for step in range(14):
+                        x = left + int(span * (.60 + .027 * step))
+                        above, below = shot.pixelColor(x, seam - 2).getRgb(), shot.pixelColor(x, seam + 2).getRgb()
+                        diffs.append(max(abs(a - b) for a, b in zip(above[:3], below[:3])))
+                    assert min(diffs) < 28 and sorted(diffs)[len(diffs) // 2] < 60, f"{route} {width}px: visible seam in the header picture {diffs}"
                     if width in (1100, 2400) or route in ("Overview", "Games", "Mods"):
                         shot.copy(left, top, span, seam + 130 - top).save(str(args.output / f"banner-{route.lower().replace(' ', '-')}-{width}.png"))
             window.close()
