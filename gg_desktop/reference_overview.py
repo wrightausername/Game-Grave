@@ -19,7 +19,7 @@ from gg_desktop.insight_widgets import FootprintRing
 from gg_desktop.artwork import game_app_id
 from gg_desktop.reference_library import _table, _text, _widget
 from gg_desktop.reference_widgets import (
-    CARD_ROLE, CoverGrid, draw_crop, icon, pixel_font, tool,
+    CARD_ROLE, CoverGrid, ROUTE_SYMBOLS, draw_crop, icon, pixel_font, tool,
 )
 from gg_desktop.widgets import button, column, label, row
 
@@ -31,10 +31,10 @@ class OverviewHero(QWidget):
         self.setMinimumHeight(128)
         box = row(spacing=15, margins=(7, 14, 8, 8))
         self.setLayout(box)
-        slash = label("╱")
-        slash.setFixedWidth(24)
-        slash.setStyleSheet("color:#ff2348;font-size:48px;font-weight:900;")
-        box.addWidget(slash)
+        marker = QLabel()  # the same home symbol the sidebar shows for Overview
+        marker.setPixmap(icon(ROUTE_SYMBOLS["Overview"], "#ff2348", 38).pixmap(38, 38))
+        marker.setFixedWidth(38)
+        box.addWidget(marker)
         text = column(spacing=3)
         heading = label("Overview")
         heading.setStyleSheet("font-size:40px;font-weight:700;background:transparent;")

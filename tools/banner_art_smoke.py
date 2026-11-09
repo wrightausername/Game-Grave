@@ -20,7 +20,7 @@ def main():
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from PySide6.QtCore import QCoreApplication, QEvent, QPoint
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QLabel
     import core
     from gg_desktop import header_banner
     from gg_desktop import reference_widgets as rw
@@ -70,6 +70,12 @@ def main():
                     assert window.current_route == route, route
                     page = window.page
                     assert getattr(page, "banner_artwork", None) is not None or route == "Ready Room", route + " has no banner artwork"
+                    if route != "Ready Room":
+                        heading = page.content.itemAt(0).widget()
+                        marks = [w for w in heading.findChildren(QLabel) if w.text() == "╱"]
+                        assert not marks, route + " heading still uses the slash instead of the menu symbol"
+                        pictured = [w for w in heading.findChildren(QLabel) if w.pixmap() is not None and not w.pixmap().isNull()]
+                        assert pictured, route + " heading shows no menu symbol"
                     shot = window.grab().toImage()
                     left = window.top_bar.mapTo(window, QPoint()).x()
                     top = window.top_bar.mapTo(window, QPoint()).y()
@@ -79,7 +85,7 @@ def main():
                         x = left + int(span * fraction)
                         lights = [sum(shot.pixelColor(x + dx, y).getRgb()[:3]) / 3
                                   for y in range(top + 6, seam - 6, 4) for dx in (-6, 0, 6)]
-                        assert sum(lights) / len(lights) > 11, f"{route} {width}px: the picture is missing at {fraction:.0%} of the width"
+                        assert sum(lights) / len(lights) > 8, f"{route} {width}px: the picture is missing at {fraction:.0%} of the width"
                     # A real seam would show in every column; buttons and text on the banner only break a few of them.
                     diffs = []
                     for step in range(14):

@@ -309,9 +309,18 @@ class TitleBar(QWidget):
         win.showNormal() if win.isMaximized() else win.showMaximized()
 
 
+# The sidebar icon of each tab. The same symbol marks the tab's page heading, so the menu and the page match.
+ROUTE_SYMBOLS = {
+    "Overview": "home", "Ready Room": "radio", "Games": "game", "Mods": "mods", "Old Files": "archive",
+    "Other Storage": "storage", "Captures": "camera", "Graveyard": "grave", "Game DNA": "dna",
+    "Undo Center": "undo", "AI Assistant": "sparkles", "More Tools": "grid", "Settings": "settings",
+}
+
+
 class PageBanner(QWidget):
     def __init__(self, title, subtitle, *, scene="games", symbol=None):
         super().__init__()
+        symbol = ROUTE_SYMBOLS.get(title, symbol)
         self.scene = scene
         self.setFixedHeight(96 if scene == "games" else 82)
         layout = row(spacing=12, margins=(8, 5, 8, 3))

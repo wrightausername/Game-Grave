@@ -22,25 +22,11 @@ from gg_desktop.widgets import label, button, row, column, ScrollPage
 from gg_desktop.reference_screens import ScreenMethods
 from gg_desktop.photo_integration import PhotoIntegration
 from gg_desktop.artwork import SteamArtwork
-from gg_desktop.reference_widgets import Brand, NavRail, TitleBar, icon, tool
+from gg_desktop.reference_widgets import Brand, NavRail, ROUTE_SYMBOLS, TitleBar, icon, tool
 from gg_desktop.scan_progress import ScanProgress
 from gg_desktop.ready_room import ReadyRoomMethods
 
-ROUTES = (
-    ("Overview", "home"),
-    ("Ready Room", "radio"),
-    ("Games", "game"),
-    ("Mods", "mods"),
-    ("Old Files", "archive"),
-    ("Other Storage", "storage"),
-    ("Captures", "camera"),
-    ("Graveyard", "grave"),
-    ("Game DNA", "dna"),
-    ("Undo Center", "undo"),
-    ("AI Assistant", "sparkles"),
-    ("More Tools", "grid"),
-    ("Settings", "settings"),
-)
+ROUTES = tuple(ROUTE_SYMBOLS.items())
 
 ROUTE_ALIASES = {
     "Steam Games": "Games", "Other Launchers": "Games",
