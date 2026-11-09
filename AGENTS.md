@@ -190,3 +190,11 @@ a preference counts for a game only when its exact key is found in that game's r
 that value, saves a dated backup first and logs to the activity log; Undo restores the backup only if the file has not
 changed since. Share codes hold only the ticked preferences. The locked photo-reference preview never shows the panel.
 Referral program, owner command center, paywall and Afterlife wait on a server and payment-provider decision.
+
+Banner art, redone (owner instruction, 2026-11-09): the owner asked for new abstract, gamer-related header art on all
+tabs, in the spirit of the sidebar art but not similar to it. `tools/make_banner_art.py` now draws one distinct
+abstract gaming motif per tab (pixel equalizer, perspective tunnel, HUD reticle, modular diamonds, glitch bands, HUD
+health bars, viewfinder, pixel sparks, pixel helix, rewind chevrons, mixer sliders, constellation, block puzzle),
+kept clear of the sidebar's hex grid, circuit traces and gamepad outline. Same rules as before: 6000x500, symmetric top
+to bottom, calm on the left behind the title, full header width. Only the picture files changed; no layout, control or
+behavior changed.
