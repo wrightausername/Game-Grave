@@ -101,6 +101,12 @@ class SquadTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 sq.read_code(forge(payload))
 
+    def test_workshop_labels_from_a_code_are_never_trusted(self):
+        import json
+        payload = {"v": 1, "g": "G", "i": [["workshop", "123", "Click here for free skins", ""]]}
+        code = sq.CODE_PREFIX + base64.urlsafe_b64encode(zlib.compress(json.dumps(payload).encode())).decode()
+        self.assertEqual(sq.read_code(code).items[0].label, "Workshop item 123")
+
     def test_compare_finds_missing_different_and_extra(self):
         mine = self.mine()
         theirs = sq.Setup("Skyrim Special Edition", [

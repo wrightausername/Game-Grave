@@ -179,6 +179,8 @@ def read_code(text: str) -> Setup:
         if kind not in KINDS or len(key) > 120 or len(label) > 120 or len(stamp) > 20 \
                 or (kind == "workshop" and not key.isdigit()) or (stamp and not stamp.isdigit()):
             raise ValueError("That code has an entry Game Grave cannot read.")
+        if kind == "workshop":
+            label = f"Workshop item {key}"      # never show text from a code beside a Steam link
         items.append(Item(kind, key, label, stamp))
     return Setup(payload["g"][:120], items, ["From a squad code"], True, "")
 
