@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - 'gg_desktop/**'
+      - 'updater/**'
+      - 'tests/test_updater.py'
       - 'ui-preview-requirements.txt'
       - 'tests/test_gg_desktop_models.py'
       - 'tests/test_ready_room_data.py'
@@ -232,7 +234,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad tests.test_updater -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -543,6 +545,28 @@ jobs:
           python -m PyInstaller --noconfirm --clean --onefile --windowed --name GameGrave-Crimson-Preview --collect-all PySide6 --add-data "gg_desktop/assets;gg_desktop/assets" gg_desktop/__main__.py
           if ($LASTEXITCODE -ne 0) { throw 'Qt PyInstaller failed.' }
           if (-not (Test-Path 'dist/GameGrave-Crimson-Preview.exe')) { throw 'Missing Qt EXE' }
+      - name: Build and smoke-test GameGrave-Updater.exe
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name GameGrave-Updater updater/gg_updater.py
+          if ($LASTEXITCODE -ne 0) { throw 'Updater PyInstaller failed.' }
+          $updater = (Resolve-Path 'dist/GameGrave-Updater.exe').Path
+          $testData = Join-Path (Resolve-Path '_ci_temp').Path 'UpdaterUser'
+          New-Item -ItemType Directory -Force $testData | Out-Null
+          $env:LOCALAPPDATA = $testData
+          Remove-Item Env:GG_UPDATE_TOKEN, Env:GITHUB_TOKEN, Env:GH_TOKEN -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath $updater -PassThru
+          Start-Sleep -Seconds 6
+          try {
+            if ($p.HasExited) { throw 'Updater window quit immediately.' }
+            Write-Host 'Updater window opened and stayed up.'
+          } finally {
+            if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          }
+          # The command-line mode must fail cleanly (not crash) when no release is reachable without a token.
+          $env:LOCALAPPDATA = $testData
+          $r = Start-Process -FilePath $updater -ArgumentList @('--fetch', (Join-Path $testData 'dl'), (Join-Path $testData 'none.json')) -PassThru -Wait
+          if (-not (Test-Path (Join-Path $testData 'none.json'))) { throw 'Updater --fetch wrote no result file.' }
       - name: Launch packaged Qt EXE with disposable isolated settings profile
         shell: pwsh
         run: |
@@ -654,6 +678,7 @@ jobs:
           name: GameGrave-Crimson-Qt-Preview-Unsigned
           path: |
             dist/GameGrave-Crimson-Preview.exe
+            dist/GameGrave-Updater.exe
             _ci_temp/crimson-*-1440.png
             _ci_temp/ready-room-*.png
             release/GameGrave-Crimson-Preview-Setup.exe
@@ -671,8 +696,28 @@ jobs:
           gh release create $tag --repo $env:GITHUB_REPOSITORY --draft --prerelease --target $env:GITHUB_SHA `
             --title "Game Grave preview (unsigned) run $env:GITHUB_RUN_ID" `
             --notes "Unsigned Windows preview built by CI run $env:GITHUB_RUN_ID from $env:GITHUB_SHA. Draft: only collaborators can see or download it. Not a signed 1.0 release." `
-            release/GameGrave-Crimson-Preview-Setup.exe release/GameGrave-Crimson-Preview-Setup.sha256 dist/GameGrave-Crimson-Preview.exe
+            release/GameGrave-Crimson-Preview-Setup.exe release/GameGrave-Crimson-Preview-Setup.sha256 dist/GameGrave-Crimson-Preview.exe dist/GameGrave-Updater.exe
           if ($LASTEXITCODE -ne 0) { throw 'Draft release was not created.' }
+
+      - name: Prove the built updater can find, download and verify this draft release
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: pwsh
+        env:
+          GG_UPDATE_TOKEN: ${{ github.token }}
+        run: |
+          $out = Join-Path (Resolve-Path '_ci_temp').Path 'updater-fetch'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $result = Join-Path $out 'result.json'
+          $p = Start-Process -FilePath (Resolve-Path 'dist/GameGrave-Updater.exe').Path -ArgumentList @('--fetch', (Join-Path $out 'dl'), $result) -PassThru -Wait
+          if (-not (Test-Path $result)) { throw 'Updater wrote no result.' }
+          Get-Content $result
+          $data = Get-Content $result -Raw | ConvertFrom-Json
+          if (-not $data.ok) { throw "Updater could not fetch the release: $($data.error)" }
+          if (-not $data.tag.StartsWith('preview-run-')) { throw 'Updater found an unexpected release.' }
+          $expected = (Get-FileHash 'release/GameGrave-Crimson-Preview-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          $got = (Get-FileHash (Join-Path $out 'dl/GameGrave-Crimson-Preview-Setup.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($got -ne $expected) { throw 'Downloaded installer is not the one this build made.' }
+          Write-Host "Updater fetched $($data.tag) and the installer matches this build byte for byte."
 
 # NOT a signed 1.0 release; LGPL/Qt redistributable obligations,
 # full UI feature parity, physical Windows human tests and beta remain open.
