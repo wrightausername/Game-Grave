@@ -125,6 +125,10 @@ class ScanProgress(QFrame):
         if not self.timer.isActive():
             self.timer.start()
 
+    def value(self):
+        """The percent of scan steps finished, as reported by the scan itself."""
+        return int(self._percent)
+
     def setValue(self, percent):
         if not self.isVisible():
             self.show()
