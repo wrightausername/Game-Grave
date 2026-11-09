@@ -168,14 +168,23 @@ def advice(entries, driver):
     if good:
         lines.append(f"Last known good: {good.driver().friendly_version}, marked by you (seen {good.last_seen}).")
     elif before:
-        lines.append(f"Before this you had {before.driver().friendly_version} (seen {before.last_seen}). "
-                     "You did not mark it known good.")
+        lines.append(f"Game Grave also saw {before.driver().friendly_version} on this card (last seen "
+                     f"{before.last_seen}). You did not mark it known good.")
     else:
         lines.append("Game Grave has not seen another driver for this card yet, so there is nothing to go back to here.")
     if good or before:
         lines.append("To go back: Device Manager > Display adapters > this card > Properties > Driver > Roll Back "
                      "Driver. If that button is greyed out, download that version from the official page.")
     return lines
+
+
+def refresh_history(reg, path):
+    """Read the current drivers and add them to the history. Returns (drivers, entries)."""
+    drivers = read_drivers(reg)
+    entries = record(load_history(path), drivers)
+    if drivers:
+        save_history(path, entries)
+    return drivers, entries
 
 
 def vendor_page(driver):

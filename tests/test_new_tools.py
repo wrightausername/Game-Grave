@@ -97,6 +97,13 @@ class BlackBox(unittest.TestCase):
         self.assertIn("inside the game's folder", crashes[0].module_note())
         self.assertIn("Nothing was changed", black_box.summary(crashes))
 
+    def test_report_names_are_valid_windows_file_names(self):
+        crash = black_box.Crash(datetime(2026, 11, 8, 20, 15), "x.exe", "", "", "", "", "", "",
+                                game='Warhammer 40,000: Space Marine 2 / "GOTY"')
+        name = black_box.report_name(crash)
+        self.assertEqual(name, "black-box-Warhammer-40-000-Space-Marine-2-GOTY-20261108-2015.txt")
+        self.assertFalse(set(name) & set('<>:"/\\|?*'))
+
     def test_query_uses_the_application_error_log_only(self):
         args = black_box.query_args(50)
         self.assertEqual(args[:3], ["wevtutil", "qe", "Application"])
@@ -263,6 +270,32 @@ class Soulbind(unittest.TestCase):
             soulbind.restore(other, Path(temp) / "b")
             self.assertFalse(Path(other.engine_ini).exists())
 
+    def test_utf16_and_crlf_files_keep_their_encoding_byte_for_byte(self):
+        with tempfile.TemporaryDirectory() as temp:
+            for encoding, bom, newline in (("utf-16-le", b"\xff\xfe", "\r\n"), ("utf-8", b"", "\r\n"),
+                                            ("utf-8", b"\xef\xbb\xbf", "\n")):
+                folder = Path(temp) / (encoding + str(len(bom)) + str(len(newline)))
+                folder.mkdir()
+                original = bom + "[systemsettings]\nr.Old=1\n".replace("\n", newline).encode(encoding)
+                (folder / "Engine.ini").write_bytes(original)
+                target = soulbind.Target("G", str(folder))
+                soulbind.apply(target, soulbind.clean_profile({"motion_blur": True}), Path(temp) / "b")
+                data = (folder / "Engine.ini").read_bytes()
+                self.assertTrue(data.startswith(bom))
+                text = data[len(bom):].decode(encoding)
+                self.assertIn("r.MotionBlurQuality=0" + newline, text)
+                self.assertEqual(text.count("[systemsettings]"), 1)
+                self.assertEqual(text.count("[SystemSettings]"), 0)
+                soulbind.restore(target, Path(temp) / "b")
+                self.assertEqual((folder / "Engine.ini").read_bytes(), original)
+
+    def test_unknown_encoding_is_left_alone(self):
+        with tempfile.TemporaryDirectory() as temp:
+            (Path(temp) / "Engine.ini").write_bytes(b"\x81\x82\xff[x]")
+            with self.assertRaises(ValueError):
+                soulbind.apply(soulbind.Target("G", temp), soulbind.clean_profile({"motion_blur": True}), Path(temp) / "b")
+            self.assertEqual((Path(temp) / "Engine.ini").read_bytes(), b"\x81\x82\xff[x]")
+
     def test_nothing_to_apply_is_refused(self):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaises(ValueError):
@@ -314,12 +347,24 @@ class SquadSync(unittest.TestCase):
         self.assertTrue(code.startswith("GGSQ1."))
         squad = squad_sync.read_code("  " + code[:20] + "\n" + code[20:] + " ")
         self.assertEqual(squad.game, "LethalCompany")
+        self.assertEqual(squad_sync.read_code("here you go:\n" + code + "\nsee you at 8").mods, squad.mods)
+        self.assertEqual(squad_sync.read_code("code " + code[:30] + "\n" + code[30:]).mods, squad.mods)
         self.assertEqual([m.name for m in squad.mods], ["BepInEx-BepInExPack", "notnotnotswipez-MoreCompany"])
 
     def test_bad_codes_are_rejected(self):
         for bad in ("", "hello", "GGSQ1.!!!!", "GGSQ1." + "A" * 70000):
             with self.assertRaises(ValueError):
                 squad_sync.read_code(bad)
+
+    def test_oversized_squad_configs_are_refused(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "big.r2z"
+            with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("export.r2x", squad_sync.export_r2x("x", [squad_sync.Mod("A-B", "1.0.0")]))
+                archive.writestr("BepInEx/config/huge.cfg", b"0" * (squad_sync.CONFIG_LIMIT_BYTES + 1))
+                archive.writestr("BepInEx/config/../../evil.cfg", b"x")
+            with self.assertRaises(ValueError):
+                squad_sync.read_squad_configs(path)
 
     def test_compare(self):
         host = [squad_sync.Mod("A-One", "1.0.0"), squad_sync.Mod("B-Two", "2.0.0"), squad_sync.Mod("C-Three", "1.0.0"),
@@ -353,8 +398,11 @@ class SquadSync(unittest.TestCase):
                 self.assertIn("BepInEx/config/MoreCompany.cfg", archive.namelist())
             squad = squad_sync.read_squad_file(out)
             self.assertEqual(squad.label, "Squad - Jake")
-            self.assertEqual([m.version for m in squad.mods], ["5.4.2100", "1.9.1", "1.4.3"])
+            # The disabled mod stays out of the squad, and turned-on state is written as it was.
+            self.assertEqual([m.version for m in squad.mods], ["5.4.2100", "1.9.1"])
             self.assertTrue(all(m.enabled for m in squad.mods))
+            self.assertIn("enabled: false", text)
+            self.assertEqual(list(squad_sync.read_squad_configs(out)), ["BepInEx/config/MoreCompany.cfg"])
             self.assertEqual(squad_sync.safe_name('Ja/ke:"*'), "Jake")
 
 

@@ -6,11 +6,14 @@ News layout itself is not rebuilt. Logic lives in `soulbind` and `squad_sync` (n
 from __future__ import annotations
 
 from pathlib import Path
+import zipfile
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QListWidget, QPlainTextEdit, QPushButton,
                                QWidget)
+
+from shiboken6 import isValid
 
 from core import config_dir
 from gg_desktop import soulbind, squad_sync, winpc
@@ -59,17 +62,27 @@ def install(page, window):
     page.hero_row.addWidget(holder)
     page.news_widgets = [w for w in (page.metrics, page.news_bar, page.patches, page.games, page.mod_panel,
                                      page.save_panel, page.health_panel) if w is not None]
-    page.soulbind_view = SoulbindView(window)
-    page.squad_view = SquadView(window)
+    # Ready Room rebuilds itself when news or checks finish. The two views live on the window and move into the new
+    # page, so a pasted code or unsaved switch survives, and the owner stays on the sub-tab they picked.
+    views = getattr(window, "_ready_tab_views", {})
+    if not (views.get("soulbind") and isValid(views["soulbind"])):
+        views["soulbind"] = SoulbindView(window)
+    if not (views.get("squad") and isValid(views["squad"])):
+        views["squad"] = SquadView(window)
+    window._ready_tab_views = views
+    page.soulbind_view, page.squad_view = views["soulbind"], views["squad"]
     for view in (page.soulbind_view, page.squad_view):
         view.hide()
         page.content.addWidget(view, 10)
-    page.ready_tab = "news"
-    page.ready_tabs["news"].setChecked(True)
+    page.tabs_window = window
+    show_tab(page, getattr(window, "_ready_tab", "news"), refresh=False)
 
 
-def show_tab(page, key):
+def show_tab(page, key, refresh=True):
+    if key not in page.ready_tabs:
+        key = "news"
     page.ready_tab = key
+    page.tabs_window._ready_tab = key
     for name, control in page.ready_tabs.items():
         control.setChecked(name == key)
     for widget in page.news_widgets:
@@ -79,10 +92,9 @@ def show_tab(page, key):
     page.content.setStretchFactor(page.bottom, 5 if key == "news" else 0)
     page.soulbind_view.setVisible(key == "soulbind")
     page.squad_view.setVisible(key == "squad")
-    if key == "soulbind":
-        page.soulbind_view.refresh()
-    elif key == "squad":
-        page.squad_view.refresh()
+    view = {"soulbind": page.soulbind_view, "squad": page.squad_view}.get(key)
+    if view is not None and (refresh or not view.loaded):
+        view.refresh()
 
 
 # ------------------------------------------------------------------ Soulbind
@@ -95,6 +107,7 @@ class SoulbindView(QWidget):
         self.backup_root = Path(config_dir()) / soulbind.BACKUP_FOLDER
         self.prefs = soulbind.load_profile(self.profile_path)
         self.targets = []
+        self.loaded = False
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 6, 0, 0)
         layout.setSpacing(12)
@@ -162,13 +175,16 @@ class SoulbindView(QWidget):
                            if chosen else "Pick at least one preference.")
 
     def refresh(self):
+        self.loaded = True
+        current = self._current()
         self.targets = soulbind.find_targets()
         self.list.clear()
         for target in self.targets:
             bound = soulbind.has_backup(target, self.backup_root)
             self.list.addItem(f"{target.name}  ·  {'Soulbound' if bound else 'Not Soulbound yet'}")
         if self.targets:
-            self.list.setCurrentRow(0)
+            keys = [t.folder for t in self.targets]
+            self.list.setCurrentRow(keys.index(current.folder) if current and current.folder in keys else 0)
         self.games_note.setText("" if self.targets else
                                 "No Unreal Engine game settings were found yet. Launch a game once so it saves its "
                                 "settings, then come back.")
@@ -270,6 +286,8 @@ class SquadView(QWidget):
         self.profiles = []
         self.squad = None
         self.last_file = ""
+        self.match_path = ""
+        self.loaded = False
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 6, 0, 0)
         layout.setSpacing(12)
@@ -338,13 +356,20 @@ class SquadView(QWidget):
         layout.addWidget(join, 6)
 
     def refresh(self):
+        self.loaded = True
+        picked = {box: box.currentText() for box in (self.share_box, self.mine_box)}
         self.profiles = squad_sync.find_profiles()
         for box in (self.share_box, self.mine_box):
+            box.blockSignals(True)
             box.clear()
             for profile in self.profiles:
                 box.addItem(profile.label)
             if not self.profiles:
                 box.addItem("No r2modman or Thunderstore Mod Manager profiles found")
+            index = box.findText(picked[box])
+            if index >= 0:
+                box.setCurrentIndex(index)
+            box.blockSignals(False)
         has = bool(self.profiles)
         for control in (self.code_button, self.copy_button, self.file_button):
             control.setEnabled(has)
@@ -400,7 +425,7 @@ class SquadView(QWidget):
             return
         try:
             self.squad = squad_sync.read_squad_file(path)
-        except (OSError, ValueError, Exception) as exc:  # a damaged zip raises BadZipFile
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
             self.result_line.setText(str(exc))
             return
         self.paste.setPlainText("")
@@ -420,11 +445,14 @@ class SquadView(QWidget):
         if self.squad is None:
             self.result_line.setText("Paste a Squad Code or open a squad file first.")
             return
+        mine_profile = self._profile(self.mine_box)
         if self.squad.game:
             same = [i for i, p in enumerate(self.profiles) if p.game.casefold() == self.squad.game.casefold()]
-            if same and self._profile(self.mine_box) and self._profile(self.mine_box).game.casefold() != self.squad.game.casefold():
+            if not same:
+                mine_profile = None
+            elif mine_profile is None or mine_profile.game.casefold() != self.squad.game.casefold():
                 self.mine_box.setCurrentIndex(same[0])
-        mine_profile = self._profile(self.mine_box)
+                mine_profile = self._profile(self.mine_box)
         try:
             mine = squad_sync.read_profile(mine_profile) if mine_profile else []
         except OSError:
@@ -442,7 +470,12 @@ class SquadView(QWidget):
         for mod in result.matching:
             self.results.addItem(f"Match  ·  {mod.name}  {mod.version}")
         who = self.squad.label or "your friend"
-        compared = f"Compared with {mine_profile.label}. " if mine_profile else "You have no profile to compare. "
+        if mine_profile:
+            compared = f"Compared with {mine_profile.label}. "
+        elif self.squad.game:
+            compared = f"You have no {self.squad.game} profile yet, so every mod is listed as missing. "
+        else:
+            compared = "You have no profile to compare. "
         self.result_line.setText(compared + result.summary() + f" Squad: {who}, {len(self.squad.mods)} mods.")
         self.match_button.setEnabled(True)
 
@@ -457,13 +490,9 @@ class SquadView(QWidget):
             path = downloads / f"{label_text} ({number}).r2z"
             number += 1
         try:
-            configs = {}
-            if self.last_file:
-                import zipfile
-                with zipfile.ZipFile(self.last_file) as archive:
-                    configs = {n: archive.read(n) for n in archive.namelist() if n.startswith("BepInEx/config/")}
+            configs = squad_sync.read_squad_configs(self.last_file) if self.last_file else {}
             squad_sync.write_squad_file(path, label_text, self.squad.mods, configs)
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
             self.result_line.setText("The squad profile was not written: " + str(exc))
             return
         self.match_path = str(path)
@@ -475,5 +504,5 @@ class SquadView(QWidget):
         winpc.activity("Squad Sync", f"Built a squad profile file with {len(self.squad.mods)} mods: {path}")
 
     def show_file(self):
-        if getattr(self, "match_path", ""):
+        if self.match_path:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(self.match_path).parent)))

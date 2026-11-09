@@ -151,21 +151,35 @@ class Squad:
     configs: dict = None
 
 
-def read_code(code):
-    text = "".join((code or "").split())
-    if not text.startswith(CODE_PREFIX):
-        raise ValueError("That is not a Squad Code. Squad Codes start with " + CODE_PREFIX)
-    if len(text) > MAX_CODE:
-        raise ValueError("That Squad Code is too long.")
+def _decode(text):
     body = text[len(CODE_PREFIX):]
-    try:
-        inflater = zlib.decompressobj()
-        raw = inflater.decompress(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)), 2 * 1024 * 1024)
-        if inflater.unconsumed_tail:
-            raise ValueError
-        data = json.loads(raw.decode("utf-8"))
-    except (ValueError, zlib.error, UnicodeDecodeError):
-        raise ValueError("That Squad Code is damaged. Ask for it again and paste all of it.") from None
+    inflater = zlib.decompressobj()
+    raw = inflater.decompress(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)), 2 * 1024 * 1024)
+    if inflater.unconsumed_tail:
+        raise ValueError
+    return json.loads(raw.decode("utf-8"))
+
+
+def read_code(code):
+    raw = code or ""
+    pattern = re.escape(CODE_PREFIX) + r"[A-Za-z0-9_-]+"
+    # People paste codes with words around them ("here you go: GGSQ1..."), and chat apps sometimes break long codes
+    # across lines. Try the code as written first, then with the line breaks removed.
+    candidates = [m.group(0) for m in re.finditer(pattern, raw)]
+    candidates += [m.group(0) for m in re.finditer(pattern, "".join(raw.split()))]
+    if not candidates:
+        raise ValueError("That is not a Squad Code. Squad Codes start with " + CODE_PREFIX)
+    data = None
+    for text in candidates:
+        if len(text) > MAX_CODE:
+            raise ValueError("That Squad Code is too long.")
+        try:
+            data = _decode(text)
+            break
+        except (ValueError, zlib.error, UnicodeDecodeError):
+            continue
+    if data is None:
+        raise ValueError("That Squad Code is damaged. Ask for it again and paste all of it.")
     mods = []
     for item in data.get("m", []) if isinstance(data, dict) else []:
         if (isinstance(item, list) and len(item) == 2 and isinstance(item[0], str) and isinstance(item[1], str)
@@ -264,7 +278,7 @@ def write_squad_file(path, profile_name, mods, configs=None):
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_name(path.name + ".gg-tmp")
     with zipfile.ZipFile(temp, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("export.r2x", export_r2x(profile_name, [Mod(m.name, m.version, True) for m in mods]))
+        archive.writestr("export.r2x", export_r2x(profile_name, list(mods)))
         for name, data in (configs or {}).items():
             if name.startswith("BepInEx/config/") and ".." not in name.split("/"):
                 archive.writestr(name, data)
@@ -285,10 +299,26 @@ def read_squad_file(path):
         configs = [n for n in archive.namelist() if n.startswith("BepInEx/config/")]
     match = re.search(r"^profileName\s*:\s*(.+)$", text, re.M)
     label = match.group(1).strip().strip('"') if match else path.stem
-    mods = [m for m in parse_mod_list(text) if VERSION_RE.match(m.version)]
+    # Only mods the sender had turned on are part of the squad.
+    mods = [m for m in parse_mod_list(text) if VERSION_RE.match(m.version) and m.enabled]
     if not mods:
-        raise ValueError("That profile export has no mods in it.")
+        raise ValueError("That profile export has no turned-on mods in it.")
     return Squad("", label, mods, {n: None for n in configs})
+
+
+def read_squad_configs(path):
+    """BepInEx config files from a squad file, refusing oversized or oddly named entries."""
+    configs, total = {}, 0
+    with zipfile.ZipFile(path) as archive:
+        for info in archive.infolist():
+            name = info.filename
+            if info.is_dir() or not name.startswith("BepInEx/config/") or ".." in name.split("/") or "\\" in name:
+                continue
+            total += info.file_size
+            if len(configs) >= CONFIG_LIMIT_FILES or total > CONFIG_LIMIT_BYTES:
+                raise ValueError("That squad file carries more config data than Game Grave accepts.")
+            configs[name] = archive.read(info)
+    return configs
 
 
 def import_steps(manager="r2modman"):

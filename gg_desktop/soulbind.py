@@ -173,7 +173,8 @@ def set_switches(text, switches):
     if lines and lines[-1] == "":
         lines.pop()
     header = re.compile(r"^\s*\[(.+?)\]\s*$")
-    start = next((i for i, line in enumerate(lines) if (m := header.match(line)) and m.group(1).strip() == SECTION), None)
+    start = next((i for i, line in enumerate(lines)
+                  if (m := header.match(line)) and m.group(1).strip().casefold() == SECTION.casefold()), None)
     if start is None:
         if lines and lines[-1].strip():
             lines.append("")
@@ -203,8 +204,32 @@ class ApplyResult:
     created: bool = False
 
 
-def _sha(text):
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+def _sha(data):
+    return hashlib.sha256(data if isinstance(data, bytes) else data.encode("utf-8")).hexdigest()
+
+
+BOMS = ((b"\xef\xbb\xbf", "utf-8"), (b"\xff\xfe", "utf-16-le"), (b"\xfe\xff", "utf-16-be"))
+
+
+def decode_ini(data):
+    """(text, encoding, bom). Some Unreal games save their ini files as UTF-16, so the encoding is kept as found."""
+    for bom, encoding in BOMS:
+        if data.startswith(bom):
+            return data[len(bom):].decode(encoding), encoding, bom
+    try:
+        return data.decode("utf-8"), "utf-8", b""
+    except UnicodeDecodeError:
+        raise ValueError("Engine.ini uses a text encoding Soulbind does not recognise, so it was left alone.") from None
+
+
+def _write_atomic(path, data):
+    temp = path.with_name(path.name + ".gg-tmp")
+    try:
+        temp.write_bytes(data)
+        temp.replace(path)
+    finally:
+        if temp.exists():
+            temp.unlink()
 
 
 def apply(target, prefs, backup_root, *, now=None):
@@ -213,23 +238,24 @@ def apply(target, prefs, backup_root, *, now=None):
         raise ValueError("None of your preferences can be applied to this game yet. Turn on at least one engine setting.")
     path = Path(target.engine_ini)
     existed = path.is_file()
-    original = path.read_text(encoding="utf-8", errors="replace") if existed else ""
+    raw = path.read_bytes() if existed else b""
+    text, encoding, bom = decode_ini(raw) if existed else ("", "utf-8", b"")
+    crlf = b"\r\n" in raw if not encoding.startswith("utf-16") else "\r\n" in text
     folder = Path(backup_root) / target.key
     folder.mkdir(parents=True, exist_ok=True)
     record_path = folder / "record.json"
     if not record_path.exists():
-        # Keep the very first original, so Restore always returns to the settings from before Soulbind.
+        # Keep the very first original, byte for byte, so Restore always returns to the settings from before Soulbind.
         if existed:
-            (folder / "Engine.ini.original").write_text(original, encoding="utf-8")
+            (folder / "Engine.ini.original").write_bytes(raw)
         record = {"name": target.name, "folder": target.folder, "existed": existed,
                   "saved": now or datetime.now().strftime("%Y-%m-%d %H:%M")}
     else:
         record = json.loads(record_path.read_text(encoding="utf-8"))
-    updated = set_switches(original, switches)
-    temp = path.with_name(path.name + ".gg-tmp")
-    temp.write_text(updated, encoding="utf-8")
-    temp.replace(path)
-    record["written_sha"] = _sha(updated)
+    updated = set_switches(text, switches)
+    data = bom + (updated.replace("\n", "\r\n") if crlf else updated).encode(encoding)
+    _write_atomic(path, data)
+    record["written_sha"] = _sha(data)
     record_path.write_text(json.dumps(record, indent=1), encoding="utf-8")
     return ApplyResult(target, switches, str(folder), not existed)
 
@@ -246,15 +272,11 @@ def restore(target, backup_root):
     record = json.loads(record_path.read_text(encoding="utf-8"))
     path = Path(target.engine_ini)
     if record.get("existed"):
-        original = (folder / "Engine.ini.original").read_text(encoding="utf-8")
-        temp = path.with_name(path.name + ".gg-tmp")
-        temp.write_text(original, encoding="utf-8")
-        temp.replace(path)
+        _write_atomic(path, (folder / "Engine.ini.original").read_bytes())
         message = "Restored the Engine.ini you had before Soulbind."
     else:
         if path.is_file():
-            current = path.read_text(encoding="utf-8", errors="replace")
-            if _sha(current) != record.get("written_sha"):
+            if _sha(path.read_bytes()) != record.get("written_sha"):
                 raise ValueError("Engine.ini changed after Soulbind wrote it (the game or you edited it), so it was "
                                  "left as it is. Remove it yourself if you want the game's defaults back.")
             path.unlink()

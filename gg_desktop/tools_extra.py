@@ -118,11 +118,7 @@ def open_exhume(window):
             dialog.detail.setText("Windows did not report a graphics driver Game Grave can read on this PC.")
 
     def work():
-        drivers = exhume.read_drivers(winpc.default_registry())
-        entries = exhume.record(exhume.load_history(_history_path()), drivers)
-        if drivers:
-            exhume.save_history(_history_path(), entries)
-        return drivers, entries
+        return exhume.refresh_history(winpc.default_registry(), _history_path())
 
     dialog.listing.currentRowChanged.connect(lambda _i: show())
     dialog.good_button.clicked.connect(toggle_good)
@@ -231,11 +227,29 @@ def open_black_box(window):
         crash = current()
         if crash is None:
             return
-        findings = dialog.findings if dialog.findings and dialog.findings.crash is crash else \
-            black_box.investigate(crash, exhume.load_history(_history_path()))
-        name = f"black-box-{(crash.game or crash.app).replace(' ', '-')}-{crash.when:%Y%m%d-%H%M}.txt"
-        path, _f = QFileDialog.getSaveFileName(dialog, "Save the Black Box report", str(Path.home() / name),
-                                               "Text files (*.txt)")
+        if dialog.findings and dialog.findings.crash is crash:
+            write_report(crash, dialog.findings)
+            return
+        # Looking through a large game folder can take a moment, so it runs off the window's thread.
+        dialog.report_button.setEnabled(False)
+        dialog.result_line.setText("Looking for changes first. Files are only read.")
+        history = exhume.load_history(_history_path())
+
+        def done(findings, error):
+            if not isValid(dialog):
+                return
+            dialog.report_button.setEnabled(True)
+            if error:
+                dialog.result_line.setText("Could not build the report: " + error)
+                return
+            dialog.findings = findings
+            dialog.result_line.setText("")
+            write_report(crash, findings)
+        _job(window, lambda: black_box.investigate(crash, history), done, "Black Box")
+
+    def write_report(crash, findings):
+        path, _f = QFileDialog.getSaveFileName(dialog, "Save the Black Box report",
+                                               str(Path.home() / black_box.report_name(crash)), "Text files (*.txt)")
         if not path:
             return
         try:
@@ -263,7 +277,15 @@ def open_black_box(window):
     dialog.report_button.clicked.connect(save_report)
     _close_row(dialog, box)
     games = list(window.inventory.games)
-    _job(window, lambda: black_box.read_crashes(winpc.Runner(), games), loaded, "Black Box")
+
+    def work():
+        # Note today's graphics driver too, so later crashes can show when it changed.
+        try:
+            exhume.refresh_history(winpc.default_registry(), _history_path())
+        except OSError:
+            pass
+        return black_box.read_crashes(winpc.Runner(), games)
+    _job(window, work, loaded, "Black Box")
     window._tools_dialog = dialog
     dialog.exec()
     return dialog

@@ -17,6 +17,8 @@ from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
 
+from gg_desktop.mod_shield import _is_link  # symlinks and Windows junctions are not followed
+
 EVENT_QUERY = "*[System[Provider[@Name='Application Error'] and (EventID=1000)]]"
 EVENT_LIMIT = 200
 CHANGE_WINDOW_DAYS = 7
@@ -167,7 +169,7 @@ def recent_changes(folders, before, *, days=CHANGE_WINDOW_DAYS, limit=CHANGE_LIM
                 continue
             for entry in items:
                 try:
-                    if entry.is_symlink():
+                    if _is_link(entry):
                         continue
                     if entry.is_dir(follow_symlinks=False):
                         stack.append(entry.path)
@@ -262,7 +264,13 @@ def report_text(findings, *, version="", scrub=None, generated=None):
     return scrub("\n".join(lines)) + "\n"
 
 
-def summary(crashes, *, days=None):
+def report_name(crash):
+    """A file name Windows accepts, for example black-box-Space-Marine-2-20261108-2015.txt."""
+    base = re.sub(r"[^A-Za-z0-9._-]+", "-", crash.game or crash.app or "crash").strip("-.")[:60] or "crash"
+    return f"black-box-{base}-{crash.when:%Y%m%d-%H%M}.txt"
+
+
+def summary(crashes):
     games = [c for c in crashes if c.game]
     if not crashes:
         return "Windows has no recent application crashes in its log."

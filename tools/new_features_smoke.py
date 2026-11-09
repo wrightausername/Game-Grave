@@ -188,6 +188,15 @@ def main():
             text = report.read_text(encoding="utf-8")
             assert "Black Box report" in text and "lead, not proof" in text
             assert logged[-1][0] == "Black Box"
+            # Saving without pressing "What changed" first looks for changes off the window's thread, then saves.
+            dialog.all_box.setChecked(True)
+            app.processEvents()
+            assert dialog.findings is None
+            report2 = root / "report2.txt"
+            with patch("gg_desktop.tools_extra.QFileDialog.getSaveFileName", return_value=(str(report2), "")):
+                dialog.report_button.click()
+                wait_for(report2.exists)
+            assert "CoolMod.dll" in report2.read_text(encoding="utf-8")
             assert (game_dir / "Mods" / "CoolMod.dll").read_bytes() == b"dll"
             snap(dialog, "tools-black-box.png")
             dialog.hide()
@@ -229,6 +238,13 @@ def main():
             view.restore_button.click()
             assert engine.read_text() == "[Core.System]\nPaths=a\n"
             assert logged[-1][0] == "Soulbind"
+            shared = root / "mine.soulbind.json"
+            with patch("gg_desktop.ready_room_tabs.QFileDialog.getSaveFileName", return_value=(str(shared), "")):
+                view.export_button.click()
+            view.checks["lens_flare"].setChecked(False)
+            with patch("gg_desktop.ready_room_tabs.QFileDialog.getOpenFileName", return_value=(str(shared), "")):
+                view.import_button.click()
+            assert view.checks["lens_flare"].isChecked() and "Imported" in view.mine_note.text()
 
             page.ready_tabs["squad"].click()
             app.processEvents()
@@ -238,6 +254,13 @@ def main():
             squad.code_button.click()
             code = squad.code.toPlainText()
             assert code.startswith("GGSQ1.")
+            squad_file = root / "Squad - Friday.r2z"
+            with patch("gg_desktop.ready_room_tabs.QFileDialog.getSaveFileName", return_value=(str(squad_file), "")):
+                squad.file_button.click()
+            assert "1 config files" in squad.share_note.text(), squad.share_note.text()
+            with patch("gg_desktop.ready_room_tabs.QFileDialog.getOpenFileName", return_value=(str(squad_file), "")):
+                squad.open_button.click()
+            assert "You match" in squad.result_line.text(), squad.result_line.text()
             squad.paste.setPlainText(code)
             squad.compare_button.click()
             assert "You match" in squad.result_line.text(), squad.result_line.text()
@@ -247,6 +270,13 @@ def main():
             with zipfile.ZipFile(files[0]) as archive:
                 assert "notnotnotswipez-MoreCompany" in archive.read("export.r2x").decode()
             assert "Import / Update" in squad.steps.text()
+            # Ready Room rebuilds itself after news and checks; the sub-tab and what was typed must survive.
+            squad.paste.setPlainText("hello " + code)
+            window.ready_reload()
+            app.processEvents()
+            page = window.page
+            assert page.ready_tab == "squad" and page.ready_tabs["squad"].isChecked() and page.squad_view is squad
+            assert squad.isVisible() and not page.patches.isVisible() and squad.paste.toPlainText() == "hello " + code
             assert (profile / "mods.yml").read_text() == MODS_YML
             snap(window, "ready-room-squad.png")
 
