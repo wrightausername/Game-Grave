@@ -60,7 +60,7 @@ def equalizer(a, b, r):
             y = MID - 8 - (k + 1) * 33
             peak = k == height - 1
             colour = b if i % 7 == 0 else a
-            out.append(rect(x, y, 30, 27, colour, (.9 if peak else .28 + .25 * bell(x)) * (1 - k * .05)))
+            out.append(rect(x, y, 30, 31, colour, (.9 if peak else .28 + .25 * bell(x)) * (1 - k * .05)))
     return "".join(out)
 
 
@@ -85,10 +85,10 @@ def diamonds(a, b, r):
 
 def glitch(a, b, r):
     out = []
-    for _ in range(26):
+    for _ in range(20):
         y = r.uniform(10, MID - 6)
-        x = r.uniform(2400, 5600)
-        w = r.uniform(180, 1500)
+        x = r.uniform(2400, 5800)
+        w = r.uniform(90, 560)
         h = r.choice((6, 10, 16, 26))
         op = .08 + .55 * bell(x + w / 2, CX, 1500)
         out.append(rect(x, y, w, h, a, op))
@@ -101,15 +101,16 @@ def glitch(a, b, r):
 def healthbars(a, b, r):
     out = []
     for row in range(5):
-        y = 22 + row * 46
+        centre = 34 + row * 46
         start = 2600 + row * 120 + r.uniform(0, 140)
         segments = int((W - start) // 64)
         lit = int(segments * r.uniform(.5, .92))
         for s in range(segments):
             x = start + s * 64
+            height = r.choice((12, 18, 24, 32, 38))
             colour = b if row == 2 else a
             op = (.55 + .35 * bell(x, CX, 1300)) if s < lit else .12
-            out.append(rect(x, y, 52, 24, colour, op))
+            out.append(rect(x, centre - height / 2, 52, height, colour, op))
     return "".join(out)
 
 
@@ -197,8 +198,12 @@ def tunnel(a, b, r):
         d = MID * (i / 9) ** 1.9
         o = .12 + .5 * (1 - i / 10)
         colour = b if i % 4 == 0 else a
-        out.append(line(vx - 3000, MID - d, W, MID - d, colour, o, 3))
-        out.append(line(vx - 3000, MID + d, W, MID + d, colour, o, 3))
+        x = vx - 3000 + r.uniform(0, 200)
+        while x < W:
+            length = r.uniform(140, 520)
+            out.append(line(x, MID - d, x + length, MID - d, colour, o, 3))
+            out.append(line(x, MID + d, x + length, MID + d, colour, o, 3))
+            x += length + r.uniform(160, 520)
     out.append(f'<ellipse cx="{vx}" cy="{MID}" rx="120" ry="14" fill="{b}" opacity=".55"/>')
     return "".join(out)
 

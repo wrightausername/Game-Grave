@@ -86,12 +86,40 @@ def main():
                         lights = [sum(shot.pixelColor(x + dx, y).getRgb()[:3]) / 3
                                   for y in range(top + 6, seam - 6, 4) for dx in (-6, 0, 6)]
                         assert sum(lights) / len(lights) > 8, f"{route} {width}px: the picture is missing at {fraction:.0%} of the width"
-                    # A real seam would show in every column; buttons and text on the banner only break a few of them.
+                    # A real seam is a jump the picture itself does not have. Compare the jump across the join with the
+                    # jump the same picture has at that spot, so busy artwork is never mistaken for a seam. Buttons and
+                    # text on the banner only break a few columns.
+                    artwork = getattr(page, "banner_artwork", None)
+                    if artwork is not None:
+                        banner = artwork.banner
+                        banner_x = banner.mapTo(window, QPoint()).x()
+                        picture_width = banner.width()
+                        picture_height = banner.mapTo(window, QPoint()).y() + banner.height() - top
+                    else:  # Ready Room draws its own slice of the same picture
+                        banner_x, picture_width, picture_height = left, span, window.top_bar.height() + 98
+                    expected = rw.brand_cover(header_banner.ROUTE_ART[route], picture_width, picture_height, 1.0, 1.0, .5).toImage()
+                    row = seam - top
+                    ground = (2, 7, 10)
                     diffs = []
                     for step in range(14):
                         x = left + int(span * (.60 + .027 * step))
-                        above, below = shot.pixelColor(x, seam - 2).getRgb(), shot.pixelColor(x, seam + 2).getRgb()
-                        diffs.append(max(abs(a - b) for a, b in zip(above[:3], below[:3])))
+                        rel = min(max(x - banner_x, 0), picture_width - 1)
+                        fraction = rel / picture_width
+                        fade = 70 * (1 - (fraction - .55) / .45) / 255 if fraction >= .55 else 0.0
+                        calm = 150 / 255 * max(0.0, (rel - (picture_width - 235)) / 235)  # top bar only
+
+                        def shown(y, calmed):
+                            art = expected.pixelColor(rel, y).getRgb()[:3]
+                            out = []
+                            for c, g in zip(art, ground):
+                                if calmed:
+                                    c = c * (1 - calm) + g * calm
+                                out.append(c * (1 - fade) + g * fade)
+                            return out
+                        want = [lo - hi for hi, lo in zip(shown(row - 2, True), shown(row + 2, False))]
+                        got = [lo - hi for hi, lo in zip(shot.pixelColor(x, seam - 2).getRgb()[:3],
+                                                         shot.pixelColor(x, seam + 2).getRgb()[:3])]
+                        diffs.append(max(abs(g - w) for g, w in zip(got, want)))
                     assert min(diffs) < 28 and sorted(diffs)[len(diffs) // 2] < 60, f"{route} {width}px: visible seam in the header picture {diffs}"
                     if width in (1100, 2400) or route in ("Overview", "Games", "Mods"):
                         shot.copy(left, top, span, seam + 130 - top).save(str(args.output / f"banner-{route.lower().replace(' ', '-')}-{width}.png"))
