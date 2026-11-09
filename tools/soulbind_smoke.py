@@ -41,10 +41,11 @@ def main():
         ini = docs / "My Games" / "Skyrim Special Edition" / "SkyrimPrefs.ini"
         ini.parent.mkdir(parents=True)
         ini.write_bytes(skyrim.encode())
-        install = root / "Skyrim"
+        install, other_install = root / "Skyrim", root / "Cyberpunk"
         install.mkdir()
+        other_install.mkdir()
         game = SteamGame("489830", "The Elder Scrolls V: Skyrim Special Edition", str(root), str(install), 100, None, "Unknown")
-        other = SteamGame("1091500", "Cyberpunk 2077", str(root), str(install), 100, None, "Unknown")
+        other = SteamGame("1091500", "Cyberpunk 2077", str(root), str(other_install), 100, None, "Unknown")
         env = {"LOCALAPPDATA": str(root / "Local")}
         with patch.dict(os.environ, env), \
              patch("gg_desktop.app.load_settings", side_effect=default_settings), \
