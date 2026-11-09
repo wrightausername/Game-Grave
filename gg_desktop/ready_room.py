@@ -484,12 +484,17 @@ class ReadyRoomContent(ScrollPage):
             self.bottom.addWidget(card, stretch)
         self.content.addLayout(self.bottom, 5)
         self.soulbind = None
+        self.blackbox = None
         if not data.reference:
             # Owner-requested Soulbind panel; the locked photo reference preview never shows it.
             from gg_desktop.soulbind_ui import build_panel
             self.soulbind = build_panel(ReadyPanel, window)
             self.content.addSpacing(14)
             self.content.addWidget(self.soulbind)
+            from gg_desktop.blackbox_ui import build_panel as build_blackbox
+            self.blackbox = build_blackbox(ReadyPanel, window)
+            self.content.addSpacing(14)
+            self.content.addWidget(self.blackbox)
         self.filter_rows("")
 
     def update_news_status(self):

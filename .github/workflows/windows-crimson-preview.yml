@@ -58,6 +58,10 @@ on:
       - 'tools/mods_page_smoke.py'
       - 'tests/test_mods_visuals.py'
       - 'tests/test_soulbind.py'
+      - 'tests/test_blackbox.py'
+      - 'tools/blackbox_smoke.py'
+      - 'gg_desktop/blackbox_core.py'
+      - 'gg_desktop/blackbox_ui.py'
       - 'tools/soulbind_smoke.py'
       - 'gg_desktop/soulbind_core.py'
       - 'gg_desktop/soulbind_ui.py'
@@ -140,6 +144,10 @@ on:
       - 'tools/mods_page_smoke.py'
       - 'tests/test_mods_visuals.py'
       - 'tests/test_soulbind.py'
+      - 'tests/test_blackbox.py'
+      - 'tools/blackbox_smoke.py'
+      - 'gg_desktop/blackbox_core.py'
+      - 'gg_desktop/blackbox_ui.py'
       - 'tools/soulbind_smoke.py'
       - 'gg_desktop/soulbind_core.py'
       - 'gg_desktop/soulbind_ui.py'
@@ -200,7 +208,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_soulbind -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_soulbind tests.test_blackbox -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -230,6 +238,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Mods status, tabs, bulk actions or sources failed in native Qt.' }
           python tools/soulbind_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Soulbind panel, apply, undo, share code or Games badge failed.' }
+          python tools/blackbox_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Black Box report building, copy, save or empty states failed.' }
           python tools/old_files_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Old Files scan, tabs, filters, folder view or Recycle Bin path failed in native Qt.' }
           python tools/other_storage_page_smoke.py --output _ci_temp
