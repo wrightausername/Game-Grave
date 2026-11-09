@@ -19,6 +19,7 @@ MIN_FRAMES = 600
 MIN_SECONDS = 10.0
 SAME_FLOOR = 0.02      # changes under 2% are never called a difference
 SPIKE_FACTOR = 2.0     # a spike is a frame longer than twice the median
+SPIKE_FLOOR = 0.10     # spike counts are small whole numbers, so under 10% is never called a difference
 
 
 class CaptureError(ValueError):
@@ -167,7 +168,7 @@ def compare(before: Stats, after: Stats) -> Comparison:
         rows.append(Row(name, fmt.format(b), fmt.format(a), change, verdict, tone))
     spike_b = before.spikes / (before.seconds / 60)
     spike_a = after.spikes / (after.seconds / 60)
-    change, tone, verdict = _verdict(spike_b, spike_a, False, noise)
+    change, tone, verdict = _verdict(spike_b, spike_a, False, max(noise, SPIKE_FLOOR))
     rows.append(Row("Spikes per minute", f"{spike_b:.1f}", f"{spike_a:.1f}", change, verdict, tone))
     return Comparison(before, after, rows, _summary(rows, noise), True)
 

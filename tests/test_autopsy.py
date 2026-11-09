@@ -71,6 +71,12 @@ class AutopsyTests(unittest.TestCase):
         self.assertEqual(verdicts["Median frame time (ms)"], "better")
         self.assertIn("One capture each", c.summary)
 
+    def test_small_spike_count_differences_are_not_called_real(self):
+        a = au.stats_for(frames(10.0, spike=50.0, every=50))
+        b = au.stats_for(frames(10.0, spike=50.0, every=48))
+        c = au.compare(a, b)
+        self.assertEqual(next(r for r in c.rows if r.metric == "Spikes per minute").verdict, "within noise")
+
     def test_identical_captures_are_within_noise(self):
         c = au.compare(au.stats_for(frames(12.0)), au.stats_for(frames(12.1)))
         self.assertTrue(all(r.verdict == "within noise" for r in c.rows if r.metric == "Average FPS"))

@@ -96,6 +96,7 @@ def main():
             assert comparison.comparable, comparison.summary
             rows = {r.metric: r for r in comparison.rows}
             assert rows["Average FPS"].verdict == "better" and rows["Median frame time (ms)"].verdict == "better"
+            assert rows["Spikes per minute"].verdict == "within noise", rows["Spikes per minute"]
             assert "One capture each" in body.summary.text()
             assert body.graph.before and body.graph.after and len(body.graph.before) <= 700
             assert body.grid.count() >= 4 * 8, body.grid.count()

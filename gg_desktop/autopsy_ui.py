@@ -221,7 +221,7 @@ class AutopsyBody(QWidget):
             self.summary.setText(comparison.summary)
             cap = 40.0
             if comparison.comparable:
-                cap = max(40.0, 2.5 * max(comparison.before.p99_ms, comparison.after.p99_ms))
+                cap = max(34.0, 1.3 * max(comparison.before.p99_ms, comparison.after.p99_ms))
             self.graph.set_data(result.before_points, result.after_points, cap)
             self._fill_grid(comparison)
         self.compare_button.setEnabled(all(self.paths.values()))
