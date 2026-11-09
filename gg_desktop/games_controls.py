@@ -4,7 +4,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QEvent, Qt, QRect, QTimer, QUrl
+from PySide6.QtCore import QObject, QEvent, QPointF, QRectF, Qt, QRect, QTimer, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMenu, QWidget
 from shiboken6 import isValid
@@ -45,7 +45,36 @@ class GamesCoverDelegate(CoverDelegate):
             painter.fillRect(QRect(area.left() + 2, area.top() + 2, 28, 24), QColor("#080d13"))
             launcher_icon(launcher_symbol(data.get("source", "")), 17).paint(
                 painter, QRect(area.left() + 7, area.top() + 5, 17, 17))
+            badge = data.get("soulbind")
+            if badge:
+                self._soulbind_badge(painter, area, *badge)
             painter.restore()
+
+    @staticmethod
+    def _soulbind_badge(painter, area, text, tone):
+        """A small pill saying whether this game already follows the owner's Soulbind preferences."""
+        color = QColor({"green": "#35dc7c", "amber": "#dfac46"}.get(tone, "#9aa4ac"))
+        font = painter.font()
+        font.setPixelSize(10)
+        font.setBold(True)
+        painter.setFont(font)
+        width = painter.fontMetrics().horizontalAdvance(text) + 18
+        left, right = area.left() + 34, area.right() - 28
+        if left + width > right:
+            return
+        pill = QRectF(left, area.top() + 6, width, 16)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(color)
+        fill = QColor("#050a0e")
+        fill.setAlpha(225)
+        painter.setBrush(fill)
+        painter.drawRoundedRect(pill, 8, 8)
+        painter.setBrush(color)
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(pill.left() + 8, pill.center().y()), 2.6, 2.6)
+        painter.setPen(color)
+        painter.drawText(QRectF(pill.left() + 14, pill.top(), pill.width() - 16, pill.height()),
+                         Qt.AlignVCenter | Qt.AlignLeft, text)
 
 
 class GamesArtwork(SteamArtwork):

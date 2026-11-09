@@ -483,6 +483,13 @@ class ReadyRoomContent(ScrollPage):
             card.setMinimumHeight(192)
             self.bottom.addWidget(card, stretch)
         self.content.addLayout(self.bottom, 5)
+        self.soulbind = None
+        if not data.reference:
+            # Owner-requested Soulbind panel; the locked photo reference preview never shows it.
+            from gg_desktop.soulbind_ui import build_panel
+            self.soulbind = build_panel(ReadyPanel, window)
+            self.content.addSpacing(14)
+            self.content.addWidget(self.soulbind)
         self.filter_rows("")
 
     def update_news_status(self):

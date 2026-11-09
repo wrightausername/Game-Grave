@@ -182,3 +182,11 @@ Turned On meter and a Space Used share bar, a ring beside the plain-words summar
 load-order stack, and conflict and update cards. Every picture is drawn from a number the tab already shows in words;
 no new claim, no "safe" language. `MetricStrip` only gained `glyphs` and `word_columns` lists, with no visual change.
 
+
+New features, first build (owner instruction, 2026-11-09): the owner asked for the five features discussed earlier
+("wtf build them"). Built one at a time, each with CI and real screenshots before the next: Soulbind, then Black Box,
+Autopsy, Exhume, Squad Sync. Soulbind is a Ready Room panel plus a small badge on Games cards. It is honest by design:
+a preference counts for a game only when its exact key is found in that game's real settings file. Apply changes only
+that value, saves a dated backup first and logs to the activity log; Undo restores the backup only if the file has not
+changed since. Share codes hold only the ticked preferences. The locked photo-reference preview never shows the panel.
+Referral program, owner command center, paywall and Afterlife wait on a server and payment-provider decision.

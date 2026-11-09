@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QSignalBlocker, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QLabel, QListWidgetItem
 from core import age_text, save_settings
+from gg_desktop import soulbind_core as sb
 from gg_desktop.models import readable_bytes
 from gg_desktop.artwork import game_app_id
 from gg_desktop.games import artwork_roots
@@ -154,6 +155,7 @@ class GamesScreens:
             rows.sort(key=lambda g: (g.size_bytes is None,
                                      (g.size_bytes or 0) * (-1 if sort == "Largest known size" else 1), g.name.casefold()))
         self._shown_games = rows
+        soulbind_profile = sb.load_profile()
         with QSignalBlocker(self.game_grid):
             self.game_grid.clear()
             for g in rows:
@@ -162,6 +164,10 @@ class GamesScreens:
                 item.setData(CARD_ROLE, {"name": g.name, "size": readable_bytes(g.size_bytes),
                                         "source": g.launcher, "steam_app_id": game_app_id(g), "favorite": self.page.games.is_favorite(g),
                                         "status_icon": "check" if g.status.startswith("Installed") else "shield"})
+                badge = sb.badge_for(g.name, soulbind_profile)
+                if badge is not None:
+                    item.setData(CARD_ROLE, {**item.data(CARD_ROLE), "soulbind": (badge.text, badge.tone)})
+                    item.setToolTip(item.toolTip() + "\nSoulbind: " + badge.text + ". " + badge.detail)
                 self.game_grid.addItem(item)
             selected = next((i for i, g in enumerate(rows) if current and g.key == current.key), 0)
             if rows:
