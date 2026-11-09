@@ -447,7 +447,7 @@ def apply_profile(adapter: Adapter, path: Path, profile: dict, *, root: Path | N
     _atomic_write(root / "ledger.json", json.dumps(entries, indent=2).encode("utf-8"))
     if log is None:
         import core
-        log = core.log_activity
+        log = core.log_event
     log("soulbind_apply", f"{adapter.title}: " + ", ".join(f"{c.label} {c.old} to {c.new}" for c in plan.differing),
         path=str(path), result="applied", source="soulbind")
     return Applied(entry["id"], str(path), plan.differing, str(backup))
@@ -470,7 +470,7 @@ def revert(entry_id: str, *, root: Path | None = None, log: Callable | None = No
     _atomic_write(root / "ledger.json", json.dumps(entries, indent=2).encode("utf-8"))
     if log is None:
         import core
-        log = core.log_activity
+        log = core.log_event
     log("soulbind_revert", f"{entry['game']}: restored the settings file from before Soulbind",
         path=str(path), result="restored", source="soulbind")
     return True

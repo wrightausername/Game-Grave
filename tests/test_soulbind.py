@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
 
@@ -91,6 +92,17 @@ class SoulbindTests(unittest.TestCase):
         self.assertEqual(game.read_bytes(), SKYRIM.encode())
         with self.assertRaises(ValueError):
             sb.revert(done.entry_id, root=self.root / "sb", log=self.log)
+
+    def test_default_logger_writes_the_real_activity_log(self):
+        import core
+        adapter = sb.adapter_for("skyrim special edition")
+        game = self.root / "SkyrimPrefs.ini"
+        game.write_bytes(SKYRIM.encode())
+        with patch("core.config_dir", return_value=self.root / "cfg"):
+            done = sb.apply_profile(adapter, game, {"invert_y": True}, root=self.root / "sb")
+            sb.revert(done.entry_id, root=self.root / "sb")
+            kinds = [e["kind"] for e in core.get_activity()]
+        self.assertEqual(kinds, ["soulbind_revert", "soulbind_apply"])
 
     def test_revert_refuses_after_a_later_change(self):
         adapter = sb.adapter_for("skyrim special edition")
