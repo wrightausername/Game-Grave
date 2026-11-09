@@ -26,16 +26,16 @@ RED = "#ff183b"
 # Consistent 24px outline icons; no platform-dependent chess/emoji glyphs.
 PATHS = {
     "home": '<path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z"/>',
-    "game": '<path d="M7 7h10c3 0 4 3 5 10 .5 3-2 4-4 2l-3-3H9l-3 3c-2 2-4.5 1-4-2C3 10 4 7 7 7Z"/><path d="M7 10v6m-3-3h6m6-1h.1m3 2h.1"/>',
-    "mods": '<path d="M8 3h5v4c4-3 7 3 2 4v4h-4c3 5-4 7-4 2H3v-6h4V7H3V3h5Z"/>',
+    "game": '<path d="M7 7h10a4 4 0 0 1 3.95 3.4l.9 5.4a2.4 2.4 0 0 1-4.1 2.1L15.6 16H8.4l-2.15 1.9A2.4 2.4 0 0 1 2.15 15.8l.9-5.4A4 4 0 0 1 7 7z"/><path d="M8 10v3M6.5 11.5h3M15.5 10.8h.01M17.8 12.8h.01"/>',
+    "mods": '<path d="M6 5h4a2 2 0 0 1 4 0h4a1 1 0 0 1 1 1v4a2 2 0 0 1 0 4v5a1 1 0 0 1-1 1h-4a2 2 0 0 0-4 0H6a1 1 0 0 1-1-1v-4a2 2 0 0 0 0-4V6a1 1 0 0 1 1-1z"/>',
     "archive": '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v12h14V9m-10 4h6"/>',
     "storage": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 4 18 4 18 0V5M3 10c0 4 18 4 18 0M3 15c0 4 18 4 18 0"/>',
     "camera": '<path d="M3 7h4l2-3h6l2 3h4v14H3Z"/><circle cx="12" cy="14" r="4"/>',
-    "grave": '<path d="M5 21V10a7 7 0 0 1 14 0v11M2 21h20M12 6v8m-3-5h6"/>',
-    "dna": '<path d="M7 2c0 10 10 10 10 20M17 2C17 12 7 12 7 22M7 5h10M8 9h8M8 15h8M7 19h10"/>',
+    "grave": '<path d="M6 21V10a6 6 0 0 1 12 0v11M3 21h18M12 8.5v6M9.5 11h5"/>',
+    "dna": '<path d="M8 3c0 3.2 8 4.3 8 9s-8 5.8-8 9M16 3c0 3.2-8 4.3-8 9s8 5.8 8 9M9.6 6.6h4.8M9.6 17.4h4.8"/>',
     "undo": '<path d="M3 4v6h6M3 10a9 9 0 1 1 0 6m9-10v6l4 2"/>',
-    "sparkles": '<path d="m12 3 3 6 6 3-6 3-3 6-3-6-6-3 6-3ZM3 2v4M1 4h4m15 13v5m-2.5-2.5h5"/>',
-    "settings": '<path d="m9 3 1-2h4l1 2 3 2 3 1v4l-2 2 2 3-2 4-4-1-1 4h-4l-1-3-4-1-3-3 2-3-2-3 2-4 3 1Z"/><circle cx="12" cy="11" r="3"/>',
+    "sparkles": '<path d="M10.5 4l1.9 5.1L17.5 11l-5.1 1.9L10.5 18l-1.9-5.1L3.5 11l5.1-1.9z"/><path d="M18.5 3v4M16.5 5h4M18.5 16v4M16.5 18h4"/>',
+    "settings": '<path d="M9.99 4.98 L10.58 2.51 L13.42 2.51 L14.01 4.98 L15.54 5.62 L17.71 4.28 L19.72 6.29 L18.38 8.46 L19.02 9.99 L21.49 10.58 L21.49 13.42 L19.02 14.01 L18.38 15.54 L19.72 17.71 L17.71 19.72 L15.54 18.38 L14.01 19.02 L13.42 21.49 L10.58 21.49 L9.99 19.02 L8.46 18.38 L6.29 19.72 L4.28 17.71 L5.62 15.54 L4.98 14.01 L2.51 13.42 L2.51 10.58 L4.98 9.99 L5.62 8.46 L4.28 6.29 L6.29 4.28 L8.46 5.62Z"/><circle cx="12" cy="12" r="3"/>',
     "grid": '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
     "list": '<path d="M8 5h13M8 12h13M8 19h13M3 5h.1M3 12h.1M3 19h.1"/>',
     "search": '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>',
@@ -53,7 +53,7 @@ PATHS = {
     "box": '<path d="m12 2 10 5v10l-10 5-10-5V7Zm0 10L2 7m10 5 10-5m-10 5v10M7 4l10 5"/>',
     "bell": '<path d="M5 17V9a7 7 0 0 1 14 0v8l2 2H3Zm5 5h4"/>',
     "help": '<circle cx="12" cy="12" r="10"/><path d="M9 8a3 3 0 1 1 5 2c-2 1-2 2-2 4m0 3h.1"/>',
-    "radio": '<circle cx="12" cy="10" r="2"/><path d="m12 12-3 10h6Zm-6 2a7 7 0 0 1 0-9m12 0a7 7 0 0 1 0 9M3 17a12 12 0 0 1 0-16m18 0a12 12 0 0 1 0 16"/>',
+    "radio": '<circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/>',
     "play": '<path d="m8 3 13 9-13 9Z"/>',
     "close": '<path d="m5 5 14 14M5 19 19 5"/>',
     "minus": '<path d="M4 12h16"/>',
@@ -61,7 +61,7 @@ PATHS = {
     "more": '<circle cx="4" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="20" cy="12" r="1"/>',
     "chevron": '<path d="m6 9 6 6 6-6"/>',
     "plus": '<path d="M12 3v18M3 12h18"/>',
-    "steam": '<circle cx="15" cy="8" r="4"/><path d="m12 11-4 6-6-3m6 3 7-5"/><circle cx="7" cy="17" r="3"/>',
+    "steam": '<circle cx="15.5" cy="8.5" r="4.5"/><circle cx="7" cy="16.5" r="3"/><path d="M4.2 14.7l-1.7-.7M12 11.5l-3.7 3.2"/>',
 }
 
 
@@ -117,12 +117,13 @@ def icon(name: str, color="#e1e3e7", size=22) -> QIcon:
     data = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
             f'fill="none" stroke="{color}" stroke-width="1.6" '
             f'stroke-linecap="round" stroke-linejoin="round">{paths}</svg>').encode()
-    pix = QPixmap(size * 2, size * 2)
+    pix = QPixmap(size * 3, size * 3)
     pix.fill(Qt.transparent)
     painter = QPainter(pix)
+    painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
     QSvgRenderer(data).render(painter)
     painter.end()
-    pix.setDevicePixelRatio(2)
+    pix.setDevicePixelRatio(3)
     return QIcon(pix)
 
 
