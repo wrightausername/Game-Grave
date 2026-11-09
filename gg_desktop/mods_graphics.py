@@ -525,6 +525,10 @@ def fit_library_columns(table):
     for i in range(table.columnCount()):
         table.setColumnHidden(i, i in hidden)
     table.setWordWrap(not library)
+    if library and table.viewport().width() >= 760:
+        # Plenty of room: show whole game and manager names instead of cutting them off.
+        table.setColumnWidth(2, 160)
+        table.setColumnWidth(3, 120)
 
 
 class _Refit(QObject):
