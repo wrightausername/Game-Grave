@@ -418,6 +418,7 @@ class ReadyRoomContent(ScrollPage):
         words.addStretch()
         hero_row.addLayout(words)
         hero_row.addStretch()
+        self.hero_row = hero_row
         self.content.addWidget(hero)
 
         self.metrics = QWidget()
@@ -698,6 +699,10 @@ class ReadyRoomPage(ReadyRoomContent):
         super().__init__(window, data, window.global_search)
         self._released = False
         self.reference_note = None
+        if not data.reference:
+            # News / Soulbind / Squad sub-tabs (owner request, 2026-11-08). News is this page, unchanged.
+            from gg_desktop import ready_room_tabs
+            ready_room_tabs.install(self, window)
         if data.reference:
             self.reference_note = QLabel("REFERENCE PREVIEW · SAMPLE DATA", self.body)
             self.reference_note.setStyleSheet("font-size:9px;color:#72808c;background:transparent;")

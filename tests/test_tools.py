@@ -30,7 +30,7 @@ class Registry(unittest.TestCase):
         self.assertTrue(all(len(c.tiles) == 4 for c in data.CATEGORIES))
 
     def test_tiles_are_go_run_or_unavailable_and_each_has_a_target_or_reason(self):
-        tabs = {"Other Storage", "Game DNA", "Overview", "Captures", "Old Files", "Graveyard"}
+        tabs = {"Other Storage", "Game DNA", "Captures"}
         for t in data.all_tiles():
             self.assertIn(t.kind, {data.GO, data.RUN, data.OFF})
             if t.kind == data.GO:
@@ -56,6 +56,13 @@ class Registry(unittest.TestCase):
         self.assertEqual((shield.kind, shield.target, shield.title), (data.RUN, "mod_shield", "Mod Shield"))
         self.assertIn("only reads", shield.note)
         self.assertIn(shield, next(c for c in data.CATEGORIES if c.key == "utilities").tiles)
+
+    def test_exhume_autopsy_and_black_box_replace_three_links(self):
+        tiles = {t.key: t for t in data.all_tiles()}
+        for gone in ("temp_files", "storage_analyzer", "advanced_cleanup"):
+            self.assertNotIn(gone, tiles)
+        for key in ("exhume", "autopsy", "black_box"):
+            self.assertEqual((tiles[key].kind, tiles[key].target), (data.RUN, key))
 
     def test_no_tile_text_claims_safety_or_freed_space(self):
         for t in data.all_tiles():

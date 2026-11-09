@@ -51,7 +51,10 @@ def run_action(window, key):
                "mod_report": lambda: export_mods(window),
                "system_report": lambda: export_system(window),
                "hash": lambda: choose_hash_file(window),
-               "mod_shield": lambda: _open_shield(window)}.get(key)
+               "mod_shield": lambda: _open_shield(window),
+               "exhume": lambda: _open_extra(window, "open_exhume"),
+               "autopsy": lambda: _open_extra(window, "open_autopsy"),
+               "black_box": lambda: _open_extra(window, "open_black_box")}.get(key)
     if handler is None:
         from gg_desktop import tools_windows
         handler = (lambda: tools_windows.HANDLERS[key](window)) if key in tools_windows.HANDLERS else None
@@ -62,6 +65,11 @@ def run_action(window, key):
 def _open_shield(window):
     from gg_desktop import tools_shield
     return tools_shield.open_shield(window)
+
+
+def _open_extra(window, name):
+    from gg_desktop import tools_extra
+    return getattr(tools_extra, name)(window)
 
 
 def run_quick(window, key):

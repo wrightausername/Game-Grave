@@ -7,6 +7,8 @@ Honesty rules for this tab:
   it will change, asks first and writes the activity log. See `winpc.py` and `tools_windows.py`.
 * Mod Shield (owner request 2026-11-08, replaces the Bulk File Manager link) only reads mod folders and lists files worth a
   look. See `mod_shield.py` and `tools_shield.py`.
+* Exhume, Autopsy and Black Box (owner request 2026-11-08) replace the Temp Files, Storage Analyzer and Advanced Cleanup
+  links. See `exhume.py`, `autopsy.py`, `black_box.py` and `tools_extra.py`.
 * A tile that cannot work would stay visible, dimmed, and say why. Nothing else changes Windows or runs commands.
 * Reports carry only numbers the scan reported. Sizes are "reported", never "freed", and nothing is called safe.
 """
@@ -49,7 +51,7 @@ def _off(key, title, symbol, why=OFF_REASON):
 CATEGORIES = (
     Category("maintenance", "Maintenance", "Keep your PC clean and running smoothly.", "red", (
         Tile("disk_cleanup", "Disk Cleanup", "trash", GO, "Other Storage", "Review reported storage items in Other Storage."),
-        Tile("temp_files", "Temp Files", "file", GO, "Other Storage", "Temporary files found by the scan are reviewed in Other Storage."),
+        Tile("exhume", "Exhume", "undo", RUN, "exhume", "Remember the graphics drivers you play on and go back to your last good one. Game Grave never installs drivers."),
         Tile("clear_caches", "Clear Caches", "refresh", GO, "Other Storage", "Cache folders found by the scan are reviewed in Other Storage."),
         Tile("windows_cleanup", "Windows Cleanup", "settings", RUN, "windows_cleanup", "Delete temporary files older than 2 days from your Windows temp folders after you confirm."))),
     Category("optimization", "Optimization", "Reduce clutter that may slow down games.", "cyan", (
@@ -63,7 +65,7 @@ CATEGORIES = (
         Tile("mod_backup", "Mod Backup", "mods", RUN, "save_vault", "Back up a mod folder you choose into a verified Save Vault ZIP."),
         Tile("resurrection_kit", "Resurrection Kit", "grave", RUN, "kit_menu", "Create, inspect, rehearse, compare or transfer verified kits."))),
     Category("analysis", "Analysis and Reporting", "Understand what uses your space.", "magenta", (
-        Tile("storage_analyzer", "Storage Analyzer", "storage", GO, "Overview", "The reported storage breakdown lives in Overview."),
+        Tile("autopsy", "Autopsy", "star", RUN, "autopsy", "Measure a game before and after a change with PresentMon and get a plain verdict."),
         Tile("game_size_report", "Game Size Report", "game", RUN, "game_report", "Save a CSV of installed games and their reported sizes."),
         Tile("mod_report", "Mod Report", "mods", RUN, "mod_report", "Save a CSV of the mod and game folders the scan found."),
         Tile("system_report", "System Report", "list", RUN, "system_report", "Save a text summary of the last scan and this PC."))),
@@ -76,7 +78,7 @@ CATEGORIES = (
         Tile("command_runner", "Command Runner", "list", RUN, "command_runner", "Run one command line you type or pick, after you see it and confirm."),
         Tile("file_associations", "File Associations", "file", RUN, "file_associations", "Look up which app opens a file type and jump to Windows Default apps."),
         Tile("junction_manager", "Junction Manager", "folder", RUN, "junction_manager", "List, create or remove folder junctions. Removing deletes only the link."),
-        Tile("advanced_cleanup", "Advanced Cleanup", "grave", GO, "Graveyard", "Reviewed items and protected folders live in the Graveyard."))),
+        Tile("black_box", "Black Box", "warning", RUN, "black_box", "See the crashes Windows recorded for your games and what changed before them. It only reads."))),
 )
 
 TABS = (
