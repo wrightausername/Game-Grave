@@ -487,6 +487,7 @@ class ReadyRoomContent(ScrollPage):
         self.blackbox = None
         self.autopsy = None
         self.exhume = None
+        self.squad = None
         if not data.reference:
             # Owner-requested Soulbind panel; the locked photo reference preview never shows it.
             from gg_desktop.soulbind_ui import build_panel
@@ -505,6 +506,10 @@ class ReadyRoomContent(ScrollPage):
             self.exhume = build_exhume(ReadyPanel, window)
             self.content.addSpacing(14)
             self.content.addWidget(self.exhume)
+            from gg_desktop.squad_ui import build_panel as build_squad
+            self.squad = build_squad(ReadyPanel, window)
+            self.content.addSpacing(14)
+            self.content.addWidget(self.squad)
         self.filter_rows("")
 
     def update_news_status(self):
