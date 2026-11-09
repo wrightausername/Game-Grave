@@ -74,6 +74,9 @@ def show_tab(page, key):
         control.setChecked(name == key)
     for widget in page.news_widgets:
         widget.setVisible(key == "news")
+    # Empty News rows must not keep their share of the height while another view is showing.
+    page.content.setStretchFactor(page.middle, 7 if key == "news" else 0)
+    page.content.setStretchFactor(page.bottom, 5 if key == "news" else 0)
     page.soulbind_view.setVisible(key == "soulbind")
     page.squad_view.setVisible(key == "squad")
     if key == "soulbind":

@@ -172,6 +172,21 @@ when clicked, and run Microsoft Defender only after confirmation with `-DisableR
 called malware or safe, and nothing is moved, changed or deleted. Checked by `tests/test_mod_shield.py` and
 `tools/tools_shield_smoke.py`. Not yet signed off.
 
+Ready Room reopened (owner choice, 2026-11-08, "Unlock Ready Room" for News / Soulbind / Squad sub-tabs, then
+"Implement the rest"): `ready_room.py` only gained `self.hero_row` and a call to `ready_room_tabs.install` for live
+data (the reference preview is untouched). News is the approved page, unchanged; Soulbind and Squad are hidden views
+shown in its place (`gg_desktop/ready_room_tabs.py`, engines `soulbind.py` and `squad_sync.py`). Soulbind writes only
+Unreal Engine `[SystemSettings]` switches into `Engine.ini` after confirmation, keeps the original for Restore, and
+shows per-game preferences (subtitles, FOV, invert Y, shake, colorblind) as not supported yet. Squad Sync supports
+r2modman and the Thunderstore Mod Manager: Squad Codes (mod names and versions only), compare, and a new importable
+profile file; it never changes the owner's profiles and never copies mod files between people.
+
+More Tools, same request: Temp Files, Storage Analyzer and Advanced Cleanup links became Exhume (driver history,
+owner-marked known good, Device Manager and official driver pages; never installs drivers), Autopsy (PresentMon
+captures only after confirmation, "no real difference" under 3%) and Black Box (Windows Application Error events,
+changes before a crash as leads, scrubbed reports). Checked by `tests/test_new_tools.py` and
+`tools/new_features_smoke.py`. None of these is signed off yet.
+
 Earlier history (kept for context; none of these tabs is open):
 
 Games: the owner reopened it to finish launcher management, ownership/update/playtime
