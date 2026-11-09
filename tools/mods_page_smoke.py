@@ -139,6 +139,13 @@ def main():
             window.mod_table.selectRow(mountain)
             settle()
             assert window.grab().save(str(args.output / "mods-graphics-1280.png"))
+            window.resize(1280, 1500)
+            settle()
+            assert window.grab().save(str(args.output / "mods-graphics-tall-1280.png"))
+            window.resize(1280, 790)
+            settle()
+            # A narrow table keeps the mod name readable by stepping Manager and Modified aside.
+            assert table.isColumnHidden(3) and table.columnWidth(1) >= 150, (table.isColumnHidden(3), table.columnWidth(1))
 
             # Sorting: every option reorders the Library, header clicks toggle direction, Size and Modified are shown.
             from gg_desktop import mods_sort

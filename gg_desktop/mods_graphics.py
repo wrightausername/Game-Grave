@@ -6,7 +6,7 @@ claims more than the text beside it. Mod managers and mod files are never touche
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QPointF, QRectF
+from PySide6.QtCore import QEvent, QObject, Qt, QPointF, QRectF
 from PySide6.QtGui import (QBrush, QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPainterPath, QPen,
                            QRadialGradient)
 from PySide6.QtWidgets import (QApplication, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QSizePolicy,
@@ -303,7 +303,7 @@ class ModHero(QWidget):
         small = _font(self.font(), 10, bold=True)
         p.setFont(small)
         fm = QFontMetrics(small)
-        if self.version:
+        if self.version and self.version.strip().casefold() not in {"unknown", "none", "n/a", "-", "—"}:
             text = "v" + self.version.lstrip("vV")
             text = fm.elidedText(text, Qt.ElideRight, 90)
             w = fm.horizontalAdvance(text) + 16
@@ -506,7 +506,37 @@ def update_card(installed, newest):
 
 
 # ---------------------------------------------------------------- wiring helpers
+LIBRARY_HEADERS = ("", "Name", "Game", "Manager", "Size", "Status", "Modified")
+FIT = ((560, (3, 6)), (640, (3,)))   # table width below which these columns step aside so names stay readable
+
+
+def fit_library_columns(table):
+    """On a narrow table hide Manager (then Modified) so the mod name keeps its room; show everything again elsewhere."""
+    headers = tuple((table.horizontalHeaderItem(i).text() if table.horizontalHeaderItem(i) else "")
+                    for i in range(table.columnCount()))
+    library = headers == LIBRARY_HEADERS
+    hidden = set()
+    if library:
+        width = table.viewport().width()
+        for limit, columns in FIT:
+            if width < limit:
+                hidden = set(columns)
+                break
+    for i in range(table.columnCount()):
+        table.setColumnHidden(i, i in hidden)
+    table.setWordWrap(not library)
+
+
+class _Refit(QObject):
+    def eventFilter(self, source, event):
+        if event.type() == QEvent.Resize:
+            fit_library_columns(self.parent())
+        return False
+
+
 def install_delegates(table):
+    table._gg_refit = _Refit(table)
+    table.viewport().installEventFilter(table._gg_refit)
     table._gg_status_delegate = StatusDelegate(table)
     table._gg_size_delegate = SizeDelegate(table)
     table.setItemDelegateForColumn(4, table._gg_size_delegate)
@@ -543,6 +573,7 @@ def decorate_library(window, control):
                 fraction = size_fraction(view.size, biggest)
                 size_cell.setData(BAR_ROLE, fraction)
                 size_cell.setData(HUE_ROLE, hue_for(view.name))
+    fit_library_columns(table)
     table.viewport().update()
 
 

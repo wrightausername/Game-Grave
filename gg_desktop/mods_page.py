@@ -189,6 +189,7 @@ def fill(window, *args, **kwargs):
             sync_profiles(window, control, include_all=window._mod_tab == "Conflicts")
         tab_fill(window, control, kwargs.get("requested_page", 0))
     chrome(window, control)
+    graphics.fit_library_columns(window.mod_table)
 
 
 def chrome(window, control):
