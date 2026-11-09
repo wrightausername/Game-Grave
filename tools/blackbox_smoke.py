@@ -115,6 +115,7 @@ def main():
             assert body.copy_button.isEnabled() and body.save_button.isEnabled()
             body.copy_button.click()
             assert QApplication.clipboard().text() == shown
+            assert live(window).games.currentText() == report.game, "The dropdown follows the shown report"
             window.page.ensureWidgetVisible(window.page.blackbox)
             settle(50)
             assert window.grab().save(str(args.output / "ready-room-blackbox-1280.png"))
@@ -137,6 +138,7 @@ def main():
             window.navigate("Ready Room")
             settle()
             assert live(window).report is not None and live(window).report.game == "Cyberpunk 2077"
+            assert live(window).games.currentText() == "Cyberpunk 2077", "The dropdown follows the shown report"
             error.assert_not_called()
     print("Black Box smoke passed")
 

@@ -124,6 +124,9 @@ class BlackBoxBody(QWidget):
                               error_title="Black Box could not build the report")
 
     def show_report(self, report):
+        at = self.games.findText(report.game)
+        if at >= 0:
+            self.games.setCurrentIndex(at)
         self.report = report
         self.text = bb.render(report)
         self.saved = None
