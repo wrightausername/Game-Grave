@@ -17,6 +17,7 @@ from shiboken6 import isValid
 
 from core import save_settings
 from gg_desktop import mods_insight as mi
+from gg_desktop import mods_words as words
 from gg_desktop.mods_data import identity, mod_page, ordinary
 from gg_desktop.models import readable_bytes
 from gg_desktop.reference_library import (LibraryScreens, _check, _checked, _combo, _text, _widget, destroy_layout)
@@ -25,7 +26,7 @@ from gg_desktop.widgets import label, row
 from ui_paging import page_window
 
 LIBRARY_HEADERS = ("", "Name", "Game", "Manager", "Size", "Status", "Modified")
-LIBRARY_WIDTHS = (25, 170, 80, 62, 56, 62, 74)
+LIBRARY_WIDTHS = (25, 170, 110, 100, 62, 92, 84)
 COLORS = {"green": "#27dc74", "amber": "#f7b737", "muted": "#9ca8bd", "": "#d7dfe7"}
 TAB_NAMES = ("Library", "Mod Radar", "Load Order", "Profiles", "Conflicts", "Cleanup")
 
@@ -54,6 +55,14 @@ def build(window, control):
     window.mod_profile.currentIndexChanged.connect(lambda *_: profile_changed(window))
     contents.insertWidget(contents.indexOf(window.mod_notice) + 1, window.mod_profile)
     window.mod_profile.hide()
+    window.mod_summary = label("", "subtle", wrap=True)
+    window.mod_summary.setObjectName("modSummary")
+    window.mod_summary.setAccessibleName("Mods in plain words")
+    window.mod_summary.setStyleSheet("font-size:13px;color:#d7dfe7;padding:0 4px;")
+    content = window.page.content
+    strip_at = next((i for i in range(content.count())
+                     if content.itemAt(i).widget() is window.page.findChild(MetricStrip)), 0)
+    content.insertWidget(strip_at + 1, window.mod_summary)
     footer = window.mod_selection.parentWidget().layout()
     window.mod_actions = tool("Actions", "list", lambda: show_menu(window, window.mod_actions))
     window.mod_actions.setToolTip("Refresh, check conflicts, export or copy the checked mods")
@@ -125,16 +134,27 @@ def apply_metrics(window, control):
     if strip is None:
         return
     m = mi.metrics(control.catalog, control.report, window._mod_updates if window._mod_updates_scanned else {})
+    tips = words.TILE_TIPS
+    if m["total_label"] == "Total Mods":
+        strip.set_value(0, m["total"], tips[0][0], tips[0][1])
+    else:
+        strip.set_value(0, m["total"], words.FOLDERS_CAPTION, words.FOLDERS_TIP)
     if m["enabled"] or m["mixed"] or m["disabled"]:
-        strip.set_value(1, m["enabled"], "Enabled (saved)" if not m["mixed"] else f"Enabled · {m['mixed']} mixed")
+        caption = tips[1][0] if not m["mixed"] else f"{tips[1][0]} · {m['mixed']} in some"
+        strip.set_value(1, m["enabled"], caption, tips[1][1])
     if window._mod_updates_scanned and window._mod_updates:
-        strip.set_value(2, m["outdated"], "Outdated (MO2 data)")
+        strip.set_value(2, m["outdated"], tips[2][0], tips[2][1])
     elif window._mod_updates_scanned:
-        strip.set_value(2, "—", "Outdated · No update data")
+        strip.set_value(2, "—", "Updates · None recorded", tips[2][1] + " Nothing has been recorded for these mods.")
     if m["conflicts"] is not None:
-        strip.set_value(3, m["conflicts"], "Findings · partial" if m["conflicts_limited"] else "Conflict Findings")
+        strip.set_value(3, m["conflicts"], "Conflicts · partial" if m["conflicts_limited"] else tips[3][0],
+                        tips[3][1] + (" This check was partial, so some conflicts may be missed." if m["conflicts_limited"] else ""))
     if m["unreferenced"] is not None:
-        strip.set_value(4, m["unreferenced"], "Not In Any Profile")
+        strip.set_value(4, m["unreferenced"], tips[4][0], tips[4][1])
+    summary = getattr(window, "mod_summary", None)
+    if summary is not None and isValid(summary):
+        games = len({e.game_key for e in control.catalog.entries if e.game_key})
+        summary.setText(words.summary(m, games=games))
 
 
 # ---------------------------------------------------------------- table filling
@@ -209,8 +229,8 @@ def library_fill(window, control, *args, **kwargs):
             cell = table.item(index, 5)
             if cell:
                 status = mi.entry_status(entry, catalog)
-                cell.setText(status.text)
-                cell.setToolTip(status.detail)
+                cell.setText(words.status_word(status.text))
+                cell.setToolTip(words.STATUS_TIPS.get(words.status_word(status.text), "") + "\n" + status.detail)
                 cell.setForeground(QColor(COLORS[status.kind]))
 
 
@@ -287,10 +307,10 @@ def order_tab(window, control):
     rows_, note = mi.load_order(control.catalog, window._mod_profile_keys.get("Load Order", ""))
     out = []
     for pos, entry, marker in rows_:
-        state = {"+": "Enabled", "-": "Disabled"}.get(marker, "Unknown")
+        state = words.status_word({"+": "Enabled", "-": "Disabled"}.get(marker, "Unknown"))
         out.append(TabRow(entry.key, (entry.name, str(pos) if pos else "—", state, entry.version or "—"), entry,
                           hay=" ".join((entry.name, entry.author, entry.path)),
-                          kinds={3: {"Enabled": "green"}.get(state, "muted")}, tip=control.tooltip(entry)))
+                          kinds={3: {"On": "green"}.get(state, "muted")}, tip=control.tooltip(entry)))
     return out, note
 
 
@@ -301,11 +321,11 @@ def profiles_tab(window, control):
         found = "—" if item["findings"] is None else str(item["findings"])
         flags = [x for x, on in (("selected when inspected", p.selected), ("older than seven days", p.stale),
                                  ("incomplete", p.incomplete)) if on]
-        out.append(TabRow(p.key, (p.name + ("  ●" if p.selected else ""), "MO2" if p.manager == "Mod Organizer 2" else p.manager,
+        out.append(TabRow(p.key, (p.name + ("  ●" if p.selected else ""), p.manager,
                                   str(item["enabled"]), str(item["disabled"]), found), item,
                           hay=" ".join((p.name, p.manager, p.source)), tip=p.source + ("\n" + ", ".join(flags) if flags else "")))
-    notice = ("● marks the profile the manager had selected when Game Grave inspected it. Profiles stay protected; "
-              "manage them in the original mod manager." if out else
+    notice = ("A profile is a saved list of which mods are on. ● marks the one your mod manager had selected. "
+              "Game Grave only reads profiles; change them in your mod manager." if out else
               "No saved profiles were found. Game Grave reads Mod Organizer 2 profiles after Scan for Mods.")
     return out, notice
 
@@ -340,9 +360,9 @@ def cleanup_tab(window, control):
 
 TABS = {
     "Mod Radar": (("", "Source", "Type", "State"), (25, 220, 120, 150), radar_tab),
-    "Load Order": (("", "Mod", "Position", "Saved", "Version"), (25, 200, 62, 70, 70), order_tab),
-    "Profiles": (("", "Profile", "Manager", "Enabled", "Disabled", "Findings"), (25, 170, 60, 62, 62, 62), profiles_tab),
-    "Conflicts": (("", "Finding", "Profile", "Mods", "Paths"), (25, 200, 100, 50, 50), conflicts_tab),
+    "Load Order": (("", "Mod", "Order", "Status", "Version"), (25, 200, 62, 90, 70), order_tab),
+    "Profiles": (("", "Profile", "Manager", "On", "Off", "Conflicts"), (25, 150, 110, 44, 44, 70), profiles_tab),
+    "Conflicts": (("", "What overlaps", "Profile", "Mods", "Files"), (25, 200, 100, 50, 50), conflicts_tab),
     "Cleanup": (("", "Item", "Type", "Size", "Action"), (25, 180, 110, 62, 100), cleanup_tab),
 }
 
@@ -367,35 +387,39 @@ def entry_for_view(window):
 
 def status_lines(window, control, contents, entry):
     catalog = control.catalog
-    detail_section(contents, "Mod Status")
+    detail_section(contents, "At a Glance")
     status = mi.entry_status(entry, catalog)
-    detail_line(contents, "check", "Status", status.text, tone=COLORS[status.kind] if status.kind != "muted" else "")
+    word = words.status_word(status.text)
+    detail_line(contents, "check", "Status", word, tone=COLORS[status.kind] if status.kind != "muted" else "")
+    note = label(words.STATUS_TIPS.get(word, "") + " " + status.detail if word == "Not recorded" else status.detail, "caption", wrap=True)
+    note.setTextFormat(Qt.PlainText)
+    contents.addWidget(note)
     selected = next((p for p in catalog.profiles if p.selected), None)
-    position = "Not established"
+    position = "Not known"
     if entry.kind == "mod" and selected:
         rows, _note = mi.load_order(catalog, selected.key)
         hit = next((pos for pos, e, _m in rows if e.key == entry.key), None)
         if hit:
-            position = f"{hit} of {len(rows)} in {selected.name} (relative)"
+            position = words.order_text(hit, len(rows), selected.name)
         elif selected.manager == "Mod Organizer 2":
-            position = "Not listed in " + selected.name
+            position = "Not in the " + selected.name + " profile"
         else:
-            position = "Not established for this manager"
+            position = "Not available for this manager"
     detail_line(contents, "list", "Load Order", position)
     deps = entry.dependencies
-    detail_line(contents, "help", "Requires", (f"{len(deps)} declared: " + ", ".join(d.name for d in deps[:5]) +
-                                               (" …" if len(deps) > 5 else "")) if deps else "None declared in metadata")
+    detail_line(contents, "help", "Needs", words.requires_text([d.name for d in deps[:5]], len(deps) > 5))
     found = control.findings(entry)
-    detail_line(contents, "warning", "Conflicts", (f"{len(found)} finding(s)" + (" (partial coverage)" if control.report.limited else ""))
-                if control.report and found else "None found in completed checks" if control.report else "Check pending")
+    detail_line(contents, "warning", "Conflicts",
+                words.conflicts_text(len(found), bool(control.report and control.report.limited), control.report is not None))
     names = {p.key: p.name for p in catalog.profiles}
     listed = [names[k] for k in entry.profiles if k in names]
-    detail_line(contents, "shield", "Listed In", (f"{len(listed)} saved profile(s): " + ", ".join(listed[:4]) +
-                                                 (" …" if len(listed) > 4 else "")) if listed else "No saved profile")
+    detail_line(contents, "shield", "Used In", words.profiles_text(listed))
     info = window._mod_updates.get(entry.key)
     if info:
-        detail_line(contents, "refresh", "Update", f"{info.newest} recorded by MO2 (installed {info.installed or 'unknown'})"
-                    if info.outdated else info.note, tone=COLORS["amber"] if info.outdated else "")
+        detail_line(contents, "refresh", "Update", words.update_text(info.newest, info.installed, bool(info.outdated), info.note),
+                    tone=COLORS["amber"] if info.outdated else "")
+    hint = label("Load order decides which mod wins when two change the same file. The one loaded later wins.", "caption", wrap=True)
+    contents.addWidget(hint)
 
 
 def library_details(window):

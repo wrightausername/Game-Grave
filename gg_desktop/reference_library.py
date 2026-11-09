@@ -418,14 +418,15 @@ class LibraryScreens:
         page = self._reference_page("Mods", "Discover, manage, and optimize your mods, all in one place.\nMore performance. Fewer conflicts. A cleaner game.", "mods", "mods")
         mods = self.inventory.mods
         known_size = sum(max(0, m.apparent_bytes) for m in mods)
-        unknown_tip = "This scanner identifies protected storage. It does not verify mod activity, versions or dependency state."
+        from gg_desktop.mods_words import FOLDERS_CAPTION, FOLDERS_TIP, TILE_TIPS
+        unknown_tip = "Game Grave has not read this from your mod manager yet."
         page.content.addWidget(MetricStrip([
-            ("mods", len(mods), "Mod Locations", "#df83ec", "Scanned storage locations, not a count of individual mods"),
-            ("check", "—", "Active · Unknown", "#27dc74", unknown_tip),
-            ("warning", "—", "Outdated · Unknown", "#f7b737", unknown_tip),
-            ("refresh", "—", "Conflicts · Unknown", "#fa2245", unknown_tip),
-            ("shield", "—", "Orphaned · Unknown", "#9ca8bd", unknown_tip),
-            ("storage", human_size(known_size), "Apparent Size", "#9bcde4", "Reported apparent size; overlapping locations or hardlinks can share bytes"),
+            ("mods", len(mods), FOLDERS_CAPTION, "#df83ec", FOLDERS_TIP),
+            ("check", "—", TILE_TIPS[1][0], "#27dc74", TILE_TIPS[1][1] + " " + unknown_tip),
+            ("warning", "—", TILE_TIPS[2][0], "#f7b737", TILE_TIPS[2][1] + " " + unknown_tip),
+            ("refresh", "—", TILE_TIPS[3][0], "#fa2245", TILE_TIPS[3][1] + " " + unknown_tip),
+            ("shield", "—", TILE_TIPS[4][0], "#9ca8bd", TILE_TIPS[4][1] + " " + unknown_tip),
+            ("storage", human_size(known_size), TILE_TIPS[5][0], "#9bcde4", TILE_TIPS[5][1]),
         ]))
         left = _widget(column(spacing=8))
         self.mod_tabs = TabStrip([("Library", "archive"), ("Mod Radar", "radio"),
@@ -473,7 +474,7 @@ class LibraryScreens:
         contents.addWidget(self.mod_notice)
         self.mod_table = _table(["", "Name", "Game", "Manager", "Size", "Status", "Modified"])
         self.mod_table.setIconSize(QSize(48, 30))
-        for i, width in enumerate([25, 170, 80, 62, 56, 62, 74]):
+        for i, width in enumerate([25, 170, 110, 100, 62, 92, 84]):
             self.mod_table.setColumnWidth(i, width)
         self.mod_table.horizontalHeader().setSectionsClickable(True)
         self.mod_table.horizontalHeader().sectionClicked.connect(self._sort_mods_by_header)
@@ -537,7 +538,7 @@ class LibraryScreens:
         rows = mods_sort.sort_views(rows, self.mod_sort.currentText())
         tab = self._mod_tab
         notice = {"Library": "", "Mod Radar": "Read-only source evidence · All detected storage remains protected.",
-                  "Load Order": "Load order is not verified by this scan. Open your mod manager to inspect or change it.",
+                  "Load Order": "Load order decides which mod wins when two change the same file. Open your mod manager to view or change it.",
                   "Profiles": "Profiles remain protected. Manage them in their original mod manager.",
                   "Conflicts": "Conflict detection is unavailable. This scan cannot establish that there are no conflicts.",
                   "Cleanup": "Managed mods and profiles remain protected. Review standalone archives in Old Files."}[tab]
@@ -557,8 +558,7 @@ class LibraryScreens:
                 _check(self.mod_table, i)
                 item = _text(self.mod_table, i, 1, m.name)
                 item.setIcon(cover_icon(m.game if m.game != "Unverified" else m.name))
-                manager = "MO2" if m.manager == "Mod Organizer 2" else m.manager
-                for c, value in enumerate((m.game, manager, mods_sort.size_text(m.size), "Protected"), 2):
+                for c, value in enumerate((m.game, m.manager, mods_sort.size_text(m.size), "Storage folder"), 2):
                     _text(self.mod_table, i, c, value)
                 _text(self.mod_table, i, 6, mods_sort.date_text(mods_sort.modified_time(str(m.record.path))))
                 self.mod_table.setRowHeight(i, 40)

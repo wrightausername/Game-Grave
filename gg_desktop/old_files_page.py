@@ -119,8 +119,7 @@ def build(window):
     self = window
     page = self._reference_page("Old Files", "Find and manage old, unused, and forgotten files taking up space on your drives.", "old_files")
     page.content.itemAt(0).widget().setFixedHeight(74)
-    page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Old Files",
-                                              art="banner_old_files.png")
+    page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Old Files")
     current_root = str(self.settings.get("scan_folder", ""))
     inventory_root = self.inventory.file_scan_root
     self._old_root = inventory_root or current_root

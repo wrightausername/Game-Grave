@@ -9,9 +9,42 @@ from PySide6.QtCore import QObject, QEvent, QPoint, QRectF, Qt
 from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import QWidget
 
-from gg_desktop.reference_widgets import brand_scaled, brand_source, reference
+from gg_desktop.reference_widgets import brand_cover, brand_source, reference
 
 BACKGROUND = QColor("#02070a")
+
+# One panoramic HD picture per tab (tools/make_banner_art.py). Every tab fills its full header width with it.
+ROUTE_ART = {
+    "Overview": "banner_overview.jpg", "Ready Room": "banner_ready_room.jpg", "Games": "banner_games.jpg",
+    "Mods": "banner_mods.jpg", "Old Files": "banner_old_files.jpg", "Other Storage": "banner_other_storage.jpg",
+    "Captures": "banner_captures.jpg", "Graveyard": "banner_graveyard.jpg", "Game DNA": "banner_dna.jpg",
+    "Undo Center": "banner_undo.jpg", "Settings": "banner_settings.jpg", "AI Assistant": "banner_assistant.jpg",
+    "More Tools": "banner_more_tools.jpg",
+}
+
+
+def paint_slice(painter, art, rect, *, top_height, total_height, dpr, is_top):
+    """Draw part of a full-width header picture: `is_top` is the native top bar, otherwise the area under it.
+
+    Both parts are slices of the same picture, so the seam between them is invisible. Used by Ready Room, whose
+    page is not a normal banner widget.
+    """
+    painter.fillRect(rect, BACKGROUND)
+    width = rect.width()
+    picture = brand_cover(art, width, total_height, round(dpr, 2), 1.0, .5)
+    if not picture.isNull():
+        painter.drawPixmap(0, 0 if is_top else -top_height, picture)
+    if is_top:
+        calm = QLinearGradient(width - 235, 0, width, 0)
+        calm.setColorAt(0, QColor(2, 7, 10, 0))
+        calm.setColorAt(1, QColor(2, 7, 10, 150))
+        painter.fillRect(QRectF(width - 235, 0, 235, rect.height()), calm)
+    fade = QLinearGradient(0, 0, width, 0)
+    fade.setColorAt(0, BACKGROUND)
+    fade.setColorAt(.30, QColor(2, 7, 10, 215))
+    fade.setColorAt(.55, QColor(2, 7, 10, 70))
+    fade.setColorAt(1, QColor(2, 7, 10, 0))
+    painter.fillRect(rect, fade)
 
 
 class _HeaderBackground(QWidget):
@@ -29,11 +62,11 @@ class _HeaderBackground(QWidget):
 
 
 class HeaderBannerArtwork(QObject):
-    INSET = 175  # width of the window-control strip the HD art stays clear of
+    INSET = 175  # width of the window-control strip that is dimmed so the controls stay readable
 
     def __init__(self, window, page, banner, *, route, scene=None, source=(0, 0, 1, 1), excluded=(), art=None):
         super().__init__(page)
-        self.art = art
+        self.art = art or ROUTE_ART.get(route)
         self.window, self.page, self.banner = window, page, banner
         self.route, self.scene = route, scene
         self.source = QRectF(*source)
@@ -74,30 +107,31 @@ class HeaderBannerArtwork(QObject):
         return False
 
     def paint_art(self, widget, *, top=False):
-        """Draw the HD banner picture once across top bar and banner: uniform scale, resampled to real pixels."""
+        """Draw the panoramic HD picture once across top bar and banner, filling the full width at any window size."""
         origin = widget.mapTo(self.window, QPoint())
         banner_origin = self.banner.mapTo(self.window, QPoint())
         header_top = self.window.top_bar.mapTo(self.window, QPoint()).y()
         height = banner_origin.y() + self.banner.height() - header_top
         width = self.banner.width()
-        source = brand_source(self.art)
         painter = QPainter(widget)
         painter.fillRect(widget.rect(), BACKGROUND)
-        if not source.isNull() and height > 0:
-            art_width = max(1, round(source.width() * height / source.height()))
-            picture = brand_scaled(self.art, art_width, height, round(widget.devicePixelRatioF(), 2), False)
-            # Keep the picture clear of the window controls: it ends INSET px before the right edge, and its last
-            # pixel column is stretched over that strip so there is no hard edge.
-            right = banner_origin.x() - origin.x() + width
-            left = right - self.INSET - art_width
-            painter.drawPixmap(left, header_top - origin.y(), picture)
-            strip = picture.copy(picture.width() - 1, 0, 1, picture.height())
-            painter.drawPixmap(QRectF(right - self.INSET, header_top - origin.y(), self.INSET, height), strip,
-                               QRectF(strip.rect()))
-        fade = QLinearGradient(banner_origin.x() - origin.x(), 0, banner_origin.x() - origin.x() + width, 0)
+        left = banner_origin.x() - origin.x()
+        if height > 0 and width > 0:
+            picture = brand_cover(self.art, width, height, round(widget.devicePixelRatioF(), 2), 1.0, .5)
+            if not picture.isNull():
+                painter.drawPixmap(left, header_top - origin.y(), picture)
+        # Quiet the strip behind the window controls so they stay legible on any picture.
+        if top:
+            right = left + width
+            calm = QLinearGradient(right - self.INSET - 60, 0, right, 0)
+            calm.setColorAt(0, QColor(2, 7, 10, 0))
+            calm.setColorAt(1, QColor(2, 7, 10, 150))
+            painter.fillRect(QRectF(right - self.INSET - 60, 0, self.INSET + 60, widget.height()), calm)
+        # Title side: dark enough to read the heading, then the picture opens up.
+        fade = QLinearGradient(left, 0, left + width, 0)
         fade.setColorAt(0, BACKGROUND)
-        fade.setColorAt(.22, QColor(2, 7, 10, 235))
-        fade.setColorAt(.5, QColor(2, 7, 10, 70))
+        fade.setColorAt(.30, QColor(2, 7, 10, 215))
+        fade.setColorAt(.55, QColor(2, 7, 10, 70))
         fade.setColorAt(1, QColor(2, 7, 10, 0))
         painter.fillRect(widget.rect(), fade)
         if not top:
@@ -109,7 +143,7 @@ class HeaderBannerArtwork(QObject):
         painter.end()
 
     def paint(self, widget, *, top=False):
-        if self.art:
+        if self.art and not brand_source(self.art).isNull():
             return self.paint_art(widget, top=top)
         source = self.source
         origin = widget.mapTo(self.window, QPoint())

@@ -81,6 +81,7 @@ class OldFilesSession(QObject):
         window.progress.setRange(0, 0)
         window.progress.show()
         self.message = "Scanning " + ("the selected drive" if mode == "full" else "selected folders") + ": " + root
+        window.progress.set_caption("Scanning " + ("the selected drive" if mode == "full" else "selected folders"))
         self.changed.emit()
         def finish(result, error):
             canceled = window.cancel.is_set()

@@ -14,7 +14,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
-    QAbstractItemView, QButtonGroup, QFrame, QHBoxLayout, QLabel, QListWidget,
+    QAbstractButton, QAbstractItemView, QButtonGroup, QFrame, QHBoxLayout, QLabel, QListWidget,
     QGraphicsDropShadowEffect, QPushButton, QSizePolicy, QStyledItemDelegate, QStyle, QToolButton, QVBoxLayout, QWidget,
 )
 from gg_desktop.widgets import button, column, label, row
@@ -208,6 +208,26 @@ def brand_scaled(name, width, height, dpr, cover):
     return out
 
 
+@lru_cache(maxsize=48)
+def brand_cover(name, width, height, dpr, anchor_x=1.0, anchor_y=.5):
+    """Fill width x height with the picture (no stretching, no gaps), cropping the overflow.
+
+    The picture is resampled once to real device pixels, so a banner that is cropped to a small window and
+    one that fills a 4K screen both stay sharp. `anchor_x` 1.0 keeps the right edge of the picture.
+    """
+    source = brand_source(name)
+    if source.isNull() or width < 1 or height < 1:
+        return QPixmap()
+    pixel_w, pixel_h = max(1, round(width * dpr)), max(1, round(height * dpr))
+    scale = max(pixel_w / source.width(), pixel_h / source.height())
+    sized = source.scaled(max(pixel_w, round(source.width() * scale)), max(pixel_h, round(source.height() * scale)),
+                          Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+    out = sized.copy(round((sized.width() - pixel_w) * anchor_x), round((sized.height() - pixel_h) * anchor_y),
+                     pixel_w, pixel_h)
+    out.setDevicePixelRatio(dpr)
+    return out
+
+
 class Brand(QWidget):
     """The Game Grave logo: a transparent HD PNG, resampled to the screen so it never looks soft."""
 
@@ -243,18 +263,24 @@ class NavRail(QFrame):
 
     def paintEvent(self, event):
         super().paintEvent(event)
+        # Subtle abstract backdrop in the free space under the menu. It only uses room the menu is not using,
+        # so it can never run over a button, and the picture itself fades to transparent at the top.
+        menu_bottom = max((child.geometry().bottom() for child in self.findChildren(QAbstractButton)
+                           if child.isVisibleTo(self)), default=0)
+        free = self.height() - menu_bottom - 14
+        source = brand_source("nav_backdrop.png")
+        if source.isNull() or free < 90:
+            return
+        full = self.width() * source.height() / source.width()
+        shown = min(full, free)
+        width = shown * source.width() / source.height()
+        pix = brand_scaled("nav_backdrop.png", round(width), round(shown), self.devicePixelRatioF(), False)
+        if pix.isNull():
+            return
         p = QPainter(self)
         p.setRenderHint(QPainter.SmoothPixmapTransform)
-        height = min(205, self.height() * .29)
-        area = QRectF(0, self.height() - height, self.width(), height)
-        pix = brand_scaled("forest_hd.png", self.width(), round(height), self.devicePixelRatioF(), True)
-        if not pix.isNull():
-            p.drawPixmap(area.topLeft(), pix)
-        shade = QLinearGradient(0, area.top(), 0, area.bottom())
-        shade.setColorAt(0, QColor("#03080b"))
-        shade.setColorAt(.4, QColor(3, 8, 11, 0))
-        shade.setColorAt(1, QColor(0, 0, 0, 35))
-        p.fillRect(area, shade)
+        p.setOpacity(.9)
+        p.drawPixmap(0, round(self.height() - pix.height() / pix.devicePixelRatio()), pix)
 
 
 class TitleBar(QWidget):
@@ -262,6 +288,13 @@ class TitleBar(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.SmoothPixmapTransform)
+        if getattr(self.window(), "current_route", "") == "Ready Room":
+            from gg_desktop.header_banner import paint_slice
+            from gg_desktop.ready_room import ReadyRoomBackground
+            paint_slice(p, ReadyRoomBackground.ART, QRectF(self.rect()), top_height=self.height(),
+                        total_height=self.height() + ReadyRoomBackground.ART_HEIGHT,
+                        dpr=self.devicePixelRatioF(), is_top=True)
+            return
         source = "old_files" if self.window().current_route == "Old Files" else "games"
         # Decorative ceiling/forest only; original controls start at x=1080.
         draw_crop(p, QRectF(481, 0, 370, 46), source, (700, 0, 370, 46), fill=False)
@@ -353,6 +386,7 @@ class MetricStrip(QFrame):
         self.setLayout(layout)
         self.values = []
         self.captions = []
+        self.cells = []
         for i, metric in enumerate(metrics):
             symbol, value, caption, color, *extra = metric
             cell = QFrame()
@@ -374,6 +408,7 @@ class MetricStrip(QFrame):
             box.addLayout(words)
             box.addStretch()
             cell.setToolTip(extra[0] if extra else caption)
+            self.cells.append(cell)
             layout.addWidget(cell, 1)
             if i < len(metrics) - 1:
                 separator = QFrame()
@@ -381,10 +416,12 @@ class MetricStrip(QFrame):
                 separator.setFixedSize(1, 32)
                 layout.addWidget(separator)
 
-    def set_value(self, index, value, caption=None):
+    def set_value(self, index, value, caption=None, tip=None):
         self.values[index].setText(str(value))
         if caption is not None:
             self.captions[index].setText(caption)
+        if tip is not None:
+            self.cells[index].setToolTip(tip)
 
 
 class TabStrip(QFrame):

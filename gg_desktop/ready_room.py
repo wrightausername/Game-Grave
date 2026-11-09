@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gg_desktop.reference_widgets import brand_scaled, brand_source
+from gg_desktop.reference_widgets import brand_scaled, brand_source  # noqa: F401
 from gg_desktop.ready_room_icons import icon, icon_label
 from gg_desktop.ready_room_data import live_ready_room, reference_ready_room
 from gg_desktop.ready_room_actions import ReadyRoomActions
@@ -83,8 +83,8 @@ def fitted_text(text, role, *, wrap=False):
 
 
 class ReadyRoomBackground(QWidget):
-    """Gaming-room illustration behind the title: one HD picture, uniformly scaled and resampled to real pixels."""
-    ART = "banner_ready_room.png"
+    """Gaming-room picture behind the title: the same full-width HD picture as the top bar, continued below it."""
+    ART = "banner_ready_room.jpg"
     ART_HEIGHT = 98
 
     def __init__(self):
@@ -92,24 +92,16 @@ class ReadyRoomBackground(QWidget):
         self.setObjectName("mainCanvas")
 
     def paintEvent(self, event):
+        from gg_desktop.header_banner import paint_slice
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor("#05090C"))
-        source = brand_source(self.ART)
-        if not source.isNull():
-            art_width = round(source.width() * self.ART_HEIGHT / source.height())
-            picture = brand_scaled(self.ART, art_width, self.ART_HEIGHT, round(self.devicePixelRatioF(), 2), False)
-            left = self.width() - art_width
-            painter.drawPixmap(left, 0, picture)
-            fade = QLinearGradient(left, 0, left + 220, 0)
-            fade.setColorAt(0, QColor("#05090C"))
-            fade.setColorAt(1, QColor(5, 9, 12, 0))
-            painter.fillRect(QRectF(left, 0, 220, self.ART_HEIGHT), fade)
-        if self.width() < 900:
-            shade = QLinearGradient(0, 0, self.width() * .85, 0)
-            shade.setColorAt(0, QColor(5, 9, 12, 250))
-            shade.setColorAt(.7, QColor(5, 9, 12, 205))
-            shade.setColorAt(1, QColor(5, 9, 12, 0))
-            painter.fillRect(QRectF(0, 0, self.width(), 104), shade)
+        bar = getattr(getattr(self.window(), "top_bar", None), "height", lambda: 46)()
+        area = QRectF(0, 0, self.width(), self.ART_HEIGHT)
+        painter.save()
+        painter.setClipRect(area)
+        paint_slice(painter, self.ART, area, top_height=bar, total_height=bar + self.ART_HEIGHT,
+                    dpr=self.devicePixelRatioF(), is_top=False)
+        painter.restore()
         bottom = QLinearGradient(0, 60, 0, 99)
         bottom.setColorAt(0, QColor(5, 9, 12, 0))
         bottom.setColorAt(1, QColor("#05090C"))

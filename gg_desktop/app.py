@@ -23,6 +23,7 @@ from gg_desktop.reference_screens import ScreenMethods
 from gg_desktop.photo_integration import PhotoIntegration
 from gg_desktop.artwork import SteamArtwork
 from gg_desktop.reference_widgets import Brand, NavRail, TitleBar, icon, tool
+from gg_desktop.scan_progress import ScanProgress
 from gg_desktop.ready_room import ReadyRoomMethods
 
 ROUTES = (
@@ -48,38 +49,6 @@ ROUTE_ALIASES = {
     "Cleanup History": "More Tools", "Automation": "More Tools",
     "Make Room": "More Tools", "Storage History": "More Tools",
 }
-
-
-class EdgeProgress(QProgressBar):
-    """A thin progress bar laid over the bottom edge of its parent. It takes no layout space."""
-
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setObjectName("scanProgress")
-        self.setFixedHeight(4)
-        self.setTextVisible(False)
-        self.setRange(0, 100)
-        self.setValue(0)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self.setStyleSheet("QProgressBar#scanProgress{background:rgba(2,7,10,160);border:none;border-radius:0;}"
-                           "QProgressBar#scanProgress::chunk{background:#ff2a4d;border-radius:0;}")
-        parent.installEventFilter(self)
-        self.hide()
-
-    def place(self):
-        parent = self.parentWidget()
-        if parent is not None:
-            self.setGeometry(0, parent.height() - self.height(), parent.width(), self.height())
-            self.raise_()
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.place()
-
-    def eventFilter(self, target, event):
-        if event.type() == QEvent.Resize and target is self.parentWidget():
-            self.place()
-        return False
 
 
 class JobSignals(QObject):
@@ -220,14 +189,17 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             control.setFixedWidth(28)
             topbox.addWidget(control)
         base.addWidget(top)
-        # The scan bar floats along the bottom edge instead of sitting between the top bar and the page, so it never
-        # splits the banner artwork or shifts the layout when a scan starts.
-        self.progress = EdgeProgress(main)
+        # The scan bar sits along the bottom of the main area (never between the top bar and the page), so it is
+        # always visible during a scan without splitting the banner artwork or moving anything at the top.
+        self.progress = ScanProgress(main)
+        self.progress.cancel_requested.connect(self.cancel_scan)
+        self._last_scan_seconds = None
         self.stack_holder = QWidget()
         self.stack_layout = column(spacing=0)
         self.stack_holder.setLayout(self.stack_layout)
         self.page = None
         base.addWidget(self.stack_holder, 1)
+        base.addWidget(self.progress)
         outer.addWidget(main, 1)
         QShortcut(QKeySequence("Ctrl+K"), self, activated=self.global_search.setFocus)
         QShortcut(QKeySequence("F5"), self, activated=self._scan_current_route)
@@ -367,8 +339,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.cancel.clear()
         self.scan_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
-        self.progress.show()
-        self.progress.setValue(0)
+        self.progress.begin(self._last_scan_seconds)
         self.status.setText("Scanning local gaming records. No files are being changed.")
         self._sync_scan_controls()
         settings = dict(self.settings)
@@ -376,19 +347,19 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         settings["never_touch"] = list(rules)
 
         def progress(percent, stage):
-            self.progress.setValue(percent)
+            self.progress.report(percent, stage)
             self.status.setText("Scanning: " + stage + " (" + str(percent) + "%)")
             self._sync_scan_controls()
         def finish(inventory):
             self.scanning = False
             self.scan_button.setEnabled(True)
             self.cancel_button.setEnabled(False)
-            self.progress.setValue(100)
-            self.progress.hide()
+            seconds = self.progress.finish()
             self._sync_scan_controls()
             if self.cancel.is_set():
                 self.status.setText("Scan canceled. The earlier inventory was not replaced.")
                 return
+            self._last_scan_seconds = seconds
             self.inventory = inventory
             self.status.setText(
                 f"Scanned {inventory.scanned_at}  •  {len(inventory.games)} game installs, "
@@ -401,6 +372,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
     def cancel_scan(self):
         if self.scanning:
             self.cancel.set()
+            self.progress.stopping()
             self.status.setText("Stopping the read-only scan…")
             self._sync_scan_controls()
 

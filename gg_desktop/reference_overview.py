@@ -271,6 +271,8 @@ class OverviewScreens:
         page.content.setSpacing(12)
         self.overview_hero = OverviewHero(self)
         page.content.addWidget(self.overview_hero)
+        from gg_desktop.header_banner import HeaderBannerArtwork
+        page.banner_artwork = HeaderBannerArtwork(self, page, self.overview_hero, route="Overview")
         found = bool(self.inventory.scanned_at)
         other_bytes = sum(r.size for r in storage_items(self.inventory))
         values = [

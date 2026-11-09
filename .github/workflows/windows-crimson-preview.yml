@@ -50,7 +50,8 @@ on:
       - 'tests/test_settings.py'
       - 'tools/tools_tab_lock.py'
       - 'tools/shell_polish_smoke.py'
-      - 'tools/make_forest_art.py'
+      - 'tools/banner_art_smoke.py'
+      - 'tools/make_nav_art.py'
       - 'tools/tools_page_smoke.py'
       - 'tests/test_tools.py'
       - 'tools/mods_tab_lock.py'
@@ -126,7 +127,8 @@ on:
       - 'tests/test_settings.py'
       - 'tools/tools_tab_lock.py'
       - 'tools/shell_polish_smoke.py'
-      - 'tools/make_forest_art.py'
+      - 'tools/banner_art_smoke.py'
+      - 'tools/make_nav_art.py'
       - 'tools/tools_page_smoke.py'
       - 'tests/test_tools.py'
       - 'tools/mods_tab_lock.py'
@@ -188,7 +190,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -207,7 +209,9 @@ jobs:
           python tools/tools_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'More Tools tiles, reports, hash checker, health, tasks, log or layout failed in native Qt.' }
           python tools/shell_polish_smoke.py --output _ci_temp
-          if ($LASTEXITCODE -ne 0) { throw 'Shell polish (HD logo, nav order, optional AI Assistant, floating scan bar) failed in native Qt.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Shell polish (HD logo, nav order, optional AI Assistant, scan bar with ETA) failed in native Qt.' }
+          python tools/banner_art_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Header pictures do not fill the full width or show a seam in native Qt.' }
           python tools/games_hd_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Games HD launcher marks or cover art failed in native Qt.' }
           python tools/tools_windows_smoke.py --output _ci_temp
@@ -423,7 +427,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $shots = @('tools-*.png','photo-more-tools-*.png','shell-*.png','ready-room-*.png','games-*.png','mods-*.png','old-files-*.png','crimson-*-1440.png' | ForEach-Object { Get-ChildItem _ci_temp -Filter $_ })
+          $shots = @('tools-*.png','photo-more-tools-*.png','shell-*.png','scan-bar-*.png','banner-*.png','ready-room-*.png','games-*.png','mods-*.png','old-files-*.png','crimson-*-1440.png' | ForEach-Object { Get-ChildItem _ci_temp -Filter $_ })
           if (-not $shots) { Write-Host 'No More Tools screenshots to publish.'; exit 0 }
           $dir = Join-Path $env:RUNNER_TEMP 'tools-shots'
           New-Item -ItemType Directory -Force $dir | Out-Null

@@ -163,8 +163,7 @@ class PhotoIntegration:
         LibraryScreens.mods_page(self)
         page = self.page
         from gg_desktop.header_banner import HeaderBannerArtwork
-        page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Mods",
-                                                  art="banner_mods.png")
+        page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Mods")
         holder = QWidget(page)
         layout = column()
         holder.setLayout(layout)
@@ -209,10 +208,16 @@ class PhotoIntegration:
             checkbox.setText(f"{manager} ({managers[manager]})")
         metrics = self.page.findChild(MetricStrip)
         individuals = [entry for entry in control.catalog.entries if entry.kind == "mod"]
-        metrics.set_value(0, len(individuals) if individuals else len(control.catalog.entries), "Total Mods" if individuals else "Mod Locations")
-        metrics.set_value(1, sum(any(marker == "+" for marker in entry.profiles.values()) for entry in individuals), "Enabled (saved)")
+        from gg_desktop import mods_words
+        if individuals:
+            metrics.set_value(0, len(individuals), *mods_words.TILE_TIPS[0])
+        else:
+            metrics.set_value(0, len(control.catalog.entries), mods_words.FOLDERS_CAPTION, mods_words.FOLDERS_TIP)
+        metrics.set_value(1, sum(any(marker == "+" for marker in entry.profiles.values()) for entry in individuals),
+                          *mods_words.TILE_TIPS[1])
         if control.report:
-            metrics.set_value(3, len(control.report.findings), "Findings · partial" if control.report.limited else "Conflict Findings")
+            metrics.set_value(3, len(control.report.findings), "Conflicts · partial" if control.report.limited else mods_words.TILE_TIPS[3][0],
+                              mods_words.TILE_TIPS[3][1])
         from gg_desktop import mods_page
         mods_page.catalog_changed(self, control)
         self._fill_mods(requested_page=self.mod_pager.page)

@@ -151,6 +151,14 @@ log. Protected engines still need explicit approval before any edit, except wher
 the feature: `ready_room_actions.py`, `ready_room_data.py` and `ready_room_services.py` were released from the byte
 guard for live Steam news (auto-refresh on open and every 30 minutes while open, Last checked, manual Refresh).
 
+Polish pass, second message (owner instruction, 2026-11-08): the owner also reopened the Overview banner, the bottom-left
+sidebar art, the art of every tab's header, the scan bar and the wording of the Mods tab. Decisions: one panoramic HD
+picture per tab (`tools/make_banner_art.py`, `gg_desktop/assets/brand/banner_*.jpg`) fills the full header width at any
+window size and replaces the photo crops in headers; the sidebar backdrop is a subtle abstract gaming picture
+(`tools/make_nav_art.py`) drawn only in free space under the menu; the scan bar is a clear strip with step, percent,
+elapsed time, an "about N left" estimate (only after a step has finished, or from the last scan) and Cancel; the Mods tab
+uses plain words (`gg_desktop/mods_words.py`) without changing any fact it shows or claiming anything is safe.
+
 Active tab: More Tools. The owner's photo is `gg_desktop/assets/references/more_tools.jpg`. Work is confined
 to new `tools_*.py` modules, a `tools_page` delegation in `photo_integration.py` and the More Tools tests and
 tools. Every locked tab above stays frozen.

@@ -93,19 +93,25 @@ def main():
             assert window.mod_table.columnCount() == 7
             assert not window.mod_profile.isVisible()
             statuses = {view.name: window.mod_table.item(i, 5).text() for i, view in enumerate(window._shown_mods)}
-            assert statuses["Mountain Textures"] == "Enabled", statuses
-            assert statuses["Framework"] == "Disabled", statuses
+            assert statuses["Mountain Textures"] == "On", statuses
+            assert statuses["Framework"] == "Off", statuses
             strip = window.page.findChild(MetricStrip)
             assert int(strip.values[0].text()) >= 4, strip.values[0].text()
             assert strip.values[2].text() == "1", "Outdated must come from MO2's saved newestVersion"
             assert int(strip.values[3].text()) >= 2
+            caps = [c.text() for c in strip.captions]
+            assert caps[0] == "Mods Found" and caps[1].startswith("Turned On") and caps[2] == "Updates Available", caps
+            summary = window.mod_summary.text()
+            assert summary.startswith("You have ") and "turned on" in summary and "update" in summary and "conflict" in summary, summary
+            assert "MO2" not in {window.mod_table.item(0, 3).text()}
+            assert strip.cells[3].toolTip(), "Each tile explains itself on hover"
             assert window.grab().save(str(args.output / "mods-page-library-1280.png"))
 
             # Details show real load order position and update evidence.
             window.mod_table.selectRow(row_of(window, "Mountain Textures"))
             settle()
             labels = " ".join(w.text() for w in window.mod_details.findChildren(QLabel))
-            assert "(relative)" in labels and "2.5" in labels, labels
+            assert "#" in labels and " of " in labels and "2.5" in labels and "available" in labels, labels
 
             # Sorting: every option reorders the Library, header clicks toggle direction, Size and Modified are shown.
             from gg_desktop import mods_sort

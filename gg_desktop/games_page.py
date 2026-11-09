@@ -23,8 +23,7 @@ from gg_desktop.widgets import label, panel, row
 class GamesScreens:
     def games_page(self):
         page = self._reference_page("Games", "Your complete game library. All launchers, one place. Manage, clean, and\nkeep your games running at their best.", "games")
-        page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Games",
-                                                  art="banner_games.png")
+        page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Games")
         page.games = GamesActions(self, page)
         page.game_artwork = GamesArtwork(self, page)
         page.game_artwork.set_library(page.games.records, artwork_roots(self.inventory, self.settings))

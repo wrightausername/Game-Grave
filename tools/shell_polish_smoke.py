@@ -89,42 +89,60 @@ def main():
             settle()
             assert window.nav_buttons["AI Assistant"].isHidden() and window.settings.get("assistant_enabled") is False
 
-            # The scan bar floats along the bottom edge, so starting a scan moves nothing and cuts through nothing.
-            for route in ("Mods", "Old Files", "Games", "Ready Room"):
+            # The scan bar sits at the bottom edge: clearly visible, with step, percent, elapsed time and an estimate,
+            # and starting a scan moves nothing at the top (the banner is never cut or shifted).
+            for route in ("Mods", "Old Files", "Games", "Ready Room", "Overview"):
                 window.navigate(route)
                 settle()
-                before = (window.page.geometry(), window.top_bar.geometry())
-                window.progress.setRange(0, 100)
-                window.progress.setValue(40)
-                window.progress.show()
+                before = (window.page.geometry().topLeft(), window.page.geometry().width(), window.top_bar.geometry())
+                window.progress.begin(None)
+                window.progress.report(40, "Mod Radar")
                 settle()
-                assert (window.page.geometry(), window.top_bar.geometry()) == before, route + " shifted when the bar appeared"
+                after = (window.page.geometry().topLeft(), window.page.geometry().width(), window.top_bar.geometry())
+                assert after == before, route + " shifted at the top when the bar appeared"
                 main = window.progress.parentWidget()
-                assert window.progress.geometry().bottom() == main.height() - 1 and window.progress.width() == main.width()
-                assert window.progress.geometry().top() >= window.page.geometry().bottom() - 8, "The bar lives at the bottom edge"
-                window.progress.hide()
+                bar = window.progress
+                assert bar.isVisible() and bar.height() >= 40, "The scan bar is a clear, full-width strip"
+                assert bar.geometry().bottom() == main.height() - 1 and bar.width() == main.width()
+                assert bar.geometry().top() >= window.page.geometry().bottom() - 1, "The bar does not cover the page"
+                assert "step" in bar.stage_label.text() and "Mod Radar" in bar.stage_label.text(), bar.stage_label.text()
+                assert bar.percent_label.text().endswith("%") and int(bar.percent_label.text()[:-1]) >= 40
+                assert "left" in bar.eta_label.text() and bar.elapsed_label.text().count(":") == 1
+                assert bar.cancel_button.isEnabled() and bar.bar.value() >= 400
+                if route == "Mods":
+                    assert window.grab().save(str(args.output / "scan-bar-1280.png"))
+                bar.finish()
                 settle()
+                assert not bar.isVisible()
             assert window.grab().save(str(args.output / "shell-polish-1280.png"))
 
             # HD brand art: full-resolution transparent PNGs, resampled to the real pixel size of the widget.
-            logo, forest = rw.brand_source("game_grave_logo.png"), rw.brand_source("forest_hd.png")
+            logo, forest = rw.brand_source("game_grave_logo.png"), rw.brand_source("nav_backdrop.png")
             assert logo.width() >= 1600 and logo.hasAlphaChannel(), "The logo is a transparent HD PNG"
-            assert forest.width() >= 1736 and forest.height() >= 1432
+            assert forest.width() >= 1184 and forest.height() >= 960 and forest.hasAlphaChannel()
             for dpr in (1.0, 2.0):
                 fitted = rw.brand_scaled("game_grave_logo.png", 200, 48, dpr, False)
                 assert fitted.width() <= round(200 * dpr) and fitted.height() <= round(48 * dpr) and fitted.devicePixelRatio() == dpr
                 assert fitted.width() >= round(200 * dpr) - 1, "The logo fills its box instead of being a small upscaled crop"
-                covered = rw.brand_scaled("forest_hd.png", 219, 205, dpr, True)
-                assert (covered.width(), covered.height()) == (round(219 * dpr), round(205 * dpr))
             image = window.brand.grab().toImage()
             reds = sum(1 for x in range(0, image.width(), 2) for y in range(0, image.height(), 2)
                        if image.pixelColor(x, y).red() > 170 and image.pixelColor(x, y).green() < 90)
             whites = sum(1 for x in range(0, image.width(), 2) for y in range(0, image.height(), 2)
                          if image.pixelColor(x, y).red() > 235 and image.pixelColor(x, y).green() > 235)
             assert reds > 40 and whites > 60, (reds, whites)
-            rail = window.nav_rail.grab().toImage()
-            strip = [rail.pixelColor(x, rail.height() - 120).red() for x in range(0, rail.width(), 6)]
-            assert max(strip) - min(strip) > 30, "The bottom-left backdrop shows the red forest glow"
+            # Sidebar backdrop: abstract art in the free space under the menu only; the menu itself stays clean.
+            for size in ((1280, 800), (1280, 1000)):
+                window.resize(*size)
+                settle()
+                window.navigate("Mods")
+                settle()
+                rail = window.nav_rail
+                image = rail.grab().toImage()
+                last = max(b.geometry().bottom() for b in window.nav_buttons.values() if b.isVisibleTo(rail))
+                drawn = [(x, y) for y in range(image.height() - 90, image.height(), 3) for x in range(0, image.width(), 5)
+                         if image.pixelColor(x, y).red() > 28 and image.pixelColor(x, y).red() > image.pixelColor(x, y).blue() + 8]
+                assert drawn, "The abstract backdrop is visible in the free space at the bottom of the sidebar"
+                assert image.height() - last > 90, "There is room under the menu for the backdrop at this size"
             window.close()
             settle()
     print("PASS: shell polish: HD logo and backdrop, More Tools above Settings, optional AI Assistant off by default, scan bar floats without shifting any page.")
