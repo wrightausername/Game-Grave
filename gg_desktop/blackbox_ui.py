@@ -22,6 +22,19 @@ def build_panel(panel_cls, window):
     return panel
 
 
+def deliver(window, report):
+    """The page can be rebuilt while a report is being made (for example by the live news refresh), so keep the
+    newest report on the window and hand it to whichever panel is showing now."""
+    window.blackbox_last = report
+    panel = getattr(window.page, "blackbox", None)
+    body = getattr(panel, "blackbox", None)
+    if body is not None:
+        try:
+            body.show_report(report)
+        except RuntimeError:
+            pass
+
+
 class BlackBoxBody(QWidget):
     def __init__(self, window):
         super().__init__()
@@ -64,6 +77,9 @@ class BlackBoxBody(QWidget):
         tools.addStretch()
         layout.addLayout(tools)
         self.refresh()
+        last = getattr(window, "blackbox_last", None)
+        if last is not None:
+            self.show_report(last)
 
     def _choices(self):
         seen, items = set(), []
@@ -104,9 +120,10 @@ class BlackBoxBody(QWidget):
         def work(_progress):
             import core
             return bb.build_report(game.name, game.install_path, activity=core.get_activity())
-        self.window_owner.job(work, self._built, error_title="Black Box could not build the report")
+        self.window_owner.job(work, lambda report: deliver(self.window_owner, report),
+                              error_title="Black Box could not build the report")
 
-    def _built(self, report):
+    def show_report(self, report):
         self.report = report
         self.text = bb.render(report)
         self.saved = None

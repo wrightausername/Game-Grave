@@ -51,6 +51,9 @@ def main():
             settle(20)
             assert datetime.now() < end, "Timed out waiting for " + label
 
+    def live(window):
+        return window.page.blackbox.blackbox
+
     with tempfile.TemporaryDirectory(prefix="GG-blackbox-") as temp:
         root = Path(temp)
         install = root / "Skyrim"
@@ -95,11 +98,12 @@ def main():
             window.inventory.scanned_at = "Disposable Black Box QA"
             window.navigate("Ready Room")
             settle()
-            body = window.page.blackbox.blackbox
+            body = live(window)
             assert body.games.count() == 2 and body.build_button.isEnabled()
             body.games.setCurrentIndex(body.games.findText("The Elder Scrolls V: Skyrim Special Edition"))
             body.build_button.click()
-            wait_for(lambda: body.report is not None, "the report")
+            wait_for(lambda: live(window).report is not None, "the report")
+            body = live(window)
             report = body.report
             assert len(report.crashes) == 1 and report.crashes[0].exe == "SkyrimSE.exe", report.crashes
             assert [f.path for f in report.logs] == [str(Path("crash") / "crash-2026-11-08.dmp")], report.logs
@@ -116,16 +120,23 @@ def main():
             assert window.grab().save(str(args.output / "ready-room-blackbox-1280.png"))
 
             with patch("gg_desktop.blackbox_core.blackbox_dir", return_value=root / "reports"):
+                settle(100)
+                body = live(window)
                 body.save_button.click()
             assert body.saved is not None and body.saved.read_text(encoding="utf-8") == shown
             assert body.saved.parent == root / "reports"
 
             body.games.setCurrentIndex(body.games.findText("Cyberpunk 2077"))
             body.build_button.click()
-            wait_for(lambda: body.report is not None and body.report.game == "Cyberpunk 2077", "the empty report")
+            wait_for(lambda: live(window).report is not None and live(window).report.game == "Cyberpunk 2077", "the empty report")
+            body = live(window)
             text = body.view.toPlainText()
             assert "None found in the Windows Application log for this game." in text
             assert body.summary.text().startswith("0 crashes recorded by Windows, 0 log or dump files")
+            # A rebuilt page still shows the newest report.
+            window.navigate("Ready Room")
+            settle()
+            assert live(window).report is not None and live(window).report.game == "Cyberpunk 2077"
             error.assert_not_called()
     print("Black Box smoke passed")
 
