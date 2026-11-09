@@ -339,7 +339,7 @@ def score_for(plan: Plan | None, chosen: int) -> Score:
     if not checked:
         return Score("Not supported", "muted", "None of your preferences were found in this game's settings file.")
     skipped = len(plan.unsupported)
-    note = f" {skipped} of your preferences are not supported by this game." if skipped else ""
+    note = f" {skipped} of your preferences {'is' if skipped == 1 else 'are'} not supported by this game." if skipped else ""
     if plan.differing:
         return Score(f"{len(plan.differing)} to apply", "amber",
                      f"{len(plan.matching)} of {checked} supported preferences already match.{note}")
