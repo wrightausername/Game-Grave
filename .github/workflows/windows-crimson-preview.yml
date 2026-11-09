@@ -53,6 +53,7 @@ on:
       - 'tools/banner_art_smoke.py'
       - 'tools/make_nav_art.py'
       - 'tools/tools_page_smoke.py'
+      - 'tools/tools_shield_smoke.py'
       - 'tests/test_tools.py'
       - 'tools/mods_tab_lock.py'
       - 'tools/mods_page_smoke.py'
@@ -131,6 +132,7 @@ on:
       - 'tools/banner_art_smoke.py'
       - 'tools/make_nav_art.py'
       - 'tools/tools_page_smoke.py'
+      - 'tools/tools_shield_smoke.py'
       - 'tests/test_tools.py'
       - 'tools/mods_tab_lock.py'
       - 'tools/mods_page_smoke.py'
@@ -218,6 +220,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Games HD launcher marks or cover art failed in native Qt.' }
           python tools/tools_windows_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'The seven Windows tools failed in native Qt.' }
+          python tools/tools_shield_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Mod Shield failed in native Qt.' }
           python tools/mods_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Mods status, tabs, bulk actions or sources failed in native Qt.' }
           python tools/old_files_page_smoke.py --output _ci_temp

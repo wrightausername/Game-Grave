@@ -164,6 +164,14 @@ Active tab: More Tools. The owner's photo is `gg_desktop/assets/references/more_
 to new `tools_*.py` modules, a `tools_page` delegation in `photo_integration.py` and the More Tools tests and
 tools. Every locked tab above stays frozen.
 
+Mod Shield (owner request, 2026-11-08, "Implement"): built on branch `claude/mod-shield`. The Utilities tile "Bulk File
+Manager" (a link to Old Files) became "Mod Shield", the one change from the More Tools photo. `gg_desktop/mod_shield.py`
+(no Qt) and `gg_desktop/tools_shield.py` (dialog) only read: they list programs, scripts, disguised names and code
+libraries outside known mod loader folders, compute SHA-256 fingerprints, open VirusTotal with the fingerprint only
+when clicked, and run Microsoft Defender only after confirmation with `-DisableRemediation` (report only). Nothing is
+called malware or safe, and nothing is moved, changed or deleted. Checked by `tests/test_mod_shield.py` and
+`tools/tools_shield_smoke.py`. Not yet signed off.
+
 Earlier history (kept for context; none of these tabs is open):
 
 Games: the owner reopened it to finish launcher management, ownership/update/playtime

@@ -49,6 +49,14 @@ class Registry(unittest.TestCase):
             self.assertEqual((t.kind, t.target), (data.RUN, t.key))
         self.assertEqual([t.key for t in data.all_tiles() if t.kind == data.OFF], [])
 
+    def test_mod_shield_replaces_the_bulk_file_link_and_only_reads(self):
+        tiles = {t.key: t for t in data.all_tiles()}
+        self.assertNotIn("bulk_files", tiles)
+        shield = tiles["mod_shield"]
+        self.assertEqual((shield.kind, shield.target, shield.title), (data.RUN, "mod_shield", "Mod Shield"))
+        self.assertIn("only reads", shield.note)
+        self.assertIn(shield, next(c for c in data.CATEGORIES if c.key == "utilities").tiles)
+
     def test_no_tile_text_claims_safety_or_freed_space(self):
         for t in data.all_tiles():
             text = (t.title + " " + t.note).casefold()

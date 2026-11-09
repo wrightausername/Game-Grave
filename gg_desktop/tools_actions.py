@@ -50,12 +50,18 @@ def run_action(window, key):
                "game_report": lambda: export_games(window),
                "mod_report": lambda: export_mods(window),
                "system_report": lambda: export_system(window),
-               "hash": lambda: choose_hash_file(window)}.get(key)
+               "hash": lambda: choose_hash_file(window),
+               "mod_shield": lambda: _open_shield(window)}.get(key)
     if handler is None:
         from gg_desktop import tools_windows
         handler = (lambda: tools_windows.HANDLERS[key](window)) if key in tools_windows.HANDLERS else None
     if handler:
         handler()
+
+
+def _open_shield(window):
+    from gg_desktop import tools_shield
+    return tools_shield.open_shield(window)
 
 
 def run_quick(window, key):

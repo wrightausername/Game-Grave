@@ -5,6 +5,8 @@ Honesty rules for this tab:
 * Owner-approved exception (polish pass): seven tiles change or inspect Windows (Windows Cleanup, Game Optimizer,
   Memory Optimizer, Startup Manager, Command Runner, File Associations, Junction Manager). Each one names exactly what
   it will change, asks first and writes the activity log. See `winpc.py` and `tools_windows.py`.
+* Mod Shield (owner request 2026-11-08, replaces the Bulk File Manager link) only reads mod folders and lists files worth a
+  look. See `mod_shield.py` and `tools_shield.py`.
 * A tile that cannot work would stay visible, dimmed, and say why. Nothing else changes Windows or runs commands.
 * Reports carry only numbers the scan reported. Sizes are "reported", never "freed", and nothing is called safe.
 """
@@ -68,7 +70,7 @@ CATEGORIES = (
     Category("utilities", "Utilities", "Handy tools for everyday tasks.", "blue", (
         Tile("screenshot_tools", "Screenshot Tools", "camera", GO, "Captures", "Screenshots are reviewed in Captures."),
         Tile("recording_tools", "Recording Tools", "radio", GO, "Captures", "Recordings are reviewed in Captures."),
-        Tile("bulk_files", "Bulk File Manager", "folder", GO, "Old Files", "Review many files at once in Old Files."),
+        Tile("mod_shield", "Mod Shield", "shield", RUN, "mod_shield", "Look through mod folders for programs, scripts and disguised files. It only reads; nothing is changed."),
         Tile("hash_checker", "Hash Checker", "check", RUN, "hash", "Compute a SHA-256 checksum of any file you choose."))),
     Category("advanced", "Advanced Tools", "Powerful tools for experienced users.", "yellow", (
         Tile("command_runner", "Command Runner", "list", RUN, "command_runner", "Run one command line you type or pick, after you see it and confirm."),
