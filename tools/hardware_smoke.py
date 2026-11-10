@@ -173,12 +173,12 @@ def main():
             assert body(window).pc_tab.isVisible() and not body(window).adv_tab.isVisible()
             window.page.ensureWidgetVisible(body(window).monitor_panel)
             settle(100)
-            hw = body(window)
+            page_body = body(window)
             # The Live Monitor is the centre of the tab: full width, above Your Parts and Drives, with big gauges.
-            assert hw.monitor_panel.width() >= hw.rig.width() * 0.9, (hw.monitor_panel.width(), hw.rig.width())
-            assert hw.monitor_panel.y() < hw.parts_panel.y() and hw.monitor_panel.y() < hw.drives_panel.y()
-            assert all(g.width() >= 140 for g in hw.gauges.values()), [g.width() for g in hw.gauges.values()]
-            assert all(c.height() >= 120 for c, _ in hw.charts.values())
+            assert page_body.monitor_panel.width() >= page_body.rig.width() * 0.9, (page_body.monitor_panel.width(), page_body.rig.width())
+            assert page_body.monitor_panel.y() < page_body.parts_panel.y() and page_body.monitor_panel.y() < page_body.drives_panel.y()
+            assert all(g.width() >= 140 for g in page_body.gauges.values()), [g.width() for g in page_body.gauges.values()]
+            assert all(c.height() >= 120 for c, _ in page_body.charts.values())
             assert window.grab().save(str(args.output / "hardware-full-1366.png"))
             pressed(window, "Upgrade Advisor").click()
             window.resize(1366, 790)
