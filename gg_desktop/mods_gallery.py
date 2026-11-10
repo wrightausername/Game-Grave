@@ -253,13 +253,23 @@ class ModCard(QFrame):
             self.style().polish(self)
 
     def mousePressEvent(self, event):
+        # Accept the press. An ignored press travels up to the main window, whose edge-resize handler reads it as a drag
+        # on the window border and starts a system resize, which blocks until the mouse is released somewhere else.
         if event.button() == Qt.LeftButton:
             self.activated.emit(self.c.facts.index)
+            event.accept()
+            return
         super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        event.accept()
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.opened.emit(self.c.facts.index)
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space):
