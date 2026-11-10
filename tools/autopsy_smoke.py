@@ -83,7 +83,18 @@ def main():
             assert not panel.strip_open and panel.maximumHeight() <= 50, "Autopsy starts as one slim line"
 
             # The automatic pass finds both captures on its own, with no click and no dialog.
-            wait_for(lambda: len(live(window).entries) == 2, "the automatic pass")
+            try:
+                wait_for(lambda: len(live(window).entries) == 2, "the automatic pass", seconds=45)
+            except AssertionError:
+                from gg_desktop import autopsy_library as _lib
+                print("DIAG", {"scanning": getattr(window, "scanning", None), "cleaning": getattr(window, "cleaning", None),
+                               "visible": window.isVisible(), "busy": getattr(window, "autopsy_busy", None),
+                               "last": getattr(window, "autopsy_last_pass", None),
+                               "notes": getattr(window, "autopsy_notes", None),
+                               "entries": len(live(window).entries), "found": [p.name for p in found.iterdir()],
+                               "candidates": _lib.find_candidates([found], set())},
+                      flush=True)
+                raise
             body = live(window)
             assert "2 of 10 kept" in panel.detail_label.text() and "better" in panel.detail_label.text(), panel.detail_label.text()
             comparison = body.result.comparison

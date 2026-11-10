@@ -18,6 +18,8 @@ from gg_desktop.widgets import button, column, label, row
 
 TONES = {"green": "#35DC7C", "amber": "#DFAC46", "muted": "#9AA4AC"}
 BEFORE_COLOR, AFTER_COLOR = "#CED3D8", "#E5384F"
+RETRY_MS = 8 * 1000             # when Game Grave's own scan is busy, look again soon (at most RETRY_LIMIT times per start)
+RETRY_LIMIT = 6
 TICK_MS = 5 * 60 * 1000          # how often a visible panel checks whether a pass is due (the check itself is free)
 INTRO = ("Game Grave looks in the folders PresentMon, CapFrameX and FrameView save to, about every 30 minutes while "
          "this page is open and no game is running. It keeps the newest ten captures and compares the latest two of "
@@ -211,6 +213,7 @@ class AutopsyBody(QWidget):
         if saved:
             self.note.setText(saved.get("note", ""))
         # Only a visible page checks, and only when a pass is due and no game is running.
+        self._retries = 0
         self.timer = QTimer(self)
         self.timer.setInterval(TICK_MS)
         self.timer.timeout.connect(self.auto_scan)
@@ -303,6 +306,12 @@ class AutopsyBody(QWidget):
             return
         if scan_allowed(owner):
             run_pass(owner)
+        elif (getattr(owner, "scanning", False) or getattr(owner, "cleaning", False)) \
+                and lib.due(getattr(owner, "autopsy_last_pass", None)) and self._retries < RETRY_LIMIT:
+            # Another job of Game Grave's own is busy: look again shortly instead of waiting for the next five minute tick.
+            # A running game never schedules a retry; that waits for the slow tick.
+            self._retries += 1
+            QTimer.singleShot(RETRY_MS, self.auto_scan)
 
     def check_now(self):
         if getattr(self.window_owner, "autopsy_busy", False):
