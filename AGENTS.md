@@ -228,12 +228,18 @@ nothing is contacted automatically. The rest of Settings stays locked.
 
 Mod Bisect, engine only (owner instruction, 2026-11-10, "I like 1", plus a request for a sophisticated recently-added ordering):
 `gg_desktop/bisect_core.py` is a pure decision engine with no screen, no file access and no game launch. It proposes one
-test at a time (exactly these mods on), the owner answers crashed / fine / not sure, and it updates its belief. Suspicion
-weights (added after the game last worked, contains scripts or plugins, named in a crash log) only order the tests; only
-the owner's answers count as proof. It checks the crash reproduces with everything on and stops with everything off (else
-"not a mod"), keeps dependencies together, handles crashes that do not always happen with a detection rate and repeat
-runs, runs a fix check and a repro check before naming a culprit, finds two mods that only crash together, and refuses to
-name a cause that needed a very unlikely answer. `recent_order` gives the newest-first ordering with plain reasons.
+test at a time (exactly these mods on), the owner answers crashed / fine / not sure, and it narrows with delta debugging, so
+it works for any number of mods that conflict (one mod, a pair, a group, or several separate causes found one after another).
+Every named group is proven by the owner's own launches: it crashes on its own (asked twice), taking away any one member
+stops it, and with every found cause off the game runs. Timing clues only ORDER the search and never decide it: "started
+after I added these" (`hint_keys`), "started in this time" (`window`), "last time it worked" (`last_good`), code mods, crash-log
+hits. A wrong clue costs launches, never correctness. `batches` groups mods installed together so a downloaded pack can be
+picked from a list; `recent_order` gives the newest-first ordering with plain reasons. It checks the crash reproduces with
+everything on and stops with everything off (else "not a mod"), keeps dependencies together, handles crashes that do not
+always happen with a detection rate and repeat runs (confidence is stated, never 100% when it is not), reports which single
+member is enough to switch off, and stops honestly ("undetermined", with what it narrowed to) after MAX_TESTS launches.
+It never calls anything safe. Measured with 400 random cases (10 to 400 mods, 1 to 8 mods per cause, up to 3 causes,
+dependencies, always-on mods, flaky crashes, right and wrong clues): 0 wrong answers; 97% finished, the rest (all 400-mod cases with several large causes) stopped honestly.
 No Mods tab screen, file move or mod-manager write exists yet; building those needs the owner's go-ahead on the screen and
 on what Bisect may change. Mods stays open only for graphics and, now, this feature.
 

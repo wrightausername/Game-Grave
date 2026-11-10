@@ -1,39 +1,42 @@
-"""Mod Bisect: find the mod behind a crash with as few launches as the evidence allows.
+"""Mod Bisect: find which mods are behind a crash, however many of them there are.
 
 This is the decision engine only. It never touches a file and never launches a game. It is told which mods exist
 (and what is known about each), it proposes one test at a time ("run the game with exactly these mods on"), the owner
-runs it and answers crashed / fine / not sure, and the engine updates what it believes.
+runs it and answers crashed / fine / not sure, and the engine decides the next test.
 
-Why this is more than "disable half, try again":
-* Every mod starts with a suspicion weight built from facts it was given, not guesses: added after the last time the
-  game worked, contains scripts or plugins (assets such as textures rarely crash a game), named in a crash log. The
-  weights only decide which tests are asked first. Only the owner's test results ever count as proof.
-* Each test splits the remaining suspicion in half, not the number of mods, so a recent script mod is checked early.
-* Mods that need other mods are switched on and off together, so a test never builds a setup that cannot load.
-* A crash that does not always happen is handled with a detection rate and repeat runs: one "fine" run proves little
-  when the crash only appears half the time, and the engine says so instead of clearing a mod.
-* It first checks that the crash really happens with everything on, and that it stops with every mod off. If it does
-  not stop, the cause is not a mod and the engine says that and stops.
-* Before it names a culprit it runs a fix check (without the mod the crash is gone) and a repro check (with only that
-  mod, plus what it needs, the crash returns). If the data only fit two mods that crash together, it finds that pair.
-* A wrong tap can be undone. Nothing is concluded from a single contradiction.
+What "reliable" means here. The answer is never inferred from a guess or from a date. It is a set of mods that your
+own launches showed to be the cause:
+  1. With only that set (plus mods that cannot be turned off) the game crashes.
+  2. Take away any one mod of the set (and whatever needs it) and the crash stops. So nothing in it is spare.
+  3. With the set off and every other mod on, the game runs. If it still crashes, there is another, separate cause;
+     the search repeats until the game runs, and every cause is listed.
+It works for one mod, two mods that only crash together, ten, or several unrelated causes at once, because it keeps
+shrinking a crashing setup until nothing more can be taken away (the "delta debugging" method) instead of assuming
+one culprit.
+
+What the clues do. Dates, "it started after I added these", a pack you downloaded, and crash-log hits are only
+hints that decide which tests run first, so the answer usually arrives in far fewer launches. A wrong hint costs
+launches, never correctness: the first tests check the hinted mods and the rest separately, and the three checks
+above are always run before anything is named.
+
+Other things it does: it first checks that the crash really happens with everything on and stops with every mod
+off (otherwise it says the cause is not a mod); it keeps mods that need each other together; crashes that do not
+always happen get repeat runs, and the answer says how sure it is; a wrong tap can be undone.
+
+What it cannot know: it assumes the crash depends only on which mods are on. A crash that depends on one particular
+save, or on the order mods load in, can look unrelated to any mod; the engine says so when the results do not fit.
 
 Pure Python (no Qt) so every rule is unit tested.
 """
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-CONFIDENCE = 0.95      # a verdict needs this much belief, after the fix and repro checks
-CLEARED = 0.05         # a mod whose belief fell below this share of where it started is cleared and left on
-SLIP = 0.01            # chance a "crash" is caused by something we are not modelling
-OUTSIDE = "__outside_mods__"
-OUTSIDE_PRIOR = 0.03   # chance the cause is not a mod at all, before any test
-PAIR_MASS = 0.15       # belief given to "two mods together" once single mods stop fitting
-PAIR_LIMIT = 80        # pairs are searched among this many most suspicious mods
-MAX_TESTS = 60
-SURPRISE = 0.05        # a result this unlikely under a theory counts against it
+MAX_TESTS = 400            # a search that needs more says where it got to instead of running forever
+MAX_CAUSES = 8             # separate causes found one after another
+PROOF_MISS = 0.001         # chance a real crash goes unseen in a check that must be trustworthy
+HOUR = 3600.0
 DAY = 86400.0
 
 
@@ -51,29 +54,62 @@ class Unit:
 
 @dataclass(frozen=True)
 class Test:
-    purpose: str                       # baseline, empty, search, fix, repro
+    purpose: str                       # baseline, empty, narrow, check, clear
     enabled: frozenset                 # exactly these units on, everything else off
-    runs: int                          # launches to do before answering "fine"
+    runs: int                          # launches to do before answering "fine"; stop at the first crash
     why: str
-    expected: str = ""                 # for fix ("ok") and repro ("crash"), else ""
-    under_test: tuple = ()             # units whose status this test is about
+    expected: str = ""                 # "crash" or "ok" when the test is a check, else ""
+    under_test: tuple = ()             # units this test is about
 
 
 @dataclass(frozen=True)
 class Verdict:
-    kind: str                          # culprit, interaction, outside, unreproducible, undetermined
-    keys: tuple
-    confidence: float
+    kind: str                          # culprit, interaction, multiple, outside, unreproducible, undetermined
+    keys: tuple                        # every mod named as part of a cause
+    confidence: float                  # 1.0 when the crash is reliable and all checks passed
     text: str
+    groups: tuple = ()                 # one tuple of keys per separate cause
+    fixes: tuple = ()                  # mods that, turned off alone, were shown to stop the crash
+
+
+@dataclass(frozen=True)
+class Batch:
+    start: float
+    end: float
+    keys: tuple
 
 
 def _plural(n, word):
-    return f"{n} {word}" + ("" if n == 1 else "s")
+    if n == 1:
+        return f"{n} {word}"
+    return f"{n} {word}" + ("es" if word.endswith(("ch", "sh", "s", "x")) else "s")
 
 
-def suspicion(unit: Unit, last_good: float | None, now: float | None) -> tuple[float, list]:
+def _sure(confidence):
+    if confidence >= 0.995:
+        return "over 99%"
+    return f"about {int(100 * confidence)}%"
+
+
+def _percent(p):
+    """A chance as text that never rounds a real risk down to nothing."""
+    if p <= 0:
+        return "0%"
+    if p < 0.01:
+        return "less than 1%"
+    return f"{round(100 * p)}%"
+
+
+def suspicion(unit: Unit, last_good: float | None, now: float | None, hinted: bool = False,
+              in_window: bool = False) -> tuple[float, list]:
     """Weight and the plain reasons behind it. These only order the tests."""
     weight, reasons = 1.0, []
+    if hinted:
+        weight *= 60.0
+        reasons.append("you said the crashes started after adding it")
+    if in_window:
+        weight *= 12.0
+        reasons.append("added in the time you named")
     if unit.kind == "code":
         weight *= 3.0
         reasons.append("contains scripts or plugins, which can crash a game")
@@ -112,21 +148,50 @@ def recent_order(units, last_good: float | None = None, now: float | None = None
     return rows
 
 
+def batches(units, gap_hours: float = 6.0) -> list:
+    """Mods installed together, newest batch first. A pack or a modlist you downloaded lands as one batch, so
+    "when I downloaded the pack" can be picked from a list instead of remembered as a date."""
+    dated = sorted((u for u in units if u.added is not None), key=lambda u: u.added)
+    found, current = [], []
+    for unit in dated:
+        if current and unit.added - current[-1].added > gap_hours * HOUR:
+            found.append(current)
+            current = []
+        current.append(unit)
+    if current:
+        found.append(current)
+    out = [Batch(group[0].added, group[-1].added, tuple(u.key for u in group)) for group in found]
+    out.sort(key=lambda b: -b.end)
+    return out
+
+
+class _OutOfBudget(Exception):
+    pass
+
+
 class Session:
     def __init__(self, units, *, last_good: float | None = None, now: float | None = None,
-                 detect: float = 1.0, runs: int = 1):
+                 hint_keys=(), window: tuple | None = None, detect: float = 1.0, runs: int = 1):
         self.units = {u.key: u for u in units}
         self.pinned = frozenset(k for k, u in self.units.items() if u.pinned)
-        self.detect = min(max(detect, 0.05), 0.99)
+        self.detect = min(max(detect, 0.05), 1.0)
         self.runs = max(1, int(runs))
-        self.weights, self.reasons = {}, {}
+        self._requires = {k: tuple(r for r in u.requires if r in self.units) for k, u in self.units.items()}
+        hinted = {k for k in hint_keys if k in self.units}
+        self.weights, self.reasons, self.priority = {}, {}, set()
         for key, unit in self.units.items():
             if key in self.pinned:
                 continue
-            self.weights[key], self.reasons[key] = suspicion(unit, last_good, now)
+            in_window = bool(window and unit.added is not None and window[0] <= unit.added <= window[1])
+            self.weights[key], self.reasons[key] = suspicion(unit, last_good, now, key in hinted, in_window)
+            if key in hinted or in_window:
+                self.priority.add(key)
+        if not self.priority and last_good is not None:
+            self.priority = {k for k in self.weights if (self.units[k].added or 0) > last_good and self.units[k].added}
         self.tests: list[tuple[Test, str]] = []
         self.unsure = 0
-        self._requires = {k: tuple(r for r in u.requires if r in self.units) for k, u in self.units.items()}
+        self._focus = frozenset(self.weights)
+        self._causes: list = []
 
     # ------------------------------------------------------------ dependencies
     def closure(self, keys) -> frozenset:
@@ -142,7 +207,10 @@ class Session:
 
     def dependents(self, key) -> frozenset:
         """The key plus every unit that needs it: what has to go off with it."""
-        out, changed = {key}, True
+        return self.dependents_of({key})
+
+    def dependents_of(self, keys) -> frozenset:
+        out, changed = set(keys), True
         while changed:
             changed = False
             for k, needs in self._requires.items():
@@ -151,228 +219,242 @@ class Session:
                     changed = True
         return frozenset(out)
 
-    # ------------------------------------------------------------ belief
-    def _hypotheses(self, pairs: bool) -> dict:
-        """theory -> prior belief. A theory is one mod, two mods together, or "not a mod"."""
-        keys = list(self.weights)
-        total = sum(self.weights.values()) or 1.0
-        mass = 1.0 - OUTSIDE_PRIOR - (PAIR_MASS if pairs else 0.0)
-        theories = {OUTSIDE: OUTSIDE_PRIOR}
-        for key in keys:
-            theories[frozenset([key])] = mass * self.weights[key] / total
-        if pairs:
-            pool = set(keys)
-            for test, result in self.tests:
-                if result == "crash":
-                    pool &= test.enabled
-            top = sorted(pool, key=lambda k: (-self.weights[k], k))[:PAIR_LIMIT]
-            norm = sum(self.weights[a] * self.weights[b] for i, a in enumerate(top) for b in top[i + 1:]) or 1.0
-            for i, a in enumerate(top):
-                for b in top[i + 1:]:
-                    theories[frozenset([a, b])] = PAIR_MASS * self.weights[a] * self.weights[b] / norm
-        return theories
-
-    def _likelihood(self, theory, test: Test, result: str) -> float:
-        q = 1.0 - (1.0 - self.detect) ** test.runs      # chance a crashing setup shows its crash in these runs
-        inside = theory == OUTSIDE or theory <= test.enabled
-        if result == "crash":
-            return q if inside else SLIP
-        return (1.0 - q) if inside else 1.0
-
-    def _belief(self, pairs: bool):
-        theories = self._hypotheses(pairs)
-        surprises = {t: 0 for t in theories}
-        post = dict(theories)
-        for test, result in self.tests:
-            for t in post:
-                lik = self._likelihood(t, test, result)
-                post[t] *= lik
-                if lik < SURPRISE:
-                    surprises[t] += 1
-        total = sum(post.values())
-        if total <= 0:
-            return {t: 1.0 / len(post) for t in post}, surprises
-        return {t: v / total for t, v in post.items()}, surprises
-
-    def posterior(self):
-        """(belief by theory, whether two-mod theories are in play, results each theory got badly wrong).
-
-        Pairs join when no single mod fits the results. A theory that needed a very unlikely result to be true is
-        never named as the cause, however large its share of the belief, because shares always add up to one."""
-        single, surprises = self._belief(False)
-        if any(s == 0 for t, s in surprises.items() if t != OUTSIDE) or not self.tests:
-            return single, False, surprises
-        both, surprises = self._belief(True)
-        return both, True, surprises
-
-    def suspects(self):
-        """Mods ranked by how strongly the evidence points at them, with the reasons."""
-        belief, _, _ = self.posterior()
-        score = {k: 0.0 for k in self.weights}
-        for theory, p in belief.items():
-            if theory != OUTSIDE:
-                for key in theory:
-                    score[key] += p
-        rows = [(self.units[k], min(1.0, score[k]), self.reasons[k]) for k in score]
-        rows.sort(key=lambda r: (-r[1], r[0].name.lower()))
-        return rows
-
-    # ------------------------------------------------------------ planning
-    def _test(self, purpose, enabled, why, expected="", under=(), runs=None) -> Test:
-        return Test(purpose, self.closure(set(enabled) | set(self.pinned)), runs or self.runs, why, expected, tuple(under))
+    # ------------------------------------------------------------ runs and confidence
+    def _miss(self, runs: int) -> float:
+        return (1.0 - self.detect) ** runs
 
     def _proof_runs(self) -> int:
-        """Launches so that a missed crash is under 1% likely: one 'fine' run proves little for a flaky crash."""
-        miss = 1.0 - self.detect
-        return max(self.runs, min(12, math.ceil(math.log(0.01) / math.log(miss)))) if miss > 0.0 else self.runs
+        """Launches so that a real crash goes unseen less than 0.1% of the time."""
+        if self.detect >= 1.0:
+            return self.runs
+        return max(self.runs, min(12, math.ceil(math.log(PROOF_MISS) / math.log(1.0 - self.detect))))
 
-    def _ran(self, purpose, enabled):
-        return any(t.enabled == enabled for t, _ in self.tests)
+    def _enabled(self, free_keys) -> frozenset:
+        return self.closure(set(free_keys) | set(self.pinned))
 
-    def _find(self, purpose):
-        for test, result in self.tests:
-            if test.purpose == purpose:
-                return test, result
-        return None
+    def _test(self, purpose, free_keys, why, *, runs=None, expected="", under=()) -> Test:
+        return Test(purpose, self._enabled(free_keys), runs or self.runs, why, expected, tuple(under))
 
+    def _names(self, keys, limit=6) -> str:
+        names = [self.units[k].name for k in sorted(keys, key=lambda k: self.units[k].name.lower())]
+        more = len(names) - limit
+        return ", ".join(names[:limit]) + (f" and {more} more" if more > 0 else "")
+
+    # ------------------------------------------------------------ the search
+    def _asker(self):
+        memo = {}
+        budget = [0]
+
+        def ask(test, fresh=False):
+            known = memo.get(test.enabled)
+            if not fresh and known and (known[0] == "crash" or known[1] >= test.runs):
+                return known[0]
+            if budget[0] >= MAX_TESTS:
+                raise _OutOfBudget()
+            budget[0] += 1
+            result = yield test
+            memo[test.enabled] = (result, test.runs)
+            return result
+        return ask
+
+    def _chunks(self, focus, n):
+        order = sorted(focus, key=lambda k: (k not in self.priority, -self.weights[k], k))
+        inside = sum(1 for k in order if k in self.priority)
+        if n == 2 and 0 < inside < len(order):
+            return [order[:inside], order[inside:]]
+        size, extra = divmod(len(order), n)
+        out, at = [], 0
+        for i in range(n):
+            step = size + (1 if i < extra else 0)
+            out.append(order[at:at + step])
+            at += step
+        return [c for c in out if c]
+
+    def _shrink(self, focus, ask):
+        """Delta debugging: keep a crashing set and take pieces away until nothing more can go.
+
+        At two pieces each half is tried on its own. At finer cuts the pieces are taken away one after the
+        other, least suspicious first, and every piece that is not needed stays removed for the rest of the pass."""
+        focus = frozenset(focus)
+        n = 2
+        while len(focus) > 1:
+            self._focus = focus
+            chunks = self._chunks(focus, min(n, len(focus)))
+            reduced = False
+            if len(chunks) <= 2:
+                for chunk in chunks:                               # does a half alone crash?
+                    part = self.closure(chunk) & focus
+                    if part and part != focus:
+                        test = self._test("narrow", part, f"Only these {_plural(len(part), 'mod')} on: "
+                                          "does it still crash? If yes, the cause is inside them.", under=part)
+                        if (yield from ask(test)) == "crash":
+                            focus, reduced = frozenset(part), True
+                            break
+                if reduced:
+                    continue
+            current = focus
+            for chunk in reversed(chunks):                         # does it still crash without a piece?
+                rest = current - self.dependents_of(chunk)
+                if rest and rest != current:
+                    test = self._test("narrow", rest, f"Without these {_plural(len(chunk), 'mod')}: does it "
+                                      "still crash? If yes, none of them is needed for the crash.", under=chunk)
+                    if (yield from ask(test)) == "crash":
+                        current, reduced = frozenset(rest), True
+            if reduced:
+                focus, n = current, max(2, n // 2)
+                continue
+            if n >= len(focus):
+                break
+            n = min(len(focus), n * 2)
+        self._focus = focus
+        return focus
+
+    def _flow(self):
+        ask = self._asker()
+        everyone = frozenset(self.weights)
+        base = self._test("baseline", everyone, "Check the crash happens with every mod on. A search cannot start "
+                          "from a crash you cannot trigger.", runs=max(self.runs, self._proof_runs()), expected="crash")
+        if (yield from ask(base)) == "ok":
+            miss = self._miss(base.runs)
+            return Verdict("unreproducible", (), 0.0,
+                           f"The game did not crash in {_plural(base.runs, 'launch')} with every mod on, so there is "
+                           f"nothing to narrow down yet. At your detection rate a real crash would go unseen {_percent(miss)} of the "
+                           "time even when the crash is real. If it only crashes sometimes, use more runs per test and "
+                           "start again.")
+        empty = self._test("empty", (), "Check the crash stops with every mod off (only the always-on ones stay).",
+                           runs=self._proof_runs(), expected="ok")
+        if (yield from ask(empty)) == "crash":
+            kept = (f" Only the always-on mods ({len(self.pinned)}) were left on, so one of those is also possible."
+                    if self.pinned else "")
+            return Verdict("outside", (), 1.0,
+                           "The game still crashes with the mods off, so the cause is not one of the mods you can turn "
+                           "off. Check the game files, the graphics driver, and the crash report from Black Box." + kept)
+        proofs = 1
+        causes = []
+        off = frozenset()
+        complete = False
+        while len(causes) < MAX_CAUSES:
+            remaining = everyone - off
+            focus = remaining
+            while True:
+                found = yield from self._shrink(focus, ask)
+                # 1-minimal: removing any one piece (with what needs it) must stop the crash, proven with full runs
+                again = None
+                for key in sorted(found):
+                    rest = found - self.dependents(key)
+                    if not rest:
+                        continue
+                    test = self._test("check", rest, f"Check: turn off only {self.units[key].name} (and what needs "
+                                      "it) from the crashing set. The crash should stop.",
+                                      runs=self._proof_runs(), expected="ok", under=(key,))
+                    if (yield from ask(test)) == "crash":
+                        again = rest
+                        break
+                    proofs += 1
+                if again is not None:
+                    focus = again
+                    continue
+                # the set must crash on its own, asked again so one wrong tap cannot carry the verdict
+                confirm = self._test("confirm", found, "Double-check: only these mods on. It crashed in an earlier "
+                                     "test; does it crash again?", runs=self._proof_runs(), expected="crash",
+                                     under=found)
+                if (yield from ask(confirm, fresh=True)) == "crash":
+                    break
+                focus = remaining                                   # the answers disagree: search again
+            causes.append(found)
+            self._causes = list(causes)
+            off = off | self.dependents_of(found)
+            clear = self._test("clear", everyone - off, "Fix check: every cause found so far off, everything else "
+                               "on. It should run without crashing.", runs=self._proof_runs(), expected="ok")
+            if (yield from ask(clear)) == "ok":
+                proofs += 1
+                complete = True
+                break
+        if not complete:
+            return self._finish(causes, proofs, complete=False, fixes=())
+        fixes = []
+        if len(causes) == 1 and len(causes[0]) > 1:
+            for key in sorted(causes[0]):
+                test = self._test("fix", everyone - self.dependents(key), f"Fix check: turn off only "
+                                  f"{self.units[key].name} (and what needs it), everything else on.",
+                                  runs=self._proof_runs(), expected="ok", under=(key,))
+                if (yield from ask(test)) == "ok":
+                    fixes.append(key)
+                    proofs += 1
+        else:
+            fixes = list(causes[0]) if len(causes) == 1 else []
+        return self._finish(causes, proofs, complete=True, fixes=tuple(fixes))
+
+    def _describe(self, group) -> str:
+        names = self._names(group)
+        inside = [(k, r) for k in sorted(group) for r in self._requires[k] if r in group]
+        if len(group) == 1:
+            line = f"{names} is the cause. The crash stopped without it and came back with it."
+        else:
+            line = f"{names} crash the game together. Take away any one of them and it stops."
+        if inside:
+            pairs = "; ".join(f"{self.units[a].name} needs {self.units[b].name}" for a, b in inside[:4])
+            line += f" They have to be switched together ({pairs}), so this test cannot separate them."
+        return line
+
+    def _finish(self, causes, proofs, complete, fixes=()) -> Verdict:
+        confidence = 1.0
+        if self.detect < 1.0:
+            confidence = max(0.0, (1.0 - self._miss(self._proof_runs())) ** proofs)
+        keys = tuple(sorted({k for c in causes for k in c}))
+        groups = tuple(tuple(sorted(c)) for c in causes)
+        if len(causes) == 1:
+            kind = "culprit" if len(groups[0]) == 1 else "interaction"
+            text = self._describe(causes[0])
+        else:
+            kind = "multiple"
+            text = f"The crash has {len(causes)} separate causes, and each one alone is enough: " + " ".join(
+                f"({i}) {self._describe(c)}" for i, c in enumerate(causes, 1))
+        if complete and len(causes) == 1 and len(causes[0]) > 1:
+            if len(fixes) == len(causes[0]):
+                text += " Turning off any one of them is enough."
+            elif fixes:
+                text += f" Turning off just {self._names(fixes)} is enough."
+            else:
+                text += " No single one of them is enough on its own, so turn them off together."
+        if not complete:
+            kind = "undetermined"
+            text += f" More causes may remain: the search stopped after {MAX_CAUSES}."
+        else:
+            text += " With these off the game ran without crashing. This comes from your test results, not from guesses."
+        if self.detect < 1.0 and complete:
+            text += (f" Because the crash does not always show, this is {_sure(confidence)} sure, "
+                     "not certain.")
+        return Verdict(kind, keys, confidence, text, groups, tuple(sorted(fixes)))
+
+    def _run(self):
+        try:
+            verdict = yield from self._flow()
+        except _OutOfBudget:
+            return self._out_of_budget()
+        return verdict
+
+    def _out_of_budget(self) -> Verdict:
+        focus = sorted(self._focus, key=lambda k: (-self.weights[k], k))
+        return Verdict("undetermined", tuple(focus[:12]), 0.0,
+                       f"This needed more than {MAX_TESTS} launches. It did narrow the crash to {_plural(len(focus), 'mod')}"
+                       f" ({self._names(focus, 8)}). A crash that depends on your save or on load order, or that needs a "
+                       "very large group of mods together, cannot be pinned down further this way.")
+
+    # ------------------------------------------------------------ public steps
     def next_step(self):
         """The next Test to run, or the Verdict when the evidence is enough."""
-        everything = frozenset(self.units)
-        base = self._find("baseline")
-        if base is None:
-            return Test("baseline", everything, max(self.runs, 2) if self.detect < 0.95 else self.runs,
-                        "Check the crash happens with every mod on. A search cannot start from a crash you cannot trigger.",
-                        expected="crash")
-        if base[1] == "ok":
-            runs = base[0].runs
-            miss = (1.0 - self.detect) ** runs
-            return Verdict("unreproducible", (), 0.0,
-                           f"The game did not crash in {_plural(runs, 'launch')} with every mod on, so there is nothing to "
-                           f"narrow down yet. At your detection rate that happens {round(100 * miss)}% of the time even when "
-                           "the crash is real. If it only crashes sometimes, use more runs per test and start again.")
-        if self._find("empty") is None:
-            return self._test("empty", (), "Check the crash stops with every mod off (only the always-on ones stay).",
-                              expected="ok", runs=max(self.runs, 1 if self.detect >= 0.95 else 3))
-        belief, pairs, surprises = self.posterior()
-        empty = self._find("empty")
-        direct = empty is not None and empty[1] == "crash" and belief[OUTSIDE] >= max(belief.values())
-        if belief[OUTSIDE] >= CONFIDENCE or direct:
-            kept = f" Only the always-on mods ({len(self.pinned)}) were left on, so one of those is also possible." if self.pinned else ""
-            return Verdict("outside", (), belief[OUTSIDE],
-                           "The game still crashes with the mods off, so the cause is not one of the mods you can turn off. "
-                           "Check the game files, the graphics driver, and the crash report from Black Box." + kept)
-        theory, p = max(((t, v) for t, v in belief.items() if t != OUTSIDE), key=lambda r: (r[1], sorted(r[0])))
-        if p >= CONFIDENCE and surprises[theory] == 0:
-            return self._verify(theory, p)
-        if pairs and surprises[theory] > 0:
-            return Verdict("undetermined", tuple(sorted(theory)), p,
-                           "No one mod and no pair of mods fits every answer. Either an answer was tapped wrong "
-                           "(undo it and repeat that test), the crash needs three or more mods together, or it "
-                           "depends on your save. The closest suspects are listed, but nothing is proven.")
-        if len(self.tests) >= MAX_TESTS:
-            return Verdict("undetermined", tuple(sorted(theory)), p,
-                           "The results do not point at one cause yet. The top suspects are listed; a crash that "
-                           "depends on three or more mods together, or on your save, cannot be narrowed this way.")
-        return self._search(belief)
+        gen = self._run()
+        try:
+            step = next(gen)
+            for recorded, result in self.tests:
+                if step.enabled != recorded.enabled:
+                    raise RuntimeError("answers no longer match the search; start a new Bisect")
+                step = gen.send(result)
+            return step
+        except StopIteration as done:
+            return done.value
 
-    def _verify(self, theory, p):
-        keys = sorted(theory)
-        all_on = frozenset(self.units)
-        for key in keys:
-            off = self.dependents(key)
-            enabled = self.closure(set(all_on - off) | set(self.pinned))
-            if not self._ran("fix", enabled):
-                names = ", ".join(self.units[k].name for k in sorted(off))
-                return Test("fix", enabled, self._proof_runs(),
-                            f"Fix check: turn off only {names}. If the crash is gone, it was one of them.",
-                            expected="ok", under_test=(key,))
-        alone = self.closure(set(keys) | set(self.pinned))
-        if not self._ran("repro", alone):
-            names = " + ".join(self.units[k].name for k in keys)
-            return Test("repro", alone, self._proof_runs(),
-                        f"Repro check: turn on only {names} (and what they need). The crash should come back.",
-                        expected="crash", under_test=tuple(keys))
-        kind = "culprit" if len(keys) == 1 else "interaction"
-        names = " and ".join(self.units[k].name for k in keys)
-        needed = sorted(self.closure(keys) - set(keys) - self.pinned)
-        if kind == "culprit":
-            text = f"{names} is the cause. The crash stopped without it and came back with it."
-        else:
-            text = f"{names} crash the game together. Either one on its own is fine."
-        if needed:
-            text += (" It cannot be switched on without " + ", ".join(self.units[k].name for k in needed) +
-                     ", so the cause is it or something it needs; this test cannot separate them.")
-        text += " This comes from your test results, not from guesses."
-        if self.detect < 0.95:
-            text += (f" Because the crash does not always show, this is about {round(100 * p)}% sure, not certain. "
-                     "Running the fix check once more would raise it.")
-        return Verdict(kind, tuple(keys), p, text)
-
-    def _search(self, belief):
-        q = 1.0 - (1.0 - self.detect) ** self.runs
-        target = min(1.0, 0.5 / q)                     # share of belief to leave switched on
-        start = self._hypotheses(False)
-        start_marginal = {k: start[frozenset([k])] for k in self.weights}
-        marginal = {k: 0.0 for k in self.weights}
-        for theory, p in belief.items():
-            if theory != OUTSIDE:
-                for key in theory:
-                    marginal[key] += p
-        cleared = {k for k, v in marginal.items() if v < CLEARED * start_marginal[k]}
-        base = self.closure(self.pinned | cleared)
-
-        def mass(keys):
-            return sum(p for t, p in belief.items() if t == OUTSIDE or t <= keys)
-
-        def spread(keys):                               # how unsure we are of the outcome: higher is more informative
-            x = min(max(mass(keys) * q, 1e-12), 1 - 1e-12)
-            return -x * math.log(x) - (1 - x) * math.log(1 - x)
-
-        order = sorted((k for k in marginal if k not in cleared), key=lambda k: (-marginal[k], k))
-        enabled = set(base)
-        current = mass(frozenset(enabled))
-        skipped = []                                    # units that would overshoot the target
-        for key in order:
-            if key in enabled:
-                continue
-            grown = self.closure(enabled | {key})
-            m = mass(grown)
-            if m <= target + 1e-9:
-                enabled, current = set(grown), m
-                if current >= target * 0.97:
-                    break
-            else:
-                skipped.append(grown)
-        everyone = frozenset(self.units)
-        options = [frozenset(enabled)]
-        for grown in skipped:                           # one more unit past the target can be the better cut
-            options.append(frozenset(enabled | grown))
-        for key in order[:40]:                          # simple cuts around one suspect, for tiny or tangled lists
-            options.append(self.closure(set(base) | {key}))
-            options.append(everyone - self.dependents(key))
-        seen = {t.enabled for t, _ in self.tests}
-        fresh = []
-        for keys in options:
-            keys = self.closure(set(keys) | set(self.pinned))
-            if keys != everyone and keys not in [k for k, _ in fresh]:
-                fresh.append((keys, keys in seen))
-        fresh.sort(key=lambda item: (item[1], -round(spread(item[0]), 9), len(item[0])))
-        if not fresh or (fresh[0][1] and q >= 0.9):
-            # Every setup that could tell the suspects apart has been run, or none can be built because the
-            # suspects need each other. Repeating a reliable test teaches nothing, so say so and stop.
-            names = ", ".join(self.units[k].name for k in order[:5])
-            return Verdict("undetermined", tuple(order[:5]), max(marginal.values(), default=0.0),
-                           "The mods still under suspicion need each other, so no setup can switch one on without "
-                           "the others and the test cannot tell them apart. The cause is among: " + names + ".")
-        pick = set(fresh[0][0])
-        tested = tuple(sorted(k for k in pick if k in marginal and k not in cleared))
-        crash_chance = mass(frozenset(pick)) * q
-        return Test("search", self.closure(set(pick) | set(self.pinned)), self.runs,
-                    f"Run with these {_plural(len(tested), 'suspect')} on and the rest off. About "
-                    f"{round(100 * crash_chance)}% chance it crashes, so either answer tells us a lot.",
-                    under_test=tested)
-
-    # ------------------------------------------------------------ results
     def record(self, test: Test, result: str) -> None:
         """result: crash, ok, or unsure. Unsure adds no evidence; the same test will be asked again."""
         if result == "unsure":
@@ -383,11 +465,26 @@ class Session:
         self.tests.append((test, result))
 
     def undo(self) -> bool:
-        """Take back the last answer (a wrong tap). Belief is rebuilt from the answers that remain."""
+        """Take back the last answer (a wrong tap). The search is replayed from the answers that remain."""
         if self.tests:
             self.tests.pop()
             return True
         return False
+
+    def progress(self) -> dict:
+        """What the screen can show while the search runs."""
+        self.next_step()
+        return {"launches": len(self.tests), "suspects": len(self._focus), "of": len(self.weights),
+                "causes_found": len(self._causes)}
+
+    def suspects(self):
+        """Mods still in play, most suspicious first, with the reasons. 'share' is relative suspicion, not a chance."""
+        self.next_step()
+        focus = [k for k in self.weights if k in self._focus]
+        total = sum(self.weights[k] for k in focus) or 1.0
+        rows = [(self.units[k], self.weights[k] / total, self.reasons[k]) for k in focus]
+        rows.sort(key=lambda r: (-r[1], r[0].name.lower()))
+        return rows
 
     def report(self) -> str:
         step = self.next_step()
