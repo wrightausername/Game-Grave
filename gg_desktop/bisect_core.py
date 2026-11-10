@@ -198,6 +198,8 @@ class Session:
             self.priority = {k for k in self.weights if (self.units[k].added or 0) > last_good and self.units[k].added}
         self.tests: list[tuple[Test, str]] = []
         self.unsure = 0
+        self._version = 0                  # bumped by every answer or undo; the replay is cached per version
+        self._cached = None
         self._focus = frozenset(self.weights)
         self._causes: list = []
 
@@ -452,6 +454,13 @@ class Session:
     # ------------------------------------------------------------ public steps
     def next_step(self):
         """The next Test to run, or the Verdict when the evidence is enough."""
+        if self._cached is not None and self._cached[0] == self._version:
+            return self._cached[1]
+        result = self._replay()
+        self._cached = (self._version, result)
+        return result
+
+    def _replay(self):
         gen = self._run()
         try:
             step = next(gen)
@@ -467,15 +476,18 @@ class Session:
         """result: crash, ok, or unsure. Unsure adds no evidence; the same test will be asked again."""
         if result == "unsure":
             self.unsure += 1
+            self._version += 1
             return
         if result not in ("crash", "ok"):
             raise ValueError("result must be crash, ok or unsure")
         self.tests.append((test, result))
+        self._version += 1
 
     def undo(self) -> bool:
         """Take back the last answer (a wrong tap). The search is replayed from the answers that remain."""
         if self.tests:
             self.tests.pop()
+            self._version += 1
             return True
         return False
 

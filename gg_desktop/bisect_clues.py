@@ -101,22 +101,24 @@ def _file_index(files: dict):
     return unique, {b for b, k in owners.items() if len(k) > 1}
 
 
-def _folder_index(units) -> dict:
+def _folder_index(units, folders=None) -> dict:
     out: dict = {}
+    folders = folders or {}
     for u in units:
-        for label in {u.key, u.name}:
+        for label in {u.key, u.name, folders.get(u.key, u.name)}:
             low = label.strip().lower()
             if low and low not in GENERIC_FOLDERS:
                 out.setdefault(low, set()).add(u.key)
     return {name: next(iter(keys)) for name, keys in out.items() if len(keys) == 1}
 
 
-def read_reports(units, files: dict, reports=(), crashes=()) -> Clues:
+def read_reports(units, files: dict, reports=(), crashes=(), folders=None) -> Clues:
     """units: Bisect units. files: {mod key: iterable of file paths inside that mod}.
     reports: iterable of (text, when) where `when` is epoch seconds or None. crashes: Black Box `Crash` records
-    (anything with .when as a datetime, .module as the faulting module name)."""
+    (anything with .when as a datetime, .module as the faulting module name). folders: {mod key: folder name} so a path
+    that names the mod's folder matches even when its display name differs."""
     unique, ambiguous = _file_index(files)
-    folders = _folder_index(units)
+    folder_names = _folder_index(units, folders)
     hits: dict = {}
     modules: Counter = Counter()
     codes: Counter = Counter()
@@ -140,7 +142,7 @@ def read_reports(units, files: dict, reports=(), crashes=()) -> Clues:
             elif low in ambiguous:
                 seen_ambiguous.add(low)
         for part in PATH_PART.findall(text or ""):
-            key = folders.get(part.strip().lower())
+            key = folder_names.get(part.strip().lower())
             if key:
                 named.add(key)
         for key in named:

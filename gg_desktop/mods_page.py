@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QHeaderView, QMenu
 from shiboken6 import isValid
 
 from core import save_settings
+from gg_desktop import bisect_tab
 from gg_desktop import mods_graphics as graphics
 from gg_desktop import mods_insight as mi
 from gg_desktop import mods_tab_graphics as tabgfx
@@ -30,7 +31,7 @@ from ui_paging import page_window
 LIBRARY_HEADERS = ("", "Name", "Game", "Manager", "Size", "Status", "Modified")
 LIBRARY_WIDTHS = (25, 170, 100, 92, 62, 108, 84)
 COLORS = {"green": "#27dc74", "amber": "#f7b737", "muted": "#9ca8bd", "": "#d7dfe7"}
-TAB_NAMES = ("Library", "Mod Radar", "Load Order", "Profiles", "Conflicts", "Cleanup")
+TAB_NAMES = ("Library", "Mod Radar", "Load Order", "Profiles", "Conflicts", "Cleanup", "Bisect")
 
 
 @dataclass
@@ -102,7 +103,7 @@ def sync_profiles(window, control, include_all):
 
 def profile_changed(window):
     window._mod_profile_keys[window._mod_tab] = window.mod_profile.currentData() or ""
-    if window._mod_tab in {"Load Order", "Conflicts"}:
+    if window._mod_tab in {"Load Order", "Conflicts", "Bisect"}:
         window._fill_mods()
 
 
@@ -186,7 +187,7 @@ def fill(window, *args, **kwargs):
     else:
         # The profile choice must exist before the rows that depend on it are built.
         combo = getattr(window, "mod_profile", None)
-        if window._mod_tab in {"Load Order", "Conflicts"} and combo is not None and isValid(combo):
+        if window._mod_tab in {"Load Order", "Conflicts", "Bisect"} and combo is not None and isValid(combo):
             sync_profiles(window, control, include_all=window._mod_tab == "Conflicts")
         tab_fill(window, control, kwargs.get("requested_page", 0))
     chrome(window, control)
@@ -201,7 +202,7 @@ def chrome(window, control):
     if combo is None or not isValid(combo):
         return
     tab = window._mod_tab
-    visible = control is not None and tab in {"Load Order", "Conflicts"}
+    visible = control is not None and tab in {"Load Order", "Conflicts", "Bisect"}
     window.mod_profile.setVisible(visible)
     window.mod_sort.setEnabled(tab == "Library")
     window.mod_type.setEnabled(tab == "Library")
@@ -290,7 +291,7 @@ def tab_fill(window, control, requested_page=0):
 
 def selection_count(window):
     table = window.mod_table
-    noun = {"Library": "locations", "Load Order": "mods"}.get(window._mod_tab, "rows")
+    noun = {"Library": "locations", "Load Order": "mods", "Bisect": "mods"}.get(window._mod_tab, "rows")
     window.mod_selection.setText(f"{len(_checked(table))} selected · {table.rowCount()} {noun}")
 
 
@@ -378,6 +379,7 @@ TABS = {
     "Profiles": (("", "Profile", "Manager", "On", "Off", "Conflicts"), (25, 150, 110, 44, 44, 70), profiles_tab),
     "Conflicts": (("", "What overlaps", "Profile", "Mods", "Files"), (25, 200, 100, 50, 50), conflicts_tab),
     "Cleanup": (("", "Item", "Type", "Size", "Action"), (25, 180, 110, 62, 100), cleanup_tab),
+    "Bisect": (bisect_tab.HEADERS, bisect_tab.WIDTHS, bisect_tab.tab_rows),
 }
 
 
@@ -642,7 +644,7 @@ def cleanup_details(window, control, contents, item):
 
 
 DETAILS = {"Mod Radar": radar_details, "Load Order": order_details, "Profiles": profile_details,
-           "Conflicts": conflict_details, "Cleanup": cleanup_details}
+           "Conflicts": conflict_details, "Cleanup": cleanup_details, "Bisect": bisect_tab.details}
 
 
 def details(window):

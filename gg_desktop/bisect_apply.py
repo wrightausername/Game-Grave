@@ -203,12 +203,13 @@ def missing(original_modlist: str, enabled_names) -> list:
     return sorted(n for n in enabled_names if n.casefold() not in present)
 
 
-def write_test(folder: Path, enabled_names, *, running=mo2_running) -> list:
+def write_test(folder: Path, enabled_names, *, running=None) -> list:
     """Make the test profile hold exactly `enabled_names` switched on. Returns the names switched on."""
     folder = Path(folder)
     root = folder.parent
     _check_copy(folder, root)
-    if running() is True:
+    check = running if running is not None else mo2_running
+    if check() is True:
         raise ApplyError("Mod Organizer 2 is running. Close it completely first, then try again: it can write its "
                          "own copy of the list over this one when it closes.")
     backup = folder / BACKUP_NAMES["modlist.txt"]

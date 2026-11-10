@@ -43,6 +43,13 @@ class Reading(unittest.TestCase):
         c = bcl.read_reports(us, {}, [(text, None)])
         self.assertEqual(c.hits, {"m3": 1})
 
+    def test_a_path_naming_the_mods_folder_matches_when_the_display_name_differs(self):
+        us = [Unit("k1", "Mountain Textures"), Unit("k2", "Other")]
+        text = r"C:\MO2\mods\MountainTextures\scripts\a.pex failed"
+        self.assertEqual(bcl.read_reports(us, {}, [(text, None)]).hits, {})
+        c = bcl.read_reports(us, {}, [(text, None)], folders={"k1": "MountainTextures", "k2": "Other"})
+        self.assertEqual(c.hits, {"k1": 1})
+
     def test_faulting_module_from_windows_records_leads_the_hints(self):
         crashes = [Crash(datetime(2026, 11, 2, 20, 0), "thing12.dll"), Crash(datetime(2026, 11, 5, 9, 0), "ntdll.dll")]
         c = bcl.read_reports(units(), files(), [("thing3.dll", None), ("thing3.dll", None)], crashes)

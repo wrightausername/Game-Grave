@@ -81,6 +81,7 @@ class Model:
         self.loading = False
         self.units: list = []
         self.files: dict = {}
+        self.folders: dict = {}           # mod key -> folder name, which is the name modlist.txt uses
         self.notes: list = []
         self.loaded_at = 0.0
         # the owner's clues
@@ -119,7 +120,7 @@ class Model:
         if previous is None or previous.key != profile.key:
             self.hints, self.hint_label, self.always_on = (), "", ()      # picks belong to one profile's mods
         self._reset_run()
-        self.marker, self.loading, self.units, self.files = marker, True, [], {}
+        self.marker, self.loading, self.units, self.files, self.folders = marker, True, [], {}, {}
         self.warn = ""
         if profile.can_write and self.apply.keeps_own_saves(profile.folder):
             self.warn = ("This profile keeps its own saves, so a copy would not see them and Bisect will not use it. "
@@ -134,7 +135,9 @@ class Model:
     def load_job(self, catalog, profile_obj, canceled):
         """Runs on a worker. Reads mod folders only."""
         def work(_emit=None):
-            return units_mod.units_for_profile(catalog, profile_obj, cancelled=canceled)
+            units, files, notes = units_mod.units_for_profile(catalog, profile_obj, cancelled=canceled)
+            folders = {e.key: Path(e.path).name for e in catalog.entries if e.kind == "mod"}
+            return units, files, notes, folders
         return work
 
     def load_done(self, result, error):
@@ -142,7 +145,8 @@ class Model:
         if error or result is None:
             self.message = "The mods in this profile could not be read. " + (error or "")
             return
-        self.units, self.files, self.notes = result
+        self.units, self.files, self.notes = result[0], result[1], result[2]
+        self.folders = dict(result[3]) if len(result) > 3 else {u.key: u.name for u in self.units}
         self.loaded_at = self.now()
         saved = store.load(self.store_root, self.profile.key) if self.profile else None
         if saved:
@@ -197,11 +201,11 @@ class Model:
 
     # ------------------------------------------------------------ crash reports
     def reports_job(self, collect):
-        """`collect(units, files, profile)` does the reading (patched in tests). Runs on a worker."""
-        units, files, profile = list(self.units), dict(self.files), self.profile
+        """`collect(units, files, profile, folders)` does the reading (patched in tests). Runs on a worker."""
+        units, files, profile, folders = list(self.units), dict(self.files), self.profile, dict(self.folders)
         self.reports_state = "reading"
         def work(_emit=None):
-            return collect(units, files, profile)
+            return collect(units, files, profile, folders)
         return work
 
     def reports_done(self, result, error):
@@ -270,7 +274,9 @@ class Model:
         step = self.flow.step() if self.flow else None
         if not isinstance(step, flow_mod.StepView) or not self.profile or not self.profile.can_write:
             return None
-        folder, names, number = self.profile.folder, list(step.on_names), step.number
+        folder, number = self.profile.folder, step.number
+        names = sorted(self.folders.get(k, self.flow.units_by_key[k].name) for k in step.on_keys
+                       if k in self.flow.units_by_key)
         self.applying = True
         def work(_emit=None):
             info = self.apply.make_copy(folder)
@@ -289,6 +295,13 @@ class Model:
     # ------------------------------------------------------------ what to show
     def rows(self) -> list:
         return self._flow().rows() if self.units else []
+
+    def reasons_for(self, key: str) -> list:
+        """Plain reasons this mod is where Bisect looks (or not), for the selected row."""
+        if not self.units:
+            return []
+        flow = self._flow()
+        return list(flow.session.reasons.get(key, []))
 
     def notice(self) -> str:
         if self.profile is None:

@@ -147,6 +147,7 @@ class Flow:
         window = (setup.window_start, now) if setup.window_start is not None else None
         hints = tuple(setup.hint_keys) or (clues_mod.started_after(self.units, clues) if clues else ())
         self.hint_keys = hints
+        self.units_by_key = {u.key: u for u in self.units}
         self.session = Session(self.units, last_good=setup.last_good, now=now, hint_keys=hints, window=window,
                                detect=setup.detect, runs=setup.runs,
                                fault_keys=clues.fault_keys if clues else ())
@@ -227,10 +228,6 @@ class Flow:
             unit = self.units_by_key[key]
             rows.append(RowView(key, unit.name, day_text(unit.added, self.now), "Always on", "you marked it always on"))
         return rows
-
-    @property
-    def units_by_key(self) -> dict:
-        return {u.key: u for u in self.units}
 
     def batch_choices(self) -> list:
         """Groups of mods installed together, newest first: (label, keys). For "when I downloaded the pack"."""

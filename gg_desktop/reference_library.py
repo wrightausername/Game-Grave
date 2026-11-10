@@ -431,7 +431,8 @@ class LibraryScreens:
         left = _widget(column(spacing=8))
         self.mod_tabs = TabStrip([("Library", "archive"), ("Mod Radar", "radio"),
                                   ("Load Order", "list"), ("Profiles", "search"),
-                                  ("Conflicts", "warning"), ("Cleanup", "refresh")])
+                                  ("Conflicts", "warning"), ("Cleanup", "refresh"),
+                                  ("Bisect", "scan")])
         left.layout().addWidget(self.mod_tabs)
         sidebar, filters = panel(kind="filterPanel", padding=9, spacing=7)
         sidebar.setFixedWidth(202)
@@ -541,7 +542,8 @@ class LibraryScreens:
                   "Load Order": "Load order decides which mod wins when two change the same file. Open your mod manager to view or change it.",
                   "Profiles": "Profiles remain protected. Manage them in their original mod manager.",
                   "Conflicts": "Conflict detection is unavailable. This scan cannot establish that there are no conflicts.",
-                  "Cleanup": "Managed mods and profiles remain protected. Review standalone archives in Old Files."}[tab]
+                  "Cleanup": "Managed mods and profiles remain protected. Review standalone archives in Old Files.",
+                  "Bisect": "Find which mod is crashing your game. Your own profile is never changed."}[tab]
         if tab == "Conflicts":
             rows = []
         self.mod_notice.setText(notice or ("No mod locations match these filters." if self.inventory.scanned_at

@@ -162,7 +162,7 @@ class Setup(Case):
 
     def test_crash_report_clues_show_up_and_a_failed_read_is_reported(self):
         model = loaded(self.root)
-        model.reports_job(lambda u, f, p: None)
+        model.reports_job(lambda u, f, p, d: None)
         self.assertEqual(model.reports_state, "reading")
         model.reports_done(None, "boom")
         self.assertIn("could not be read", model.message)
@@ -196,6 +196,19 @@ class Testing(Case):
         self.assertTrue(model.answer("crash"))
         self.assertEqual(model.applied, 0)
         self.assertFalse([b for b in model.panel().buttons if b.key == "crash"][0].enabled)
+
+    def test_the_test_profile_is_written_with_folder_names_not_display_names(self):
+        fake = FakeApply()
+        model = bm.Model(Path(self.root), now=lambda: NOW, apply_module=fake)
+        model.sync(mo2(), 1)
+        model.loaded_at = NOW
+        folders = {u.key: "Folder_" + u.key for u in units()}
+        model.load_done((units(), {}, [], folders), "")
+        model.start()
+        model.apply_done(model.apply_job()(), "")
+        written = fake.calls[1][1]
+        self.assertEqual(len(written), 24)
+        self.assertTrue(all(name.startswith("Folder_m") for name in written))
 
     def test_a_write_problem_is_shown_and_nothing_is_answered(self):
         model = loaded(self.root, fake=FakeApply(fail="Mod Organizer 2 is running."))
