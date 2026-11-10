@@ -137,6 +137,23 @@ def main():
             assert len(window.page.visible_patches) == 4
             assert window.page.visible_games[0].status == "Patch news"
             assert len(load_state(store)["news"]) == 4
+
+            # Patch Watch and Your Games show the game's own library picture once Game Grave has it.
+            from PySide6.QtGui import QColor, QPixmap
+            from gg_desktop.ready_room import ArtThumb
+            game_key = window.inventory.games[0].key
+            picture = QPixmap(600, 900)
+            picture.fill(QColor("#c03050"))
+            window.artwork.images[(game_key, "cover")] = picture
+            window.page.filter_rows("")
+            settle()
+            thumbs = window.page.findChildren(ArtThumb)
+            assert len(thumbs) == 5, len(thumbs)   # four patch rows and one game row
+            assert all(t._key == game_key for t in thumbs), [t._key for t in thumbs]
+            shown = thumbs[0].pixmap()
+            assert shown is not None and not shown.isNull()
+            middle = shown.toImage().pixelColor(shown.width() // 2, shown.height() // 2)
+            assert abs(middle.red() - 0xC0) < 8 and abs(middle.blue() - 0x50) < 8, middle.name()
             window.page.search.setText("maintenance")
             assert len(window.page.visible_patches) == 1
             window.page.search.clear()

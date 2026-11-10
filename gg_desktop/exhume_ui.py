@@ -7,18 +7,21 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QWidget
 
 from gg_desktop import exhume_core as ex
+from gg_desktop.feature_strip import collapsible
 from gg_desktop.widgets import button, column, label, row
 
 TONES = {"green": "#35DC7C", "amber": "#DFAC46", "muted": "#9AA4AC"}
 
 
 def build_panel(panel_cls, window):
-    panel = panel_cls("Exhume", "Bring back an older graphics driver that Windows still has stored.", "undo")
-    panel.setMinimumHeight(190)
+    panel = collapsible(panel_cls, "Exhume", "Bring back an older graphics driver that Windows still has stored. Open to check.",
+                        "undo", open_height=230)
     body = ExhumeBody(window)
+    body.on_status = panel.set_subtitle
     panel.body_layout.setContentsMargins(14, 8, 14, 10)
     panel.body_layout.addWidget(body)
     panel.exhume = body
+    body.report_status()
     return panel
 
 
@@ -61,6 +64,7 @@ class ExhumeBody(QWidget):
         super().__init__()
         self.window_owner = window
         self.cards = []
+        self.on_status = None
         layout = column(spacing=8)
         self.setLayout(layout)
         top = row(spacing=10)
@@ -84,6 +88,23 @@ class ExhumeBody(QWidget):
         else:
             self.summary.setText("Press Check to see your graphics driver. Nothing is changed by checking.")
 
+    def report_status(self):
+        """The one line shown while the panel is closed. Nothing is asked of Windows until the owner presses Check."""
+        if self.on_status is None:
+            return
+        last = getattr(self.window_owner, "exhume_result", None)
+        if last is None:
+            return
+        cards, error = last
+        if error:
+            self.on_status("Windows would not share its driver list.")
+        elif not cards:
+            self.on_status("Windows reports no display adapter with a driver.")
+        else:
+            older = sum(len(card.older) for card in cards)
+            self.on_status(f"{len(cards)} display adapter{'s' if len(cards) != 1 else ''}; "
+                           f"{older} older driver{'s' if older != 1 else ''} still stored.")
+
     def check(self):
         self.check_button.setEnabled(False)
         self.summary.setText("Asking Windows…")
@@ -95,6 +116,7 @@ class ExhumeBody(QWidget):
         self.cards = cards
         self.check_button.setEnabled(True)
         self._clear()
+        self.report_status()
         if error:
             self.summary.setText(f"Windows would not share its driver list: {error}")
             return

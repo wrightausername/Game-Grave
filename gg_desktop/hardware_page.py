@@ -210,11 +210,11 @@ def build(window):
     ui.pc_tab, pc = QWidget(), column(spacing=10)
     ui.pc_tab.setLayout(pc)
     pc.addWidget(ui.rig)
+    pc.addWidget(ui.monitor_panel)   # the live monitor is the centre of this tab: full width, above the rest
     bottom = row(spacing=10)
-    bottom.addWidget(ui.monitor_panel, 2)
+    bottom.addWidget(ui.parts_panel, 2)
     bottom.addWidget(ui.drives_panel, 1)
     pc.addLayout(bottom)
-    pc.addWidget(ui.parts_panel)
     ui.adv_tab, adv = QWidget(), row(spacing=10)
     ui.adv_tab.setLayout(adv)
     adv.addWidget(ui.advice_panel, 6)
@@ -314,12 +314,14 @@ class Body(QObject):
         advice.addStretch()
 
         self.monitor_panel, mon = panel(kind="libraryPanel", padding=12, spacing=6)
-        head = row(spacing=8)
-        head.addWidget(label("Live Monitor", "sectionTitle"), 1)
-        head.addWidget(label(f"Last {HISTORY * TICK_SECONDS} seconds, updated every {TICK_SECONDS} seconds while "
-                             "this tab is open", "caption"))
-        mon.addLayout(head)
-        charts = row(spacing=14)
+        title = label("Live Monitor", "sectionTitle")
+        title.setAlignment(Qt.AlignHCenter)
+        mon.addWidget(title)
+        caption = label(f"Last {HISTORY * TICK_SECONDS} seconds, updated every {TICK_SECONDS} seconds while "
+                        "this tab is open", "caption")
+        caption.setAlignment(Qt.AlignHCenter)
+        mon.addWidget(caption)
+        charts = row(spacing=18)
         self.charts = {}
         self.gauges = {}
         for key, title, color, empty in (("cpu", "CPU", "#42D4F2", "Not readable"),
@@ -329,7 +331,7 @@ class Body(QObject):
                                          ("temp", "GPU TEMP", "#f8c82c", "Needs an NVIDIA card")):
             cell = column(spacing=2)
             now = label("—", "readyWhen")
-            gauge = hg.RingGauge(color, title, 112)
+            gauge = hg.RingGauge(color, title, 150)
             cell.addWidget(gauge, 0, Qt.AlignHCenter)
             chart = hg.AreaChart(color, empty, HISTORY, "100 °C" if key == "temp" else "100%")
             chart.setAccessibleName(f"{title} load, last {HISTORY * TICK_SECONDS} seconds")

@@ -34,6 +34,7 @@ class Item:
     key: str
     label: str
     stamp: str = ""          # Workshop "time updated", digits, when known
+    nexus: str = ""          # "game/modid" from Mod Organizer 2's own meta.ini for the mod, when it recorded one
 
 
 @dataclass
@@ -84,8 +85,8 @@ def read_workshop(library: str, app_id: str) -> list[Item] | None:
     return sorted(items, key=lambda i: int(i.key))
 
 
-def read_mo2(game: str, roots: dict) -> list[Item] | None:
-    """Enabled mods of the selected profile of a Mod Organizer 2 instance made for this game."""
+def mo2_instance(game: str, roots: dict):
+    """(instance folder, ini lines, selected profile) of the Mod Organizer 2 instance made for this game, or None."""
     for local in roots.get("local", []):
         base = local / "ModOrganizer"
         try:
@@ -101,13 +102,35 @@ def read_mo2(game: str, roots: dict) -> list[Item] | None:
             chosen = re.sub(r"^@ByteArray\((.*)\)$", r"\1", chosen) or "Default"
             if re.search(r"[\\/]", chosen):
                 continue
-            lines = _lines(instance / "profiles" / chosen / "modlist.txt")
-            if not lines:
-                continue
-            items = [Item("mo2", l[1:].strip().casefold(), l[1:].strip()) for l in lines
-                     if l.startswith("+") and SAFE_NAME.fullmatch(l[1:].strip() or "\x00")]
-            return items[:MAX_ITEMS]
+            return instance, ini, chosen
     return None
+
+
+def _plain_folder_name(name: str) -> bool:
+    return bool(name) and not re.search(r"[\\/]", name) and name not in (".", "..")
+
+
+def read_mo2(game: str, roots: dict) -> list[Item] | None:
+    """Enabled mods of the selected profile of a Mod Organizer 2 instance made for this game."""
+    from gg_desktop import nexus_core
+    found = mo2_instance(game, roots)
+    if found is None:
+        return None
+    instance, ini, chosen = found
+    lines = _lines(instance / "profiles" / chosen / "modlist.txt")
+    if not lines:
+        return None
+    mods = instance / "mods"
+    custom = next((l.split("=", 1)[1].strip() for l in ini if l.casefold().startswith("mod_directory=")), "")
+    if custom:
+        mods = Path(custom.replace("%BASE_DIR%", str(instance)))
+    items = []
+    for l in lines:
+        name = l[1:].strip()
+        if l.startswith("+") and SAFE_NAME.fullmatch(name or "\x00"):
+            ref = nexus_core.read_meta(mods / name / "meta.ini") if _plain_folder_name(name) else ""
+            items.append(Item("mo2", name.casefold(), name, "", ref))
+    return items[:MAX_ITEMS]
 
 
 def read_plugins(game: str, roots: dict) -> list[Item] | None:
@@ -148,8 +171,11 @@ def read_setup(game: str, app_id: str | None, library: str | None, roots: dict |
 
 # ------------------------------------------------------------------ the squad code
 def make_code(setup: Setup) -> str:
-    payload = {"v": 1, "g": setup.game[:120],
-               "i": [[i.kind, i.key, i.label, i.stamp] for i in setup.items[:MAX_ITEMS]]}
+    items = setup.items[:MAX_ITEMS]
+    with_nexus = any(i.nexus for i in items)
+    payload = {"v": 2 if with_nexus else 1, "g": setup.game[:120],
+               "i": [[i.kind, i.key, i.label, i.stamp, i.nexus] if with_nexus else [i.kind, i.key, i.label, i.stamp]
+                     for i in items]}
     packed = zlib.compress(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8"), 9)
     return CODE_PREFIX + base64.urlsafe_b64encode(packed).decode("ascii").rstrip("=")
 
@@ -168,20 +194,22 @@ def read_code(text: str) -> Setup:
         payload = json.loads(data.decode("utf-8"))
     except (ValueError, zlib.error, UnicodeError):
         raise ValueError("That code is damaged or cut off. Ask your friend to copy it again.")
-    if not isinstance(payload, dict) or payload.get("v") != 1 or not isinstance(payload.get("g"), str) \
+    if not isinstance(payload, dict) or payload.get("v") not in (1, 2) or not isinstance(payload.get("g"), str) \
             or not isinstance(payload.get("i"), list) or len(payload["i"]) > MAX_ITEMS:
         raise ValueError("That code is not one this version of Game Grave understands.")
     items = []
     for row in payload["i"]:
-        if not (isinstance(row, list) and len(row) == 4 and all(isinstance(x, str) for x in row)):
+        if not (isinstance(row, list) and len(row) in (4, 5) and all(isinstance(x, str) for x in row)):
             raise ValueError("That code has an entry Game Grave cannot read.")
-        kind, key, label, stamp = row
+        kind, key, label, stamp = row[:4]
+        nexus = row[4] if len(row) == 5 else ""
         if kind not in KINDS or len(key) > 120 or len(label) > 120 or len(stamp) > 20 \
                 or (kind == "workshop" and not key.isdigit()) or (stamp and not stamp.isdigit()):
             raise ValueError("That code has an entry Game Grave cannot read.")
         if kind == "workshop":
             label = f"Workshop item {key}"      # never show text from a code beside a Steam link
-        items.append(Item(kind, key, label, stamp))
+        from gg_desktop import nexus_core
+        items.append(Item(kind, key, label, stamp, nexus_core.clean_ref(nexus) if kind == "mo2" else ""))
     return Setup(payload["g"][:120], items, ["From a squad code"], True, "")
 
 
@@ -199,6 +227,11 @@ class Comparison:
 
 def workshop_url(item: Item) -> str | None:
     return f"steam://url/CommunityFilePage/{item.key}" if item.kind == "workshop" and item.key.isdigit() else None
+
+
+def nexus_url(item: Item) -> str | None:
+    from gg_desktop import nexus_core
+    return nexus_core.mod_page(item.nexus) if item.kind == "mo2" and item.nexus else None
 
 
 def compare(theirs: Setup, mine: Setup) -> Comparison:
@@ -259,7 +292,8 @@ def save_snapshot(setup: Setup, root: Path | None = None, now: datetime | None =
     stamp = (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
     path = root / "snapshots" / f"{_slug(setup.game)}-{stamp}.json"
     payload = {"v": 1, "game": setup.game, "made": setup.made or stamp,
-               "items": [[i.kind, i.key, i.label, i.stamp] for i in setup.items[:MAX_ITEMS]]}
+               "items": [[i.kind, i.key, i.label, i.stamp, i.nexus] if i.nexus else [i.kind, i.key, i.label, i.stamp]
+                         for i in setup.items[:MAX_ITEMS]]}
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload), encoding="utf-8")
     os.replace(tmp, path)
@@ -286,7 +320,7 @@ def list_snapshots(game: str, root: Path | None = None) -> list[tuple[Path, str,
 def load_snapshot(path: Path) -> Setup:
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-        items = [Item(*row) for row in data["items"] if len(row) == 4 and row[0] in KINDS]
+        items = [Item(*row) for row in data["items"] if len(row) in (4, 5) and row[0] in KINDS]
         return Setup(str(data["game"])[:120], items[:MAX_ITEMS], ["From a snapshot"], True, str(data.get("made", "")))
     except (OSError, ValueError, KeyError, TypeError):
         raise ValueError("That snapshot could not be read.")

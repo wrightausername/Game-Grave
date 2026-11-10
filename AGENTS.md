@@ -259,3 +259,23 @@ keeps its own saves, writing while MO2 runs, and mods not in the list. Other man
 folder names, never manifest names. The install date is the mod folder's creation time. Do not widen these writes without approval.
 Mods otherwise stays open only for graphics.
 
+
+Ready Room, Mods names, Hardware and Undo Center reopened for one pass (owner instruction, 2026-11-10, "soulbind needs more
+settings ... less intrusive ... autopsy should be automatic ... undo center easier on the eyes ..."). Only these parts were
+reopened; the rest of each tab stays as locked.
+- Background rule (owner: "cant be super intrusive as to hinder performance on users PC when gaming"): every automatic job is
+  bounded, spaced out, and skipped while a game runs (`window._games_tracker.ledger.active`). Never add unbounded or polling work.
+- Ready Room panels (Soulbind, Autopsy, Exhume, Squad Sync) are slim `feature_strip.collapsible` strips: one header line plus a
+  status line, body hidden until opened. Patch Watch and Your Games at a Glance show game artwork through `ArtThumb`.
+- Soulbind: a preference counts only if its exact key is found in the game's real config file; unsupported otherwise.
+- Autopsy is automatic (`autopsy_library.py`, pure). Game Grave keeps only its own summaries of the newest 10 captures; the 11th
+  drops the oldest from Game Grave's file, never the owner's CSV. Passes are bounded and skipped while a game runs.
+- Squad Sync / Nexus (`nexus_core.py`): the owner's personal Nexus API key, stored with Windows DPAPI (owner-only file elsewhere),
+  sent only to api.nexusmods.com. Downloads are Premium-only direct links, host allowlist (nexusmods.com, nexus-cdn.com), new files
+  only, batch of 10, nothing is installed. Steam Workshop pages open through `steam://`; Steam decides about subscribing. A true
+  Wabbajack-style login needs Nexus to register Game Grave; do not fake one.
+- Mods names: `readable_name` turns folder names into readable names and keeps the folder name in the tooltip and detail panel.
+- Hardware: the Live Monitor is full width above Your Parts and Drives, with larger gauges. Same readings, same honesty rules.
+- Undo Center: larger type, brighter text and roomier rows, scoped to this page (`TABLE_STYLE`, `ReadableName`). Behavior and
+  `recovery.py` are untouched.
+- Prompts: `theme.STYLE` makes every dialog and message box dark with light text (covered by `tests/test_theme_prompts.py`).

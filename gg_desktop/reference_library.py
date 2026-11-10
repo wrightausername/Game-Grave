@@ -559,6 +559,9 @@ class LibraryScreens:
             for i, m in enumerate(rows):
                 _check(self.mod_table, i)
                 item = _text(self.mod_table, i, 1, m.name)
+                raw_name = str(getattr(m.record, "name", ""))
+                if raw_name and raw_name != m.name:
+                    item.setToolTip(f"{m.name}\nFolder name on disk: {raw_name}")
                 item.setIcon(cover_icon(m.game if m.game != "Unverified" else m.name))
                 for c, value in enumerate((m.game, m.manager, mods_sort.size_text(m.size), "Storage folder"), 2):
                     _text(self.mod_table, i, c, value)
@@ -592,7 +595,9 @@ class LibraryScreens:
         for symbol, title, value in (
             ("game", "Game", m.game), ("shield", "Manager", m.manager),
             ("help", "Version", "Unknown"), ("storage", "Apparent Size", readable_bytes(m.size)),
-            ("file", "Files", str(m.record.file_count)), ("folder", "Location", str(m.record.path)),
+            ("file", "Files", str(m.record.file_count)),
+            *((("folder", "Folder name", str(m.record.name)),) if str(m.record.name) != m.name else ()),
+            ("folder", "Location", str(m.record.path)),
         ):
             detail_line(contents, symbol, title, value)
         contents.addWidget(tool("Open Folder", "folder", lambda: self._open_folder(str(m.record.path)), kind="primary"))

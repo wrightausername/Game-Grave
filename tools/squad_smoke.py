@@ -58,6 +58,8 @@ def main():
         (mo2 / "profiles" / "Co-op").mkdir(parents=True)
         (mo2 / "ModOrganizer.ini").write_text("[General]\ngameName=Skyrim Special Edition\nselected_profile=@ByteArray(Co-op)\n", encoding="utf-8")
         (mo2 / "profiles" / "Co-op" / "modlist.txt").write_text("+SkyUI\n-Off\n+USSEP\n", encoding="utf-8")
+        (mo2 / "mods" / "SkyUI").mkdir(parents=True)
+        (mo2 / "mods" / "SkyUI" / "meta.ini").write_text("[General]\ngameName=skyrimspecialedition\nmodid=12604\n", encoding="utf-8")
         (local / "Skyrim Special Edition").mkdir()
         (local / "Skyrim Special Edition" / "plugins.txt").write_text("*SkyUI_SE.esp\n*Patch.esp\n", encoding="utf-8")
         (root / "Roaming" / "Vortex").mkdir(parents=True)
@@ -66,6 +68,7 @@ def main():
         opened = []
         with patch.dict(os.environ, env), \
              patch("gg_desktop.app.load_settings", side_effect=default_settings), \
+             patch("core.config_dir", return_value=root / "Prefs"), \
              patch("gg_desktop.ready_room_services.config_dir", return_value=root / "Prefs"), \
              patch("gg_desktop.ready_room_services.fetch_one",
                    side_effect=lambda sid, name: parse_news({"appnews": {"appid": int(sid), "newsitems": []}}, sid, name)), \
@@ -77,6 +80,11 @@ def main():
             window.navigate("Ready Room")
             settle(300)
             assert window.page.squad is not None, "Squad Sync panel is missing from Ready Room"
+            strip = window.page.squad
+            assert not strip.strip_open and strip.maximumHeight() <= 50, "Squad Sync starts as one slim line"
+            strip.strip_toggle.click()
+            settle(80)
+            assert strip.strip_open
             assert "Scan your PC" in live(window).summary.text() and not live(window).read_button.isEnabled()
 
             window.inventory.steam = [game]
@@ -86,6 +94,8 @@ def main():
             settle(300)
             body = live(window)
             assert body.games.count() == 1 and body.read_button.isEnabled()
+            assert body.setup is not None and body.setup.read_any, "the setup is read as soon as a game is there"
+            assert "mod items read for Skyrim Special Edition" in window.page.squad.detail_label.text()
             body.read_button.click()
             settle(100)
             body = live(window)
@@ -97,6 +107,7 @@ def main():
             body.copy_button.click()
             code = QApplication.clipboard().text()
             assert code.startswith("GGSQ1-") and str(root) not in code
+            assert {i.label: i.nexus for i in sq.read_code(code).items}["SkyUI"] == "skyrimspecialedition/12604"
 
             friend = sq.Setup("Skyrim Special Edition", [
                 sq.Item("workshop", "1111111", "w", "1700000000"), sq.Item("workshop", "2222222", "w", "1700009999"),
@@ -117,13 +128,80 @@ def main():
             buttons(window, "Open in Steam")[0].click()
             assert opened == ["steam://url/CommunityFilePage/3333333"], opened
             opened.clear()
+            # One press gets what is missing: no confirmation for opening pages.
+            body.open_button.click()
+            settle(60)
+            assert opened == ["steam://url/CommunityFilePage/3333333"], opened
+            assert "Press Subscribe" in body.fetch_note.text(), body.fetch_note.text()
+            opened.clear()
+            body.console_button.click()
+            assert QApplication.clipboard().text() == "workshop_download_item 489830 3333333", QApplication.clipboard().text()
+            assert opened == ["steam://nav/console"], opened
+            opened.clear()
+
+            # Nexus: a mod with a Nexus reference gets its own page; no key means pages, never a download.
+            nexus_friend = sq.Setup("Skyrim Special Edition", [
+                sq.Item("workshop", "3333333", "w", "1700000000"),
+                sq.Item("mo2", "extra mod", "Extra Mod", "", "skyrimspecialedition/999"),
+                sq.Item("mo2", "no source", "No Source")], read_any=True)
+            with patch("gg_desktop.squad_ui.QInputDialog.getText", return_value=(sq.make_code(nexus_friend), True)):
+                body.import_button.click()
+            settle(100)
+            body = live(window)
+            assert len(buttons(window, "Open on Nexus")) == 1 and len(buttons(window, "Open in Steam")) == 1
+            assert window.page.squad.detail_label.text().startswith("3 missing"), window.page.squad.detail_label.text()
+            assert body.nexus_label.text() == "Nexus: not signed in"
+            body.open_button.click()
+            settle(1300)
+            assert opened == ["steam://url/CommunityFilePage/3333333",
+                              "https://www.nexusmods.com/skyrimspecialedition/mods/999?tab=files"], opened
+            assert "Slow download" in body.fetch_note.text() and "no download source" in body.fetch_note.text()
+            opened.clear()
+
+            # Sign in with a key: it is checked with Nexus, saved, and shown by name.
+            from gg_desktop import nexus_core as nx
+            key = "abcdEFGH1234567890abcdEFGH1234567890"
+            with patch("gg_desktop.squad_ui.QInputDialog.getText", return_value=(key, True)), \
+                 patch("gg_desktop.squad_ui.nx.validate", return_value=nx.Account("Alex", True)):
+                body.nexus_button.click()
+                wait_for(lambda: live(window).nexus_label.text().startswith("Nexus: Alex"), "the Nexus sign-in")
+            body = live(window)
+            assert body.nexus_label.text() == "Nexus: Alex · Premium" and nx.load_key() == key
+            assert body.nexus_button.text() == "Sign out of Nexus"
+            opened.clear()
+
+            # Premium: declining the confirmation opens pages; accepting downloads new files only.
+            fake_choice = nx.FileChoice(7, "Extra Mod.zip", "1.0", 10)
+            def fake_download(url, folder, name, **kw):
+                target = Path(folder) / name
+                Path(folder).mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b"zip")
+                return target
             with patch.object(window, "confirm", return_value=False):
                 body.open_button.click()
-            assert opened == []
-            with patch.object(window, "confirm", return_value=True) as confirm:
+            settle(1300)
+            assert opened[-1].startswith("https://www.nexusmods.com/") and not (mo2 / "downloads").exists()
+            opened.clear()
+            with patch.object(window, "confirm", return_value=True) as confirm, \
+                 patch("gg_desktop.squad_ui.nx.validate", return_value=nx.Account("Alex", True)), \
+                 patch("gg_desktop.squad_ui.nx.main_file", return_value=fake_choice), \
+                 patch("gg_desktop.squad_ui.nx.download_url", return_value="https://x.nexus-cdn.com/a.zip"), \
+                 patch("gg_desktop.squad_ui.nx.download", side_effect=fake_download):
                 body.open_button.click()
-                assert "does not subscribe" in confirm.call_args[0][1]
-            assert opened == ["steam://url/CommunityFilePage/3333333"], opened
+                assert "nothing is overwritten and nothing is installed" in confirm.call_args[0][1]
+                wait_for(lambda: "Downloaded 1 file" in live(window).fetch_note.text(), "the Nexus download")
+            assert (mo2 / "downloads" / "Extra Mod.zip").is_file(), "saved into the Mod Organizer 2 downloads folder"
+            opened.clear()
+
+            # A free account is told so and gets the page instead.
+            with patch.object(window, "confirm", return_value=True), \
+                 patch("gg_desktop.squad_ui.nx.validate", return_value=nx.Account("Sam", False)):
+                live(window).open_button.click()
+                wait_for(lambda: "not Premium" in live(window).fetch_note.text(), "the free-account message")
+            settle(1300)
+            assert "https://www.nexusmods.com/skyrimspecialedition/mods/999?tab=files" in opened, opened
+            live(window).nexus_button.click()
+            assert nx.load_key() == "" and live(window).nexus_label.text() == "Nexus: not signed in"
 
             # A code for another game and a junk code are refused in words.
             wrong = sq.make_code(sq.Setup("Fallout 4", [sq.Item("mo2", "a", "A")], read_any=True))
@@ -144,6 +222,7 @@ def main():
             settle(100)
             assert body.comparison.summary.startswith("Nothing is missing"), body.comparison.summary
             assert not body.open_button.isVisibleTo(body)
+            assert window.page.squad.detail_label.text().startswith("Nothing is missing")
 
             # A page rebuild keeps the game, the setup and the newest comparison.
             window.navigate("Ready Room")

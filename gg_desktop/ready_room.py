@@ -132,6 +132,7 @@ class ReadyPanel(QFrame):
         detail_label.setFixedHeight(15)
         words.addWidget(title_label)
         words.addWidget(detail_label)
+        self.detail_label = detail_label
         heading.addLayout(words, 1)
         if trailing:
             heading.addWidget(trailing)
@@ -140,6 +141,11 @@ class ReadyPanel(QFrame):
         self.body_layout = column(spacing=0, margins=(12, 3, 11, 7))
         self.body.setLayout(self.body_layout)
         self.stack.addWidget(self.body, 1)
+
+    def set_subtitle(self, text):
+        """One line under the title; the full text stays available as a tooltip."""
+        self.detail_label.setText(text)
+        self.detail_label.setToolTip(text)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -229,6 +235,40 @@ def thumbnail(artwork, kind, width, height):
         result.setAlignment(Qt.AlignCenter)
         result.setStyleSheet("background:#111B23;border:1px solid #33414D;border-radius:5px;")
     return result
+
+
+class ArtThumb(QLabel):
+    """A small game picture: the game's own library artwork when Game Grave has it (the same local pictures the Games
+    tab uses), else a bundled decorative picture, else a plain placeholder. Never downloads anything by itself."""
+
+    def __init__(self, library, key, bundled, kind, width, height):
+        super().__init__()
+        self.setFixedSize(width, height)
+        self._library, self._key, self._bundled, self._kind = library, key, bundled, kind
+        self._paint()
+        if library is not None and key:
+            library.changed.connect(self._changed)
+
+    def _changed(self, app_id, _kind):
+        if app_id in ("", self._key):
+            self._paint()
+
+    def _paint(self):
+        from gg_desktop.reference_widgets import _cover_fit
+        width, height = self.width(), self.height()
+        picture = self._library.pixmap(self._key) if self._library is not None and self._key else None
+        if picture is not None and not picture.isNull():
+            self.setStyleSheet("border:1px solid #33414D;border-radius:5px;")
+            self.setPixmap(_cover_fit(picture, width, height, max(1.0, round(self.devicePixelRatioF(), 2))))
+            return
+        if self._bundled:
+            self.setStyleSheet("")
+            self.setPixmap(QPixmap(str(ASSETS / f"{self._bundled}_{self._kind}.png")).scaled(
+                width, height, Qt.IgnoreAspectRatio, Qt.SmoothTransformation))
+            return
+        self.setPixmap(icon("gamepad", "#778993", 28).pixmap(QSize(28, 28)))
+        self.setAlignment(Qt.AlignCenter)
+        self.setStyleSheet("background:#111B23;border:1px solid #33414D;border-radius:5px;")
 
 
 def status_badge(text, tone, glyph, *, bordered=True):
@@ -540,7 +580,8 @@ class ReadyRoomContent(ScrollPage):
             control.setFixedHeight(41)
             contents = row(spacing=12)
             control.setLayout(contents)
-            contents.addWidget(thumbnail(notice.artwork, "logo", 140, 38))
+            contents.addWidget(ArtThumb(self._library_art(), self._key_for_app(notice.app_id), notice.artwork,
+                                        "logo", 140, 38))
             words = column(spacing=0)
             words.addWidget(fitted_text(notice.game, "readyGameTitle"))
             words.addWidget(fitted_text(notice.detail, "readyDetail"))
@@ -561,7 +602,7 @@ class ReadyRoomContent(ScrollPage):
             control.setFixedHeight(41)
             contents = row(spacing=9)
             control.setLayout(contents)
-            contents.addWidget(thumbnail(game.artwork, "portrait", 74, 36))
+            contents.addWidget(ArtThumb(self._library_art(), game.key, game.artwork, "portrait", 74, 36))
             contents.addWidget(fitted_text(game.name, "readyGameTitle"), 1)
             played = QWidget()
             played.setFixedWidth(62)
@@ -593,6 +634,20 @@ class ReadyRoomContent(ScrollPage):
                         "No matching games" if query else "Make room for your games",
                         "Try another game title." if query else "Scan your PC to see your installed games here.",
                         "Scan PC", self.window_owner.start_scan)
+
+    def _library_art(self):
+        """The window's local game-artwork cache, or None in the photo reference preview, which must stay sample-only."""
+        if self.data.reference:
+            return None
+        return getattr(self.window_owner, "artwork", None)
+
+    def _key_for_app(self, app_id):
+        """The inventory key of the Steam game with this app number, or '' when no scanned game matches."""
+        if not app_id:
+            return ""
+        games = getattr(getattr(self.window_owner, "inventory", None), "games", ()) or ()
+        return next((g.key for g in games if str(getattr(g, "app_id", "")) == str(app_id)
+                     and getattr(g, "launcher", "") == "Steam"), "")
 
     @staticmethod
     def _separator(layout):

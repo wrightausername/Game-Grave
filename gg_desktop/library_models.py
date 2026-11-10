@@ -60,7 +60,9 @@ def mod_view(record, games) -> ModView:
     manager = next((name for name in ("Vortex", "Mod Organizer 2", "Steam Workshop",
                                     "Thunderstore", "Minion", "CurseForge")
                     if name.casefold() in source.casefold()), source)
-    return ModView(record, str(getattr(record, "name", "Mod storage")), game,
+    from gg_desktop.mods_words import readable_name
+    shown = readable_name(str(getattr(record, "name", "Mod storage")), str(getattr(record, "path", "")), source, games)
+    return ModView(record, shown, game,
                    manager, "Unknown", str(getattr(record, "status", "Unknown")),
                    getattr(record, "apparent_bytes", None))
 

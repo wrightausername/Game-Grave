@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFrame, QGrid
                                QSpinBox, QWidget)
 
 from gg_desktop import soulbind_core as sb
+from gg_desktop.feature_strip import collapsible
 from gg_desktop.widgets import button, column, label, row
 
 TONES = {"green": "#35DC7C", "amber": "#DFAC46", "muted": "#9AA4AC"}
@@ -16,13 +17,14 @@ MAX_GAMES = 6
 
 
 def build_panel(panel_cls, window, roots=None):
-    panel = panel_cls("Soulbind", "Set your game preferences once. Apply them to every game Game Grave can verify.",
-                      "star")
-    panel.setMinimumHeight(330)
+    panel = collapsible(panel_cls, "Soulbind", "Set your game preferences once and apply them to every game Game Grave can verify.",
+                        "star", open_height=420)
     body = SoulbindBody(window, roots)
+    body.on_status = panel.set_subtitle
     panel.body_layout.setContentsMargins(14, 8, 14, 10)
     panel.body_layout.addWidget(body)
     panel.soulbind = body
+    body.refresh()
     return panel
 
 
@@ -34,15 +36,16 @@ class SoulbindBody(QWidget):
         self.profile = sb.load_profile()
         self.uses, self.controls = {}, {}
         self._loading = False
+        self.on_status = None
         layout = row(spacing=20, margins=(0, 0, 0, 0))
         self.setLayout(layout)
-        layout.addLayout(self._profile_column(), 5)
+        layout.addLayout(self._profile_column(), 7)
         divider = QFrame()
         divider.setFixedWidth(1)
         divider.setStyleSheet("background:#222A30;")
         layout.addWidget(divider)
         self.games_column = column(spacing=0)
-        layout.addLayout(self.games_column, 6)
+        layout.addLayout(self.games_column, 5)
         self._load_controls()
         self.refresh()
 
@@ -52,31 +55,38 @@ class SoulbindBody(QWidget):
         box.addWidget(label("Your preferences", "readyGameTitle"))
         box.addWidget(label("Tick what you want every game to follow. Unticked preferences are left alone.",
                             "readyDetail", wrap=True))
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(5)
-        grid.setColumnStretch(1, 1)
-        at = 0
-        for group in sb.GROUPS:
-            heading = label(group.upper(), "readyWhen")
-            heading.setStyleSheet("font-size:11px;font-weight:700;color:#9AA4AC;")
-            grid.addWidget(heading, at, 0, 1, 3)
-            at += 1
-            for pref in (p for p in sb.PREFS if p.group == group):
-                use = QCheckBox()
-                use.setAccessibleName("Use " + pref.label)
-                use.toggled.connect(self._changed)
-                text = label(pref.label, "readyDetail")
-                text.setToolTip(pref.tip or pref.label)
-                text.setStyleSheet("font-size:13px;color:#E6E8EB;")
-                control = self._control(pref)
-                control.setAccessibleName(pref.label)
-                (control.valueChanged if pref.kind == "number" else control.currentIndexChanged).connect(self._changed)
-                grid.addWidget(use, at, 0)
-                grid.addWidget(text, at, 1)
-                grid.addWidget(control, at, 2)
-                self.uses[pref.id], self.controls[pref.id] = use, control
+        columns = row(spacing=22, margins=(0, 0, 0, 0))
+        sides = ((sb.GROUPS[:3], QGridLayout()), (sb.GROUPS[3:], QGridLayout()))
+        for groups, grid in sides:
+            grid.setHorizontalSpacing(10)
+            grid.setVerticalSpacing(5)
+            grid.setColumnStretch(1, 1)
+            at = 0
+            for group in groups:
+                heading = label(group.upper(), "readyWhen")
+                heading.setStyleSheet("font-size:11px;font-weight:700;color:#9AA4AC;")
+                grid.addWidget(heading, at, 0, 1, 3)
                 at += 1
+                for pref in (p for p in sb.PREFS if p.group == group):
+                    use = QCheckBox()
+                    use.setAccessibleName("Use " + pref.label)
+                    use.toggled.connect(self._changed)
+                    text = label(pref.label, "readyDetail")
+                    text.setToolTip(pref.tip or pref.label)
+                    text.setStyleSheet("font-size:13px;color:#E6E8EB;")
+                    control = self._control(pref)
+                    control.setAccessibleName(pref.label)
+                    (control.valueChanged if pref.kind == "number" else control.currentIndexChanged).connect(self._changed)
+                    grid.addWidget(use, at, 0)
+                    grid.addWidget(text, at, 1)
+                    grid.addWidget(control, at, 2)
+                    self.uses[pref.id], self.controls[pref.id] = use, control
+                    at += 1
+            holder = column(spacing=0, margins=(0, 0, 0, 0))
+            holder.addLayout(grid)
+            holder.addStretch()
+            columns.addLayout(holder, 1)
+        grid = columns
         box.addLayout(grid)
         box.addStretch()
         tools = row(spacing=14)
@@ -94,7 +104,7 @@ class SoulbindBody(QWidget):
         if pref.kind == "number":
             spin = QSpinBox()
             spin.setRange(*pref.options)
-            spin.setSuffix("°")
+            spin.setSuffix(pref.unit)
             spin.setFixedWidth(96)
             return spin
         combo = QComboBox()
@@ -210,6 +220,22 @@ class SoulbindBody(QWidget):
             self.games_column.addWidget(note)
         self.games_column.addStretch()
         self.copy_button.setEnabled(bool(self.profile))
+        if self.on_status is not None:
+            self.on_status(self.status_line(games, verifiable))
+
+    def status_line(self, games, verifiable):
+        """The one sentence shown while the panel is closed. Only counts what was actually checked."""
+        chosen = len(self.profile)
+        if not chosen:
+            return "Set your game preferences once and apply them to every game Game Grave can verify."
+        if not games:
+            return f"{chosen} preference{'s' if chosen != 1 else ''} chosen. Scan your PC to see which games it can check."
+        waiting = sum(1 for row_ in self.rows if row_[2].tone == "amber")
+        if not verifiable:
+            return f"{chosen} preference{'s' if chosen != 1 else ''} chosen. None of your scanned games can be verified yet."
+        if waiting:
+            return f"{waiting} of {len(verifiable)} verifiable game{'s' if len(verifiable) != 1 else ''} can take your preferences."
+        return f"All {len(verifiable)} verifiable game{'s' if len(verifiable) != 1 else ''} already match."
 
     def _game_row(self, game, adapter):
         path = sb.config_file(adapter, self.roots)

@@ -67,6 +67,14 @@ on:
       - 'tools/squad_smoke.py'
       - 'gg_desktop/squad_core.py'
       - 'gg_desktop/squad_ui.py'
+      - 'gg_desktop/nexus_core.py'
+      - 'tests/test_nexus.py'
+      - 'gg_desktop/autopsy_library.py'
+      - 'gg_desktop/autopsy_ui.py'
+      - 'tests/test_autopsy_library.py'
+      - 'gg_desktop/feature_strip.py'
+      - 'gg_desktop/theme.py'
+      - 'gg_desktop/undo_page.py'
       - 'tests/test_hardware.py'
       - 'tools/hardware_smoke.py'
       - 'gg_desktop/hardware_core.py'
@@ -189,6 +197,14 @@ on:
       - 'tools/squad_smoke.py'
       - 'gg_desktop/squad_core.py'
       - 'gg_desktop/squad_ui.py'
+      - 'gg_desktop/nexus_core.py'
+      - 'tests/test_nexus.py'
+      - 'gg_desktop/autopsy_library.py'
+      - 'gg_desktop/autopsy_ui.py'
+      - 'tests/test_autopsy_library.py'
+      - 'gg_desktop/feature_strip.py'
+      - 'gg_desktop/theme.py'
+      - 'gg_desktop/undo_page.py'
       - 'tests/test_hardware.py'
       - 'tools/hardware_smoke.py'
       - 'gg_desktop/hardware_core.py'
@@ -282,7 +298,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad tests.test_updater tests.test_update_check tests.test_bisect tests.test_bisect_clues tests.test_bisect_apply tests.test_bisect_units tests.test_bisect_flow tests.test_bisect_store tests.test_bisect_model tests.test_hardware -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad tests.test_nexus tests.test_autopsy_library tests.test_theme_prompts tests.test_updater tests.test_update_check tests.test_bisect tests.test_bisect_clues tests.test_bisect_apply tests.test_bisect_units tests.test_bisect_flow tests.test_bisect_store tests.test_bisect_model tests.test_hardware -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }

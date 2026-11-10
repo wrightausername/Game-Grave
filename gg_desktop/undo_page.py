@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import threading
 
 from PySide6.QtCore import QDate, QRect, QSignalBlocker, QSize, Qt
-from PySide6.QtGui import QColor, QFontMetrics, QGuiApplication, QPainter
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QPainter
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QDateEdit, QFileDialog,
                                QHeaderView, QLabel, QLineEdit, QMenu, QPushButton, QRadioButton, QScrollArea,
                                QSizePolicy, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QWidget)
@@ -41,6 +41,64 @@ EMPTY_ALL = ("Nothing has been recorded yet. Cleanups, restores, scans and skipp
              "logs them.")
 
 
+# Readability: the owner asked for an Undo Center that is easier on the eyes. Larger type, brighter text and roomier rows,
+# scoped to this page only (the other tables keep the compact look the locked photos show).
+ROW_COMPACT, ROW_DETAILED = 36, 54
+TABLE_STYLE = """
+QTableWidget#referenceTable { font-size:14px; color:#eef2f7; selection-background-color:#4a1626; }
+QTableWidget#referenceTable::item { padding:6px 8px; border-bottom:1px solid #243441; }
+QTableWidget#referenceTable::item:selected { background:#4a1626; color:#ffffff; }
+QHeaderView::section { font-size:12px; color:#c4d0dc; padding:8px 6px; font-weight:600; }
+"""
+FILTER_STYLE = "QCheckBox, QRadioButton { font-size:12px; }"
+COUNT_STYLE = "color:#b9c5d2;font-size:12px;"
+
+
+def readable_row(control):
+    """Bigger name and count text for a filter row (the shared row widgets stay unchanged for other pages)."""
+    control.setFixedHeight(28)
+    control.count.setStyleSheet(COUNT_STYLE)
+    font = control.name.font()
+    font.setPixelSize(13)
+    control.name.setFont(font)
+    return control
+
+
+class ReadableName(NameDelegate):
+    """The shared two-line name cell with a brighter, larger second line, for this page only."""
+
+    def paint(self, painter, option, index):
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        title, opt.text = opt.text, ""
+        widget = opt.widget
+        style = widget.style() if widget else QApplication.style()
+        style.drawControl(QStyle.CE_ItemViewItem, opt, painter, widget)
+        rect = style.subElementRect(QStyle.SE_ItemViewItemText, opt, widget).adjusted(4, 0, -4, 0)
+        sub = str(index.data(Qt.UserRole) or "")
+        painter.save()
+        bold = font_delta(opt.font, 0.5)
+        bold.setBold(True)
+        painter.setFont(bold)
+        painter.setPen(QColor("#ffffff"))
+        if not sub:
+            painter.drawText(rect, int(Qt.AlignLeft | Qt.AlignVCenter),
+                             QFontMetrics(bold).elidedText(title, Qt.ElideRight, rect.width()))
+            painter.restore()
+            return
+        half = rect.height() // 2
+        top = QRect(rect.left(), rect.top() + 4, rect.width(), half)
+        painter.drawText(top, int(Qt.AlignLeft | Qt.AlignVCenter),
+                         QFontMetrics(bold).elidedText(title, Qt.ElideRight, top.width()))
+        small = font_delta(opt.font, -1.0)
+        painter.setFont(small)
+        painter.setPen(QColor("#b9c5d2"))
+        bottom = QRect(rect.left(), rect.top() + half + 2, rect.width(), half - 4)
+        painter.drawText(bottom, int(Qt.AlignLeft | Qt.AlignVCenter),
+                         QFontMetrics(small).elidedText(sub, Qt.ElideRight, bottom.width()))
+        painter.restore()
+
+
 class StatusDelegate(QStyledItemDelegate):
     """A coloured pill. The text is the display role and the colour is stored under Qt.UserRole."""
 
@@ -54,10 +112,12 @@ class StatusDelegate(QStyledItemDelegate):
         color = QColor(index.data(Qt.UserRole) or "#9ca8bd")
         painter.save()
         painter.setRenderHint(QPainter.Antialiasing)
-        small = font_delta(opt.font, -1.5)
+        small = QFont(opt.font)
+        small.setPixelSize(12)
+        small.setBold(True)
         painter.setFont(small)
-        width = min(opt.rect.width() - 6, QFontMetrics(small).horizontalAdvance(text) + 16)
-        pill = QRect(0, 0, width, 20)
+        width = min(opt.rect.width() - 6, QFontMetrics(small).horizontalAdvance(text) + 20)
+        pill = QRect(0, 0, width, 24)
         pill.moveCenter(opt.rect.center())
         painter.setPen(color)
         painter.setBrush(QColor(color.red(), color.green(), color.blue(), 28))
@@ -74,14 +134,14 @@ class RadioRow(QWidget):
         line = row(spacing=6, margins=(2, 0, 2, 0))
         self.setLayout(line)
         self.setMinimumWidth(0)
-        self.setFixedHeight(22)
+        self.setFixedHeight(28)
         self.button = QRadioButton()
         self.button.setAccessibleName(text)
         group.addButton(self.button)
         self.name = ElidedLabel(text)
         self.name.clicked.connect(self.button.click)
         self.count = QLabel("0")
-        self.count.setStyleSheet("color:#9ca8bd;font-size:10px;")
+        self.count.setStyleSheet(COUNT_STYLE)
         self.count.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         line.addWidget(self.button)
         line.addWidget(self.name, 1)
@@ -140,8 +200,9 @@ def build(window):
 
     # --- Filters
     filters, side = panel(kind="fileFilterPanel", padding=8, spacing=4)
-    filters.setMinimumWidth(165)
-    filters.setMaximumWidth(190)
+    filters.setMinimumWidth(180)
+    filters.setMaximumWidth(215)
+    filters.setStyleSheet(FILTER_STYLE)
     head = row(spacing=4)
     glyph = QLabel()
     glyph.setPixmap(icon("filter", "#ff3b57", 17).pixmap(17, 17))
@@ -177,7 +238,7 @@ def build(window):
     range_lay.addWidget(self.undo_custom)
     stack.addWidget(Section("Time Range", range_body, True))
 
-    self.undo_type_rows = {name: CheckRow(name, True) for name in data.CATEGORIES}
+    self.undo_type_rows = {name: readable_row(CheckRow(name, True)) for name in data.CATEGORIES}
     type_body = QWidget()
     type_lay = column(spacing=1)
     type_body.setLayout(type_lay)
@@ -204,7 +265,7 @@ def build(window):
     self.undo_source_lay.addWidget(self.undo_source_more)
     stack.addWidget(Section("Game / Source", source_body, True))
 
-    self.undo_hidden_row = CheckRow("Show hidden rows", False)
+    self.undo_hidden_row = readable_row(CheckRow("Show hidden rows", False))
     self.undo_hidden_row.setToolTip("Rows you hid with Hide from History. The logs themselves are never edited.")
     stack.addWidget(self.undo_hidden_row)
     stack.addStretch()
@@ -249,11 +310,12 @@ def build(window):
     self.undo_notice.setTextFormat(Qt.PlainText)
     contents.addWidget(self.undo_notice)
     self.undo_table = _table(COLUMNS)
-    for c, width in enumerate((24, 80, 150, 84, 54, 104, 80)):
+    self.undo_table.setStyleSheet(TABLE_STYLE)
+    for c, width in enumerate((28, 92, 150, 92, 64, 116, 96)):
         self.undo_table.setColumnWidth(c, width)
     self.undo_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
     self.undo_table.setSelectionMode(QAbstractItemView.SingleSelection)
-    self.undo_table.setItemDelegateForColumn(2, NameDelegate(self.undo_table))
+    self.undo_table.setItemDelegateForColumn(2, ReadableName(self.undo_table))
     self.undo_table.setItemDelegateForColumn(6, StatusDelegate(self.undo_table))
     contents.addWidget(self.undo_table, 1)
     self.undo_pager = InventoryPager()
@@ -404,12 +466,12 @@ def update_sources(window):
     names = [n for n in counts if not state.source_query or state.source_query in n.casefold()]
     shown = names if state.expand_sources or state.source_query else names[:insight.SOURCE_SHOWN]
     state.source_rows = {}
-    everything = CheckRow("All Sources", not state.sources)
+    everything = readable_row(CheckRow("All Sources", not state.sources))
     everything.set_count(sum(counts.values()) if counts else 0)
     everything.box.toggled.connect(lambda on: all_sources(window, on))
     lay.addWidget(everything)
     for name in shown:
-        control = CheckRow(name, name in state.sources)
+        control = readable_row(CheckRow(name, name in state.sources))
         control.set_count(counts[name])
         control.setToolTip(name)
         control.box.toggled.connect(lambda on, n=name: source_toggled(window, n, on))
@@ -516,8 +578,8 @@ def fill_table(window, previous):
             pill.setToolTip(data.reversible_text(e) if e.recovery_id else e.note or e.status)
             if e.key in state.hidden:
                 for c in range(1, 6):
-                    table.item(n, c).setForeground(QColor("#6b7683"))
-            table.setRowHeight(n, 30 if state.compact else 44)
+                    table.item(n, c).setForeground(QColor("#8996a4"))
+            table.setRowHeight(n, ROW_COMPACT if state.compact else ROW_DETAILED)
         if state.shown:
             wanted = previous.key if previous else None
             index = next((n for n, e in enumerate(state.shown) if e.key == wanted), 0)

@@ -70,6 +70,11 @@ def main():
             window.navigate("Ready Room")
             settle(300)
             assert window.page.exhume is not None, "Exhume panel is missing from Ready Room"
+            strip = window.page.exhume
+            assert not strip.strip_open and strip.maximumHeight() <= 50, "Exhume starts as one slim line"
+            strip.strip_toggle.click()
+            settle(80)
+            assert strip.strip_open
             assert "Nothing is changed by checking" in live(window).summary.text()
             assert not buttons(window, "Roll back…")
 
@@ -81,6 +86,7 @@ def main():
             assert "not running as administrator" in body.summary.text()
             assert len(buttons(window, "Roll back…")) == 2 and len(buttons(window, "Mark this driver as good")) == 1
             assert ran == [], "Checking must not run any change"
+            assert strip.detail_label.text() == "1 display adapter; 2 older drivers still stored.", strip.detail_label.text()
             window.page.ensureWidgetVisible(window.page.exhume)
             settle(80)
             assert window.grab().save(str(args.output / "ready-room-exhume-1280.png"))

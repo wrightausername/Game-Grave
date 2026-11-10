@@ -65,6 +65,11 @@ def main():
             panel = window.page.soulbind
             assert panel is not None, "Soulbind panel is missing from Ready Room"
             body = panel.soulbind
+            assert not panel.strip_open and panel.maximumHeight() <= 50, "Soulbind starts as one slim line"
+            assert "Set your game preferences once" in panel.detail_label.text()
+            panel.strip_toggle.click()
+            settle()
+            assert panel.strip_open and panel.maximumHeight() > 200, "Open shows the full panel"
             assert body.profile == {}
             assert [r[2].text for r in body.rows] == ["No profile"], [r[2].text for r in body.rows]
             assert not body.copy_button.isEnabled()
@@ -79,6 +84,7 @@ def main():
             assert [r[2].text for r in body.rows] == ["1 to apply"], [r[2].text for r in body.rows]
             assert "not supported" in body.rows[0][2].detail
             assert body.copy_button.isEnabled()
+            assert "can take your preferences" in panel.detail_label.text(), panel.detail_label.text()
             window.page.ensureWidgetVisible(panel)
             settle()
             assert window.grab().save(str(args.output / "ready-room-soulbind-1280.png"))

@@ -89,3 +89,44 @@ def update_text(newest: str, installed: str, outdated: bool, note: str) -> str:
     if outdated:
         return f"Version {newest} is available (you have {installed or 'an unknown version'})"
     return note
+
+
+# ---------------------------------------------------------------- readable names
+import re as _re
+
+_NEXUS_ARCHIVE = _re.compile(r"^(?P<title>.+?)-(?P<modid>\d{1,7})(?:-[0-9A-Za-z]{1,12}){1,6}-(?P<stamp>\d{9,11})$")
+_TRAILING_STAMP = _re.compile(r"[-_ ]+\d{9,}$")
+_HEXISH = _re.compile(r"^(?:[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}|[0-9a-fA-F]{20,})$")
+
+
+def readable_name(name: str, path: str = "", source: str = "", games=()) -> str:
+    """A name a person can read for a mod storage folder, using only what the folder name or the scan proves.
+
+    * A folder named only by digits inside Steam's Workshop folder is a Steam app number. It gets the installed game's
+      name only when that exact app number is one of the scanned games.
+    * A download name such as "SkyUI-12604-5-2SE-1564405049" loses its trailing mod id, version and time stamp.
+    * Long hexadecimal or GUID names are shortened so they do not read as a wall of characters.
+    Anything else is returned unchanged. The caller keeps the original folder name for the tooltip and inspector.
+    """
+    raw = (name or "").strip()
+    if not raw:
+        return "Mod storage"
+    in_workshop = "workshop" in (source + " " + path).casefold()
+    if raw.isdigit():
+        game = next((g for g in games if str(getattr(g, "app_id", "")) == raw), None)
+        if game is not None and in_workshop:
+            return f"{game.name} Workshop items"
+        if in_workshop:
+            return f"Steam Workshop items (app {raw})"
+        return f"Folder {raw}"
+    nexus = _NEXUS_ARCHIVE.match(raw)
+    if nexus:
+        title = _re.sub(r"[_]+", " ", nexus.group("title")).strip()
+        if len(title) >= 2:
+            return title
+    if _HEXISH.match(raw):
+        return f"Folder {raw[:8]}…"
+    stripped = _TRAILING_STAMP.sub("", raw)
+    if stripped and stripped != raw and len(stripped) >= 3:
+        return stripped
+    return raw

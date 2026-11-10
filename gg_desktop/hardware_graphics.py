@@ -64,7 +64,8 @@ class RingGauge(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         side = min(self.width(), self.height())
-        box = QRectF((self.width() - side) / 2 + 9, (self.height() - side) / 2 + 9, side - 18, side - 18)
+        k = side / 112.0   # every measure was drawn for 112 px; scale so a larger gauge stays in proportion
+        box = QRectF((self.width() - side) / 2 + 9 * k, (self.height() - side) / 2 + 9 * k, side - 18 * k, side - 18 * k)
         color = QColor(self.base) if self.fraction is not None else QColor("#4a5863")   # load is shown, never judged
         # quiet backdrop disc
         back = QRadialGradient(box.center(), box.width() / 2)
@@ -72,39 +73,39 @@ class RingGauge(QWidget):
         back.setColorAt(1, QColor(8, 14, 20, 0))
         p.setPen(Qt.NoPen)
         p.setBrush(back)
-        p.drawEllipse(box.adjusted(-4, -4, 4, 4))
+        p.drawEllipse(box.adjusted(-4 * k, -4 * k, 4 * k, 4 * k))
         # tick marks around the open ring
         p.setPen(QPen(QColor("#22323e"), 1))
         for i in range(0, 28):
             angle = 225 - i * 270 / 27
             self._tick(p, box, angle, 3 if i % 9 == 0 else 2)
         # track and fill
-        ring = box.adjusted(7, 7, -7, -7)
-        pen = QPen(TRACK, 8)
+        ring = box.adjusted(7 * k, 7 * k, -7 * k, -7 * k)
+        pen = QPen(TRACK, 8 * k)
         pen.setCapStyle(Qt.RoundCap)
         p.setPen(pen)
         p.drawArc(ring, SWEEP_START * 16, SWEEP * 16)
         if self.fraction:
             glow = QColor(color)
             glow.setAlpha(50)
-            wide = QPen(glow, 14)
+            wide = QPen(glow, 14 * k)
             wide.setCapStyle(Qt.RoundCap)
             p.setPen(wide)
             p.drawArc(ring, SWEEP_START * 16, int(SWEEP * 16 * self.fraction))
-            bright = QPen(color, 8)
+            bright = QPen(color, 8 * k)
             bright.setCapStyle(Qt.RoundCap)
             p.setPen(bright)
             p.drawArc(ring, SWEEP_START * 16, int(SWEEP * 16 * self.fraction))
         # numbers
         p.setPen(QColor("#f1f4f7" if self.fraction is not None else "#6c7a86"))
-        p.setFont(_font(self.font(), 20 if len(self.big) <= 4 else 15, bold=True))
-        p.drawText(QRectF(0, self.height() / 2 - 20, self.width(), 28), Qt.AlignCenter, self.big)
+        p.setFont(_font(self.font(), round((20 if len(self.big) <= 4 else 15) * k), bold=True))
+        p.drawText(QRectF(0, self.height() / 2 - 20 * k, self.width(), 28 * k), Qt.AlignCenter, self.big)
         p.setPen(QColor("#8794a1"))
-        p.setFont(_font(self.font(), 10))
-        p.drawText(QRectF(0, self.height() / 2 + 6, self.width(), 14), Qt.AlignCenter, self.small or self.title)
+        p.setFont(_font(self.font(), round(10 * k)))
+        p.drawText(QRectF(0, self.height() / 2 + 6 * k, self.width(), 14 * k), Qt.AlignCenter, self.small or self.title)
         p.setPen(QColor(self.base))
-        p.setFont(_font(self.font(), 10, bold=True))
-        p.drawText(QRectF(0, self.height() - 16, self.width(), 14), Qt.AlignCenter, self.title if self.small else "")
+        p.setFont(_font(self.font(), round(10 * k), bold=True))
+        p.drawText(QRectF(0, self.height() - 16 * k, self.width(), 14 * k), Qt.AlignCenter, self.title if self.small else "")
 
     @staticmethod
     def _tick(p, box, degrees, length):
@@ -126,8 +127,8 @@ class AreaChart(QWidget):
         self.empty_text = empty_text
         self.history = history
         self.values = []
-        self.setMinimumHeight(92)
-        self.setMaximumHeight(220)
+        self.setMinimumHeight(120)
+        self.setMaximumHeight(300)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def set_values(self, values):

@@ -94,12 +94,45 @@ class SquadTests(unittest.TestCase):
         def forge(payload):
             import json
             return sq.CODE_PREFIX + base64.urlsafe_b64encode(zlib.compress(json.dumps(payload).encode())).decode()
-        for payload in ({"v": 2, "g": "G", "i": []}, {"v": 1, "g": "G", "i": [["evil", "k", "l", ""]]},
+        for payload in ({"v": 3, "g": "G", "i": []}, {"v": 1, "g": "G", "i": [["evil", "k", "l", ""]]},
                         {"v": 1, "g": "G", "i": [["workshop", "12;calc", "l", ""]]},
                         {"v": 1, "g": "G", "i": [["mo2", "k", "l", "notdigits"]]},
                         {"v": 1, "g": "G", "i": [["mo2", "k"]]}):
             with self.assertRaises(ValueError):
                 sq.read_code(forge(payload))
+
+    def test_nexus_references_come_from_mo2_meta_and_travel_in_the_code(self):
+        mods = self.root / "Local" / "ModOrganizer" / "Skyrim SE" / "mods"
+        (mods / "SkyUI").mkdir(parents=True)
+        (mods / "SkyUI" / "meta.ini").write_text("[General]\ngameName=skyrimspecialedition\nmodid=12604\n", encoding="utf-8")
+        (mods / "USSEP").mkdir()
+        (mods / "USSEP" / "meta.ini").write_text("[General]\nmodid=0\n", encoding="utf-8")
+        setup = self.mine()
+        by_label = {i.label: i for i in setup.items}
+        self.assertEqual(by_label["SkyUI"].nexus, "skyrimspecialedition/12604")
+        self.assertEqual(by_label["USSEP"].nexus, "")
+        self.assertEqual(sq.nexus_url(by_label["SkyUI"]), "https://www.nexusmods.com/skyrimspecialedition/mods/12604?tab=files")
+        self.assertIsNone(sq.nexus_url(by_label["USSEP"]))
+        back = sq.read_code(sq.make_code(setup))
+        self.assertEqual({i.label: i.nexus for i in back.items}["SkyUI"], "skyrimspecialedition/12604")
+
+    def test_a_code_without_nexus_stays_the_old_format_and_a_hostile_reference_is_dropped(self):
+        import json
+        code = sq.make_code(self.mine())
+        body = code[len(sq.CODE_PREFIX):]
+        payload = json.loads(zlib.decompress(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4))))
+        self.assertEqual(payload["v"], 1)
+        forged = {"v": 2, "g": "G", "i": [["mo2", "k", "l", "", "../../evil/1"]]}
+        forged_code = sq.CODE_PREFIX + base64.urlsafe_b64encode(zlib.compress(json.dumps(forged).encode())).decode()
+        self.assertEqual(sq.read_code(forged_code).items[0].nexus, "")
+
+    def test_meta_folder_names_cannot_climb_out_of_the_mods_folder(self):
+        inst = self.root / "Local" / "ModOrganizer" / "Skyrim SE"
+        (inst / "profiles" / "Co-op" / "modlist.txt").write_text("+..\n+a/b\n+SkyUI\n", encoding="utf-8")
+        (inst / "meta.ini").write_text("[General]\nmodid=99\ngameName=skyrimspecialedition\n", encoding="utf-8")
+        refs = {i.label: i.nexus for i in self.mine().items if i.kind == "mo2"}
+        self.assertEqual(refs.get(".."), "")
+        self.assertEqual(refs.get("a/b"), "")
 
     def test_workshop_labels_from_a_code_are_never_trusted(self):
         import json

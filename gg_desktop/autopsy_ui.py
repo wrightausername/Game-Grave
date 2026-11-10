@@ -1,20 +1,27 @@
-"""The Autopsy panel in Ready Room: pick a before capture and an after capture, see the frame-time traces and a
-plain comparison. Display only; every rule lives in autopsy_core. Nothing here goes online or records frames."""
+"""The Autopsy panel in Ready Room: captures are found automatically, the newest ten are kept, and the latest two of the
+same game are compared. Display only; every rule lives in autopsy_core and autopsy_library. Nothing here goes online or
+records frames, and automatic passes are small, spaced out and skipped while a game is running."""
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QApplication, QFileDialog, QFrame, QGridLayout, QLabel, QLineEdit, QWidget
+from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame, QGridLayout, QLabel, QLineEdit, QWidget)
 
 from gg_desktop import autopsy_core as au
+from gg_desktop import autopsy_library as lib
+from gg_desktop.feature_strip import collapsible
 from gg_desktop.widgets import button, column, label, row
 
 TONES = {"green": "#35DC7C", "amber": "#DFAC46", "muted": "#9AA4AC"}
 BEFORE_COLOR, AFTER_COLOR = "#CED3D8", "#E5384F"
-POINTS = 700
+TICK_MS = 5 * 60 * 1000          # how often a visible panel checks whether a pass is due (the check itself is free)
+INTRO = ("Game Grave looks in the folders PresentMon, CapFrameX and FrameView save to, about every 30 minutes while "
+         "this page is open and no game is running. It keeps the newest ten captures and compares the latest two of "
+         "the same game. Your capture files are never changed or deleted.")
 
 
 @dataclass
@@ -28,36 +35,62 @@ class Result:
 
 
 def build_panel(panel_cls, window):
-    panel = panel_cls("Autopsy", "Compare two frame-time captures from before and after a change.", "pulse")
-    panel.setMinimumHeight(360)
+    panel = collapsible(panel_cls, "Autopsy", "Automatic. Compares your newest frame-time captures, ten kept.", "pulse",
+                        open_height=420)
     body = AutopsyBody(window)
+    body.on_status = panel.set_subtitle
     panel.body_layout.setContentsMargins(14, 8, 14, 10)
     panel.body_layout.addWidget(body)
     panel.autopsy = body
+    body.reload()
+    body.auto_scan()
     return panel
 
 
-def compute(before_path, after_path) -> Result:
-    """Runs off the main thread. Problems with a file come back as text, never as a dialog."""
-    try:
-        before, after = au.read_capture(before_path), au.read_capture(after_path)
-    except au.CaptureError as problem:
-        return Result(error=str(problem))
-    comparison = au.compare(au.stats_for(before), au.stats_for(after))
-    return Result(comparison, "", au.downsample_max(before, POINTS), au.downsample_max(after, POINTS),
-                  Path(before_path).name, Path(after_path).name)
+def result_for(before, after) -> Result:
+    """A comparison of two library entries. Pure arithmetic on stored numbers, so it is instant."""
+    comparison = au.compare(before.stats_obj(), after.stats_obj())
+    return Result(comparison, "", before.points, after.points, before.name, after.name)
 
 
-def deliver(window, result):
-    """The page can be rebuilt while a comparison runs, so keep the newest result on the window."""
-    window.autopsy_result = result
-    panel = getattr(window.page, "autopsy", None)
-    body = getattr(panel, "autopsy", None)
-    if body is not None:
+def game_running(window) -> bool:
+    """True when the Games tracker, which already samples processes, last saw a game running. Costs nothing extra."""
+    tracker = getattr(window, "_games_tracker", None)
+    return bool(tracker is not None and getattr(getattr(tracker, "ledger", None), "active", None))
+
+
+def scan_allowed(window, now=None) -> bool:
+    if getattr(window, "scanning", False) or getattr(window, "cleaning", False):
+        return False
+    if game_running(window) or getattr(window, "autopsy_busy", False):
+        return False
+    return lib.due(getattr(window, "autopsy_last_pass", None), now)
+
+
+def run_pass(window, done=None, *, by_hand: bool = False):
+    """One bounded capture check in the background. Errors become notes, never a dialog (it may run during a game)."""
+    window.autopsy_busy = True
+    window.autopsy_last_pass = time.monotonic()
+
+    def work(_progress):
         try:
-            body.show_result(result)
-        except RuntimeError:
-            pass
+            return lib.refresh()
+        except Exception as problem:     # noqa: BLE001 - a background pass must never raise a dialog
+            return lib.Refresh(notes=[f"Capture check stopped: {problem}"], looked=True)
+
+    def finish(result):
+        window.autopsy_busy = False
+        window.autopsy_notes = result.notes
+        body = getattr(getattr(window.page, "autopsy", None), "autopsy", None)
+        if body is not None:
+            try:
+                body.after_pass(result, by_hand)
+            except RuntimeError:
+                pass
+        if done:
+            done(result)
+
+    window.job(work, finish, error_title="Autopsy could not check for captures")
 
 
 class FrameGraph(QWidget):
@@ -119,36 +152,44 @@ class AutopsyBody(QWidget):
     def __init__(self, window):
         super().__init__()
         self.window_owner = window
-        self.paths = {"before": None, "after": None}
-        self.names = {}
+        self.entries = []
         self.result = None
+        self.on_status = None
+        self._loading = False
         layout = column(spacing=8)
         self.setLayout(layout)
+        top = row(spacing=14)
+        self.count = label("", "readyGameTitle")
+        top.addWidget(self.count, 1)
+        self.check_button = button("Check for new captures", self.check_now, kind="actionLink",
+                                   tip="Looks in the PresentMon, CapFrameX and FrameView folders once, right now.")
+        self.add_button = button("Add a capture…", self.add_by_hand, kind="actionLink",
+                                 tip="Adds one CSV from anywhere. It counts toward the ten kept.")
+        top.addWidget(self.check_button)
+        top.addWidget(self.add_button)
+        layout.addLayout(top)
+        pick = row(spacing=10)
+        self.combos = {}
         for key, title in (("before", "Before"), ("after", "After")):
-            line = row(spacing=10)
             heading = label(title, "readyGameTitle")
             heading.setFixedWidth(52)
-            line.addWidget(heading)
-            name = label("No file chosen", "readyDetail")
-            self.names[key] = name
-            line.addWidget(name, 1)
-            choose = button("Choose capture…", lambda _=False, k=key: self.choose(k), kind="actionLink",
-                            tip="A CSV saved by PresentMon, CapFrameX or FrameView with a MsBetweenPresents or FrameTime column.")
-            choose.setAccessibleName(f"Choose {title.lower()} capture")
-            setattr(self, f"{key}_button", choose)
-            line.addWidget(choose)
-            layout.addLayout(line)
+            combo = QComboBox()
+            combo.setMinimumWidth(240)
+            combo.setAccessibleName(f"{title} capture")
+            combo.currentIndexChanged.connect(self._picked)
+            self.combos[key] = combo
+            pick.addWidget(heading)
+            pick.addWidget(combo, 1)
+        layout.addLayout(pick)
         line = row(spacing=10)
         self.note = QLineEdit()
         self.note.setMaxLength(120)
         self.note.setPlaceholderText("What changed between the two? For example: updated the graphics driver")
         self.note.setAccessibleName("What changed")
+        self.note.textChanged.connect(self._remember)
         line.addWidget(self.note, 1)
-        self.compare_button = button("Compare", self.compare, kind="primary",
-                                     tip="Reads the two files and does arithmetic on them. Changes nothing.")
-        line.addWidget(self.compare_button)
         layout.addLayout(line)
-        self.summary = label("", "readyDetail", wrap=True)
+        self.summary = label(INTRO, "readyDetail", wrap=True)
         layout.addWidget(self.summary)
         middle = row(spacing=14)
         self.graph = FrameGraph()
@@ -166,66 +207,147 @@ class AutopsyBody(QWidget):
         tools.addWidget(self.copy_button)
         tools.addStretch()
         layout.addLayout(tools)
-        saved = getattr(window, "autopsy_paths", None)
+        saved = getattr(window, "autopsy_choice", None)
         if saved:
-            self.paths.update(saved["paths"])
-            self.note.setText(saved["note"])
-            self._names()
-        self.note.textChanged.connect(self._remember)
-        last = getattr(window, "autopsy_result", None)
-        if last is not None:
-            self.show_result(last)
-        else:
-            self.summary.setText("Game Grave does not record frames. Capture before and after with PresentMon, "
-                                 "CapFrameX or FrameView, then choose the two files here.")
-        self._sync()
+            self.note.setText(saved.get("note", ""))
+        # Only a visible page checks, and only when a pass is due and no game is running.
+        self.timer = QTimer(self)
+        self.timer.setInterval(TICK_MS)
+        self.timer.timeout.connect(self.auto_scan)
+        self.timer.start()
+
+    # ------------------------------------------------------------ library
+    def reload(self, *, choose_newest: bool = False):
+        self.entries = lib.load()
+        self._loading = True
+        saved = getattr(self.window_owner, "autopsy_choice", None) or {}
+        for key, combo in self.combos.items():
+            combo.clear()
+            for entry in self.entries:
+                combo.addItem(entry.label(), entry.id)
+        before, after = lib.pair_for(self.entries)
+        wanted = {"before": before, "after": after}
+        if not choose_newest and saved.get("before") and saved.get("after"):
+            ids = {e.id for e in self.entries}
+            if saved["before"] in ids and saved["after"] in ids:
+                wanted = {"before": next(e for e in self.entries if e.id == saved["before"]),
+                          "after": next(e for e in self.entries if e.id == saved["after"])}
+        for key, entry in wanted.items():
+            if entry is not None:
+                self.combos[key].setCurrentIndex(max(0, self.combos[key].findData(entry.id)))
+            else:
+                self.combos[key].setCurrentIndex(-1)
+        self._loading = False
+        self.count.setText(f"{len(self.entries)} of {lib.KEEP} captures kept")
+        self._show()
+
+    def _chosen(self):
+        by_id = {e.id: e for e in self.entries}
+        return tuple(by_id.get(self.combos[k].currentData()) for k in ("before", "after"))
+
+    def _picked(self, *_):
+        if not self._loading:
+            self._remember()
+            self._show()
 
     def _remember(self, *_):
-        self.window_owner.autopsy_paths = {"paths": dict(self.paths), "note": self.note.text()}
+        before, after = self._chosen()
+        self.window_owner.autopsy_choice = {"before": before.id if before else "", "after": after.id if after else "",
+                                            "note": self.note.text()}
 
-    def _names(self):
-        for key, path in self.paths.items():
-            self.names[key].setText(Path(path).name if path else "No file chosen")
-
-    def _sync(self):
-        self.compare_button.setEnabled(all(self.paths.values()))
-        self.copy_button.setEnabled(bool(self.result and self.result.comparison))
-
-    def choose(self, key):
-        path, _ = QFileDialog.getOpenFileName(self.window_owner, f"Choose the {key} capture", "",
-                                              "Frame-time captures (*.csv);;All files (*)")
-        if not path:
-            return
-        self.paths[key] = path
-        self._names()
-        self._remember()
-        self._sync()
-
-    def compare(self):
-        before, after = self.paths["before"], self.paths["after"]
-        if not (before and after):
-            return
-        self.compare_button.setEnabled(False)
-        self.summary.setText("Reading both captures…")
-        self.window_owner.job(lambda _progress: compute(before, after), lambda r: deliver(self.window_owner, r),
-                              error_title="Autopsy could not compare the captures")
-
-    def show_result(self, result):
-        self.result = result
+    def _show(self):
+        before, after = self._chosen()
         self._clear_grid()
-        if result.error:
-            self.summary.setText(result.error)
+        self.result = None
+        if not self.entries:
             self.graph.set_data([], [], 40)
+            self.summary.setText(INTRO + " Nothing found yet. Save a capture and it will appear here.")
+            self._status("Automatic. Save a capture with PresentMon, CapFrameX or FrameView and it appears here.")
+        elif before is None or after is None:
+            self.graph.set_data([], [], 40)
+            self.summary.setText("Pick a Before and an After capture. " + INTRO if len(self.entries) > 1 else
+                                 "One capture kept. Autopsy needs a second capture of the same game to compare.")
+            self._status(f"{len(self.entries)} of {lib.KEEP} captures kept. Waiting for a second capture of the same game.")
+        elif before.id == after.id:
+            self.graph.set_data([], [], 40)
+            self.summary.setText("Before and After are the same capture. Choose two different ones.")
+            self._status(f"{len(self.entries)} of {lib.KEEP} captures kept.")
         else:
-            comparison = result.comparison
+            self.result = result_for(before, after)
+            comparison = self.result.comparison
             self.summary.setText(comparison.summary)
             cap = 40.0
             if comparison.comparable:
                 cap = max(34.0, 1.3 * max(comparison.before.p99_ms, comparison.after.p99_ms))
-            self.graph.set_data(result.before_points, result.after_points, cap)
+            self.graph.set_data(self.result.before_points, self.result.after_points, cap)
             self._fill_grid(comparison)
-        self.compare_button.setEnabled(all(self.paths.values()))
-        self._sync()
+            guessed = before.game.casefold() != after.game.casefold()
+            if guessed:
+                self.summary.setText(self.summary.text() + " These two look like different games by their file names.")
+            self._status(f"{len(self.entries)} of {lib.KEEP} kept. " + lib.headline(comparison))
+        self.copy_button.setEnabled(bool(self.result and self.result.comparison))
+
+    def _status(self, text):
+        if self.on_status is not None:
+            self.on_status(text)
+
+    # ------------------------------------------------------------ automatic and manual passes
+    def auto_scan(self):
+        """A quiet pass, only while Ready Room is the page on screen, the window is up, no game is running and a pass is
+        due. Nothing runs in the background otherwise."""
+        owner = self.window_owner
+        live = getattr(getattr(owner, "page", None), "autopsy", None)
+        if getattr(live, "autopsy", None) is not self:
+            return
+        if not owner.isVisible() or owner.isMinimized():
+            return
+        if scan_allowed(owner):
+            run_pass(owner)
+
+    def check_now(self):
+        if getattr(self.window_owner, "autopsy_busy", False):
+            return
+        self.check_button.setEnabled(False)
+        self.summary.setText("Looking in the capture folders…")
+        run_pass(self.window_owner, by_hand=True)
+
+    def after_pass(self, result, by_hand):
+        self.check_button.setEnabled(True)
+        if result.added:
+            self.reload(choose_newest=True)
+            tail = f" Replaced the oldest {len(result.dropped)}." if result.dropped else ""
+            self.summary.setText(self.summary.text() + f" Found {len(result.added)} new capture"
+                                 f"{'s' if len(result.added) != 1 else ''}.{tail}")
+        elif by_hand:
+            self.summary.setText(("No new captures found. " + " ".join(result.notes)).strip())
+        if result.notes and not by_hand and not result.added:
+            self.window_owner.autopsy_notes = result.notes
+
+    def add_by_hand(self):
+        path, _ = QFileDialog.getOpenFileName(self.window_owner, "Add a frame-time capture", "",
+                                              "Frame-time captures (*.csv);;All files (*)")
+        if not path:
+            return
+        self.add_button.setEnabled(False)
+        self.summary.setText("Reading the capture…")
+
+        def work(_progress):
+            try:
+                return lib.add_by_hand(path), ""
+            except (au.CaptureError, OSError) as problem:
+                return None, str(problem)
+
+        def finish(result):
+            self.add_button.setEnabled(True)
+            outcome, problem = result
+            if problem:
+                self.summary.setText(problem)
+                return
+            self.reload(choose_newest=True)
+            if outcome[1]:
+                self.summary.setText(self.summary.text() + " Replaced the oldest one.")
+
+        self.window_owner.job(work, finish, error_title="Autopsy could not add the capture")
 
     def _clear_grid(self):
         while self.grid.count():

@@ -35,3 +35,26 @@ class ModsWordsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReadableNames(unittest.TestCase):
+    class Game:
+        def __init__(self, name, app_id):
+            self.name, self.app_id = name, app_id
+
+    def test_workshop_app_numbers_are_named_only_when_the_game_is_scanned(self):
+        games = [self.Game("Skyrim Special Edition", "489830")]
+        path = r"D:\Steam\steamapps\workshop\content\489830"
+        self.assertEqual(w.readable_name("489830", path, "Steam Workshop", games), "Skyrim Special Edition Workshop items")
+        self.assertEqual(w.readable_name("294100", path, "Steam Workshop", games), "Steam Workshop items (app 294100)")
+        self.assertEqual(w.readable_name("12345", r"D:\Mods\12345", "Other", games), "Folder 12345")
+
+    def test_download_names_lose_their_id_version_and_stamp(self):
+        self.assertEqual(w.readable_name("SkyUI_5_2_SE-12604-5-2SE-1564405049"), "SkyUI 5 2 SE")
+        self.assertEqual(w.readable_name("Unofficial Patch-266-4-3-3a-1604000000"), "Unofficial Patch")
+        self.assertEqual(w.readable_name("My Texture Pack 1700000000"), "My Texture Pack")
+
+    def test_hex_walls_are_shortened_and_ordinary_names_are_untouched(self):
+        self.assertEqual(w.readable_name("3f2a9c1d-1111-2222-3333-444455556666"), "Folder 3f2a9c1d…")
+        for plain in ("SkyUI", "Better Combat 2", "RimWorld Reborn v1-2", "ENB 2026", ""):
+            self.assertEqual(w.readable_name(plain), plain or "Mod storage")

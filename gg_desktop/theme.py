@@ -225,4 +225,19 @@ QTableWidget#referenceTable { font-size:12px; }
 QHeaderView::section { font-size:11px; }
 QLabel#detailKey, QLabel#detailValue { font-size:12px; }
 QListWidget#sourceFilters { font-size:12px; }
+/* Prompts: every dialog and message box is dark with light text. Without this they fall back to the system
+   light background while the text stays white, which made them unreadable (for example in the Resurrection Kit). */
+QDialog, QMessageBox, QInputDialog, QFileDialog { background:#0B121A; color:#F4F7FC; }
+QDialog QLabel, QMessageBox QLabel, QInputDialog QLabel { color:#F4F7FC; background:transparent; font-size:14px; }
+QDialog QCheckBox, QDialog QRadioButton, QDialog QGroupBox { color:#F4F7FC; }
+QDialog QTextEdit, QDialog QPlainTextEdit, QDialog QTextBrowser, QMessageBox QTextEdit {
+    background:#0D141D; color:#F4F7FC; border:1px solid #34414F; border-radius:7px; padding:8px;
+    selection-background-color:#2E5667; selection-color:white;
+}
+QDialog QPushButton, QMessageBox QPushButton { min-width:88px; min-height:26px; padding:6px 16px; }
+QDialog QAbstractItemView, QDialog QTreeView, QDialog QListView { background:#0D141D; color:#F4F7FC; }
+QMenu { background:#111A23; color:#F4F7FC; border:1px solid #34414F; padding:4px; }
+QMenu::item { padding:6px 22px; }
+QMenu::item:selected { background:#2B5264; color:white; }
+QMenu::item:disabled { color:#778594; }
 """

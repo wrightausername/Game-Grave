@@ -222,10 +222,13 @@ def main():
             window.undo_sort.setCurrentText("Date (Newest)")
             window.undo_view_list.click()
             settle()
-            assert window.undo_table.rowHeight(0) == 30
+            assert window.undo_table.rowHeight(0) == 36
             window.undo_view_grid.click()
             settle()
-            assert window.undo_table.rowHeight(0) == 44
+            assert window.undo_table.rowHeight(0) == 54
+            # Readability: this page's table uses larger type and brighter text than the shared compact look.
+            assert "font-size:14px" in window.undo_table.styleSheet()
+            assert window.undo_table.item(0, 2).text()
             assert window.grab().save(str(args.output / "undo-filters-1280.png"))
 
             # Select This Run checks only that run's shown rows.

@@ -214,7 +214,10 @@ def radar_rows(catalog, report, inventory, extra_roots):
 
 
 def source_rows(inventory, extra_roots):
-    rows = [{"name": m.name, "path": str(m.path), "kind": m.source, "state": m.status, "custom": False} for m in inventory.mods]
+    from gg_desktop.mods_words import readable_name
+    games = getattr(inventory, "games", ()) or ()
+    rows = [{"name": readable_name(m.name, str(m.path), m.source, games), "path": str(m.path), "kind": m.source,
+             "state": m.status, "custom": False} for m in inventory.mods]
     known = {identity(r["path"]) for r in rows}
     for root in extra_roots:
         rows.append({"name": str(root).rstrip("/\\").rsplit("\\", 1)[-1].rsplit("/", 1)[-1] or str(root), "path": str(root),

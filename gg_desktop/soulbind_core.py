@@ -39,20 +39,34 @@ class Pref:
     default: object
     options: tuple = ()             # choice: ((value, label), ...)   number: (minimum, maximum)
     tip: str = ""
+    unit: str = ""                  # shown after a number, for example "°" or "%"
 
 
 PREFS = (
     Pref("subtitles", "Show subtitles", "Accessibility", "toggle", True, tip="Turn subtitles on."),
     Pref("screen_effects", "Screen shake and distortion", "Accessibility", "choice", "reduced",
          (("full", "Full"), ("reduced", "Reduced"), ("off", "Off")), "Less motion on screen can help with motion sickness."),
+    Pref("fov_effects", "Speed and sprint view stretch", "Accessibility", "number", 50, (0, 100),
+         "How much the view stretches when you sprint or speed up. Lower is calmer.", "%"),
     Pref("view_bob", "Camera head bob", "Comfort", "toggle", False, tip="Turn walking camera bob on or off."),
-    Pref("fov", "Field of view", "Comfort", "number", 90, (60, 120), "Wider view, in degrees."),
+    Pref("fov", "Field of view", "Comfort", "number", 90, (60, 120), "Wider view, in degrees.", "°"),
+    Pref("particles", "Particles", "Comfort", "choice", "decreased",
+         (("all", "All"), ("decreased", "Fewer"), ("minimal", "Minimal")), "Fewer particles are easier on the eyes and the PC."),
     Pref("invert_y", "Invert vertical look", "Controls", "toggle", False, tip="Push up to look down."),
     Pref("toggle_sprint", "Toggle sprint (tap instead of hold)", "Controls", "toggle", True),
     Pref("toggle_crouch", "Toggle crouch (tap instead of hold)", "Controls", "toggle", True),
+    Pref("always_run", "Always run by default", "Controls", "toggle", True, tip="Walk only when you hold the walk key."),
+    Pref("mouse_accel", "Mouse acceleration", "Controls", "toggle", False,
+         tip="Off makes the cursor follow your hand the same way every time."),
+    Pref("auto_jump", "Auto jump", "Controls", "toggle", False, tip="Step up one block without pressing jump."),
+    Pref("vsync", "Vertical sync", "Display", "toggle", True, tip="Stops screen tearing; can add a little input delay."),
+    Pref("max_fps", "Frame rate limit", "Display", "number", 120, (30, 260), "The most frames per second the game draws.", " fps"),
+    Pref("render_distance", "Render distance", "Display", "number", 12, (2, 32), "How far the world is drawn, in chunks.", " chunks"),
+    Pref("master_volume", "Master volume", "Audio", "number", 80, (0, 100), "Overall game volume.", "%"),
+    Pref("music_volume", "Music volume", "Audio", "number", 50, (0, 100), "Music only.", "%"),
 )
 PREF_BY_ID = {p.id: p for p in PREFS}
-GROUPS = ("Accessibility", "Comfort", "Controls")
+GROUPS = ("Accessibility", "Comfort", "Controls", "Display", "Audio")
 
 
 def clean_value(pref: Pref, value):
@@ -94,7 +108,7 @@ def value_text(pref: Pref, value) -> str:
     if pref.kind == "toggle":
         return "On" if value else "Off"
     if pref.kind == "number":
-        return f"{value}°"
+        return f"{value}{pref.unit}"
     return dict(pref.options).get(value, str(value))
 
 
@@ -168,6 +182,32 @@ def _effect_read(text):
     return "full" if number >= .75 else "reduced" if number >= .25 else "off"
 
 
+def _int_text(value):
+    return str(int(value))
+
+
+def _percent_text(value):
+    return f"{int(value) / 100:.2f}"
+
+
+def _read_percent(text):
+    try:
+        return int(round(float(text.strip()) * 100))
+    except ValueError:
+        return None
+
+
+_PARTICLES = {"all": "0", "decreased": "1", "minimal": "2"}
+
+
+def _particles_text(value):
+    return _PARTICLES[value]
+
+
+def _particles_read(text):
+    return {"0": "all", "1": "decreased", "2": "minimal"}.get(text.strip())
+
+
 @dataclass(frozen=True)
 class Setting:
     pref: str
@@ -190,6 +230,9 @@ class Adapter:
 BETHESDA = (
     Setting("invert_y", "bInvertYValues", _bool01, _read01, "Controls"),
     Setting("fov", "fDefaultWorldFOV", _num_ini, _read_num, "Display"),
+    Setting("always_run", "bAlwaysRunByDefault", _bool01, _read01, "Controls"),
+    Setting("mouse_accel", "bMouseAcceleration", _bool01, _read01, "Controls"),
+    Setting("vsync", "iPresentInterval", _bool01, _read01, "Display"),
 )
 
 ADAPTERS = (
@@ -205,6 +248,14 @@ ADAPTERS = (
                 Setting("toggle_sprint", "toggleSprint", _bool_word, _read_word),
                 Setting("toggle_crouch", "toggleCrouch", _bool_word, _read_word),
                 Setting("screen_effects", "screenEffectScale", _effect_text, _effect_read),
+                Setting("fov_effects", "fovEffectScale", _percent_text, _read_percent),
+                Setting("particles", "particles", _particles_text, _particles_read),
+                Setting("auto_jump", "autoJump", _bool_word, _read_word),
+                Setting("vsync", "enableVsync", _bool_word, _read_word),
+                Setting("max_fps", "maxFps", _int_text, _read_num),
+                Setting("render_distance", "renderDistance", _int_text, _read_num),
+                Setting("master_volume", "soundCategory_master", _percent_text, _read_percent),
+                Setting("music_volume", "soundCategory_music", _percent_text, _read_percent),
             )),
 )
 

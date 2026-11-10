@@ -135,3 +135,44 @@ class SoulbindTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MoreSettings(unittest.TestCase):
+    OPTIONS = ("fovEffectScale:1.0\nparticles:0\nautoJump:false\nenableVsync:true\nmaxFps:260\nrenderDistance:12\n"
+               "soundCategory_master:1.0\nsoundCategory_music:0.5\nunrelated:keep\n")
+
+    def test_minecraft_takes_the_new_preferences_and_changes_only_those_lines(self):
+        adapter = sb.adapter_for("Minecraft")
+        profile = {"fov_effects": 25, "particles": "minimal", "auto_jump": True, "vsync": False, "max_fps": 120,
+                   "render_distance": 16, "master_volume": 60, "music_volume": 0}
+        plan = sb.make_plan(adapter, self.OPTIONS, profile)
+        self.assertEqual(len(plan.differing), 8, plan)
+        out = sb.apply_to_text(adapter, self.OPTIONS, profile)
+        for line in ("fovEffectScale:0.25", "particles:2", "autoJump:true", "enableVsync:false", "maxFps:120",
+                     "renderDistance:16", "soundCategory_master:0.60", "soundCategory_music:0.00", "unrelated:keep"):
+            self.assertIn(line, out.split("\n"))
+        again = sb.make_plan(adapter, out, profile)
+        self.assertEqual(again.differing, ())
+
+    def test_a_preference_a_game_does_not_have_is_unsupported_never_added(self):
+        adapter = sb.adapter_for("Minecraft")
+        plan = sb.make_plan(adapter, "unrelated:1\n", {"max_fps": 60, "always_run": True})
+        self.assertEqual(plan.changes, ())
+        self.assertEqual(sorted(plan.unsupported), ["always_run", "max_fps"])
+        self.assertEqual(sb.apply_to_text(adapter, "unrelated:1\n", {"max_fps": 60}), "unrelated:1\n")
+
+    def test_bethesda_keys_are_matched_only_when_the_file_really_has_them(self):
+        adapter = sb.adapter_for("Skyrim Special Edition")
+        text = "[Display]\niPresentInterval=1\nfDefaultWorldFOV=90.0000\n[Controls]\nbAlwaysRunByDefault=1\nbMouseAcceleration=1\n"
+        plan = sb.make_plan(adapter, text, {"vsync": False, "always_run": True, "mouse_accel": False, "fov": 90})
+        self.assertEqual(sorted(c.pref for c in plan.differing), ["mouse_accel", "vsync"])
+        self.assertEqual(sorted(c.pref for c in plan.matching), ["always_run", "fov"])
+
+    def test_number_values_show_their_unit_and_stay_in_range(self):
+        pref = sb.PREF_BY_ID["master_volume"]
+        self.assertEqual(sb.value_text(pref, 60), "60%")
+        self.assertEqual(sb.value_text(sb.PREF_BY_ID["fov"], 90), "90°")
+        with self.assertRaises(ValueError):
+            sb.clean_value(pref, 101)
+        self.assertEqual(sb.read_code(sb.make_code({"max_fps": 144, "particles": "all"})), {"max_fps": 144, "particles": "all"})
+        self.assertEqual(set(p.group for p in sb.PREFS), set(sb.GROUPS))
