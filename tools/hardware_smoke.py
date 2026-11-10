@@ -123,7 +123,15 @@ def main():
             assert sum(1 for t in shown if t == "NEEDS SESSIONS") == 3, [t for t in shown if t.isupper()]
             assert any("Moving games is done in Steam" in t for t in shown), "storage note comes from install folders"
             assert any("NO PURCHASE NEEDED" == t for t in shown)
+            assert body(window).pc_tab.isVisible() and not body(window).adv_tab.isVisible(), "Your PC is the first tab"
             assert window.grab().save(str(args.output / "hardware-no-sessions-1366.png"))
+
+            # The advisor is its own tab inside Hardware.
+            pressed(window, "Upgrade Advisor").click()
+            settle(100)
+            assert body(window).adv_tab.isVisible() and not body(window).pc_tab.isVisible()
+            assert window.hardware_tab == "Upgrade Advisor"
+            assert window.grab().save(str(args.output / "hardware-advisor-empty-1366.png"))
 
             # A too-short recording is thrown away.
             pressed(window, "Record Play Session").click()
@@ -149,16 +157,24 @@ def main():
             assert "STRONGEST SIGNAL" in shown and "NOT NEEDED YET" in shown and "NO SIGN OF A LIMIT" in shown, [t for t in shown if t.isupper()]
             assert any("Video memory peaked at 7.7 GB of 8 GB in 3 of 3 sessions" in t for t in shown), [t for t in shown if "Video" in t]
             assert any(e["kind"] == "Hardware session recorded" for e in core.get_activity())
+            assert sum(1 for t in shown if t.endswith(" readings")) == 3, [t for t in shown if "readings" in t]
+            assert any(t.startswith("GPU ") and t.endswith("%") for t in shown), [t for t in shown if t.startswith("GPU")]
             window.page.ensureWidgetVisible(body(window).advice_panel)
             settle(100)
             assert window.grab().save(str(args.output / "hardware-with-sessions-1366.png"))
 
-            # The whole page at once, so the Live Monitor and Drives panels are reviewed too.
+            # The whole advisor tab, then the whole Your PC tab, so every panel is reviewed.
+            window.resize(1366, 1100)
+            settle(300)
+            assert window.grab().save(str(args.output / "hardware-advisor-full-1366.png"))
+            pressed(window, "Your PC").click()
             window.resize(1366, 1500)
             settle(300)
+            assert body(window).pc_tab.isVisible() and not body(window).adv_tab.isVisible()
             window.page.ensureWidgetVisible(body(window).monitor_panel)
             settle(100)
             assert window.grab().save(str(args.output / "hardware-full-1366.png"))
+            pressed(window, "Upgrade Advisor").click()
             window.resize(1366, 790)
             settle(200)
 
@@ -178,6 +194,7 @@ def main():
             wait_for(lambda: window.page.isVisible(), "the rebuilt page")
             settle(300)
             assert len(body(window).sessions) == 3 and any("AMD Ryzen" in t for t in texts(window))
+            assert body(window).adv_tab.isVisible(), "the chosen tab is remembered after a rebuild"
             assert len(reads) == 1, "the parts are read once, not on every visit"
 
             # Spec sheet goes to the clipboard and nowhere else.

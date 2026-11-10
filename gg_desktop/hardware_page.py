@@ -11,13 +11,13 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QTimer
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QFileDialog, QFrame, QLabel
+from PySide6.QtWidgets import QFileDialog, QFrame, QGridLayout, QLabel, QWidget
 
 from core import human_size, log_event
 from gg_desktop import hardware_core as hw
 from gg_desktop import hardware_graphics as hg
 from gg_desktop.header_banner import HeaderBannerArtwork
-from gg_desktop.reference_widgets import MetricStrip
+from gg_desktop.reference_widgets import MetricStrip, TabStrip
 from gg_desktop.widgets import button, column, label, panel, row
 
 SUBTITLE = "Your PC's real parts and live load. Upgrade notes appear only when your own recorded sessions point to them."
@@ -132,8 +132,18 @@ def _clear(layout):
             _clear(item.layout())
 
 
-def _spec_row(code, name, detail, tone="cyan", extra=()):
-    line = row(spacing=12, margins=(0, 6, 0, 6))
+def _card_frame(accent):
+    frame = QFrame()
+    frame.setObjectName("hwCard")
+    frame.setStyleSheet(f"QFrame#hwCard{{border:1px solid #1f2d37;border-left:3px solid {accent};border-radius:9px;"
+                        "background:#0a131a;}QLabel{border:0;background:transparent;}")
+    return frame
+
+
+def _spec_card(code, name, detail, tone="cyan", extra=()):
+    frame = _card_frame(TONES[tone])
+    line = row(spacing=12, margins=(12, 10, 12, 10))
+    frame.setLayout(line)
     chip = QLabel(code)
     chip.setAlignment(Qt.AlignCenter)
     chip.setFixedSize(46, 30)
@@ -150,7 +160,33 @@ def _spec_row(code, name, detail, tone="cyan", extra=()):
         words.addSpacing(3)
         words.addWidget(widget)
     line.addLayout(words, 1)
-    return line
+    return frame
+
+
+def _peak_chip(name, value, color):
+    chip = QLabel(f"{name} {'—' if value is None else str(round(value)) + '%'}")
+    chip.setAlignment(Qt.AlignCenter)
+    chip.setStyleSheet(f"font-size:11px;font-weight:700;color:{color if value is not None else '#6c7a86'};"
+                       f"border:1px solid {color if value is not None else '#2a3b4b'};border-radius:9px;padding:1px 8px;"
+                       "background:transparent;")
+    return chip
+
+
+def _session_card(session):
+    import datetime
+    frame = _card_frame("#42D4F2")
+    line = row(spacing=8, margins=(12, 8, 12, 8))
+    frame.setLayout(line)
+    words = column(spacing=0)
+    when = datetime.datetime.fromtimestamp(session.started).strftime("%b %d, %H:%M")
+    words.addWidget(label(when, "readyGameTitle"))
+    words.addWidget(label(f"{hw.short_time(session.seconds)} · {session.samples} readings", "caption"))
+    line.addLayout(words, 1)
+    for name, color, value in zip(("CPU", "GPU", "RAM", "VRAM"), ("#42D4F2", "#FF3B57", "#35DC7C", "#df83ec"),
+                                  hg.SessionPeaks.values(session)):
+        line.addWidget(_peak_chip(name, value, color))
+    frame.setAccessibleName(f"Session {when}, {hw.short_time(session.seconds)}")
+    return frame
 
 
 # ------------------------------------------------------------------ the page
@@ -165,18 +201,31 @@ def build(window):
     page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Hardware",
                                               scene="undo", source=(915, 28, 365, 83), excluded=((1090, 0, 190, 40),))
     ui = page.hardware = Body(self, monitor)
+    ui.tabs = TabStrip([("Your PC", "chip"), ("Upgrade Advisor", "radio")], selected=getattr(self, "hardware_tab", "Your PC"))
+    ui.tabs.setMaximumWidth(560)
     page.content.addWidget(ui.metrics)
-    page.content.addWidget(ui.rig)
-    columns = row(spacing=10)
-    columns.addWidget(ui.parts_panel, 5)
-    columns.addWidget(ui.advice_panel, 6)
-    page.content.addLayout(columns)
-    page.content.addWidget(ui.peaks_panel)
+    page.content.addWidget(ui.tabs, 0, Qt.AlignLeft)
+    ui.pc_tab, pc = QWidget(), column(spacing=10)
+    ui.pc_tab.setLayout(pc)
+    pc.addWidget(ui.rig)
     bottom = row(spacing=10)
     bottom.addWidget(ui.monitor_panel, 2)
     bottom.addWidget(ui.drives_panel, 1)
-    page.content.addLayout(bottom)
+    pc.addLayout(bottom)
+    pc.addWidget(ui.parts_panel)
+    ui.adv_tab, adv = QWidget(), row(spacing=10)
+    ui.adv_tab.setLayout(adv)
+    adv.addWidget(ui.advice_panel, 6)
+    side = column(spacing=10)
+    side.addWidget(ui.peaks_panel)
+    side.addWidget(ui.sessions_panel)
+    side.addStretch()
+    adv.addLayout(side, 5)
+    page.content.addWidget(ui.pc_tab)
+    page.content.addWidget(ui.adv_tab)
     page.content.addStretch()
+    ui.tabs.changed.connect(ui.show_tab)
+    ui.show_tab(getattr(self, "hardware_tab", "Your PC"))
     ui.start()
     page.destroyed.connect(ui.stop_viewing)
     return page
@@ -203,21 +252,31 @@ class Body(QObject):
         peaks.addLayout(peaks_head)
         self.peaks = hg.SessionPeaks()
         peaks.addWidget(self.peaks)
-        self.parts_panel, parts = panel(kind="libraryPanel", padding=12, spacing=4)
-        head = row(spacing=8)
-        head.addWidget(label("Your PC", "sectionTitle"), 1)
+        self.sessions_panel, sessions = panel(kind="libraryPanel", padding=12, spacing=8)
+        sessions.addWidget(label("Recorded Sessions", "sectionTitle"))
+        self.sessions_box = column(spacing=8)
+        sessions.addLayout(self.sessions_box)
+        self.parts_panel, parts = panel(kind="libraryPanel", padding=12, spacing=8)
+        head = row(spacing=10)
+        head.addWidget(label("Your Parts", "sectionTitle"))
         self.parts_when = label("", "caption")
         head.addWidget(self.parts_when)
-        parts.addLayout(head)
-        self.parts_box = column(spacing=0)
-        parts.addLayout(self.parts_box)
-        actions = row(spacing=8)
+        head.addStretch()
+        self.copy_button = button("Copy Specs", self.copy_specs, kind="actionLink",
+                                  tip="Copies a plain text list of your parts. It stays on this PC until you paste it.")
+        head.addWidget(self.copy_button)
+        self.save_button = button("Save as .txt", self.save_specs, kind="actionLink")
+        head.addWidget(self.save_button)
         self.reread = button("Re-read Hardware", self.read_parts, kind="primary",
                              tip="Asks Windows what is installed. Changes nothing.")
-        actions.addWidget(self.reread)
-        actions.addStretch()
-        parts.addLayout(actions)
-        parts.addStretch()
+        head.addWidget(self.reread)
+        parts.addLayout(head)
+        self.parts_box = QGridLayout()
+        self.parts_box.setContentsMargins(0, 0, 0, 0)
+        self.parts_box.setSpacing(10)
+        self.parts_box.setColumnStretch(0, 1)
+        self.parts_box.setColumnStretch(1, 1)
+        parts.addLayout(self.parts_box)
 
         self.advice_panel, advice = panel(kind="libraryPanel", padding=12, spacing=8)
         head = row(spacing=8)
@@ -288,14 +347,6 @@ class Body(QObject):
         self.drives_box = column(spacing=8)
         drives.addLayout(self.drives_box)
         drives.addStretch()
-        sheet = row(spacing=8)
-        self.copy_button = button("Copy Specs", self.copy_specs, kind="actionLink",
-                                  tip="Copies a plain text list of your parts. It stays on this PC until you paste it.")
-        sheet.addWidget(self.copy_button)
-        self.save_button = button("Save as .txt", self.save_specs, kind="actionLink")
-        sheet.addWidget(self.save_button)
-        sheet.addStretch()
-        drives.addLayout(sheet)
 
     # -------------------------------------------------------------- lifecycle
     def start(self):
@@ -342,16 +393,17 @@ class Body(QObject):
         if specs is None:
             self.parts_when.setText("")
             self.rig.set_specs(None, "Windows would not share the hardware list.")
-            self.parts_box.addWidget(self._line(label(f"Windows would not share the hardware list: {error}", "readyDetail",
-                                                      wrap=True)))
+            self.parts_box.addWidget(label(f"Windows would not share the hardware list: {error}", "readyDetail", wrap=True),
+                                     0, 0, 1, 2)
             return
         self.parts_when.setText("Read from Windows just now")
+        cards = []
         if specs.cpu:
             c = specs.cpu
             detail = f"{c.cores} cores, {c.threads} threads, base {c.base_ghz} GHz" + (f", socket {c.socket}" if c.socket else "")
-            self.parts_box.addLayout(_spec_row("CPU", c.name, detail, "cyan", extra=(hg.CoreGrid(c.cores, c.threads),)))
+            cards.append(_spec_card("CPU", c.name, detail, "cyan", extra=(hg.CoreGrid(c.cores, c.threads),)))
         for gpu in specs.gpus:
-            self.parts_box.addLayout(_spec_row("GPU", gpu.name, f"Driver {gpu.driver}" if gpu.driver else "", "red"))
+            cards.append(_spec_card("GPU", gpu.name, f"Driver {gpu.driver}" if gpu.driver else "", "red"))
         if specs.memory:
             m = specs.memory
             slots = f"{m.sticks} of {m.slots} slots used" if m.slots else f"{m.sticks} module{'s' if m.sticks != 1 else ''}"
@@ -362,29 +414,35 @@ class Body(QObject):
                 extra.append(hg.SlotStrip(m.sticks, m.slots))
             if m.running_mts and m.rated_mts:
                 extra.append(hg.SpeedBars(m.running_mts, m.rated_mts))
-            self.parts_box.addLayout(_spec_row("RAM", f"{hw._gb(m.total_gb)}{kind}", ". ".join(x for x in (slots, speed) if x),
-                                               "green", extra=tuple(extra)))
+            cards.append(_spec_card("RAM", f"{hw._gb(m.total_gb)}{kind}", ". ".join(x for x in (slots, speed) if x),
+                                    "green", extra=tuple(extra)))
         for drive in specs.drives:
             model = drive.model or "Unnamed drive"
-            self.parts_box.addLayout(_spec_row("SSD" if drive.fast else "HDD" if drive.kind == "hard drive" else "DRV",
-                                               f"{drive.letter}: {model}",
-                                               f"{drive.kind[:1].upper() + drive.kind[1:]}, {human_size(drive.total)}, {human_size(drive.free)} free",
-                                               "amber" if drive.kind == "hard drive" else "cyan"))
+            hard = drive.kind == "hard drive"
+            used = 1 - drive.free / drive.total if drive.total else 0
+            cards.append(_spec_card("SSD" if drive.fast else "HDD" if hard else "DRV", f"{drive.letter}: {model}",
+                                    f"{drive.kind[:1].upper() + drive.kind[1:]}, {human_size(drive.total)}, {human_size(drive.free)} free",
+                                    "amber" if hard else "cyan",
+                                    extra=(hg.DriveBar(used, "#DFAC46" if hard else "#42D4F2"),)))
         if specs.board:
-            self.parts_box.addLayout(_spec_row("MB", specs.board, f"BIOS {specs.bios}" if specs.bios else "", "cyan"))
+            cards.append(_spec_card("MB", specs.board, f"BIOS {specs.bios}" if specs.bios else "", "cyan"))
         if specs.display:
-            self.parts_box.addLayout(_spec_row("DSP", specs.display, "", "green"))
+            cards.append(_spec_card("DSP", specs.display, "", "green"))
         if specs.os_name:
-            self.parts_box.addLayout(_spec_row("OS", specs.os_name, f"Version {specs.os_version}" if specs.os_version else "", "green"))
+            cards.append(_spec_card("OS", specs.os_name, f"Version {specs.os_version}" if specs.os_version else "", "green"))
+        for index, card in enumerate(cards):
+            self.parts_box.addWidget(card, index // 2, index % 2)
         self.rig.set_specs(specs)
         self.show_advice()
         self.show_drives(specs)
         self.draw_metrics_static(specs)
 
-    def _line(self, widget):
-        holder = row()
-        holder.addWidget(widget, 1)
-        return holder
+    def show_tab(self, name):
+        name = name if name in ("Your PC", "Upgrade Advisor") else "Your PC"
+        self.window_owner.hardware_tab = name
+        self.pc_tab.setVisible(name == "Your PC")
+        self.adv_tab.setVisible(name == "Upgrade Advisor")
+        self.tabs.select(name)
 
     def draw_metrics_static(self, specs):
         self.metrics.values[5].setText(str(len(specs.drives)))
@@ -400,6 +458,12 @@ class Body(QObject):
         self.session_count.setText(f"{n} recorded session{'s' if n != 1 else ''}")
         self.clear_button.setVisible(n > 0)
         self.peaks.set_sessions(self.sessions)
+        _clear(self.sessions_box)
+        if not self.sessions:
+            self.sessions_box.addWidget(label("No sessions yet. Press Record Play Session, play for a while, then stop it.",
+                                              "readyDetail", wrap=True))
+        for session in reversed(self.sessions[-8:]):
+            self.sessions_box.addWidget(_session_card(session))
 
     def show_advice(self):
         for key, chip in self.chip_buttons.items():
