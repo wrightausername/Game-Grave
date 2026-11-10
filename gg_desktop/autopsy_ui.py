@@ -18,6 +18,7 @@ from gg_desktop.widgets import button, column, label, row
 
 TONES = {"green": "#35DC7C", "amber": "#DFAC46", "muted": "#9AA4AC"}
 BEFORE_COLOR, AFTER_COLOR = "#CED3D8", "#E5384F"
+FIRST_CHECK_MS = 1500           # the first look, once the page is on screen
 RETRY_MS = 8 * 1000             # when Game Grave's own scan is busy, look again soon (at most RETRY_LIMIT times per start)
 RETRY_LIMIT = 6
 TICK_MS = 5 * 60 * 1000          # how often a visible panel checks whether a pass is due (the check itself is free)
@@ -45,7 +46,9 @@ def build_panel(panel_cls, window):
     panel.body_layout.addWidget(body)
     panel.autopsy = body
     body.reload()
-    body.auto_scan()
+    # The page is not the current page yet while it is being built, so the first check waits a moment. It also keeps the
+    # tab opening instantly: the check itself runs in the background after the page is on screen.
+    QTimer.singleShot(FIRST_CHECK_MS, body.auto_scan)
     return panel
 
 
