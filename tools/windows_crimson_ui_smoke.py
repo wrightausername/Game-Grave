@@ -124,7 +124,7 @@ def main():
                 path = root / "_ci_temp" / filename
                 assert window.grab().save(str(path)), "Cannot render Qt screenshot: " + route
                 assert path.stat().st_size > 9000, "Blank Qt screenshot: " + route
-            print("PASS: Qt Crimson Overview, Ready Room and 13 interactive pages, mixed-launcher "
+            print("PASS: Qt Crimson Overview, Ready Room and 14 interactive pages, mixed-launcher "
                   "Games, inline exact-rule Unprotect without deletion, "
                   "five screenshots and original hero asset.")
         finally:

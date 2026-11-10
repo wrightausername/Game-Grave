@@ -400,6 +400,10 @@ class PhotoIntegration:
         from gg_desktop import dna_page
         dna_page.build(self)
 
+    def hardware_page(self):
+        from gg_desktop import hardware_page
+        hardware_page.build(self)
+
     def undo_page(self):
         from gg_desktop import undo_page
         undo_page.build(self)

@@ -67,6 +67,10 @@ on:
       - 'tools/squad_smoke.py'
       - 'gg_desktop/squad_core.py'
       - 'gg_desktop/squad_ui.py'
+      - 'tests/test_hardware.py'
+      - 'tools/hardware_smoke.py'
+      - 'gg_desktop/hardware_core.py'
+      - 'gg_desktop/hardware_page.py'
       - 'tools/exhume_smoke.py'
       - 'gg_desktop/exhume_core.py'
       - 'gg_desktop/exhume_ui.py'
@@ -165,6 +169,10 @@ on:
       - 'tools/squad_smoke.py'
       - 'gg_desktop/squad_core.py'
       - 'gg_desktop/squad_ui.py'
+      - 'tests/test_hardware.py'
+      - 'tools/hardware_smoke.py'
+      - 'gg_desktop/hardware_core.py'
+      - 'gg_desktop/hardware_page.py'
       - 'tools/exhume_smoke.py'
       - 'gg_desktop/exhume_core.py'
       - 'gg_desktop/exhume_ui.py'
@@ -234,7 +242,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad tests.test_updater -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad tests.test_updater tests.test_hardware -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -272,6 +280,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Exhume driver check, mark, refusal or confirmed rollback states failed.' }
           python tools/squad_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Squad Sync read, code, comparison, Steam links or snapshot states failed.' }
+          python tools/hardware_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Hardware parts, live readings, session recording, advisor notes or spec sheet failed in native Qt.' }
           python tools/old_files_page_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Old Files scan, tabs, filters, folder view or Recycle Bin path failed in native Qt.' }
           python tools/other_storage_page_smoke.py --output _ci_temp
@@ -481,7 +491,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $shots = @('tools-*.png','photo-more-tools-*.png','shell-*.png','scan-bar-*.png','banner-*.png','ready-room-*.png','games-*.png','mods-*.png','old-files-*.png','crimson-*-1440.png' | ForEach-Object { Get-ChildItem _ci_temp -Filter $_ })
+          $shots = @('hardware-*.png','tools-*.png','photo-more-tools-*.png','shell-*.png','scan-bar-*.png','banner-*.png','ready-room-*.png','games-*.png','mods-*.png','old-files-*.png','crimson-*-1440.png' | ForEach-Object { Get-ChildItem _ci_temp -Filter $_ })
           if (-not $shots) { Write-Host 'No More Tools screenshots to publish.'; exit 0 }
           $dir = Join-Path $env:RUNNER_TEMP 'tools-shots'
           New-Item -ItemType Directory -Force $dir | Out-Null

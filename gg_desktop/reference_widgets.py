@@ -36,6 +36,7 @@ PATHS = {
     "undo": '<path d="M3 4v6h6M3 10a9 9 0 1 1 0 6m9-10v6l4 2"/>',
     "sparkles": '<path d="M10.5 4l1.9 5.1L17.5 11l-5.1 1.9L10.5 18l-1.9-5.1L3.5 11l5.1-1.9z"/><path d="M18.5 3v4M16.5 5h4M18.5 16v4M16.5 18h4"/>',
     "settings": '<path d="M9.99 4.98 L10.58 2.51 L13.42 2.51 L14.01 4.98 L15.54 5.62 L17.71 4.28 L19.72 6.29 L18.38 8.46 L19.02 9.99 L21.49 10.58 L21.49 13.42 L19.02 14.01 L18.38 15.54 L19.72 17.71 L17.71 19.72 L15.54 18.38 L14.01 19.02 L13.42 21.49 L10.58 21.49 L9.99 19.02 L8.46 18.38 L6.29 19.72 L4.28 17.71 L5.62 15.54 L4.98 14.01 L2.51 13.42 L2.51 10.58 L4.98 9.99 L5.62 8.46 L4.28 6.29 L6.29 4.28 L8.46 5.62Z"/><circle cx="12" cy="12" r="3"/>',
+    "chip": '<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx=".6"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/>',
     "grid": '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
     "list": '<path d="M8 5h13M8 12h13M8 19h13M3 5h.1M3 12h.1M3 19h.1"/>',
     "search": '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>',
@@ -314,7 +315,7 @@ class TitleBar(QWidget):
 ROUTE_SYMBOLS = {
     "Overview": "home", "Ready Room": "radio", "Games": "game", "Mods": "mods", "Old Files": "archive",
     "Other Storage": "storage", "Captures": "camera", "Graveyard": "grave", "Game DNA": "dna",
-    "Undo Center": "undo", "AI Assistant": "sparkles", "More Tools": "grid", "Settings": "settings",
+    "Hardware": "chip", "Undo Center": "undo", "AI Assistant": "sparkles", "More Tools": "grid", "Settings": "settings",
 }
 
 

@@ -108,7 +108,7 @@ def main():
             idle(window)
             assert window.windowFlags() & Qt.FramelessWindowHint
             assert window.nav_rail.width() == 219 and window.top_bar.height() == 46
-            assert len(ROUTES) == 13 and isinstance(window.game_grid, CoverGrid)
+            assert len(ROUTES) == 14 and isinstance(window.game_grid, CoverGrid)
             assert window.game_grid.count() == 10
             first = window.game_grid.visualItemRect(window.game_grid.item(0))
             point = window.game_grid.viewport().mapTo(window, first.topLeft())
@@ -235,7 +235,7 @@ def main():
             settle()
     print("PASS: Photo shell, native cover grid and three-column inspectors, locked 1280 geometry, "
           "Games actions/favorites/artwork, mod hover/conflict tools, drive/full scan/paging/cancel/recycling, "
-          "Ready Room search/layout, all 13 routes and three sizes; no automatic network.")
+          "Ready Room search/layout, all 14 routes and three sizes; no automatic network.")
     return 0
 
 

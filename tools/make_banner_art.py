@@ -3,7 +3,7 @@ Needs rsvg-convert and Pillow. Deterministic. Writes gg_desktop/assets/brand/ban
 
 Abstract gaming motifs, one per tab, kept clear of the sidebar art (hex grid, circuit traces, gamepad outline):
 pixel equalizer, perspective tunnel, HUD reticle, modular diamonds, glitch bands, HUD health bars, viewfinder,
-pixel sparks, pixel helix, rewind chevrons, mixer sliders, constellation and block puzzle. No characters, no logos.
+pixel sparks, pixel helix, rewind chevrons, processor packages, mixer sliders, constellation and block puzzle. No characters, no logos.
 Every picture is 6000x500 and exactly symmetric top to bottom, so it stays centred however the window crops it.
 The left half stays calm behind the title; the motif builds toward the right, where the light is brightest.
 """
@@ -31,6 +31,7 @@ TABS = {
     "captures": ("#e175eb", "#ff2a4d", "viewfinder"),
     "graveyard": ("#9a6bff", "#ff2a4d", "sparks"),
     "dna": ("#ff2a4d", "#18c9eb", "helix"),
+    "hardware": ("#13bcf5", "#ff2a4d", "chips"),
     "undo": ("#f2b43a", "#ff2a4d", "rewind"),
     "settings": ("#7f93ad", "#ff2a4d", "sliders"),
     "assistant": ("#30d76b", "#18c9eb", "constellation"),
@@ -229,6 +230,33 @@ def reticle(a, b, r):
     return "".join(out)
 
 
+def chips(a, b, r):
+    """Processor packages seen from above: square die, pin rows on all four sides, a heat spreader. Mirror-symmetric."""
+    out = []
+    for cx, size, o in ((CX, 340, 1.0), (CX - 1000, 210, .55), (CX + 1000, 210, .55)):
+        half = size / 2
+        scale = size / 340
+        pins = 11
+        gap = size / (pins + 1)
+        for i in range(pins):
+            offset = -half + gap * (i + 1)
+            for sign in (-1, 1):
+                out.append(rect(cx + offset - 5 * scale, MID + sign * (half + 17 * scale) - 17 * scale, 10 * scale, 34 * scale, a, .8 * o))
+                out.append(rect(cx + sign * (half + 17 * scale) - 17 * scale, MID + offset - 5 * scale, 34 * scale, 10 * scale, a, .8 * o))
+        out.append(rect(cx - half, MID - half, size, size, "#0a1218", .9 * o, f'stroke="{a}" stroke-width="{6 * scale:.1f}" rx="{14 * scale:.0f}"'))
+        inner = half * .62
+        out.append(rect(cx - inner, MID - inner, inner * 2, inner * 2, "none", .9 * o, f'stroke="{b}" stroke-width="{5 * scale:.1f}" rx="{8 * scale:.0f}"'))
+        core = inner * .52
+        out.append(rect(cx - core, MID - core, core * 2, core * 2, b, .55 * o, f'rx="{5 * scale:.0f}"'))
+        for dx in (-1, 1):
+            for dy in (-1, 1):
+                out.append(rect(cx + dx * inner * .55 - 7 * scale, MID + dy * inner * .55 - 7 * scale, 14 * scale, 14 * scale, a, .9 * o))
+    out.append(line(CX - 2500, MID, CX - 1250, MID, a, .25, 2))
+    out.append(line(CX - 870, MID, CX - 200, MID, a, .35, 3))
+    out.append(line(CX + 200, MID, CX + 870, MID, a, .35, 3))
+    return "".join(out)
+
+
 def viewfinder(a, b, r):
     out = []
     for half_w, half_h, o, length in ((1250, 215, .85, 90), (900, 150, .55, 70), (520, 85, .4, 50)):
@@ -279,7 +307,7 @@ def rewind(a, b, r):
 
 MIRRORED = {"equalizer": equalizer, "diamonds": diamonds, "glitch": glitch, "healthbars": healthbars, "sparks": sparks,
             "sliders": sliders, "constellation": constellation, "blocks": blocks}
-CENTRED = {"tunnel": tunnel, "reticle": reticle, "viewfinder": viewfinder, "helix": helix, "rewind": rewind}
+CENTRED = {"chips": chips, "tunnel": tunnel, "reticle": reticle, "viewfinder": viewfinder, "helix": helix, "rewind": rewind}
 
 
 def picture(slug, seed):

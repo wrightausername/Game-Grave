@@ -284,6 +284,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             "Old Files": self.old_files_page,
             "Graveyard": self.graveyard_page,
             "Game DNA": self.dna_page,
+            "Hardware": self.hardware_page,
             "Undo Center": self.undo_page,
             "Settings": self.settings_page,
             "More Tools": self.tools_page,
