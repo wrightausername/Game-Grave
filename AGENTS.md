@@ -225,3 +225,15 @@ asks the GitHub releases list for the newest preview installer, and reports in w
 Updater last installed; if there is no record it says so instead of guessing. It downloads and installs nothing. "Open Updater"
 launches GameGrave-Updater.exe or opens the releases page. The "Check for updates on launch" switch stays off and unavailable;
 nothing is contacted automatically. The rest of Settings stays locked.
+
+Mod Bisect, engine only (owner instruction, 2026-11-10, "I like 1", plus a request for a sophisticated recently-added ordering):
+`gg_desktop/bisect_core.py` is a pure decision engine with no screen, no file access and no game launch. It proposes one
+test at a time (exactly these mods on), the owner answers crashed / fine / not sure, and it updates its belief. Suspicion
+weights (added after the game last worked, contains scripts or plugins, named in a crash log) only order the tests; only
+the owner's answers count as proof. It checks the crash reproduces with everything on and stops with everything off (else
+"not a mod"), keeps dependencies together, handles crashes that do not always happen with a detection rate and repeat
+runs, runs a fix check and a repro check before naming a culprit, finds two mods that only crash together, and refuses to
+name a cause that needed a very unlikely answer. `recent_order` gives the newest-first ordering with plain reasons.
+No Mods tab screen, file move or mod-manager write exists yet; building those needs the owner's go-ahead on the screen and
+on what Bisect may change. Mods stays open only for graphics and, now, this feature.
+
