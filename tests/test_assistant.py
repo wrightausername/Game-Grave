@@ -243,3 +243,44 @@ class Chats(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FeatureQuestions(unittest.TestCase):
+    def test_resurrection_kit_help_is_answered(self):
+        for q in ("help me with the resurrection kit", "what is the Resurrection Kit?", "how do I use ressurection kits",
+                  "what does a kit do"):
+            a = engine.answer(q, facts())
+            self.assertEqual(a.intent, "feature", q)
+            self.assertIn("ZIP", a.text)
+            self.assertIn("More Tools", a.text)
+            self.assertNotIn("I answer from what Game Grave has already scanned", a.text)
+            self.assertEqual(a.handoffs, (("Open More Tools", "More Tools"),))
+
+    def test_other_features(self):
+        for q, title in (("how does save vault work", "Save Vault"), ("what does black box do", "Black Box"),
+                         ("explain soulbind", "Soulbind"), ("what is exhume", "Exhume"),
+                         ("what is game dna", "Game DNA"), ("what does the undo center do", "Undo Center")):
+            a = engine.answer(q, facts())
+            self.assertEqual(a.intent, "feature", q)
+            self.assertTrue(a.text.startswith(title), a.text[:40])
+
+    def test_scan_questions_still_use_scan_data(self):
+        self.assertEqual(engine.classify("any mods taking space?", facts())[0], "mods")
+        self.assertEqual(engine.classify("Explain my last cleanup", facts())[0], "history")
+        self.assertEqual(engine.classify("help", facts())[0], "help")
+        self.assertEqual(engine.classify("tell me a joke", facts())[0], "unknown")
+
+    def test_no_safe_claims_and_safety_note(self):
+        a = engine.answer("is it safe to delete old files", facts())
+        self.assertEqual(a.intent, "feature")
+        self.assertIn("can't tell you that something is safe", a.note)
+        for f in __import__("gg_desktop.assistant_features", fromlist=["x"]).FEATURES:
+            blob = (f.what + " ".join(f.steps) + f.never + f.hover).casefold()
+            self.assertNotIn("is safe", blob, f.key)
+            self.assertNotIn("safe to remove", blob, f.key)
+
+    def test_hover_text_is_specific(self):
+        from gg_desktop import tools_data
+        for key, title, hint in tools_data.KIT_ACTIONS:
+            self.assertGreater(len(hint.split()), 12, key)
+        self.assertIn("verified ZIP", tools_data.tile("resurrection_kit").note)

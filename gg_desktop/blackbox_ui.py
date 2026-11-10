@@ -8,13 +8,14 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QComboBox, QPlainTextEdit, QWidget
 
 from gg_desktop import blackbox_core as bb
+from gg_desktop.feature_strip import collapsible
 from gg_desktop.widgets import button, column, label, row
 
 
 def build_panel(panel_cls, window):
-    panel = panel_cls("Black Box", "After a crash, gather what Windows and the game folder recorded into one report.",
-                      "warning")
-    panel.setMinimumHeight(260)
+    panel = collapsible(panel_cls, "Black Box",
+                        "After a crash, gather what Windows and the game folder recorded into one report. Open to build one.",
+                        "warning", open_height=300)
     body = BlackBoxBody(window)
     panel.body_layout.setContentsMargins(14, 8, 14, 10)
     panel.body_layout.addWidget(body)

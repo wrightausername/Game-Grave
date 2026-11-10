@@ -93,6 +93,17 @@ def main():
             settle()
             panel = window.page.blackbox
             assert panel is not None, "Black Box panel is missing from Ready Room"
+            assert not panel.strip_open and panel.maximumHeight() <= 50, "Black Box starts as one slim line"
+            assert panel.strip_toggle.text() == "Open"
+            panel.strip_toggle.click()
+            settle(60)
+            assert panel.strip_open and panel.strip_toggle.text() == "Hide" and panel.body.isVisible()
+            panel.strip_toggle.click()
+            settle(60)
+            assert not panel.strip_open and not panel.body.isVisible() and panel.maximumHeight() <= 50, \
+                "Black Box minimizes again like the other Ready Room panels"
+            panel.strip_toggle.click()
+            settle(60)
             body = panel.blackbox
             assert body.games.count() == 0 and not body.build_button.isEnabled()
             assert "Scan your PC" in body.summary.text()
@@ -103,6 +114,8 @@ def main():
             window.inventory.scanned_at = "Disposable Black Box QA"
             window.navigate("Ready Room")
             settle()
+            window.page.blackbox.set_open(True)
+            settle(60)
             body = live(window)
             assert body.games.count() == 2 and body.build_button.isEnabled()
             body.games.setCurrentIndex(body.games.findText("The Elder Scrolls V: Skyrim Special Edition"))

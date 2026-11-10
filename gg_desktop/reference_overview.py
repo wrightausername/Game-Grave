@@ -150,6 +150,7 @@ class OverviewMetric(QPushButton):
 
 class OverviewRing(FootprintRing):
     activated = Signal(str)
+    brand_mark = True  # the Overview dial shows the real, cut-out GG mark; other dials keep the photo crop
 
     def __init__(self, segments, *, scanned=False):
         super().__init__(caption="DETECTED STORAGE")

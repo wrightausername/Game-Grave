@@ -108,6 +108,8 @@ on:
       - 'gg_desktop/autopsy_core.py'
       - 'gg_desktop/autopsy_ui.py'
       - 'tools/blackbox_smoke.py'
+      - 'tools/overview_ring_smoke.py'
+      - 'gg_desktop/assistant_features.py'
       - 'gg_desktop/blackbox_core.py'
       - 'gg_desktop/blackbox_ui.py'
       - 'tools/soulbind_smoke.py'
@@ -240,6 +242,8 @@ on:
       - 'gg_desktop/autopsy_core.py'
       - 'gg_desktop/autopsy_ui.py'
       - 'tools/blackbox_smoke.py'
+      - 'tools/overview_ring_smoke.py'
+      - 'gg_desktop/assistant_features.py'
       - 'gg_desktop/blackbox_core.py'
       - 'gg_desktop/blackbox_ui.py'
       - 'tools/soulbind_smoke.py'
@@ -338,6 +342,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Soulbind panel, apply, undo, share code or Games badge failed.' }
           python tools/blackbox_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Black Box report building, copy, save or empty states failed.' }
+          python tools/overview_ring_smoke.py --output _ci_temp
+          if ($LASTEXITCODE -ne 0) { throw 'Overview storage dial or GG mark failed in native Qt.' }
           python tools/autopsy_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Autopsy comparison, graph, copy or refusal states failed.' }
           python tools/exhume_smoke.py --output _ci_temp

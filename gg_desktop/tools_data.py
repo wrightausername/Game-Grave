@@ -46,35 +46,35 @@ def _off(key, title, symbol, why=OFF_REASON):
 
 CATEGORIES = (
     Category("maintenance", "Maintenance", "Keep your PC clean and running smoothly.", "red", (
-        Tile("disk_cleanup", "Disk Cleanup", "trash", GO, "Other Storage", "Review reported storage items in Other Storage."),
-        Tile("temp_files", "Temp Files", "file", GO, "Other Storage", "Temporary files found by the scan are reviewed in Other Storage."),
-        Tile("clear_caches", "Clear Caches", "refresh", GO, "Other Storage", "Cache folders found by the scan are reviewed in Other Storage."),
+        Tile("disk_cleanup", "Disk Cleanup", "trash", GO, "Other Storage", "Opens Other Storage, where caches, logs and temp files the scan found are listed. You review items one at a time; nothing is removed from here."),
+        Tile("temp_files", "Temp Files", "file", GO, "Other Storage", "Opens Other Storage filtered to the temporary files the scan found. Nothing is removed until you review and confirm there."),
+        Tile("clear_caches", "Clear Caches", "refresh", GO, "Other Storage", "Opens Other Storage to the cache folders the scan found. Each is reviewed and confirmed there; driver and Steam library caches are review only."),
         Tile("windows_cleanup", "Windows Cleanup", "settings", RUN, "windows_cleanup", "Delete temporary files older than 2 days from your Windows temp folders after you confirm."))),
     Category("optimization", "Optimization", "Reduce clutter that may slow down games.", "cyan", (
         Tile("game_optimizer", "Game Optimizer", "play", RUN, "game_optimizer", "Turn on Game Mode, turn off background recording or switch the power plan. Undo restores your values."),
-        Tile("shader_cache", "Shader Cache", "dna", GO, "Game DNA", "Shader caches proven per game are shown in Game DNA."),
+        Tile("shader_cache", "Shader Cache", "dna", GO, "Game DNA", "Opens Game DNA, which lists the shader caches Game Grave can prove belong to a game (by Steam app ID). Display only."),
         Tile("memory_optimizer", "Memory Optimizer", "storage", RUN, "memory_optimizer", "Choose open apps to close politely, largest memory first. Windows itself is never listed."),
         Tile("startup_manager", "Startup Manager", "clock", RUN, "startup_manager", "Turn your startup programs off or on with the same switch Task Manager uses."))),
     Category("backup", "Backup and Recovery", "Back up and restore what matters most.", "purple", (
         Tile("game_backup", "Game Backup", "archive", RUN, "save_vault", "Back up a folder you choose into a verified Save Vault ZIP."),
         Tile("save_backup", "Save Backup", "shield", RUN, "save_vault", "Back up a save folder you choose into a verified Save Vault ZIP."),
         Tile("mod_backup", "Mod Backup", "mods", RUN, "save_vault", "Back up a mod folder you choose into a verified Save Vault ZIP."),
-        Tile("resurrection_kit", "Resurrection Kit", "grave", RUN, "kit_menu", "Create, inspect, rehearse, compare or transfer verified kits."))),
+        Tile("resurrection_kit", "Resurrection Kit", "grave", RUN, "kit_menu", "Packs the saves (and optional mods) folders you pick into one verified ZIP. Opens a menu to create, inspect, rehearse, compare or transfer kits. Nothing changes until you confirm."))),
     Category("analysis", "Analysis and Reporting", "Understand what uses your space.", "magenta", (
-        Tile("storage_analyzer", "Storage Analyzer", "storage", GO, "Overview", "The reported storage breakdown lives in Overview."),
+        Tile("storage_analyzer", "Storage Analyzer", "storage", GO, "Overview", "Opens Overview, which shows the sizes your last scan reported, grouped by type. They are reported sizes, not measured disk use."),
         Tile("game_size_report", "Game Size Report", "game", RUN, "game_report", "Save a CSV of installed games and their reported sizes."),
         Tile("mod_report", "Mod Report", "mods", RUN, "mod_report", "Save a CSV of the mod and game folders the scan found."),
         Tile("system_report", "System Report", "list", RUN, "system_report", "Save a text summary of the last scan and this PC."))),
     Category("utilities", "Utilities", "Handy tools for everyday tasks.", "blue", (
-        Tile("screenshot_tools", "Screenshot Tools", "camera", GO, "Captures", "Screenshots are reviewed in Captures."),
-        Tile("recording_tools", "Recording Tools", "radio", GO, "Captures", "Recordings are reviewed in Captures."),
-        Tile("bulk_files", "Bulk File Manager", "folder", GO, "Old Files", "Review many files at once in Old Files."),
+        Tile("screenshot_tools", "Screenshot Tools", "camera", GO, "Captures", "Opens Captures, where screenshots are grouped by game only when the file path proves the game. Each is previewed before any Recycle Bin move."),
+        Tile("recording_tools", "Recording Tools", "radio", GO, "Captures", "Opens Captures, where recordings are listed with their size and game when proven. Removal is Recycle Bin only, after you confirm."),
+        Tile("bulk_files", "Bulk File Manager", "folder", GO, "Old Files", "Opens Old Files, which lists older ordinary files in the folder you pick. Age does not prove a file is unused; you choose what to review."),
         Tile("hash_checker", "Hash Checker", "check", RUN, "hash", "Compute a SHA-256 checksum of any file you choose."))),
     Category("advanced", "Advanced Tools", "Powerful tools for experienced users.", "yellow", (
         Tile("command_runner", "Command Runner", "list", RUN, "command_runner", "Run one command line you type or pick, after you see it and confirm."),
         Tile("file_associations", "File Associations", "file", RUN, "file_associations", "Look up which app opens a file type and jump to Windows Default apps."),
         Tile("junction_manager", "Junction Manager", "folder", RUN, "junction_manager", "List, create or remove folder junctions. Removing deletes only the link."),
-        Tile("advanced_cleanup", "Advanced Cleanup", "grave", GO, "Graveyard", "Reviewed items and protected folders live in the Graveyard."))),
+        Tile("advanced_cleanup", "Advanced Cleanup", "grave", GO, "Graveyard", "Opens the Graveyard, where apparent storage and protected folders are explained and individual Recycle Bin moves are approved one at a time."))),
 )
 
 TABS = (
@@ -109,17 +109,17 @@ QUICK_ACTIONS = (
     ("size_report", "Game Size Report", "game", "cyan", "Save a CSV of installed games and their reported sizes."),
     ("caches", "Review Game Caches", "trash", "green", "Open Other Storage to review cache and temp findings."),
     ("saves", "Back Up My Saves", "download", "yellow", "Create a verified Save Vault ZIP of a folder you choose."),
-    ("kit", "Open Resurrection Kit", "grave", "purple", "Create, inspect, rehearse, compare or transfer verified kits."),
+    ("kit", "Open Resurrection Kit", "grave", "purple", "Packs the saves (and optional mods) folders you pick into one verified ZIP. Opens a menu to create, inspect, rehearse, compare or transfer kits. Nothing changes until you confirm."),
 )
 
 KIT_ACTIONS = (
-    ("create", "Create verified Resurrection Kit", "Build a new verified kit from folders you choose."),
-    ("restore", "Inspect and restore a kit to a NEW folder", "Check a kit, then restore it into an empty folder."),
-    ("rehearse", "Rehearse recovery in isolation", "Try a restore without touching active game files."),
-    ("missing", "Check missing pieces", "A diagnostic, not proof that a kit is complete."),
-    ("compare", "Compare two kit snapshots", "Show what changed between two verified kits."),
-    ("versions", "Browse Time Machine snapshots", "List verified kit manifests in a folder, newest first."),
-    ("transfer", "Prepare a portable PC-to-PC kit", "Build a new portable kit folder."),
+    ("create", "Create verified Resurrection Kit", "Pick a game name, a saves folder and an optional mods folder. Writes one new ZIP plus a manifest, then checks the ZIP. Your original folders are not changed and no game install files are included."),
+    ("restore", "Inspect and restore a kit to a NEW folder", "Checks a kit you pick, shows what is inside, then restores it into an empty folder you choose. Nothing is overwritten."),
+    ("rehearse", "Rehearse recovery in isolation", "Extracts a kit into a temporary folder and compares file hashes to show the restore works. Never touches your game files and never launches the game."),
+    ("missing", "Check missing pieces", "Reads a kit's own contents and lists what looks absent. A diagnostic, not proof that a kit is complete."),
+    ("compare", "Compare two kit snapshots", "Shows files added, removed or changed between two verified kits of the same game."),
+    ("versions", "Browse Time Machine snapshots", "Lists the kit manifests found in a folder you pick, newest first. Being listed does not mean a kit has been verified."),
+    ("transfer", "Prepare a portable PC-to-PC kit", "Copies a verified kit and its manifest into a new folder you can carry over yourself. No game files or Steam licenses are copied."),
 )
 
 

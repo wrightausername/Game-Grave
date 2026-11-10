@@ -12,6 +12,7 @@ import re
 
 from core import human_size
 from gg_desktop import assistant_data as data
+from gg_desktop import assistant_features as features
 from gg_desktop import undo_insight
 from gg_desktop.models import _path_key
 
@@ -31,7 +32,8 @@ SAFETY_TEXT = ("I can't tell you that something is safe to remove, and I never r
                "again right before it acts. Age, size and a name never prove a file is unused.")
 HELP_TEXT = ("I answer from what Game Grave has already scanned on this PC. Try: largest games, where storage space "
              "goes, what is in Other Storage, recordings and screenshots by game, mods, games you haven't played "
-             "lately, games per launcher, your cleanup history, or a game by name.")
+             "lately, games per launcher, your cleanup history, or a game by name. You can also ask how a feature works, for "
+             "example: what is the Resurrection Kit, how does Save Vault work, what does Black Box do.")
 UNKNOWN_TEXT = ("I can't answer that from your scan data. " + HELP_TEXT)
 
 
@@ -122,7 +124,11 @@ def _source_names(*keys):
 def classify(question, facts):
     text = " ".join(_words(question))
     words = set(text.split())
-    if not words or _has(words, text, "help", "what can you", "what can i ask", "how do you work"):
+    if not words:
+        return "help", None
+    if features.find_feature(question):
+        return "feature", None
+    if _has(words, text, "help", "what can you", "what can i ask", "how do you work"):
         return "help", None
     if _has(words, text, "safe", "safely", "should i delete", "can i delete", "ok to delete", "okay to delete",
             "protected", "protect"):
@@ -161,6 +167,8 @@ def classify(question, facts):
 # ------------------------------------------------------------------ answers
 def answer(question, facts):
     intent, game = classify(question, facts)
+    if intent == "feature":
+        return _feature(question)
     handler = {"help": _help, "safety": _safety, "unknown": _unknown}.get(intent)
     if handler:
         return handler()
@@ -175,6 +183,16 @@ def _help():
 
 def _unknown():
     return Answer("unknown", UNKNOWN_TEXT)
+
+
+def _feature(question):
+    """How one of Game Grave's own features works. Described from the code, not from scan data, so no source is used."""
+    feature = features.find_feature(question)
+    text = features.explain(feature)
+    asked_safe = any(w in question.casefold() for w in ("safe", "safely", "delete", "remove"))
+    note = SAFETY_TEXT if asked_safe else ""
+    handoffs = ((f"Open {feature.tab}", feature.tab),) if feature.tab else ()
+    return Answer("feature", text, note=note, handoffs=handoffs)
 
 
 def _safety():

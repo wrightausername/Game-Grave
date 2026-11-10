@@ -295,3 +295,17 @@ engines (`mod_conflicts`, `bisect_*`, writes) and every other locked tab are unt
 - The inspector gets the game's artwork behind the status and version chips, and "Open in Conflicts" as the main button when the
   mod shares files with another; Open Folder, Details, Mod Page and Manager stay.
 - `tools/mods_gallery_smoke.py` drives it on Windows CI; `tools/mods_page_smoke.py` switches to List first and still covers the table.
+
+Ready Room Black Box, Overview storage graphic, AI Assistant answers and hover text (owner instruction, 2026-11-10, "black box
+needs to be minimizable ... storage overview graphic ... AI assistant doesnt really do much ... better description when hovering").
+Four scoped reopenings; everything else in these tabs stays as locked.
+- Ready Room: only the Black Box panel changed. It is now a `feature_strip.collapsible` strip like Soulbind, Autopsy, Exhume and
+  Squad Sync (one line, Open / Hide), body unchanged.
+- Overview: only the storage dial's centre mark. `OverviewRing.brand_mark` draws the real GG mark cut out of the full-resolution
+  transparent `game_grave_logo.png` (`insight_widgets.gg_mark`, resampled to device pixels) instead of a screened crop of the photo.
+  The same dial class on Other Storage and Game DNA is unchanged.
+- AI Assistant: feature and "how does it work" questions (Resurrection Kit, Save Vault, Black Box, Exhume, Autopsy, Soulbind, Squad
+  Sync, Undo Center, Graveyard, Old Files, Game DNA, Mods Library, Hash Checker, Data Used) are answered from
+  `gg_desktop/assistant_features.py`, which only states what the code does and never says anything is safe to remove. Scan-data
+  intents, sources, safety and hand-offs are unchanged and checked first-class by `tests/test_assistant.py`.
+- More Tools hover text: Resurrection Kit, its seven menu actions and the Go tiles now say what they read, write and never do.

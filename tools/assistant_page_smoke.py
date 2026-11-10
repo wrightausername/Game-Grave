@@ -145,6 +145,10 @@ def main():
             assert "can't tell you that something is safe" in text and "Open Graveyard" in buttons(window), text
             ask(window, "Which games haven't I played lately?")
             assert "Cyberpunk 2077" in transcript(window) and "never remove anything" in transcript(window)
+            ask(window, "help me with the resurrection kit")
+            text = transcript(window)
+            assert "Resurrection Kit:" in text and "single ZIP file" in text and "Open More Tools" in buttons(window), text
+            assert text.count("I answer from what Game Grave has already scanned") == 0, "A feature question is answered, not deflected"
             ask(window, "tell me a joke")
             assert "can't answer that from your scan data" in transcript(window)
             # The only allowed "safe to remove" is the refusal itself and the user's own question.

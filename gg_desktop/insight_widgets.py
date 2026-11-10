@@ -4,10 +4,28 @@ from __future__ import annotations
 from math import atan2, cos, degrees, hypot, radians, sin
 
 from PySide6.QtCore import Qt, QPointF, QRect, QRectF, QSize, Signal
-from PySide6.QtGui import QColor, QBrush, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
+from functools import lru_cache
+
+from PySide6.QtGui import QColor, QBrush, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QRadialGradient
 from PySide6.QtWidgets import QFrame, QLayout, QListWidget, QStyledItemDelegate, QStyle, QWidget
 from core import human_size
-from gg_desktop.reference_widgets import CoverGrid, draw_crop, icon, pixel_font
+from gg_desktop.reference_widgets import BRAND, CoverGrid, draw_crop, icon, pixel_font
+
+# The GG mark inside gg_desktop/assets/brand/game_grave_logo.png (transparent PNG): left, top, width, height.
+GG_MARK = (24, 40, 356, 320)
+
+
+@lru_cache(maxsize=16)
+def gg_mark(width, height, dpr):
+    """The GG mark cut out of the full-resolution brand logo (no background), resampled once to real device pixels."""
+    source = QPixmap(str(BRAND / "game_grave_logo.png"))
+    if source.isNull() or width < 1 or height < 1:
+        return QPixmap()
+    left, top, w, h = GG_MARK
+    out = source.copy(left, top, w, h).scaled(max(1, round(width * dpr)), max(1, round(height * dpr)),
+                                              Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    out.setDevicePixelRatio(dpr)
+    return out
 
 CAPTURE_ROLE = int(Qt.UserRole) + 10
 
@@ -89,6 +107,8 @@ class ReferenceArt(QWidget):
 
 
 class FootprintRing(QWidget):
+    brand_mark = False  # True: draw the real GG mark (transparent, full resolution) instead of the photo crop
+
     def __init__(self, *, caption="REPORTED SIZE"):
         super().__init__()
         self.segments = []
@@ -231,9 +251,20 @@ class FootprintRing(QWidget):
         p.setPen(Qt.NoPen)
         p.setBrush(logo_glow)
         p.drawEllipse(QRectF(-36, -65, 72, 72))
-        p.setCompositionMode(QPainter.CompositionMode_Screen)
-        draw_crop(p, QRectF(-22, -49, 44, 37), "games", (26, 14, 53, 46), fill=False)
-        p.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        if self.brand_mark:
+            height = 38.0
+            width = height * GG_MARK[2] / GG_MARK[3]
+            device = p.deviceTransform().m11()  # logical-to-pixel scale including the dial's own scaling
+            mark = gg_mark(max(1, round(width * device)), max(1, round(height * device)), 1.0)
+            if not mark.isNull():
+                p.save()
+                p.setRenderHint(QPainter.SmoothPixmapTransform)
+                p.drawPixmap(QRectF(-width / 2, -50, width, height), mark, QRectF(mark.rect()))
+                p.restore()
+        else:
+            p.setCompositionMode(QPainter.CompositionMode_Screen)
+            draw_crop(p, QRectF(-22, -49, 44, 37), "games", (26, 14, 53, 46), fill=False)
+            p.setCompositionMode(QPainter.CompositionMode_SourceOver)
 
         font = pixel_font(26 if len(self.title) < 10 else 21, True)
         font.setLetterSpacing(QFont.AbsoluteSpacing, -.4)
