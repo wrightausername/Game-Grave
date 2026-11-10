@@ -479,6 +479,18 @@ class Session:
             return True
         return False
 
+    @property
+    def focus(self) -> frozenset:
+        """Mods still in play for the cause being searched (all of them before the first answer)."""
+        self.next_step()
+        return frozenset(self._focus)
+
+    @property
+    def causes(self) -> list:
+        """Groups proven so far, in the order they were found."""
+        self.next_step()
+        return [frozenset(c) for c in self._causes]
+
     def progress(self) -> dict:
         """What the screen can show while the search runs."""
         self.next_step()
