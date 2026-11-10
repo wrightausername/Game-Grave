@@ -6,13 +6,13 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 
-def event(exe, path):
+def event(exe, path, when):
     return ('<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><EventID>1000</EventID>'
-            '<TimeCreated SystemTime="2026-11-08T20:15:30.1234567Z"/></System><EventData>'
+            '<TimeCreated SystemTime="' + when + '"/></System><EventData>'
             f'<Data>{exe}</Data><Data>1.0</Data><Data>0</Data><Data>d3d11.dll</Data><Data>1.0</Data><Data>0</Data>'
             f'<Data>c0000005</Data><Data>000000000012ab34</Data><Data>1234</Data><Data>0</Data><Data>{path}</Data>'
             '</EventData></Event>')
@@ -66,14 +66,19 @@ def main():
         patch_file = install / "Data" / "patch.esp"
         patch_file.parent.mkdir()
         patch_file.write_bytes(b"p")
-        recent = (datetime.now() - timedelta(days=1)).timestamp()
+        # Everything is relative to now, so this check never goes stale: the crash was two days ago and the
+        # files were last written the day before it.
+        crash_at = datetime.now(timezone.utc) - timedelta(days=2)
+        crash_text = crash_at.strftime("%Y-%m-%dT%H:%M:%S.1234567Z")
+        recent = (crash_at - timedelta(days=1)).timestamp()
         os.utime(dump, (recent, recent))
         os.utime(patch_file, (recent, recent))
         game = SteamGame("489830", "The Elder Scrolls V: Skyrim Special Edition", str(root), str(install), 100, None, "Unknown")
         empty_install = root / "Cyberpunk"
         empty_install.mkdir()
         other = SteamGame("1091500", "Cyberpunk 2077", str(root), str(empty_install), 100, None, "Unknown")
-        events = event("SkyrimSE.exe", str(exe)) + event("chrome.exe", "C:\\Program Files\\Chrome\\chrome.exe")
+        events = (event("SkyrimSE.exe", str(exe), crash_text)
+                  + event("chrome.exe", "C:\\Program Files\\Chrome\\chrome.exe", crash_text))
         with patch.dict(os.environ, {"LOCALAPPDATA": str(root / "Local")}), \
              patch("gg_desktop.app.load_settings", side_effect=default_settings), \
              patch("gg_desktop.ready_room_services.config_dir", return_value=root / "Prefs"), \
