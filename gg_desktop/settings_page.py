@@ -662,7 +662,7 @@ def check_updates(window):
     window.settings_update.setEnabled(False)
     window.settings_update_note.setText("Asking GitHub for the newest preview build...")
 
-    def work():
+    def work(progress=None):  # the job runner passes a progress callback
         try:
             return update_check.check()
         except update_check.UpdateCheckError as problem:
