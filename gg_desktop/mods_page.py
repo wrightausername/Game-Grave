@@ -17,6 +17,7 @@ from shiboken6 import isValid
 
 from core import save_settings
 from gg_desktop import bisect_tab
+from gg_desktop import mods_gallery as gallery
 from gg_desktop import mods_graphics as graphics
 from gg_desktop import mods_insight as mi
 from gg_desktop import mods_tab_graphics as tabgfx
@@ -75,6 +76,8 @@ def build(window, control):
     footer.insertWidget(1, window.mod_actions)
     table.setContextMenuPolicy(Qt.CustomContextMenu)
     table.customContextMenuRequested.connect(lambda pos: show_menu(window, table.viewport(), pos))
+    gallery.install(window, contents)
+    gallery.apply_mode(window)
 
 
 def sync_profiles(window, control, include_all):
@@ -194,6 +197,7 @@ def fill(window, *args, **kwargs):
     graphics.fit_library_columns(window.mod_table)
     tabgfx.use_for(window.mod_table, window._mod_tab)
     tabgfx.refresh_empty(window)
+    gallery.refresh(window)
 
 
 def chrome(window, control):
@@ -291,6 +295,9 @@ def tab_fill(window, control, requested_page=0):
 
 def selection_count(window):
     table = window.mod_table
+    if gallery.is_gallery(window):
+        window.mod_selection.setText(gallery.selection_text(window))
+        return
     noun = {"Library": "locations", "Load Order": "mods", "Bisect": "mods"}.get(window._mod_tab, "rows")
     window.mod_selection.setText(f"{len(_checked(table))} selected · {table.rowCount()} {noun}")
 
@@ -462,7 +469,8 @@ def library_details(window):
     destroy_layout(contents)
     state = mi.entry_status(entry, control.catalog)
     tone = {"green": "#3cda63", "amber": "#eab464"}.get(state.kind, "#8794a1")
-    contents.addWidget(graphics.ModHero(entry.name, entry.version, words.status_word(state.text), tone))
+    picture = window.mod_gallery.pixmap_for(view.game) if gallery._alive(getattr(window, "mod_gallery", None)) else None
+    contents.addWidget(gallery.ArtHero(entry.name, entry.version, words.status_word(state.text), tone, picture))
     title = label(entry.name, "detailTitle", wrap=True)
     title.setTextFormat(Qt.PlainText)
     contents.addWidget(title)
@@ -473,7 +481,11 @@ def library_details(window):
                                 ("file", "Version", entry.version), ("help", "Author", entry.author),
                                 ("folder", "Location", entry.path)):
         detail_line(contents, symbol, name, value)
-    contents.addWidget(tool("Open Folder", "folder", lambda: control.open_folder(entry), kind="primary"))
+    if control.findings(entry):
+        contents.addWidget(tool("Open in Conflicts", "warning", lambda: goto(window, "Conflicts"), kind="primary"))
+        contents.addWidget(tool("Open Folder", "folder", lambda: control.open_folder(entry)))
+    else:
+        contents.addWidget(tool("Open Folder", "folder", lambda: control.open_folder(entry), kind="primary"))
     actions = row(spacing=4)
     actions.addWidget(tool("Details", "file", lambda: control.explain(entry)))
     page_button = tool("Mod Page", "search", lambda: control.open_page(entry))

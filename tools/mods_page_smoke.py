@@ -88,6 +88,12 @@ def main():
             wait_for(lambda: not window.workers and window.page.mods.report is not None)
             wait_for(lambda: window._mod_updates_scanned and not window.workers, "Update evidence never finished")
             control = window.page.mods
+            from gg_desktop import mods_gallery
+            # The Library opens as a gallery (checked in mods_gallery_smoke); this run checks the List view's table.
+            assert mods_gallery.is_gallery(window) and not window.mod_table.isVisible()
+            mods_gallery.set_mode(window, False)
+            settle()
+            assert window.mod_table.isVisible() and not window.mod_gallery.isVisible()
 
             # Library: layout columns unchanged, status is real, metrics are real.
             assert window.mod_table.columnCount() == 7
@@ -128,7 +134,7 @@ def main():
             assert window.mod_summary.ring.isVisible(), "Ring shows once on/off is known"
             assert window.mod_meters[1].isVisible() and window.mod_meters[5].isVisible()
             from PySide6.QtWidgets import QFrame
-            assert len(window.mod_details.findChildren(graphics.ModHero)) == 1
+            assert len(window.mod_details.findChildren(mods_gallery.ArtHero)) == 1
             assert len(window.mod_details.findChildren(graphics.OrderStack)) == 1
             assert any(f.objectName() == "modCard" for f in window.mod_details.findChildren(QFrame)), "Update card"
             window.mod_table.selectRow(frame)

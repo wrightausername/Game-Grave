@@ -279,3 +279,19 @@ reopened; the rest of each tab stays as locked.
 - Undo Center: larger type, brighter text and roomier rows, scoped to this page (`TABLE_STYLE`, `ReadableName`). Behavior and
   `recovery.py` are untouched.
 - Prompts: `theme.STYLE` makes every dialog and message box dark with light text (covered by `tests/test_theme_prompts.py`).
+
+Mods Library redesign (owner instruction, 2026-11-10, "good fully implement that", after viewing the gallery mockup): Mods is
+reopened for the Library tab only. The Library now opens as a gallery (`gg_desktop/mods_gallery.py`, Qt; pure facts and wording in
+`gg_desktop/mods_gallery_data.py`): a poster wall of your games (each game's own artwork when Game Grave already has it, else a drawn
+colour field), a banner for the picked game with its counts and a health bar, "Needs attention" (conflicts first, then updates your
+mod manager recorded), "Recently changed" (folder change time, newest first) and "No change date" card rows, and a search box and
+Gallery / List switch above them. List is the previous table, kept as it was with its filter column. The other six sub-tabs, the
+engines (`mod_conflicts`, `bisect_*`, writes) and every other locked tab are untouched.
+- Honest-claims rules stay: every card is drawn from a fact the tab already has (saved profile status, MO2's recorded update, the
+  file-sharing check, the folder's change time). A check that has not run shows "not checked", never zero. Nothing is called safe.
+  Game Grave does not install or change mods, so a flagged card offers Review (opens Conflicts) or Details, never Update or Turn Off.
+  A conflict is "shares files with", not a verdict on which mod to keep. Mod pictures are the game's artwork plus a colour from the
+  mod's name; there is no per-mod picture and none is invented.
+- The inspector gets the game's artwork behind the status and version chips, and "Open in Conflicts" as the main button when the
+  mod shares files with another; Open Folder, Details, Mod Page and Manager stay.
+- `tools/mods_gallery_smoke.py` drives it on Windows CI; `tools/mods_page_smoke.py` switches to List first and still covers the table.
