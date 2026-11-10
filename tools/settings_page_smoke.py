@@ -293,10 +293,10 @@ def main():
                         break
                     time.sleep(0.02)
                 assert window.settings_update.isEnabled() and "boom" in window.settings_update_note.text()
-            before = opened.call_count
+            opened_before = opened.call_count
             with patch.object(update_check, "updater_path", return_value=None):
                 window.settings_update_open.click()
-            assert opened.call_count == before + 1 and "github.com" in opened.call_args[0][0].toString()
+            assert opened.call_count == opened_before + 1 and "github.com" in opened.call_args[0][0].toString()
             window.settings_tab_buttons["Notifications"].click()
             settle()
             texts = " ".join(l.text() for l in window.findChildren(settings_page.QLabel))
