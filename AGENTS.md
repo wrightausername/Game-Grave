@@ -249,6 +249,13 @@ when they agree, says "named, not the cause" for a mod that stayed on during the
 the cause), and for a crash with every mod off it points at the non-mod file the reports name (graphics driver, DirectX, Windows)
 and what the recorded exception code means. `what_reports_say` summarizes the reports before any testing. The launches always
 win; the cross-check never changes a verdict. Finding the reports on disk is Black Box's job and belongs to the future screen layer.
-No Mods tab screen, file move or mod-manager write exists yet; building those needs the owner's go-ahead on the screen and
-on what Bisect may change. Mods stays open only for graphics and, now, this feature.
+Bisect tab (owner approval 2026-11-10, "Yes to all"): a Bisect tab inside Mods, copy-based writes, and a date the owner enters for
+"last time it worked" with Black Box crash times as a hint only. Logic lives in pure, tested modules (`bisect_flow`, `bisect_model`,
+`bisect_units`, `bisect_store`, `bisect_apply`); `bisect_tab.py` is the thin Qt layer and `tools/bisect_tab_smoke.py` drives it on
+Windows CI. Write model: Mod Organizer 2 only. It makes `<profiles>/GG Bisect - <profile>` (with a `gg-bisect.json` marker and
+`GG-original-modlist.txt` / `GG-original-plugins.txt` backups) and rewrites only that copy's `modlist.txt`. It never touches the
+original profile, never deletes (the owner removes the copy in MO2), and refuses a folder without the marker, links, a profile that
+keeps its own saves, writing while MO2 runs, and mods not in the list. Other managers get a list to apply by hand. Modlist names are
+folder names, never manifest names. The install date is the mod folder's creation time. Do not widen these writes without approval.
+Mods otherwise stays open only for graphics.
 
