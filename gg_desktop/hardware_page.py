@@ -160,6 +160,7 @@ def _spec_card(code, name, detail, tone="cyan", extra=()):
         words.addSpacing(3)
         words.addWidget(widget)
     line.addLayout(words, 1)
+    line.setAlignment(words, Qt.AlignTop)
     return frame
 
 
@@ -202,9 +203,10 @@ def build(window):
                                               scene="undo", source=(915, 28, 365, 83), excluded=((1090, 0, 190, 40),))
     ui = page.hardware = Body(self, monitor)
     ui.tabs = TabStrip([("Your PC", "chip"), ("Upgrade Advisor", "radio")], selected=getattr(self, "hardware_tab", "Your PC"))
+    ui.tabs.setMinimumWidth(420)
     ui.tabs.setMaximumWidth(560)
     page.content.addWidget(ui.metrics)
-    page.content.addWidget(ui.tabs, 0, Qt.AlignLeft)
+    page.content.addWidget(ui.tabs)
     ui.pc_tab, pc = QWidget(), column(spacing=10)
     ui.pc_tab.setLayout(pc)
     pc.addWidget(ui.rig)
