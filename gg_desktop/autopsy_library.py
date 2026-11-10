@@ -163,13 +163,19 @@ def merge(entries: list, new: list, keep: int = KEEP) -> tuple[list, list]:
 
 
 def pair_for(entries: list, game: str | None = None):
-    """(before, after) for the game of the newest capture: its newest capture and the one before. (None, None) if short."""
+    """(before, after) for the game of the newest capture: its newest capture and the one before, else the newest game that has two. (None, None) if none does."""
     if not entries:
         return None, None
     ordered = sorted(entries, key=lambda e: e.mtime, reverse=True)
-    target = (game or ordered[0].game).casefold()
-    same = [e for e in ordered if e.game.casefold() == target]
-    return (same[1], same[0]) if len(same) >= 2 else (None, None)
+    # The newest capture's game first; if it has no partner yet, the newest game that does (a stray capture of another game
+    # must not hide a comparison that is already possible).
+    targets = [game.casefold()] if game else []
+    targets += [e.game.casefold() for e in ordered]
+    for target in dict.fromkeys(targets):
+        same = [e for e in ordered if e.game.casefold() == target]
+        if len(same) >= 2:
+            return same[1], same[0]
+    return None, None
 
 
 def headline(comparison) -> str:

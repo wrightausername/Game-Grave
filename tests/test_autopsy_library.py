@@ -107,6 +107,14 @@ class Library(Capture):
         self.assertEqual((before.game, after.game), ("Doom", "Doom"))
         self.assertEqual(lib.pair_for(lib.load(self.store)[:1]), (None, None))
 
+    def test_a_stray_capture_of_another_game_does_not_hide_a_possible_comparison(self):
+        self.make(f"PresentMon-Hades-{stamp(1)}.csv", age_days=3, seconds=12)
+        self.make(f"PresentMon-Hades-{stamp(2)}.csv", age_days=2, seconds=12)
+        self.make(f"PresentMon-Doom-{stamp(3)}.csv", age_days=0, seconds=12)
+        lib.refresh([self.docs], root=self.store, limit=10)
+        before, after = lib.pair_for(lib.load(self.store))
+        self.assertEqual((before.game, after.game), ("Hades", "Hades"))
+
     def test_add_by_hand_counts_toward_the_ten(self):
         path = self.make(f"PresentMon-Hand-{stamp(1)}.csv", seconds=12)
         entry, dropped = lib.add_by_hand(path, root=self.store)
