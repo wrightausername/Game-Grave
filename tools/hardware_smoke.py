@@ -153,6 +153,15 @@ def main():
             settle(100)
             assert window.grab().save(str(args.output / "hardware-with-sessions-1366.png"))
 
+            # The whole page at once, so the Live Monitor and Drives panels are reviewed too.
+            window.resize(1366, 1500)
+            settle(300)
+            window.page.ensureWidgetVisible(body(window).monitor_panel)
+            settle(100)
+            assert window.grab().save(str(args.output / "hardware-full-1366.png"))
+            window.resize(1366, 790)
+            settle(200)
+
             # Filters only change what is listed.
             pressed(window, "Memory").click()
             settle(60)

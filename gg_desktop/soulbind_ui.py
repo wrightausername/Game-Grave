@@ -80,9 +80,9 @@ class SoulbindBody(QWidget):
         box.addLayout(grid)
         box.addStretch()
         tools = row(spacing=14)
-        self.copy_button = button("Copy my Soulbind code", self.copy_code, kind="readyLink",
+        self.copy_button = button("Copy my Soulbind code", self.copy_code, kind="actionLink",
                                   tip="A short code you can send to a friend. It holds only these preferences.")
-        self.import_button = button("Import a code…", self.import_code, kind="readyLink")
+        self.import_button = button("Import a code…", self.import_code, kind="actionLink")
         tools.addWidget(self.copy_button)
         tools.addWidget(self.import_button)
         tools.addStretch()

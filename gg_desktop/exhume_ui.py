@@ -14,7 +14,7 @@ TONES = {"green": "#35DC7C", "amber": "#DFAC46", "muted": "#9AA4AC"}
 
 def build_panel(panel_cls, window):
     panel = panel_cls("Exhume", "Bring back an older graphics driver that Windows still has stored.", "undo")
-    panel.setMinimumHeight(300)
+    panel.setMinimumHeight(190)
     body = ExhumeBody(window)
     panel.body_layout.setContentsMargins(14, 8, 14, 10)
     panel.body_layout.addWidget(body)
@@ -135,7 +135,7 @@ class ExhumeBody(QWidget):
         if card.current_is_marked:
             left.addWidget(self._pill(f"Marked good on {card.marked['marked']}", "green"), 0, Qt.AlignLeft)
         else:
-            mark = button("Mark this driver as good", lambda _=False, c=card: self.mark(c), kind="readyLink",
+            mark = button("Mark this driver as good", lambda _=False, c=card: self.mark(c), kind="actionLink",
                           tip="Saves this version in Game Grave's own file so you can find it later. Changes nothing in Windows.")
             left.addWidget(mark, 0, Qt.AlignLeft)
             if card.marked:

@@ -132,7 +132,7 @@ class AutopsyBody(QWidget):
             name = label("No file chosen", "readyDetail")
             self.names[key] = name
             line.addWidget(name, 1)
-            choose = button("Choose capture…", lambda _=False, k=key: self.choose(k), kind="readyLink",
+            choose = button("Choose capture…", lambda _=False, k=key: self.choose(k), kind="actionLink",
                             tip="A CSV saved by PresentMon, CapFrameX or FrameView with a MsBetweenPresents or FrameTime column.")
             choose.setAccessibleName(f"Choose {title.lower()} capture")
             setattr(self, f"{key}_button", choose)
@@ -161,7 +161,7 @@ class AutopsyBody(QWidget):
         middle.addWidget(self.grid_frame, 6)
         layout.addLayout(middle, 1)
         tools = row(spacing=14)
-        self.copy_button = button("Copy comparison", self.copy, kind="readyLink",
+        self.copy_button = button("Copy comparison", self.copy, kind="actionLink",
                                   tip="Copies the table and the plain summary as text.")
         tools.addWidget(self.copy_button)
         tools.addStretch()

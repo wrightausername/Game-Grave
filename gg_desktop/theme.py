@@ -139,6 +139,11 @@ QPushButton#tabButton { padding:4px 5px; min-height:23px; font-size:12px; }
 QFrame#tabStrip { background:#050c12; border:1px solid #29353e; border-radius:7px; }
 QPushButton#filterChip { font-size:10px; padding:3px 4px; min-height:19px; }
 QPushButton#toolButton { padding:4px 6px; font-size:11px; }
+QPushButton#actionLink { font-size: 12px; font-weight: 600; background: transparent; border: none; border-bottom: 1px solid transparent;
+    border-radius: 0; padding: 2px 0; min-height: 20px; color: #64D9FF; }
+QPushButton#actionLink:hover { color: #B2F0FF; border-bottom: 1px solid #64D9FF; }
+QPushButton#actionLink:focus { border-bottom: 1px solid #4DD8E2; }
+QPushButton#actionLink:disabled { color: #5D6B76; border-bottom: 1px solid transparent; }
 QToolButton { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #162129,stop:.3 #080d12,stop:1 #05090c);
     border:1px solid #3b4149; border-radius:5px; padding:3px 1px; color:#e4e7ec; font-size:9px; }
 QToolButton:hover { border-color:#c45b70; background:#20131c; }

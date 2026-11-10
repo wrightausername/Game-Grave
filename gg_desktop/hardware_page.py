@@ -274,7 +274,7 @@ class Body(QObject):
         self.record = button("Record Play Session", self.toggle_record, kind="primary",
                              tip="Samples your PC every 2 seconds until you stop. Keep Game Grave open while you play.")
         rec.addWidget(self.record)
-        self.clear_button = button("Clear Sessions", self.clear_sessions, kind="readyLink",
+        self.clear_button = button("Clear Sessions", self.clear_sessions, kind="actionLink",
                                    tip="Deletes only Game Grave's own recorded sessions file.")
         rec.addWidget(self.clear_button)
         self.record_status = label("", "readyDetail", wrap=True)
@@ -327,10 +327,10 @@ class Body(QObject):
         drives.addLayout(self.drives_box)
         drives.addStretch()
         sheet = row(spacing=8)
-        self.copy_button = button("Copy Specs", self.copy_specs, kind="readyLink",
+        self.copy_button = button("Copy Specs", self.copy_specs, kind="actionLink",
                                   tip="Copies a plain text list of your parts. It stays on this PC until you paste it.")
         sheet.addWidget(self.copy_button)
-        self.save_button = button("Save as .txt", self.save_specs, kind="readyLink")
+        self.save_button = button("Save as .txt", self.save_specs, kind="actionLink")
         sheet.addWidget(self.save_button)
         sheet.addStretch()
         drives.addLayout(sheet)
@@ -399,7 +399,7 @@ class Body(QObject):
             model = drive.model or "Unnamed drive"
             self.parts_box.addLayout(_spec_row("SSD" if drive.fast else "HDD" if drive.kind == "hard drive" else "DRV",
                                                f"{drive.letter}: {model}",
-                                               f"{drive.kind}, {human_size(drive.total)}, {human_size(drive.free)} free",
+                                               f"{drive.kind[:1].upper() + drive.kind[1:]}, {human_size(drive.total)}, {human_size(drive.free)} free",
                                                "amber" if drive.kind == "hard drive" else "cyan"))
         if specs.board:
             self.parts_box.addLayout(_spec_row("MB", specs.board, f"BIOS {specs.bios}" if specs.bios else "", "cyan"))
@@ -458,7 +458,7 @@ class Body(QObject):
             box.addWidget(label("•  " + point, "readyDetail", wrap=True))
         box.addWidget(label("Cannot tell you: " + note.limit, "caption", wrap=True))
         if note.action:
-            go = button(note.action[0], lambda _=False, r=note.action[1]: self.window_owner.navigate(r), kind="readyLink")
+            go = button(note.action[0], lambda _=False, r=note.action[1]: self.window_owner.navigate(r), kind="actionLink")
             box.addWidget(go, 0, Qt.AlignLeft)
         frame.setAccessibleName(f"{note.title}: {note.tag}")
         return frame

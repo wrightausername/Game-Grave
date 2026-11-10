@@ -14,7 +14,7 @@ from gg_desktop.widgets import button, column, label, row
 def build_panel(panel_cls, window):
     panel = panel_cls("Black Box", "After a crash, gather what Windows and the game folder recorded into one report.",
                       "warning")
-    panel.setMinimumHeight(330)
+    panel.setMinimumHeight(260)
     body = BlackBoxBody(window)
     panel.body_layout.setContentsMargins(14, 8, 14, 10)
     panel.body_layout.addWidget(body)
@@ -59,7 +59,7 @@ class BlackBoxBody(QWidget):
         layout.addWidget(self.summary)
         self.view = QPlainTextEdit()
         self.view.setReadOnly(True)
-        self.view.setMinimumHeight(170)
+        self.view.setMinimumHeight(120)
         self.view.setAccessibleName("Black Box report")
         mono = QFont("Consolas")
         mono.setStyleHint(QFont.Monospace)
@@ -68,10 +68,10 @@ class BlackBoxBody(QWidget):
         self.view.setStyleSheet("background:#0B0F12;border:1px solid #222A30;color:#CED3D8;")
         layout.addWidget(self.view, 1)
         tools = row(spacing=14)
-        self.copy_button = button("Copy report", self.copy, kind="readyLink",
+        self.copy_button = button("Copy report", self.copy, kind="actionLink",
                                   tip="Copies the text. The Windows user name is already hidden.")
-        self.save_button = button("Save report file", self.save, kind="readyLink")
-        self.folder_button = button("Open reports folder", self.open_folder, kind="readyLink")
+        self.save_button = button("Save report file", self.save, kind="actionLink")
+        self.folder_button = button("Open reports folder", self.open_folder, kind="actionLink")
         for control in (self.copy_button, self.save_button, self.folder_button):
             tools.addWidget(control)
         tools.addStretch()

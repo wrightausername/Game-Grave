@@ -17,7 +17,7 @@ OPEN_MAX = 10
 
 def build_panel(panel_cls, window):
     panel = panel_cls("Squad Sync", "Match your co-op group's mods using the real lists Game Grave can read.", "sync")
-    panel.setMinimumHeight(360)
+    panel.setMinimumHeight(290)
     body = SquadBody(window)
     panel.body_layout.setContentsMargins(14, 8, 14, 10)
     panel.body_layout.addWidget(body)
@@ -53,9 +53,9 @@ class SquadBody(QWidget):
         columns = row(spacing=20)
         left = column(spacing=6)
         left.addWidget(label("Share your setup", "readyGameTitle"))
-        self.copy_button = button("Copy squad code", self.copy_code, kind="readyLink",
+        self.copy_button = button("Copy squad code", self.copy_code, kind="actionLink",
                                   tip="A code for your friends. It holds mod names and Workshop numbers only, no paths or user name.")
-        self.snapshot_button = button("Save a snapshot", self.snapshot, kind="readyLink",
+        self.snapshot_button = button("Save a snapshot", self.snapshot, kind="actionLink",
                                       tip="Saves your mod list (not the mod files) so you can compare against it later.")
         left.addWidget(self.copy_button, 0, Qt.AlignLeft)
         left.addWidget(self.snapshot_button, 0, Qt.AlignLeft)
@@ -67,8 +67,8 @@ class SquadBody(QWidget):
         right = column(spacing=6)
         right.addWidget(label("Match a friend or a snapshot", "readyGameTitle"))
         pick = row(spacing=14)
-        self.import_button = button("Paste a squad code…", self.import_code, kind="readyLink")
-        self.compare_snapshot_button = button("Compare with a snapshot…", self.compare_snapshot, kind="readyLink")
+        self.import_button = button("Paste a squad code…", self.import_code, kind="actionLink")
+        self.compare_snapshot_button = button("Compare with a snapshot…", self.compare_snapshot, kind="actionLink")
         pick.addWidget(self.import_button)
         pick.addWidget(self.compare_snapshot_button)
         pick.addStretch()
@@ -77,7 +77,7 @@ class SquadBody(QWidget):
         right.addWidget(self.result_summary)
         self.rows_box = column(spacing=3)
         right.addLayout(self.rows_box)
-        self.open_button = button("Open missing Workshop items in Steam…", self.open_missing, kind="readyLink")
+        self.open_button = button("Open missing Workshop items in Steam…", self.open_missing, kind="actionLink")
         right.addWidget(self.open_button, 0, Qt.AlignLeft)
         right.addStretch()
         columns.addLayout(right, 6)
@@ -240,7 +240,7 @@ class SquadBody(QWidget):
             line.addWidget(label(item.label, "readyDetail"), 1)
             line.addWidget(self._pill("Missing", "amber"))
             if sq.workshop_url(item):
-                open_one = button("Open in Steam", lambda _=False, i=item: self.open_item(i), kind="readyLink")
+                open_one = button("Open in Steam", lambda _=False, i=item: self.open_item(i), kind="actionLink")
                 open_one.setAccessibleName(f"Open {item.label} in Steam")
                 line.addWidget(open_one)
             self.rows_box.addLayout(line)
@@ -253,7 +253,7 @@ class SquadBody(QWidget):
             older = int(mine.stamp) < int(theirs.stamp)
             line.addWidget(self._pill("Yours is older" if older else "Yours is newer", "amber" if older else "muted"))
             if sq.workshop_url(theirs):
-                line.addWidget(button("Open in Steam", lambda _=False, i=theirs: self.open_item(i), kind="readyLink"))
+                line.addWidget(button("Open in Steam", lambda _=False, i=theirs: self.open_item(i), kind="actionLink"))
             self.rows_box.addLayout(line)
         hidden = len(result.missing) + len(result.different) - shown
         if hidden > 0:
