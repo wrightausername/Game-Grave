@@ -291,7 +291,7 @@ class AutopsyBody(QWidget):
             if guessed:
                 self.summary.setText(self.summary.text() + " These two look like different games by their file names.")
             self._status(f"{len(self.entries)} of {lib.KEEP} kept. " + lib.headline(comparison))
-        self.copy_button.setEnabled(bool(self.result and self.result.comparison))
+        self.copy_button.setEnabled(bool(self.result and self.result.comparison and self.result.comparison.comparable))
 
     def _status(self, text):
         if self.on_status is not None:
