@@ -30,9 +30,9 @@ TONE_TEXT = {"green": "#69DEA7", "amber": "#FFD08E", "red": "#FF8796", "muted": 
 TONE_LINE = {"green": "#3E9E77", "amber": "#B58B4E", "red": "#FF5269", "muted": "#4A5967"}
 PANEL, BORDER, TEXT, MUTED = "#111922", "#2A3541", "#F4F7FC", "#A3B4C5"
 RED, CYAN, AMBER = "#FF5269", "#42D4F2", "#FFD08E"
-POSTER = (132, 174)
-CARD = (208, 218)
-ART_HEIGHT = 117
+POSTER = (122, 158)
+CARD = (204, 208)
+ART_HEIGHT = 108
 ROW_PAD = 22  # room for a row's margins and its thin scroll bar
 
 STYLE = f"""
@@ -280,10 +280,10 @@ class PosterTile(QAbstractButton):
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setText(tile.name)
-        noun = "mod" if tile.count == 1 else "mods"
+        noun = gd.count_noun(tile.count, tile.folders)
         extra = f", {tile.flagged} need a look" if tile.flagged else ""
-        self.setAccessibleName(f"{tile.name}, {tile.count} {noun}{extra}")
-        self.setToolTip(f"{tile.name}\n{tile.count} {noun}" + (f"\n{tile.flagged} with a conflict or a recorded update" if tile.flagged else ""))
+        self.setAccessibleName(f"{tile.name}, {noun}{extra}")
+        self.setToolTip(f"{tile.name}\n{noun}" + (f"\n{tile.flagged} with a conflict or a recorded update" if tile.flagged else ""))
 
     def sizeHint(self):
         return QSize(*POSTER)
@@ -318,9 +318,8 @@ class PosterTile(QAbstractButton):
                    fm.elidedText(self.tile.name, Qt.ElideRight, int(art.width() - 20)))
         p.setFont(_font(11))
         p.setPen(QColor("#C2CEDA"))
-        noun = "mod" if self.tile.count == 1 else "mods"
         p.drawText(QRectF(art.left() + 10, art.bottom() - 22, art.width() - 20, 16), Qt.AlignVCenter | Qt.AlignLeft,
-                   f"{self.tile.count} {noun}")
+                   gd.count_noun(self.tile.count, self.tile.folders))
         p.setClipping(False)
         if self.tile.flagged:
             chip(p, art.right() - 7, art.top() + 7, str(self.tile.flagged), AMBER, dot=True, right=True, line="#B58B4E")
@@ -338,7 +337,7 @@ class Banner(QFrame):
     def __init__(self, pixmap, name, parts):
         super().__init__()
         self.pixmap, self.name, self.parts = pixmap, name, parts
-        self.setMinimumHeight(150)
+        self.setMinimumHeight(132)
         self.setAccessibleName("Selected game " + name)
 
     def paintEvent(self, event):
@@ -584,7 +583,7 @@ class ModsGallery(QWidget):
         body.setObjectName("modGalleryBody")
         column = QVBoxLayout(body)
         column.setContentsMargins(2, 2, 6, 8)
-        column.setSpacing(14)
+        column.setSpacing(10)
         tiles = gd.tiles(everything)
         column.addLayout(self._games_head(tiles))
         posters = [self._poster(t, t.name == chosen) for t in tiles]
@@ -717,7 +716,9 @@ class ModsGallery(QWidget):
         title.setFont(_font(28, True))
         title.setStyleSheet("background:transparent;color:#F6FAFF;")
         size = sum(f.size or 0 for f in rows if f.is_mod)
-        bits = [f"{h['count']} {'item' if h['count'] == 1 else 'items'}"]
+        bits = [gd.count_noun(h["on"] + h["off"] + h["unrecorded"], 0)] if h["count"] != h["folders"] else []
+        if h["folders"]:
+            bits.append(f"{h['folders']} mod {'folder' if h['folders'] == 1 else 'folders'}")
         if size:
             bits.append(mods_sort.size_text(size) + " reported")
         manager = gd.managers_text(rows)

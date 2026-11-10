@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import faulthandler
 import hashlib
 import os
 from pathlib import Path
@@ -15,11 +16,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("_ci_temp"))
     args = parser.parse_args()
+    # A hang (for example a click that opens a menu nobody can close) must fail with a stack trace, not run for an hour.
+    faulthandler.dump_traceback_later(300, exit=True)
     args.output.mkdir(parents=True, exist_ok=True)
     if sys.platform.startswith("linux"):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from PySide6.QtCore import QCoreApplication, QEvent, Qt
+    from PySide6.QtCore import QCoreApplication, QEvent, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication, QLabel
     from core import default_settings
@@ -52,6 +56,16 @@ def main():
 
     def card_named(window, name):
         return next(c for c in cards(window) if c.c.facts.name == name)
+
+    def press(widget):
+        """A left-button press delivered straight to the widget. A real click would land on whatever is drawn at that
+        screen spot, and a card scrolled out of view sits over other controls (the Actions menu blocks the test)."""
+        point = QPointF(widget.width() / 2, widget.height() / 2)
+        event = QMouseEvent(QEvent.MouseButtonPress, point, widget.mapToGlobal(point), Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+        QApplication.sendEvent(widget, event)
+
+    def stage(text):
+        print("stage:", text, flush=True)
 
     def posters(window):
         return window.mod_gallery.findChildren(mg.PosterTile)
@@ -88,15 +102,18 @@ def main():
             assert window.mod_view_bar.gallery_button.isChecked() and not window.mod_view_bar.list_button.isChecked()
             assert window.grab().save(str(args.output / "mods-gallery-1280.png"))
 
+            stage("poster wall")
             # Poster wall: All Games first, then one poster per game that has mods, each with its real count.
             tiles = posters(window)
             names = [t.tile.name for t in tiles]
             assert names[0] == gd.ALL_GAMES, names
             assert set(names[1:]) == {v.game for v in window._mod_views}, names
-            assert tiles[0].tile.count == len(window._mod_views)
+            assert tiles[0].tile.count + tiles[0].tile.folders == len(window._mod_views)
+            assert tiles[0].tile.count == len([e for e in control.catalog.entries if e.kind == "mod"]), "Folders are not counted as mods"
             assert tiles[0].picked and not any(t.picked for t in tiles[1:]), "All Games is the picked poster at first"
             assert all(t.accessibleName() for t in tiles)
 
+            stage("cards")
             # Cards come from real facts: the recorded update and the file-sharing check both show, and nothing else does.
             expected_flagged = {e.name for e in control.catalog.entries if e.kind == "mod" and control.findings(e)}
             updates = {e.name for e in control.catalog.entries if e.kind == "mod"
@@ -114,8 +131,9 @@ def main():
             assert mountain.accessibleName().startswith("Mountain Textures,")
             assert mountain.focusPolicy() == Qt.StrongFocus
 
+            stage("click a card")
             # Clicking a card selects that row, fills the inspector and marks only that card.
-            QTest.mouseClick(mountain, Qt.LeftButton)
+            press(mountain)
             settle()
             assert window.mod_table.currentRow() == mountain.c.facts.index
             assert window._shown_mods[window.mod_table.currentRow()].name == "Mountain Textures"
@@ -126,6 +144,7 @@ def main():
             assert "Mountain Textures" in text and "2.5" in text, text
             assert window.grab().save(str(args.output / "mods-gallery-selected-1280.png"))
 
+            stage("keyboard")
             # Keyboard: a card takes focus and the space bar picks it.
             other = card_named(window, "Framework")
             other.setFocus()
@@ -133,6 +152,7 @@ def main():
             settle()
             assert window._shown_mods[window.mod_table.currentRow()].name == "Framework"
 
+            stage("review")
             # Review on a conflict card goes to the Conflicts tab; the gallery gives way to that tab's table.
             flagged = [c for c in cards(window) if c.c.label == "Conflict"]
             if flagged:
@@ -144,6 +164,7 @@ def main():
                 settle()
                 assert mg.is_gallery(window) and window.mod_gallery.isVisible() and not window.mod_table.isVisible()
 
+            stage("poster filter")
             # Choosing a poster filters to that game through the same filter the list uses.
             game_tile = next(t for t in posters(window) if t.tile.name != gd.ALL_GAMES)
             game_tile.click()
@@ -157,6 +178,7 @@ def main():
             settle()
             assert window.mod_game_filters.currentRow() == 0
 
+            stage("search")
             # Search through the gallery's own box drives the same search the list uses.
             search = window.mod_view_bar.search
             search.setFocus()
@@ -168,6 +190,7 @@ def main():
             settle()
             assert window.mod_search.text() == "" and len(cards(window)) > 1
 
+            stage("chips")
             # Manager chips are the manager check boxes.
             if window.mod_manager_checks:
                 chips = [b for b in window.mod_gallery.findChildren(mg.QPushButton) if b.objectName() == "chip"]
@@ -180,6 +203,7 @@ def main():
                 settle()
                 assert not any(c.isChecked() for c in window.mod_manager_checks)
 
+            stage("list view")
             # List view is the old table, with the filter column back; switching back restores the gallery.
             window.mod_view_bar.list_button.click()
             settle()
@@ -190,6 +214,7 @@ def main():
             settle()
             assert mg.is_gallery(window) and window.mod_gallery.isVisible() and not window.mod_table.isVisible()
 
+            stage("widths")
             # Other widths keep every part reachable.
             for width, height in ((960, 650), (1536, 864)):
                 window.resize(width, height)

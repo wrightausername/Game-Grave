@@ -116,11 +116,19 @@ class HealthTests(unittest.TestCase):
 
 class TileTests(unittest.TestCase):
     def test_all_games_first_then_biggest(self):
-        rows = [facts("a", game="Skyrim"), facts("b", game="Skyrim", conflicts=1), facts("c", game="Cyberpunk"),
-                facts("d", game="Skyrim", outdated=True), facts("e", game="Unverified")]
+        rows = [facts("a", game="Skyrim", is_mod=True), facts("b", game="Skyrim", conflicts=1, is_mod=True),
+                facts("c", game="Cyberpunk", is_mod=True), facts("d", game="Skyrim", outdated=True, is_mod=True),
+                facts("e", game="Unverified"), facts("f", game="Cyberpunk")]
         found = gd.tiles(rows)
         self.assertEqual([t.name for t in found], [gd.ALL_GAMES, "Skyrim", "Cyberpunk", "Unverified"])
-        self.assertEqual([(t.count, t.flagged) for t in found], [(5, 2), (3, 2), (1, 0), (1, 0)])
+        self.assertEqual([(t.count, t.flagged, t.folders) for t in found], [(4, 2, 2), (3, 2, 0), (1, 0, 1), (0, 0, 1)])
+
+    def test_folders_are_never_counted_as_mods(self):
+        self.assertEqual(gd.count_noun(5, 2), "5 mods")
+        self.assertEqual(gd.count_noun(1, 0), "1 mod")
+        self.assertEqual(gd.count_noun(0, 2), "2 folders")
+        self.assertEqual(gd.count_noun(0, 1), "1 folder")
+        self.assertEqual(gd.count_noun(0, 0), "No mods")
 
     def test_empty(self):
         self.assertEqual(gd.tiles([]), [gd.Tile(gd.ALL_GAMES, 0, 0)])

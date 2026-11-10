@@ -157,19 +157,33 @@ def bar_parts(h: dict):
 @dataclass(frozen=True)
 class Tile:
     name: str
-    count: int
-    flagged: int
+    count: int          # individual mods
+    flagged: int        # mods with a conflict or a recorded update
+    folders: int = 0    # mod storage folders (a folder can hold many mods, so it is never counted as one)
+
+
+def count_noun(count: int, folders: int) -> str:
+    """The words under a poster: mods when there are any, else the folders, never the two added together."""
+    if count:
+        return f"{count} mod" + ("" if count == 1 else "s")
+    if folders:
+        return f"{folders} folder" + ("" if folders == 1 else "s")
+    return "No mods"
 
 
 def tiles(all_facts) -> list[Tile]:
-    """One poster per game plus All Games, biggest first. `flagged` counts mods with a conflict or an update."""
+    """One poster per game plus All Games, the game with the most mods first."""
     by_game: dict[str, list[Facts]] = {}
     for f in all_facts:
         by_game.setdefault(f.game, []).append(f)
-    def flagged(rows):
-        return sum(bool(f.conflicts) or bool(f.outdated) for f in rows)
-    ordered = sorted(by_game.items(), key=lambda kv: (-len(kv[1]), kv[0].casefold()))
-    return [Tile(ALL_GAMES, len(all_facts), flagged(all_facts))] + [Tile(n, len(r), flagged(r)) for n, r in ordered]
+
+    def make(name, rows):
+        mods = [f for f in rows if f.is_mod]
+        return Tile(name, len(mods), sum(bool(f.conflicts) or bool(f.outdated) for f in mods), len(rows) - len(mods))
+
+    ordered = sorted(((n, make(n, r)) for n, r in by_game.items()),
+                     key=lambda kv: (-kv[1].count, -kv[1].folders, kv[0].casefold()))
+    return [make(ALL_GAMES, list(all_facts))] + [t for _n, t in ordered]
 
 
 def managers_text(facts) -> str:
