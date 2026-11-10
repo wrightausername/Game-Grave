@@ -22,6 +22,7 @@ from recovery import get_records
 from gg_desktop import __version__
 from gg_desktop import settings_data as data
 from gg_desktop import settings_system as system
+from gg_desktop import update_check
 from gg_desktop.backend import add_never_touch_path, refresh_graveyard, unprotect_exact_personal_item
 from gg_desktop.header_banner import HeaderBannerArtwork
 from gg_desktop.insight_widgets import ActionFlow
@@ -656,6 +657,45 @@ def facts_panel(window):
 
 
 # ------------------------------------------------------------------ actions
+def check_updates(window):
+    """Manual only: one request to the GitHub releases list, nothing downloaded or installed."""
+    window.settings_update.setEnabled(False)
+    window.settings_update_note.setText("Asking GitHub for the newest preview build...")
+
+    def work():
+        try:
+            return update_check.check()
+        except update_check.UpdateCheckError as problem:
+            return ("error", str(problem))
+        except Exception as problem:  # never leave the button stuck on a surprise
+            return ("error", "The update check could not finish: %s" % (problem or type(problem).__name__))
+
+    def finish(result):
+        if not isValid(window.settings_update):  # the page was rebuilt while the answer was on its way
+            return
+        kind, sentence = result
+        window.settings_update.setEnabled(True)
+        window.settings_update_note.setText(sentence)
+        window.settings_update_open.setVisible(kind in {"available", "unknown", "error"})
+
+    window.job(work, finish, error_title="Update check failed")
+
+
+def open_updater(window):
+    import subprocess
+    import sys
+    app_folder = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else None
+    path = update_check.updater_path(app_folder)
+    if path:
+        try:
+            subprocess.Popen([str(path)], close_fds=True)
+            return
+        except OSError as exc:
+            window.error("Updater would not open", str(exc))
+            return
+    QDesktopServices.openUrl(QUrl(update_check.RELEASES_PAGE))
+
+
 def open_data_folder(window):
     folder = core.config_dir()
     try:
@@ -861,7 +901,20 @@ def build(window):
     data_row.addWidget(_widget(buttons), 3)
     version = column(spacing=1)
     version.addWidget(label("Game Grave " + __version__, "detailValue"))
-    version.addWidget(label("Updates not connected", "caption"))
+    self.settings_update_note = label("Nothing is contacted until you press Check for Updates.", "caption", wrap=True)
+    self.settings_update_note.setMinimumWidth(0)
+    self.settings_update_note.setMaximumWidth(300)
+    version.addWidget(self.settings_update_note)
+    update_buttons = row(spacing=6)
+    self.settings_update = tool("Check for Updates", "refresh", lambda: check_updates(self),
+                                tip="Ask GitHub whether a newer preview build exists. Nothing is downloaded or installed.")
+    self.settings_update_open = tool("Open Updater", "download", lambda: open_updater(self),
+                                     tip="Open the Game Grave Updater, or the releases page if it is not installed")
+    for control in (self.settings_update, self.settings_update_open):
+        control.setFixedHeight(28)
+        update_buttons.addWidget(control)
+    self.settings_update_open.hide()
+    version.addLayout(update_buttons)
     data_row.addLayout(version)
     strip_body.addLayout(data_row)
     page.content.addWidget(strip_box)

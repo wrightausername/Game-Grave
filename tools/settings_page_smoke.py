@@ -271,6 +271,32 @@ def main():
             # Data folder opens through the system, and Notifications and Appearance say what is real.
             window.settings_open.click()
             assert opened.call_count == 1 and Path(opened.call_args[0][0].toLocalFile()) == core.config_dir()
+            # Check for Updates is manual: nothing is asked until the button is pressed, and it only reports.
+            import time
+            from gg_desktop import update_check
+            with patch.object(update_check, "check", return_value=("available", "Newer build available: preview-run-9 (61 MB). Installed by the Updater: preview-run-8.")) as asked:
+                assert asked.call_count == 0 and not window.settings_update_open.isVisibleTo(window.settings_update_note.parentWidget())
+                window.settings_update.click()
+                for _ in range(200):
+                    settle()
+                    if window.settings_update.isEnabled():
+                        break
+                    time.sleep(0.02)
+                assert asked.call_count == 1 and window.settings_update.isEnabled()
+                assert "preview-run-9" in window.settings_update_note.text()
+                assert not window.settings_update_open.isHidden()
+            with patch.object(update_check, "check", side_effect=RuntimeError("boom")):
+                window.settings_update.click()
+                for _ in range(200):
+                    settle()
+                    if window.settings_update.isEnabled():
+                        break
+                    time.sleep(0.02)
+                assert window.settings_update.isEnabled() and "boom" in window.settings_update_note.text()
+            before = opened.call_count
+            with patch.object(update_check, "updater_path", return_value=None):
+                window.settings_update_open.click()
+            assert opened.call_count == before + 1 and "github.com" in opened.call_args[0][0].toString()
             window.settings_tab_buttons["Notifications"].click()
             settle()
             texts = " ".join(l.text() for l in window.findChildren(settings_page.QLabel))

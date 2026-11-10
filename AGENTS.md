@@ -218,3 +218,10 @@ notes only from at least 3 sessions of at least 2 minutes the owner recorded, ea
 cannot tell, and there are no frame rate, price or "safe to buy" claims. Everything painted comes from a number the tab
 already shows. The next tab's lock must freeze Hardware against this commit. Mods stays open only for the graphics pass
 recorded above; it has not been separately signed off.
+
+Settings, update check (owner instruction, 2026-11-10, answered "yes" to an in-app Check for Updates button): Settings is reopened
+for this one control only. The version box now has a "Check for Updates" button (`update_check.py`). It runs only when pressed,
+asks the GitHub releases list for the newest preview installer, and reports in words whether this PC has it, using the build the
+Updater last installed; if there is no record it says so instead of guessing. It downloads and installs nothing. "Open Updater"
+launches GameGrave-Updater.exe or opens the releases page. The "Check for updates on launch" switch stays off and unavailable;
+nothing is contacted automatically. The rest of Settings stays locked.
