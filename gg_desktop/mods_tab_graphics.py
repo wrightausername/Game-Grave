@@ -181,8 +181,12 @@ def use_for(table, tab):
     for column in range(table.columnCount()):
         kind = chosen.get(column, "plain")
         if kind == "status":
+            if not hasattr(table, "_gg_status_delegate"):
+                table._gg_status_delegate = graphics.StatusDelegate(table)
             delegate = table._gg_status_delegate
         elif kind == "size":
+            if not hasattr(table, "_gg_size_delegate"):
+                table._gg_size_delegate = graphics.SizeDelegate(table)
             delegate = table._gg_size_delegate
         else:
             delegate = painters[kind]
