@@ -2,6 +2,11 @@ name: Mods gallery debug (temporary)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [claude/old-files-full-functionality]
+    paths:
+      - 'tools/mods_gallery_probe.py'
+      - '.github/workflows/mods-gallery-debug.yml'
 
 jobs:
   probe:
