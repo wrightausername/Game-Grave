@@ -206,3 +206,15 @@ type bar, coverage cards, a conflict banner and a picture for empty tables (`gg_
 helpers in `mods_visuals.py`). Hardware gets ring gauges, smooth live charts, a core grid, memory slots, speed bars and
 drive bars (`gg_desktop/hardware_graphics.py`). Painted display only: every shape comes from a number or word the tab
 already shows, cell text is unchanged, no new claim, nothing called safe, and no behavior, control or engine changed.
+
+Hardware: OWNER SIGNED OFF AND LOCKED ("I like it lock it in", 2026-11-09). The approved baseline is commit
+f3067827ced6a12d4dcf50682e1bf436bd9222b1 on branch `claude/old-files-full-functionality`, Windows run
+https://github.com/wrightausername/Game-Grave/actions/runs/42747155944. Do not change its layout, tabs, controls or
+behavior, or anything that reaches it through shared code, unless the owner explicitly reopens it. Two tabs inside:
+Your PC (rig map, live gauges and charts, drives donut, parts as cards, Copy Specs, Save as .txt, Re-read Hardware) and
+Upgrade Advisor (notes, Record Play Session, Session Peaks, Recorded Sessions). Its honest-claims rules stay: parts only
+from Windows, CPU temperature never shown, graphics load, video memory and temperature only through nvidia-smi, upgrade
+notes only from at least 3 sessions of at least 2 minutes the owner recorded, each note says what was measured and what it
+cannot tell, and there are no frame rate, price or "safe to buy" claims. Everything painted comes from a number the tab
+already shows. The next tab's lock must freeze Hardware against this commit. Mods stays open only for the graphics pass
+recorded above; it has not been separately signed off.
