@@ -240,6 +240,11 @@ always happen with a detection rate and repeat runs (confidence is stated, never
 member is enough to switch off, and stops honestly ("undetermined", with what it narrowed to) after MAX_TESTS launches.
 It never calls anything safe. Measured with 400 random cases (10 to 400 mods, 1 to 8 mods per cause, up to 3 causes,
 dependencies, always-on mods, flaky crashes, right and wrong clues): 0 wrong answers; 97% finished, the rest (all 400-mod cases with several large causes) stopped honestly.
+Crash reports (owner instruction, 2026-11-10, "reference crash reports too if it can find them"): `gg_desktop/bisect_clues.py`
+is pure too: it is handed report text and Black Box crash records (it opens no file) and returns which mods have files named in
+reports, which mod owns the file Windows recorded as the crash location, and when the crashes began. File names shared by
+several mods are ignored, never blamed. These only ORDER the search (`fault_keys`, `crash_hits`, `started_after`); a report
+naming a mod is not proof. Finding the reports on disk is Black Box's job and belongs to the future screen layer.
 No Mods tab screen, file move or mod-manager write exists yet; building those needs the owner's go-ahead on the screen and
 on what Bisect may change. Mods stays open only for graphics and, now, this feature.
 

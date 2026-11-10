@@ -101,7 +101,7 @@ def _percent(p):
 
 
 def suspicion(unit: Unit, last_good: float | None, now: float | None, hinted: bool = False,
-              in_window: bool = False) -> tuple[float, list]:
+              in_window: bool = False, at_fault: bool = False) -> tuple[float, list]:
     """Weight and the plain reasons behind it. These only order the tests."""
     weight, reasons = 1.0, []
     if hinted:
@@ -110,6 +110,9 @@ def suspicion(unit: Unit, last_good: float | None, now: float | None, hinted: bo
     if in_window:
         weight *= 12.0
         reasons.append("added in the time you named")
+    if at_fault:
+        weight *= 40.0
+        reasons.append("Windows recorded the crash inside one of its files")
     if unit.kind == "code":
         weight *= 3.0
         reasons.append("contains scripts or plugins, which can crash a game")
@@ -171,21 +174,26 @@ class _OutOfBudget(Exception):
 
 class Session:
     def __init__(self, units, *, last_good: float | None = None, now: float | None = None,
-                 hint_keys=(), window: tuple | None = None, detect: float = 1.0, runs: int = 1):
+                 hint_keys=(), window: tuple | None = None, detect: float = 1.0, runs: int = 1,
+                 fault_keys=()):
         self.units = {u.key: u for u in units}
         self.pinned = frozenset(k for k, u in self.units.items() if u.pinned)
         self.detect = min(max(detect, 0.05), 1.0)
         self.runs = max(1, int(runs))
         self._requires = {k: tuple(r for r in u.requires if r in self.units) for k, u in self.units.items()}
         hinted = {k for k in hint_keys if k in self.units}
+        at_fault = {k for k in fault_keys if k in self.units}
         self.weights, self.reasons, self.priority = {}, {}, set()
         for key, unit in self.units.items():
             if key in self.pinned:
                 continue
             in_window = bool(window and unit.added is not None and window[0] <= unit.added <= window[1])
-            self.weights[key], self.reasons[key] = suspicion(unit, last_good, now, key in hinted, in_window)
+            self.weights[key], self.reasons[key] = suspicion(unit, last_good, now, key in hinted, in_window,
+                                                                  key in at_fault)
             if key in hinted or in_window:
                 self.priority.add(key)
+        if not self.priority:                         # crash reports name files: test those mods first
+            self.priority = {k for k in self.weights if k in at_fault or self.units[k].crash_hits}
         if not self.priority and last_good is not None:
             self.priority = {k for k in self.weights if (self.units[k].added or 0) > last_good and self.units[k].added}
         self.tests: list[tuple[Test, str]] = []
