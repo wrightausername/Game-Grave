@@ -118,5 +118,98 @@ class InTheSearch(unittest.TestCase):
             self.assertEqual(set(verdict.keys), truth)
 
 
+class CrossCheck(unittest.TestCase):
+    def verdict(self, truth, us=None, **kw):
+        us = us or units()
+        s = Session(us, now=NOW, **kw)
+        for _ in range(300):
+            step = s.next_step()
+            if isinstance(step, Verdict):
+                return s, step
+            s.record(step, "crash" if truth <= step.enabled else "ok")
+        raise AssertionError("no verdict")
+
+    def test_reports_that_agree_are_said_to_agree(self):
+        c = bcl.read_reports(units(), files(), [("thing12.dll failed", NOW), ("thing12.dll again", NOW)])
+        _, v = self.verdict({"m12"})
+        lines = bcl.cross_reference(units(), c, v)
+        self.assertTrue(any("agree on Mod 12" in l and "2 crash reports" in l for l in lines), lines)
+
+    def test_a_mod_named_but_present_in_the_clean_run_is_called_named_not_guilty(self):
+        c = bcl.read_reports(units(), files(), [("thing12.dll thing30.dll", NOW)])
+        _, v = self.verdict({"m12"})
+        lines = bcl.cross_reference(units(), c, v)
+        self.assertTrue(any("Mod 30 is named" in l and "named, not the cause" in l for l in lines), lines)
+
+    def test_a_mod_that_was_off_with_the_cause_is_not_called_cleared(self):
+        us = units()
+        us[30] = Unit("m30", "Mod 30", added=us[30].added, requires=("m12",))
+        c = bcl.read_reports(us, files(), [("thing30.dll", NOW)])
+        _, v = self.verdict({"m12"}, us)
+        lines = bcl.cross_reference(us, c, v)
+        self.assertFalse(any("Mod 30" in l and "named, not the cause" in l for l in lines), lines)
+
+    def test_reports_naming_nothing_leave_the_result_standing_on_the_launches(self):
+        c = bcl.read_reports(units(), files(), [("nothing useful", NOW)])
+        _, v = self.verdict({"m4"})
+        lines = bcl.cross_reference(units(), c, v)
+        self.assertTrue(any("result stands on your launches" in l for l in lines), lines)
+
+    def test_a_crash_with_mods_off_points_at_the_driver_the_reports_name(self):
+        crashes = [Crash(datetime(2026, 11, 2, 20, 0), "nvwgf2umx.dll") for _ in range(3)]
+        for c_ in crashes:
+            c_.code = "c0000005"
+        c = bcl.read_reports(units(), files(), [], crashes)
+        s = Session(units(), now=NOW)
+        step = s.next_step()
+        s.record(step, "crash")
+        step = s.next_step()
+        s.record(step, "crash")
+        v = s.next_step()
+        self.assertEqual(v.kind, "outside")
+        lines = bcl.cross_reference(units(), c, v)
+        text = " ".join(lines)
+        self.assertIn("3 of 3 recorded crashes happened inside nvwgf2umx.dll", text)
+        self.assertIn("NVIDIA graphics driver", text)
+        self.assertIn("access violation", text)
+        self.assertIn("C0000005", text)
+        self.assertIn("is not a mod", text)
+
+    def test_a_driver_crash_with_a_mod_verdict_keeps_the_mod_as_possible_trigger(self):
+        c = bcl.Clues(modules=(("nvwgf2umx.dll", 4),), codes=(("c0000005", 4),))
+        _, v = self.verdict({"m9"})
+        text = " ".join(bcl.cross_reference(units(), c, v))
+        self.assertIn("A mod can still be the trigger", text)
+
+    def test_windows_core_files_are_not_presented_as_a_part_to_fix(self):
+        c = bcl.Clues(modules=(("ntdll.dll", 5),))
+        _, v = self.verdict({"m9"})
+        self.assertFalse(any("ntdll" in l and "trigger" in l for l in bcl.cross_reference(units(), c, v)))
+        self.assertIn("surfaced there", " ".join(bcl.what_reports_say(c)))
+
+    def test_codes_in_report_text_are_counted_only_when_known(self):
+        c = bcl.read_reports(units(), files(), [("Exception 0xC0000005 at 0x12345678 and 0xDEADBEEF", None)])
+        self.assertEqual(dict(c.codes), {"c0000005": 1})
+
+    def test_no_verdict_overclaims_and_garbage_does_not_crash(self):
+        rng = random.Random(9)
+        for _ in range(60):
+            c = bcl.Clues(hits={f"m{rng.randint(0, 60)}": rng.randint(0, 3) for _ in range(5)},
+                          fault_keys=("m1", "zzz"), modules=(("x.dll", 1), ("", 2)), codes=(("zz", 1),))
+            truth = set(f"m{i}" for i in rng.sample(range(40), rng.randint(1, 3)))
+            _, v = self.verdict(truth)
+            text = " ".join(bcl.cross_reference(units(), c, v) + bcl.what_reports_say(c)).lower()
+            self.assertNotIn("safe", text)
+            self.assertNotIn("culprit is", text)
+
+    def test_the_session_report_carries_the_cross_check(self):
+        c = bcl.read_reports(units(), files(), [("thing12.dll", NOW)])
+        s, v = self.verdict({"m12"})
+        text = s.report(extra=bcl.cross_reference(units(), c, v))
+        self.assertIn("Crash reports", text)
+        self.assertIn("agree on Mod 12", text)
+        self.assertNotIn("safe", text.lower())
+
+
 if __name__ == "__main__":
     unittest.main()

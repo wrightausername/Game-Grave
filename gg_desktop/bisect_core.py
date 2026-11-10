@@ -494,12 +494,15 @@ class Session:
         rows.sort(key=lambda r: (-r[1], r[0].name.lower()))
         return rows
 
-    def report(self) -> str:
+    def report(self, extra=()) -> str:
+        """Plain-text report. `extra` is lines from outside the engine (crash report cross-check), added as given."""
         step = self.next_step()
         lines = ["Mod Bisect report", ""]
         for i, (test, result) in enumerate(self.tests, 1):
             lines.append(f"{i}. {test.purpose}: {len(test.enabled)} of {len(self.units)} mods on -> {result}")
         if isinstance(step, Verdict):
             lines += ["", step.text]
+        if extra:
+            lines += ["", "Crash reports"] + [f"- {line}" for line in extra]
         lines += ["", "Only your test answers count as proof. The suspicion order is a starting point, not a finding."]
         return "\n".join(lines)

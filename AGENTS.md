@@ -244,7 +244,11 @@ Crash reports (owner instruction, 2026-11-10, "reference crash reports too if it
 is pure too: it is handed report text and Black Box crash records (it opens no file) and returns which mods have files named in
 reports, which mod owns the file Windows recorded as the crash location, and when the crashes began. File names shared by
 several mods are ignored, never blamed. These only ORDER the search (`fault_keys`, `crash_hits`, `started_after`); a report
-naming a mod is not proof. Finding the reports on disk is Black Box's job and belongs to the future screen layer.
+naming a mod is not proof. After a verdict, `cross_reference` compares the reports with what the launches proved: it says
+when they agree, says "named, not the cause" for a mod that stayed on during the clean run (never for a mod that was off with
+the cause), and for a crash with every mod off it points at the non-mod file the reports name (graphics driver, DirectX, Windows)
+and what the recorded exception code means. `what_reports_say` summarizes the reports before any testing. The launches always
+win; the cross-check never changes a verdict. Finding the reports on disk is Black Box's job and belongs to the future screen layer.
 No Mods tab screen, file move or mod-manager write exists yet; building those needs the owner's go-ahead on the screen and
 on what Bisect may change. Mods stays open only for graphics and, now, this feature.
 
