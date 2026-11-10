@@ -49,9 +49,9 @@ def main():
                 if c.red() > 170 and c.green() < 90 and c.blue() < 110:
                     red += 1
         assert red > 150 * scale * scale / 3, f"The GG mark is missing at {scale}x ({red} red pixels)"
-        # No rectangular photo box: the pixels just outside the mark's corners match the dial face beside them.
+        # No rectangular photo box: the pixel just outside the mark's left corner matches the dial face on the other side.
         corner = QColor(image.pixel(cx - 23 * scale, cy - 55 * scale))
-        beside = QColor(image.pixel(cx - 40 * scale, cy - 55 * scale))
+        beside = QColor(image.pixel(cx + 23 * scale, cy - 55 * scale))
         assert abs(corner.lightness() - beside.lightness()) < 40, (corner.name(), beside.name())
     assert grab(old, 1).save(str(args.output / "other-dial-unchanged.png"))
     print("Overview ring smoke passed")
