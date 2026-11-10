@@ -40,6 +40,12 @@ def main():
             if datetime.now() >= end:
                 break
 
+    def wait_for(test, label, seconds=20):
+        end = datetime.now() + timedelta(seconds=seconds)
+        while not test():
+            settle(20)
+            assert datetime.now() < end, "Timed out waiting for " + label
+
     def live(window):
         return window.page.squad.squad
 
