@@ -26,7 +26,7 @@ def clamp(value, low=0.0, high=1.0):
 
 
 def level_color(base: str, fraction):
-    """Same hue as the gauge until it is very full, then amber and red. Fullness is shown, never judged as good or bad."""
+    """Drive bars keep their hue until the drive is very full, then amber and red. Used for drive fullness only."""
     if fraction is None:
         return QColor("#4a5863")
     if fraction >= .95:
@@ -61,7 +61,7 @@ class RingGauge(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         side = min(self.width(), self.height())
         box = QRectF((self.width() - side) / 2 + 9, (self.height() - side) / 2 + 9, side - 18, side - 18)
-        color = level_color(self.base, self.fraction)
+        color = QColor(self.base) if self.fraction is not None else QColor("#4a5863")   # load is shown, never judged
         # quiet backdrop disc
         back = QRadialGradient(box.center(), box.width() / 2)
         back.setColorAt(0, QColor(18, 30, 40, 200))

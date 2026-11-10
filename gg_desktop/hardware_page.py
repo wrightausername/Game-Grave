@@ -255,11 +255,7 @@ class Body(QObject):
                                          ("gpu", "GPU", "#FF3B57", "Needs an NVIDIA card"),
                                          ("mem", "MEMORY", "#35DC7C", "Not readable")):
             cell = column(spacing=2)
-            top = row(spacing=6)
-            top.addWidget(label(title, "caption"), 1)
             now = label("—", "readyWhen")
-            top.addWidget(now)
-            cell.addLayout(top)
             gauge = hg.RingGauge(color, title, 112)
             cell.addWidget(gauge, 0, Qt.AlignHCenter)
             chart = hg.AreaChart(color, empty, HISTORY)

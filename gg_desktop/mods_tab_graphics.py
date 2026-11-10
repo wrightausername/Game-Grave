@@ -377,7 +377,7 @@ class SplitRing(QWidget):
             p.drawText(QRectF(118, y - 3, 40, 18), Qt.AlignVCenter | Qt.AlignLeft, str(count))
             p.setPen(QColor("#9aa7b3"))
             p.setFont(_font(self.font(), 11))
-            p.drawText(QRectF(148, y - 3, max(10, self.width() - 150), 18), Qt.AlignVCenter | Qt.AlignLeft, name)
+            p.drawText(QRectF(134, y - 3, max(10, self.width() - 136), 18), Qt.AlignVCenter | Qt.AlignLeft, name)
             y += 22
 
 
