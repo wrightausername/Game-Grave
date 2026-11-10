@@ -7,7 +7,7 @@ Cell text is never changed, mod managers and mod files are never touched, and no
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QObject, QPointF, QRectF, Qt
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFontMetrics, QLinearGradient, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QSizePolicy, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
                                QVBoxLayout, QWidget, QApplication)
@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QSizePolicy, QStyle, QStyled
 from gg_desktop import mods_graphics as graphics
 from gg_desktop.mods_graphics import BAR_ROLE, HUE_ROLE, PILL_ROLE, SHARE_COLORS, TRACK, _card, _font, _text
 from gg_desktop.mods_visuals import count_tone, hue_for, mix_parts, rail_fraction, size_fraction, split_fractions
-from gg_desktop.widgets import label
 
 TONE_ROLE = int(Qt.UserRole) + 60
 FRACTION_ROLE = TONE_ROLE + 1

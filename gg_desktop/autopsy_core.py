@@ -72,7 +72,7 @@ def read_capture(path) -> list[float]:
                     frames.append(value)
                     if len(frames) > MAX_FRAMES:
                         raise CaptureError("That capture has more than 2 million frames, so Autopsy will not read it.")
-    except OSError as problem:
+    except (OSError, csv.Error) as problem:
         raise CaptureError(f"Could not read that file: {problem}")
     if not frames:
         raise CaptureError("No frame times were found in that file.")

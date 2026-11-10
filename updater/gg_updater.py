@@ -10,8 +10,10 @@ Command line (used by the build checks, no window):
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -140,10 +142,18 @@ def _get(url: str, token: str, accept: str, opener=None):
     return response
 
 
+def _read(response, size=-1) -> bytes:
+    """Read from a reply. A connection that drops half way is an updater problem, not a crash."""
+    try:
+        return response.read(size)
+    except (OSError, http.client.HTTPException) as problem:
+        raise UpdaterError("The connection to GitHub broke off: %s" % (problem or type(problem).__name__))
+
+
 def list_releases(token: str, opener=None) -> list:
     response = _get(API, token, "application/vnd.github+json", opener)
     try:
-        data = json.loads(response.read().decode("utf-8"))
+        data = json.loads(_read(response).decode("utf-8"))
     except ValueError:
         raise UpdaterError("GitHub sent an answer that could not be read.")
     if not isinstance(data, list):
@@ -193,7 +203,7 @@ def parse_sha256(text: str, filename: str = SETUP_NAME) -> str:
 
 def fetch_checksum(release: dict, token: str, opener=None) -> str:
     response = _get(release["sum"]["url"], token, "application/octet-stream", opener)
-    return parse_sha256(response.read(4096).decode("utf-8", "replace"))
+    return parse_sha256(_read(response, 4096).decode("utf-8", "replace"))
 
 
 def download_setup(release: dict, token: str, folder: Path, expected: str, progress=None, opener=None) -> Path:
@@ -209,7 +219,7 @@ def download_setup(release: dict, token: str, folder: Path, expected: str, progr
     try:
         with os.fdopen(fd, "wb") as sink:
             while True:
-                block = response.read(CHUNK)
+                block = _read(response, CHUNK)
                 if not block:
                     break
                 done += len(block)
@@ -267,6 +277,8 @@ def run_fetch(folder: Path, result_file: Path) -> int:
                   "sha256": expected}
     except UpdaterError as problem:
         result["error"] = str(problem)
+    except OSError as problem:
+        result["error"] = "Could not finish: %s" % problem
     Path(result_file).write_text(json.dumps(result, indent=2), encoding="utf-8")
     return 0 if result["ok"] else 1
 
@@ -320,7 +332,10 @@ def run_window() -> int:
 
     def pump():
         while pending:
-            pending.pop(0)()
+            try:
+                pending.pop(0)()
+            except Exception:   # one bad update to the window must not stop the others
+                pass
         root.after(80, pump)
 
     def set_busy(value):
@@ -345,9 +360,10 @@ def run_window() -> int:
                     extra = "Built %s%s" % (release["created"][:16].replace("T", " "), " (private draft)" if release["draft"] else "")
                 post(lambda: (state.update(release=release), headline.configure(text=sentence), detail.configure(text=extra),
                               set_busy(False)))
-            except UpdaterError as problem:
+            except Exception as problem:   # UpdaterError or anything unexpected: never leave the window stuck
+                message = str(problem) if isinstance(problem, UpdaterError) else "Unexpected problem: %s" % problem
                 post(lambda: (state.update(release=None), headline.configure(text="Could not check for updates"),
-                              detail.configure(text=str(problem)), set_busy(False)))
+                              detail.configure(text=message), set_busy(False)))
         threading.Thread(target=work, daemon=True).start()
 
     def install():
@@ -365,6 +381,7 @@ def run_window() -> int:
                           detail.configure(text="%.0f of %.0f MB" % (done / 1048576, total / 1048576))))
 
         def work():
+            folder = None
             try:
                 token = find_token()
                 expected = fetch_checksum(release, token)
@@ -378,12 +395,13 @@ def run_window() -> int:
                 write_state(installed_tag=release["tag"])
                 post(lambda: (headline.configure(text="Updated to %s" % release["tag"]), detail.configure(text=""),
                               set_busy(False), offer_open()))
-            except UpdaterError as problem:
-                post(lambda: (headline.configure(text="Update did not finish"), detail.configure(text=str(problem)),
+            except Exception as problem:   # UpdaterError, OSError or anything unexpected
+                message = str(problem) if isinstance(problem, UpdaterError) else "Unexpected problem: %s" % problem
+                post(lambda: (headline.configure(text="Update did not finish"), detail.configure(text=message),
                               set_busy(False)))
-            except OSError as problem:
-                post(lambda: (headline.configure(text="Update did not finish"), detail.configure(text=str(problem)),
-                              set_busy(False)))
+            finally:
+                if folder is not None:   # the downloaded installer is large; do not leave it in Temp
+                    shutil.rmtree(folder, ignore_errors=True)
         threading.Thread(target=work, daemon=True).start()
 
     def offer_open():

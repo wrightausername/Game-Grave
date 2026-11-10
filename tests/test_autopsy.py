@@ -44,6 +44,8 @@ class AutopsyTests(unittest.TestCase):
             au.read_capture(self.write("e.csv", csv_text(["x", "y"])))
         with self.assertRaises(au.CaptureError):
             au.read_capture(self.root / "missing.csv")
+        with self.assertRaises(au.CaptureError):
+            au.read_capture(self.write("huge.csv", "MsBetweenPresents\n" + "9" * 200000 + "\n"))
 
     def test_stats_are_plain_arithmetic(self):
         s = au.stats_for(frames(10.0))

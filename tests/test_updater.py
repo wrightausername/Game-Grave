@@ -1,4 +1,5 @@
 import hashlib
+import http.client
 import json
 import os
 import sys
@@ -101,6 +102,20 @@ class Network(unittest.TestCase):
         with self.assertRaises(up.UpdaterError):
             up.list_releases("", lambda u, h: Reply(200, b'{"message": "x"}'))
         self.assertEqual(up.list_releases("", lambda u, h: Reply(200, b"[]")), [])
+
+
+class Dropped(unittest.TestCase):
+    def test_a_connection_that_breaks_mid_answer_is_an_updater_error(self):
+        class Breaks:
+            status, headers = 200, {}
+
+            def read(self, n=-1):
+                raise http.client.IncompleteRead(b"partial")
+
+        with self.assertRaises(up.UpdaterError):
+            up.list_releases("", opener=lambda url, headers: Breaks())
+        with self.assertRaises(up.UpdaterError):
+            up.fetch_checksum({"sum": {"url": "https://api.github.com/a/2"}}, "", opener=lambda url, headers: Breaks())
 
 
 class Download(unittest.TestCase):
