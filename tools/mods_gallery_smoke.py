@@ -100,6 +100,12 @@ def main():
             assert window.mod_gallery.isVisible() and window.mod_view_bar.isVisible()
             assert not window.mod_table.isVisible() and not window.mod_game_filters.isVisible()
             assert window.mod_view_bar.gallery_button.isChecked() and not window.mod_view_bar.list_button.isChecked()
+            footer = window.mod_selection.parentWidget()
+            footer_buttons = {b.text(): b for b in footer.findChildren(mg.QPushButton)}
+            assert not footer_buttons["Add Source"].isVisible() and not footer_buttons["Scan for Mods"].isVisible(), \
+                "The banner carries these two, so the footer copies are hidden in the gallery"
+            banner_buttons = {b.text() for b in window.mod_gallery.findChildren(mg.QPushButton)}
+            assert {"Add Source", "Scan for Mods"} <= banner_buttons, banner_buttons
             assert window.grab().save(str(args.output / "mods-gallery-1280.png"))
 
             stage("poster wall")
@@ -208,6 +214,7 @@ def main():
             window.mod_view_bar.list_button.click()
             settle()
             assert not mg.is_gallery(window) and window.mod_table.isVisible() and window.mod_game_filters.isVisible()
+            assert footer_buttons["Add Source"].isVisible() and footer_buttons["Scan for Mods"].isVisible(), "List view keeps its footer"
             assert not window.mod_gallery.isVisible() and window.mod_view_bar.list_button.isChecked()
             assert window.mod_table.columnCount() == 7 and window.mod_table.rowCount() >= 4
             window.mod_view_bar.gallery_button.click()

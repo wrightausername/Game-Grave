@@ -30,7 +30,7 @@ TONE_TEXT = {"green": "#69DEA7", "amber": "#FFD08E", "red": "#FF8796", "muted": 
 TONE_LINE = {"green": "#3E9E77", "amber": "#B58B4E", "red": "#FF5269", "muted": "#4A5967"}
 PANEL, BORDER, TEXT, MUTED = "#111922", "#2A3541", "#F4F7FC", "#A3B4C5"
 RED, CYAN, AMBER = "#FF5269", "#42D4F2", "#FFD08E"
-POSTER = (122, 158)
+POSTER = (114, 144)
 CARD = (204, 208)
 ART_HEIGHT = 108
 ROW_PAD = 22  # room for a row's margins and its thin scroll bar
@@ -347,7 +347,7 @@ class Banner(QFrame):
     def __init__(self, pixmap, name, parts):
         super().__init__()
         self.pixmap, self.name, self.parts = pixmap, name, parts
-        self.setMinimumHeight(132)
+        self.setMinimumHeight(116)
         self.setAccessibleName("Selected game " + name)
 
     def paintEvent(self, event):
@@ -593,7 +593,7 @@ class ModsGallery(QWidget):
         body.setObjectName("modGalleryBody")
         column = QVBoxLayout(body)
         column.setContentsMargins(2, 2, 6, 8)
-        column.setSpacing(10)
+        column.setSpacing(8)
         tiles = gd.tiles(everything)
         column.addLayout(self._games_head(tiles))
         posters = [self._poster(t, t.name == chosen) for t in tiles]
@@ -723,7 +723,7 @@ class ModsGallery(QWidget):
         eyebrow.setStyleSheet(f"color:{AMBER};font-size:10px;font-weight:700;letter-spacing:2px;background:transparent;")
         title = QLabel(name)
         title.setTextFormat(Qt.PlainText)
-        title.setFont(_font(28, True))
+        title.setFont(_font(25, True))
         title.setStyleSheet("background:transparent;color:#F6FAFF;")
         size = sum(f.size or 0 for f in rows if f.is_mod)
         bits = [gd.count_noun(h["on"] + h["off"] + h["unrecorded"], 0)] if h["count"] != h["folders"] else []
@@ -866,6 +866,12 @@ def apply_mode(window):
     filters = window.mod_game_filters.parentWidget()
     if _alive(filters):
         filters.setVisible(not on)
+    # The banner has its own Add Source and Scan for Mods, so the footer's copies step aside in the gallery.
+    footer = window.mod_selection.parentWidget()
+    if _alive(footer):
+        for button in footer.findChildren(QPushButton):
+            if button.text() in ("Add Source", "Scan for Mods"):
+                button.setVisible(not on)
     return on
 
 
