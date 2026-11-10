@@ -9,12 +9,13 @@ from collections import deque
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import QFileDialog, QFrame, QLabel, QSizePolicy, QWidget
+from PySide6.QtCore import QObject, Qt, QTimer
+from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QFileDialog, QFrame, QLabel
 
 from core import human_size, log_event
 from gg_desktop import hardware_core as hw
+from gg_desktop import hardware_graphics as hg
 from gg_desktop.header_banner import HeaderBannerArtwork
 from gg_desktop.reference_widgets import MetricStrip
 from gg_desktop.widgets import button, column, label, panel, row
@@ -112,64 +113,6 @@ def monitor_of(window) -> Monitor:
 
 
 # ------------------------------------------------------------------ small widgets
-class LiveChart(QWidget):
-    def __init__(self, color, scale_label):
-        super().__init__()
-        self.color, self.scale_label = QColor(color), scale_label
-        self.values = []
-        self.setMinimumHeight(92)
-        self.setMaximumHeight(220)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-    def set_values(self, values):
-        self.values = values
-        self.update()
-
-    def paintEvent(self, event):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        w, h = self.width(), self.height() - 2
-        p.setPen(QPen(QColor("#162129"), 1))
-        for fraction in (.25, .5, .75):
-            y = round(h * (1 - fraction))
-            p.drawLine(0, y, w, y)
-        p.setPen(QPen(QColor("#30383E"), 1))
-        p.drawLine(0, h, w, h)
-        readable = [v for v in self.values if v is not None]
-        if not readable:
-            p.setPen(QColor("#9AA4AC"))
-            p.drawText(QRectF(0, 0, w, h), Qt.AlignCenter, self.scale_label)
-            return
-        slot = w / HISTORY
-        start = HISTORY - len(self.values)
-        for i, value in enumerate(self.values):
-            if value is None:
-                continue
-            color = QColor(self.color)
-            color.setAlphaF(.35 + .65 * (start + i) / HISTORY)
-            top = h * (1 - max(0.0, min(100.0, value)) / 100.0)
-            p.fillRect(QRectF((start + i) * slot + .5, top, max(1.0, slot - 1.5), h - top), color)
-
-
-class ThinBar(QWidget):
-    def __init__(self, fraction, color):
-        super().__init__()
-        self.fraction, self.color = max(0.0, min(1.0, fraction)), QColor(color)
-        self.setFixedHeight(7)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-    def paintEvent(self, event):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        rect = QRectF(self.rect())
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor("#142029"))
-        p.drawRoundedRect(rect, 3.5, 3.5)
-        if self.fraction > 0:
-            p.setBrush(self.color)
-            p.drawRoundedRect(QRectF(0, 0, max(7.0, rect.width() * self.fraction), rect.height()), 3.5, 3.5)
-
-
 def _pill(text, tone):
     pill = QLabel(text)
     pill.setAlignment(Qt.AlignCenter)
@@ -189,7 +132,7 @@ def _clear(layout):
             _clear(item.layout())
 
 
-def _spec_row(code, name, detail, tone="cyan"):
+def _spec_row(code, name, detail, tone="cyan", extra=()):
     line = row(spacing=12, margins=(0, 6, 0, 6))
     chip = QLabel(code)
     chip.setAlignment(Qt.AlignCenter)
@@ -203,6 +146,9 @@ def _spec_row(code, name, detail, tone="cyan"):
     words.addWidget(title)
     if detail:
         words.addWidget(label(detail, "readyDetail", wrap=True))
+    for widget in extra:
+        words.addSpacing(3)
+        words.addWidget(widget)
     line.addLayout(words, 1)
     return line
 
@@ -304,6 +250,7 @@ class Body(QObject):
         mon.addLayout(head)
         charts = row(spacing=14)
         self.charts = {}
+        self.gauges = {}
         for key, title, color, empty in (("cpu", "CPU", "#42D4F2", "Not readable"),
                                          ("gpu", "GPU", "#FF3B57", "Needs an NVIDIA card"),
                                          ("mem", "MEMORY", "#35DC7C", "Not readable")):
@@ -313,10 +260,14 @@ class Body(QObject):
             now = label("—", "readyWhen")
             top.addWidget(now)
             cell.addLayout(top)
-            chart = LiveChart(color, empty)
+            gauge = hg.RingGauge(color, title, 112)
+            cell.addWidget(gauge, 0, Qt.AlignHCenter)
+            chart = hg.AreaChart(color, empty, HISTORY)
             chart.setAccessibleName(f"{title} load, last {HISTORY * TICK_SECONDS} seconds")
             cell.addWidget(chart)
+            now.hide()   # the gauge above shows the same reading
             self.charts[key] = (chart, now)
+            self.gauges[key] = gauge
             charts.addLayout(cell, 1)
         mon.addLayout(charts)
         self.monitor_note = label("", "readyDetail", wrap=True)
@@ -387,7 +338,7 @@ class Body(QObject):
         if specs.cpu:
             c = specs.cpu
             detail = f"{c.cores} cores, {c.threads} threads, base {c.base_ghz} GHz" + (f", socket {c.socket}" if c.socket else "")
-            self.parts_box.addLayout(_spec_row("CPU", c.name, detail, "cyan"))
+            self.parts_box.addLayout(_spec_row("CPU", c.name, detail, "cyan", extra=(hg.CoreGrid(c.cores, c.threads),)))
         for gpu in specs.gpus:
             self.parts_box.addLayout(_spec_row("GPU", gpu.name, f"Driver {gpu.driver}" if gpu.driver else "", "red"))
         if specs.memory:
@@ -395,7 +346,13 @@ class Body(QObject):
             slots = f"{m.sticks} of {m.slots} slots used" if m.slots else f"{m.sticks} module{'s' if m.sticks != 1 else ''}"
             speed = (f"Running at {m.running_mts} MT/s" + (f", rated {m.rated_mts}" if m.rated_mts else "")) if m.running_mts else ""
             kind = f" {m.kind}" if m.kind else ""
-            self.parts_box.addLayout(_spec_row("RAM", f"{hw._gb(m.total_gb)}{kind}", ". ".join(x for x in (slots, speed) if x), "green"))
+            extra = []
+            if m.slots or m.sticks:
+                extra.append(hg.SlotStrip(m.sticks, m.slots))
+            if m.running_mts and m.rated_mts:
+                extra.append(hg.SpeedBars(m.running_mts, m.rated_mts))
+            self.parts_box.addLayout(_spec_row("RAM", f"{hw._gb(m.total_gb)}{kind}", ". ".join(x for x in (slots, speed) if x),
+                                               "green", extra=tuple(extra)))
         for drive in specs.drives:
             model = drive.model or "Unnamed drive"
             self.parts_box.addLayout(_spec_row("SSD" if drive.fast else "HDD" if drive.kind == "hard drive" else "DRV",
@@ -514,6 +471,12 @@ class Body(QObject):
         self.charts["cpu"][1].setText(percent(live.cpu))
         self.charts["gpu"][1].setText(percent(g.load if g else None))
         self.charts["mem"][1].setText("—" if live.mem_used_gb is None else f"{live.mem_used_gb:.1f} GB")
+        mem_fraction = (live.mem_used_gb / live.mem_total_gb if live.mem_used_gb is not None and live.mem_total_gb else None)
+        self.gauges["cpu"].set_value(None if live.cpu is None else live.cpu / 100.0, percent(live.cpu), "in use")
+        self.gauges["gpu"].set_value(None if not g or g.load is None else g.load / 100.0, percent(g.load if g else None),
+                                     "in use" if g else "needs NVIDIA")
+        self.gauges["mem"].set_value(mem_fraction, "—" if live.mem_used_gb is None else f"{live.mem_used_gb:.1f}",
+                                     "GB of " + f"{live.mem_total_gb:.0f}" if live.mem_total_gb else "GB")
         values = self.metrics.values
         values[0].setText(percent(live.cpu))
         values[1].setText(percent(g.load if g else None))
@@ -537,7 +500,7 @@ class Body(QObject):
             top.addWidget(label(f"{human_size(d.free)} free of {human_size(d.total)}", "caption"))
             line.addLayout(top)
             used = 1 - d.free / d.total if d.total else 0
-            line.addWidget(ThinBar(used, "#DFAC46" if d.free < d.total * .10 else "#42D4F2"))
+            line.addWidget(hg.DriveBar(used, "#DFAC46" if d.kind == "hard drive" else "#42D4F2"))
             self.drives_box.addLayout(line)
 
     def copy_specs(self):

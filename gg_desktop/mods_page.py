@@ -18,6 +18,7 @@ from shiboken6 import isValid
 from core import save_settings
 from gg_desktop import mods_graphics as graphics
 from gg_desktop import mods_insight as mi
+from gg_desktop import mods_tab_graphics as tabgfx
 from gg_desktop import mods_words as words
 from gg_desktop.mods_data import identity, mod_page, ordinary
 from gg_desktop.models import readable_bytes
@@ -190,6 +191,8 @@ def fill(window, *args, **kwargs):
         tab_fill(window, control, kwargs.get("requested_page", 0))
     chrome(window, control)
     graphics.fit_library_columns(window.mod_table)
+    tabgfx.use_for(window.mod_table, window._mod_tab)
+    tabgfx.refresh_empty(window)
 
 
 def chrome(window, control):
@@ -280,6 +283,7 @@ def tab_fill(window, control, requested_page=0):
         notice = "Nothing matches the search." if query else "Nothing to show here."
     window.mod_notice.setText(notice)
     window.mod_notice.setVisible(bool(notice))
+    tabgfx.decorate(window)
     window._mod_selection_count()
     window._mod_details()
 
@@ -531,9 +535,18 @@ def radar_details(window, control, contents, item):
         if s["custom"]:
             contents.addWidget(tool("Stop Scanning This Source", "close", lambda: remove_source(window, s["path"])))
             contents.addWidget(plain_label("Removing a source only stops Game Grave scanning it. No file is changed.", "caption"))
+    sources = mi.source_rows(window.inventory, list(window.settings.get("mod_extra_roots", [])))
+    if sources:
+        detail_section(contents, "Sources by Type")
+        kinds = {}
+        for source in sources:
+            kinds[source["kind"]] = kinds.get(source["kind"], 0) + 1
+        contents.addWidget(tabgfx.MixBar(kinds))
     detail_section(contents, "Coverage")
     for name, text, tone in mi.radar_rows(control.catalog, control.report, window.inventory, []):
-        contents.addWidget(plain_label(f"{name}: {text}", "caption" if tone == "info" else "warning"))
+        card = tabgfx.coverage_card(name, text, "warn" if tone == "warn" else "info")
+        card.setAccessibleName(f"{name}: {text}")
+        contents.addWidget(card)
 
 
 def order_details(window, control, contents, item):
@@ -548,6 +561,11 @@ def order_details(window, control, contents, item):
     detail_line(contents, "check", "Saved", item.cells[2])
     detail_line(contents, "file", "Version", entry.version or "Unknown")
     detail_line(contents, "folder", "Location", entry.path)
+    saved_rows, _saved_note = mi.load_order(control.catalog, window._mod_profile_keys.get("Load Order", ""))
+    here = next((pos for pos, e, _m in saved_rows if e.key == entry.key and pos), None)
+    if here:
+        shown, first, last = graphics.order_rows(saved_rows, here)
+        contents.addWidget(graphics.OrderStack(shown, first, last))
     contents.addWidget(tool("Details", "file", lambda: control.explain(entry), kind="primary"))
     contents.addWidget(tool("Open Folder", "folder", lambda: control.open_folder(entry)))
     contents.addWidget(plain_label("Position comes from the manager's saved list and is relative. Game Grave never reorders mods.", "caption"))
@@ -560,6 +578,7 @@ def profile_details(window, control, contents, item):
         return
     p = item.payload["profile"]
     contents.addWidget(plain_label(p.name, "detailTitle"))
+    contents.addWidget(tabgfx.SplitRing(item.payload["enabled"], item.payload["disabled"], item.payload["unknown"]))
     detail_line(contents, "mods", "Manager", p.manager)
     detail_line(contents, "check", "Enabled", item.payload["enabled"])
     detail_line(contents, "close", "Disabled", item.payload["disabled"])
@@ -587,6 +606,7 @@ def conflict_details(window, control, contents, item):
         return
     f = item.payload["finding"]
     contents.addWidget(plain_label(f.kind, "detailTitle"))
+    contents.addWidget(tabgfx.FindingBanner(len(f.mods), f.count or len(f.paths)))
     detail_line(contents, "shield", "Profile", item.payload["profile"])
     contents.addWidget(plain_label(f.detail))
     detail_section(contents, "Mods Involved")

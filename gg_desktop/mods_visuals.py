@@ -71,3 +71,45 @@ QUIET = ("#9aa7b3", "#2a3b4b", "#0c141b", "#6f7f8d")
 
 def pill_colors(word: str):
     return PILLS.get(word, QUIET)
+
+
+def split_fractions(on, off, unknown=0):
+    """(on, off, unmarked) shares of a profile's list, summing to 1. None when the list has no mods."""
+    parts = [max(0, int(v or 0)) for v in (on, off, unknown)]
+    total = sum(parts)
+    if not total:
+        return None
+    return tuple(p / total for p in parts)
+
+
+def rail_fraction(position, count):
+    """Where a mod sits along its load-order rail, 0 (first) to 1 (last). None when the position is unknown."""
+    try:
+        position, count = int(position), int(count)
+    except (TypeError, ValueError):
+        return None
+    if position < 1 or count < 1 or position > count:
+        return None
+    return 0.5 if count == 1 else (position - 1) / (count - 1)
+
+
+def count_tone(text, active):
+    """The chip colour for a number cell: `active` for a count above zero, quiet for zero or a dash."""
+    try:
+        return active if int(str(text).strip()) > 0 else "muted"
+    except ValueError:
+        return "muted"
+
+
+def mix_parts(counts, keep: int = 4):
+    """[(label, count, share)] for the `keep` biggest groups plus one combined 'Other'. Zero groups are dropped."""
+    known = sorted(((str(k), int(v)) for k, v in dict(counts).items() if v and int(v) > 0),
+                   key=lambda item: (-item[1], item[0].casefold()))
+    total = sum(v for _k, v in known)
+    if not total:
+        return []
+    shown = known[:keep]
+    rest = sum(v for _k, v in known[keep:])
+    if rest:
+        shown.append(("Other", rest))
+    return [(name, value, value / total) for name, value in shown]

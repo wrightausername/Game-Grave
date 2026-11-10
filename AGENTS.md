@@ -198,3 +198,11 @@ health bars, viewfinder, pixel sparks, pixel helix, rewind chevrons, mixer slide
 kept clear of the sidebar's hex grid, circuit traces and gamepad outline. Same rules as before: 6000x500, symmetric top
 to bottom, calm on the left behind the title, full header width. Only the picture files changed; no layout, control or
 behavior changed.
+
+Graphics pass (owner instruction, 2026-11-09): the owner said the Hardware tab should look fancier and that the Mods tab
+"is just a jumble of numbers", which reopens Mods for graphics only. Mods sub-tabs (Mod Radar, Load Order, Profiles,
+Conflicts, Cleanup) now draw count chips, an on/off bar under each profile, a load-order rail, a profile ring, a source
+type bar, coverage cards, a conflict banner and a picture for empty tables (`gg_desktop/mods_tab_graphics.py`, pure
+helpers in `mods_visuals.py`). Hardware gets ring gauges, smooth live charts, a core grid, memory slots, speed bars and
+drive bars (`gg_desktop/hardware_graphics.py`). Painted display only: every shape comes from a number or word the tab
+already shows, cell text is unchanged, no new claim, nothing called safe, and no behavior, control or engine changed.

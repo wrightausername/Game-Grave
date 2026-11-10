@@ -1,7 +1,7 @@
 import unittest
 
-from gg_desktop.mods_visuals import (hue_for, initials, lit_segments, order_window, pill_colors, share_parts,
-                                     size_fraction)
+from gg_desktop.mods_visuals import (count_tone, hue_for, initials, lit_segments, mix_parts, order_window,
+                                     pill_colors, rail_fraction, share_parts, size_fraction, split_fractions)
 
 
 class ModsVisualsTests(unittest.TestCase):
@@ -49,6 +49,37 @@ class ModsVisualsTests(unittest.TestCase):
     def test_pill_colors(self):
         self.assertNotEqual(pill_colors("On"), pill_colors("Off"))
         self.assertEqual(pill_colors("Storage folder"), pill_colors("Not recorded"))
+
+
+class TabGraphicsHelperTests(unittest.TestCase):
+    def test_split_fractions_sum_to_one_and_need_mods(self):
+        self.assertIsNone(split_fractions(0, 0, 0))
+        on, off, unknown = split_fractions(3, 2, 0)
+        self.assertAlmostEqual(on + off + unknown, 1.0)
+        self.assertAlmostEqual(on, 0.6)
+        self.assertEqual(split_fractions(1, 0), (1.0, 0.0, 0.0))
+
+    def test_rail_fraction(self):
+        self.assertEqual(rail_fraction(1, 5), 0.0)
+        self.assertEqual(rail_fraction(5, 5), 1.0)
+        self.assertEqual(rail_fraction(3, 5), 0.5)
+        self.assertEqual(rail_fraction(1, 1), 0.5)
+        for bad in (("-", 5), (0, 5), (6, 5), (None, 5), (2, 0)):
+            self.assertIsNone(rail_fraction(*bad))
+
+    def test_count_tone_is_quiet_for_zero_and_dash(self):
+        self.assertEqual(count_tone("3", "amber"), "amber")
+        self.assertEqual(count_tone("0", "amber"), "muted")
+        self.assertEqual(count_tone("—", "amber"), "muted")
+
+    def test_mix_parts_keep_every_count_true(self):
+        parts = mix_parts({"Mod Organizer 2": 4, "Vortex": 0, "Added by you": 1, "A": 1, "B": 1, "C": 1, "D": 1})
+        self.assertEqual(parts[0][:2], ("Mod Organizer 2", 4))
+        self.assertEqual(parts[-1][:2], ("Other", 2))
+        self.assertEqual(sum(p[1] for p in parts), 9)
+        self.assertAlmostEqual(sum(p[2] for p in parts), 1.0)
+        self.assertNotIn("Vortex", [p[0] for p in parts])
+        self.assertEqual(mix_parts({}), [])
 
 
 if __name__ == "__main__":
