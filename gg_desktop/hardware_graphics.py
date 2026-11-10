@@ -6,9 +6,13 @@ count, how many memory slots are used, how full a drive is). Nothing here estima
 """
 from __future__ import annotations
 
+import math
+
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
 from PySide6.QtWidgets import QSizePolicy, QWidget
+
+from core import human_size
 
 TRACK = QColor("#15222c")
 SWEEP_START, SWEEP = 225, -270     # degrees: the gauge opens at the bottom
@@ -104,7 +108,6 @@ class RingGauge(QWidget):
 
     @staticmethod
     def _tick(p, box, degrees, length):
-        import math
         rad = math.radians(degrees)
         c = box.center()
         r = box.width() / 2
@@ -355,3 +358,289 @@ class DriveBar(QWidget):
         p.setPen(QColor("#f1f4f7"))
         p.setFont(_font(self.font(), 10, bold=True))
         p.drawText(rect.adjusted(7, 0, -7, 0), Qt.AlignVCenter | Qt.AlignLeft, f"{round(self.fraction * 100)}% full")
+
+
+# ---------------------------------------------------------------- the rig map
+def _elide(p, text, width):
+    return QFontMetrics(p.font()).elidedText(str(text), Qt.ElideRight, max(8, int(width)))
+
+
+class RigMap(QWidget):
+    """A drawn map of this PC: the processor, memory slots, graphics card and drives, joined by a bus.
+
+    Every box is a part Windows reported, with its real name and numbers. The live readings light the parts up
+    (processor glow, memory fill, graphics bars, drive fullness). A part that cannot be read is drawn dim and says so.
+    """
+
+    HEIGHT = 312
+
+    def __init__(self):
+        super().__init__()
+        self.specs = None
+        self.live = None
+        self.message = "Reading your hardware…"
+        self.setFixedHeight(self.HEIGHT)
+        self.setMinimumWidth(520)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setAccessibleName("Map of your PC")
+
+    def set_specs(self, specs, message=""):
+        self.specs = specs
+        if message:
+            self.message = message
+        self.update()
+
+    def set_live(self, live):
+        self.live = live
+        self.update()
+
+    # ------------------------------------------------------------ drawing helpers
+    def _label(self, p, text, rect, color="#d7dfe7", size=12, bold=False, align=Qt.AlignLeft | Qt.AlignVCenter):
+        p.setPen(QColor(color))
+        p.setFont(_font(self.font(), size, bold))
+        p.drawText(rect, align, _elide(p, text, rect.width()))
+
+    @staticmethod
+    def _bar(p, rect, fraction, color, track="#15222c"):
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(track))
+        p.drawRoundedRect(rect, rect.height() / 2, rect.height() / 2)
+        if fraction is not None and fraction > 0:
+            fill = QRectF(rect.left(), rect.top(), max(rect.height(), rect.width() * clamp(fraction)), rect.height())
+            gradient = QLinearGradient(fill.topLeft(), fill.topRight())
+            gradient.setColorAt(0, QColor(color).darker(160))
+            gradient.setColorAt(1, QColor(color))
+            p.setBrush(gradient)
+            p.drawRoundedRect(fill, rect.height() / 2, rect.height() / 2)
+
+    @staticmethod
+    def _tag(p, rect, text, color, font):
+        p.setPen(QPen(QColor(color), 1))
+        p.setBrush(QColor(0, 0, 0, 90))
+        p.drawRoundedRect(rect, 5, 5)
+        p.setFont(font)
+        p.setPen(QColor(color))
+        p.drawText(rect, Qt.AlignCenter, text)
+
+    # ------------------------------------------------------------ the painting
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        shape = QPainterPath()
+        shape.addRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 10, 10)
+        p.setClipPath(shape)
+        wash = QLinearGradient(0, 0, 0, h)
+        wash.setColorAt(0, QColor("#0c1720"))
+        wash.setColorAt(1, QColor("#070d12"))
+        p.fillPath(shape, wash)
+        p.setPen(QPen(QColor(66, 212, 242, 13), 1))
+        for x in range(24, w, 24):
+            p.drawLine(x, 1, x, h - 1)
+        for y in range(24, h, 24):
+            p.drawLine(1, y, w - 1, y)
+        self._label(p, "YOUR RIG", QRectF(16, 9, 120, 16), "#8794a1", 11, True)
+        specs = self.specs
+        if specs is None:
+            self._label(p, self.message, QRectF(20, 0, w - 40, h), "#6c7a86", 14, False, Qt.AlignCenter)
+            p.setClipping(False)
+            p.setPen(QPen(QColor("#26343f"), 1))
+            p.setBrush(Qt.NoBrush)
+            p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 10, 10)
+            return
+        live = self.live
+        cpu_load = None if live is None or live.cpu is None else clamp(live.cpu / 100.0)
+        mem_fraction = (None if live is None or live.mem_used_gb is None or not live.mem_total_gb
+                        else clamp(live.mem_used_gb / live.mem_total_gb))
+        gpu_live = None if live is None else live.gpu
+        top, bottom = 36, h - 38
+        mid = top + (bottom - top) * .46
+        bus_color = QColor(66, 212, 242, 70)
+        colc_x = w * .60
+        colc_w = w - colc_x - 18
+        # ---- bus: runs from the processor across, then down beside the graphics card and drives
+        spine_x = colc_x - 14
+        p.setPen(QPen(bus_color, 2, Qt.SolidLine, Qt.RoundCap))
+        p.drawLine(QPointF(w * .20, mid), QPointF(spine_x, mid))
+        p.drawLine(QPointF(spine_x, top + 40), QPointF(spine_x, bottom - 6))
+        # ---- processor
+        cx = w * .20
+        size = min(100.0, (bottom - top) * .46)
+        chip = QRectF(cx - size / 2, mid - size / 2, size, size)
+        if cpu_load is not None:
+            glow = QRadialGradient(chip.center(), size * .95)
+            glow.setColorAt(0, QColor(66, 212, 242, int(40 + 150 * cpu_load)))
+            glow.setColorAt(1, QColor(66, 212, 242, 0))
+            p.setPen(Qt.NoPen)
+            p.setBrush(glow)
+            p.drawEllipse(chip.center(), size * .95, size * .95)
+        socket = chip.adjusted(-9, -9, 9, 9)
+        p.setPen(QPen(QColor("#26404d"), 1))
+        p.setBrush(QColor("#0b171f"))
+        p.drawRoundedRect(socket, 7, 7)
+        pin = QColor(66, 212, 242, 150)
+        p.setPen(QPen(pin, 1.4))
+        for i in range(1, 11):
+            t = i / 11
+            x = chip.left() + chip.width() * t
+            y = chip.top() + chip.height() * t
+            p.drawLine(QPointF(x, socket.top() - 1), QPointF(x, socket.top() + 4))
+            p.drawLine(QPointF(x, socket.bottom() + 1), QPointF(x, socket.bottom() - 4))
+            p.drawLine(QPointF(socket.left() - 1, y), QPointF(socket.left() + 4, y))
+            p.drawLine(QPointF(socket.right() + 1, y), QPointF(socket.right() - 4, y))
+        body = QLinearGradient(chip.topLeft(), chip.bottomRight())
+        body.setColorAt(0, QColor("#17303c"))
+        body.setColorAt(1, QColor("#0d1b24"))
+        p.setPen(QPen(QColor(66, 212, 242, 190), 1.4))
+        p.setBrush(body)
+        p.drawRoundedRect(chip, 8, 8)
+        die = chip.adjusted(size * .22, size * .22, -size * .22, -size * .22)
+        p.setPen(QPen(QColor(66, 212, 242, 160), 1))
+        p.setBrush(QColor(66, 212, 242, int(26 + 110 * (cpu_load or 0))))
+        p.drawRoundedRect(die, 4, 4)
+        self._label(p, "CPU", die, "#e8f7fb", 14, True, Qt.AlignCenter)
+        if specs.cpu:
+            c = specs.cpu
+            self._label(p, c.name, QRectF(cx - w * .17, socket.bottom() + 8, w * .34, 16), "#e6edf2", 12, True, Qt.AlignHCenter | Qt.AlignVCenter)
+            self._label(p, f"{c.cores} cores · {c.threads} threads · {c.base_ghz} GHz", QRectF(cx - w * .17, socket.bottom() + 25, w * .34, 15),
+                        "#8794a1", 11, False, Qt.AlignHCenter | Qt.AlignVCenter)
+        bar = QRectF(cx - 48, socket.bottom() + 46, 96, 6)
+        self._bar(p, bar, cpu_load, "#42D4F2")
+        self._label(p, "not readable" if cpu_load is None else f"{round(cpu_load * 100)}% in use",
+                    QRectF(cx - 70, bar.bottom() + 3, 140, 14), "#8fdcf0", 11, True, Qt.AlignHCenter | Qt.AlignVCenter)
+        # ---- memory slots
+        memory = specs.memory
+        colb_x = w * .37
+        colb_w = w * .17
+        count = min(8, (memory.slots or memory.sticks) if memory else 0)
+        slot_top = mid - 62
+        slot_h = 124.0
+        if count:
+            gap = 7
+            slot_w = max(8.0, min(20.0, (colb_w - gap * (count - 1)) / count))
+            total_w = slot_w * count + gap * (count - 1)
+            x0 = colb_x + (colb_w - total_w) / 2
+            green = QColor("#35DC7C")
+            p.setPen(QPen(bus_color, 2, Qt.SolidLine, Qt.RoundCap))
+            p.drawLine(QPointF(socket.right(), mid), QPointF(x0, mid))
+            for i in range(count):
+                x = x0 + i * (slot_w + gap)
+                rect = QRectF(x, slot_top, slot_w, slot_h)
+                used = i < memory.sticks
+                border = QColor(green)
+                border.setAlpha(220 if used else 80)
+                p.setPen(QPen(border, 1.2))
+                p.setBrush(QColor(8, 16, 22, 230))
+                p.drawRoundedRect(rect, 3, 3)
+                if used:
+                    fraction = mem_fraction if mem_fraction is not None else 0.0
+                    fill_h = max(0.0, (slot_h - 6) * fraction)
+                    if fill_h > 0:
+                        fill = QRectF(x + 2, slot_top + slot_h - 3 - fill_h, slot_w - 4, fill_h)
+                        gradient = QLinearGradient(fill.topLeft(), fill.bottomLeft())
+                        gradient.setColorAt(0, green)
+                        gradient.setColorAt(1, green.darker(210))
+                        p.setPen(Qt.NoPen)
+                        p.setBrush(gradient)
+                        p.drawRoundedRect(fill, 2, 2)
+                p.setPen(Qt.NoPen)
+                p.setBrush(border)
+                p.drawRect(QRectF(x + slot_w / 2 - 1.5, slot_top - 4, 3, 4))
+            base = slot_top + slot_h + 8
+            self._label(p, f"{memory.total_gb:g} GB {memory.kind}".strip(), QRectF(colb_x - 10, base, colb_w + 20, 16), "#e6edf2", 12, True, Qt.AlignHCenter | Qt.AlignVCenter)
+            if live is not None and live.mem_used_gb is not None:
+                self._label(p, f"{live.mem_used_gb:.1f} GB in use", QRectF(colb_x - 10, base + 16, colb_w + 20, 15), "#7bf0a6", 11, True, Qt.AlignHCenter | Qt.AlignVCenter)
+            if memory.running_mts:
+                speed = f"{memory.running_mts} of {memory.rated_mts} MT/s" if memory.rated_mts else f"{memory.running_mts} MT/s"
+                self._label(p, speed, QRectF(colb_x - 14, base + 31, colb_w + 28, 15), "#8794a1", 11, False, Qt.AlignHCenter | Qt.AlignVCenter)
+        else:
+            self._label(p, "Memory not reported", QRectF(colb_x, mid - 10, colb_w, 20), "#6c7a86", 11, False, Qt.AlignCenter)
+        # ---- graphics card
+        card = QRectF(colc_x, top, colc_w, 100)
+        red = QColor("#FF3B57")
+        load = None if gpu_live is None or gpu_live.load is None else clamp(gpu_live.load / 100.0)
+        p.setPen(QPen(bus_color, 2, Qt.SolidLine, Qt.RoundCap))
+        p.drawLine(QPointF(spine_x, card.center().y()), QPointF(card.left(), card.center().y()))
+        if load is not None:
+            halo = QRadialGradient(card.center(), card.width() * .5)
+            halo.setColorAt(0, QColor(255, 59, 87, int(30 + 70 * load)))
+            halo.setColorAt(1, QColor(255, 59, 87, 0))
+            p.setPen(Qt.NoPen)
+            p.setBrush(halo)
+            p.drawEllipse(card.center(), card.width() * .5, card.height() * .8)
+        shell = QLinearGradient(card.topLeft(), card.bottomLeft())
+        shell.setColorAt(0, QColor("#1b0f15"))
+        shell.setColorAt(1, QColor("#0e0a0e"))
+        edge = QColor(red)
+        edge.setAlpha(200)
+        p.setPen(QPen(edge, 1.4))
+        p.setBrush(shell)
+        p.drawRoundedRect(card, 9, 9)
+        fans = 2 if card.width() >= 280 else 1
+        for k in range(fans):
+            fc = QPointF(card.left() + 38 + k * 66, card.center().y())
+            p.setPen(QPen(QColor(255, 59, 87, 120), 1))
+            p.setBrush(QColor(10, 6, 9))
+            p.drawEllipse(fc, 28, 28)
+            p.setPen(QPen(QColor(255, 59, 87, 200), 3, Qt.SolidLine, Qt.RoundCap))
+            for blade in range(7):
+                a0 = math.radians(blade * 360 / 7)
+                a1 = a0 + .55
+                p.drawLine(QPointF(fc.x() + 6 * math.cos(a0), fc.y() + 6 * math.sin(a0)),
+                           QPointF(fc.x() + 23 * math.cos(a1), fc.y() + 23 * math.sin(a1)))
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor("#2a1a20"))
+            p.drawEllipse(fc, 6, 6)
+        tx = card.left() + 12 + fans * 66
+        tw = card.right() - tx - 10
+        gpu = specs.gpus[0] if specs.gpus else None
+        self._tag(p, QRectF(tx, card.top() + 9, 34, 17), "GPU", "#FF3B57", _font(self.font(), 10, True))
+        self._label(p, gpu.name if gpu else "Not reported", QRectF(tx + 40, card.top() + 8, tw - 40, 19), "#f1f4f7", 12, True)
+        bar1 = QRectF(tx, card.top() + 38, tw - 56, 6)
+        self._bar(p, bar1, load, "#FF3B57")
+        self._label(p, "needs NVIDIA" if load is None else f"{round(load * 100)}% load", QRectF(bar1.right() + 6, card.top() + 32, 60, 17), "#ff9aa9", 11, True)
+        vram = None
+        if gpu_live is not None and gpu_live.mem_used_mb is not None and gpu_live.mem_total_mb:
+            vram = clamp(gpu_live.mem_used_mb / gpu_live.mem_total_mb)
+        bar2 = QRectF(tx, card.top() + 58, tw - 56, 6)
+        self._bar(p, bar2, vram, "#df83ec")
+        self._label(p, "" if vram is None else f"{gpu_live.mem_used_mb / 1024:.1f} GB", QRectF(bar2.right() + 6, card.top() + 52, 60, 17), "#e4aef0", 11, True)
+        temp = "" if gpu_live is None or gpu_live.temp_c is None else f"  ·  {round(gpu_live.temp_c)} °C"
+        driver = f"Driver {gpu.driver}" if gpu and gpu.driver else ""
+        self._label(p, driver + temp, QRectF(tx, card.top() + 72, tw, 17), "#8794a1", 11)
+        # ---- drives
+        drives = list(specs.drives)[:4]
+        y = card.bottom() + 12
+        row_h, row_gap = 38.0, 7.0
+        for drive in drives:
+            rect = QRectF(colc_x, y, colc_w, row_h)
+            p.setPen(QPen(bus_color, 2, Qt.SolidLine, Qt.RoundCap))
+            p.drawLine(QPointF(spine_x, rect.center().y()), QPointF(rect.left(), rect.center().y()))
+            hard = drive.kind == "hard drive"
+            tone = QColor("#DFAC46" if hard else "#42D4F2")
+            p.setPen(QPen(QColor(tone.red(), tone.green(), tone.blue(), 150), 1.2))
+            p.setBrush(QColor(9, 16, 22, 230))
+            p.drawRoundedRect(rect, 7, 7)
+            self._tag(p, QRectF(rect.left() + 8, rect.top() + 9, 38, 17), "HDD" if hard else ("SSD" if drive.fast else "DRV"),
+                      tone.name(), _font(self.font(), 10, True))
+            used = 1 - drive.free / drive.total if drive.total else 0
+            self._label(p, f"{drive.letter}: {drive.model or 'Drive'}", QRectF(rect.left() + 54, rect.top() + 3, rect.width() - 112, 17), "#e6edf2", 11, True)
+            self._bar(p, QRectF(rect.left() + 54, rect.top() + 24, rect.width() - 112, 6), used, tone.name())
+            self._label(p, f"{round(used * 100)}% full", QRectF(rect.right() - 54, rect.top() + 3, 48, 17), tone.name(), 11, True, Qt.AlignRight | Qt.AlignVCenter)
+            self._label(p, f"{human_size(drive.free)} free", QRectF(rect.right() - 62, rect.top() + 20, 56, 15), "#8794a1", 10, False, Qt.AlignRight | Qt.AlignVCenter)
+            y += row_h + row_gap
+        if len(specs.drives) > len(drives):
+            self._label(p, f"+ {len(specs.drives) - len(drives)} more drives", QRectF(colc_x, y - 4, colc_w, 16), "#8794a1", 11)
+        # ---- footer: board, display, system
+        p.setPen(QPen(QColor("#1b2a35"), 1))
+        p.drawLine(QPointF(14, h - 31), QPointF(w - 14, h - 31))
+        pieces = [("BOARD", specs.board), ("DISPLAY", specs.display), ("SYSTEM", specs.os_name)]
+        slot = (w - 28) / 3
+        for i, (name, value) in enumerate(pieces):
+            rect = QRectF(14 + i * slot, h - 28, slot - 8, 24)
+            self._label(p, name, QRectF(rect.left(), rect.top(), 52, 24), "#5b6e7c", 10, True)
+            self._label(p, value or "not reported", QRectF(rect.left() + 52, rect.top(), rect.width() - 52, 24), "#c3ced6" if value else "#6c7a86", 11)
+        p.setClipping(False)
+        p.setPen(QPen(QColor("#26343f"), 1))
+        p.setBrush(Qt.NoBrush)
+        p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 10, 10)

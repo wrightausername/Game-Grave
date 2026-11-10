@@ -166,6 +166,7 @@ def build(window):
                                               scene="undo", source=(915, 28, 365, 83), excluded=((1090, 0, 190, 40),))
     ui = page.hardware = Body(self, monitor)
     page.content.addWidget(ui.metrics)
+    page.content.addWidget(ui.rig)
     columns = row(spacing=10)
     columns.addWidget(ui.parts_panel, 5)
     columns.addWidget(ui.advice_panel, 6)
@@ -193,6 +194,7 @@ class Body(QObject):
             ("storage", "—", "Memory In Use", "#2bd971"), ("grid", "—", "Video Memory", "#d76ce6"),
             ("radio", "—", "GPU Temp", "#f8c82c"), ("storage", "—", "Drives Found", "#16baf1")], compact=True)
 
+        self.rig = hg.RigMap()
         self.parts_panel, parts = panel(kind="libraryPanel", padding=12, spacing=4)
         head = row(spacing=8)
         head.addWidget(label("Your PC", "sectionTitle"), 1)
@@ -327,6 +329,7 @@ class Body(QObject):
         _clear(self.parts_box)
         if specs is None:
             self.parts_when.setText("")
+            self.rig.set_specs(None, "Windows would not share the hardware list.")
             self.parts_box.addWidget(self._line(label(f"Windows would not share the hardware list: {error}", "readyDetail",
                                                       wrap=True)))
             return
@@ -361,6 +364,7 @@ class Body(QObject):
             self.parts_box.addLayout(_spec_row("DSP", specs.display, "", "green"))
         if specs.os_name:
             self.parts_box.addLayout(_spec_row("OS", specs.os_name, f"Version {specs.os_version}" if specs.os_version else "", "green"))
+        self.rig.set_specs(specs)
         self.show_advice()
         self.show_drives(specs)
         self.draw_metrics_static(specs)
@@ -455,6 +459,7 @@ class Body(QObject):
         self.draw_live(live)
 
     def draw_live(self, live):
+        self.rig.set_live(live)
         history = list(self.monitor.history)
         cpu = [r.cpu for r in history]
         gpu = [(r.gpu.load if r.gpu else None) for r in history]
