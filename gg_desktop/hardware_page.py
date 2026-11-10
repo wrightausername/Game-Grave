@@ -22,7 +22,8 @@ from gg_desktop.widgets import button, column, label, panel, row
 SUBTITLE = "Your PC's real parts and live load. Upgrade notes appear only when your own recorded sessions point to them."
 TONES = {"red": "#FF3B57", "green": "#35DC7C", "cyan": "#42D4F2", "amber": "#DFAC46", "muted": "#9AA4AC"}
 HISTORY = 48
-TICK_MS = 2000
+TICK_SECONDS = 2   # what the caption tells the person; tests may speed up TICK_MS but not this
+TICK_MS = TICK_SECONDS * 1000
 RECORD_CAP = 7200  # readings (4 hours); a longer recording is saved when it reaches this
 
 
@@ -116,9 +117,9 @@ class LiveChart(QWidget):
         super().__init__()
         self.color, self.scale_label = QColor(color), scale_label
         self.values = []
-        self.setMinimumHeight(86)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setFixedHeight(92)
+        self.setMinimumHeight(92)
+        self.setMaximumHeight(220)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def set_values(self, values):
         self.values = values
@@ -298,7 +299,7 @@ class Body(QObject):
         self.monitor_panel, mon = panel(kind="libraryPanel", padding=12, spacing=6)
         head = row(spacing=8)
         head.addWidget(label("Live Monitor", "sectionTitle"), 1)
-        head.addWidget(label(f"Last {HISTORY * TICK_MS // 1000} seconds, updated every {TICK_MS // 1000} seconds while "
+        head.addWidget(label(f"Last {HISTORY * TICK_SECONDS} seconds, updated every {TICK_SECONDS} seconds while "
                              "this tab is open", "caption"))
         mon.addLayout(head)
         charts = row(spacing=14)
@@ -313,7 +314,7 @@ class Body(QObject):
             top.addWidget(now)
             cell.addLayout(top)
             chart = LiveChart(color, empty)
-            chart.setAccessibleName(f"{title} load, last {HISTORY * TICK_MS // 1000} seconds")
+            chart.setAccessibleName(f"{title} load, last {HISTORY * TICK_SECONDS} seconds")
             cell.addWidget(chart)
             self.charts[key] = (chart, now)
             charts.addLayout(cell, 1)
