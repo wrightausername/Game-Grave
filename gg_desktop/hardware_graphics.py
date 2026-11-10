@@ -119,8 +119,9 @@ class RingGauge(QWidget):
 class AreaChart(QWidget):
     """The last readings as a smooth glowing line over a soft fill. Unreadable readings leave a gap, never a zero."""
 
-    def __init__(self, color, empty_text, history):
+    def __init__(self, color, empty_text, history, top_label="100%"):
         super().__init__()
+        self.top_label = top_label
         self.color = QColor(color)
         self.empty_text = empty_text
         self.history = history
@@ -161,7 +162,7 @@ class AreaChart(QWidget):
             p.drawLine(0, y, w, y)
         p.setPen(QColor("#4b5a66"))
         p.setFont(_font(self.font(), 9))
-        p.drawText(QRectF(5, 2, 40, 12), Qt.AlignLeft | Qt.AlignTop, "100%")
+        p.drawText(QRectF(5, 2, 40, 12), Qt.AlignLeft | Qt.AlignTop, self.top_label)
         p.drawText(QRectF(5, h - 14, 40, 12), Qt.AlignLeft | Qt.AlignBottom, "0")
         p.setPen(QPen(QColor("#26343f"), 1))
         p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 6, 6)
@@ -644,3 +645,154 @@ class RigMap(QWidget):
         p.setPen(QPen(QColor("#26343f"), 1))
         p.setBrush(Qt.NoBrush)
         p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 10, 10)
+
+
+# ---------------------------------------------------------------- recorded sessions
+class SessionPeaks(QWidget):
+    """The peaks of each recorded play session as grouped bars: processor, graphics, memory and video memory.
+
+    These are the same numbers the upgrade notes are built from, so the chart is the evidence behind the notes.
+    A reading the session could not take is left out, never drawn as zero.
+    """
+
+    SERIES = (("Processor", "#42D4F2"), ("Graphics", "#FF3B57"), ("Memory", "#35DC7C"), ("Video memory", "#df83ec"))
+
+    def __init__(self, sessions=()):
+        super().__init__()
+        self.sessions = list(sessions)[-8:]
+        self.setFixedHeight(196)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setAccessibleName(f"Peaks of {len(self.sessions)} recorded sessions")
+
+    def set_sessions(self, sessions):
+        self.sessions = list(sessions)[-8:]
+        self.setAccessibleName(f"Peaks of {len(self.sessions)} recorded sessions")
+        self.update()
+
+    @staticmethod
+    def values(session):
+        def share(part, whole):
+            return None if part is None or not whole else clamp(part / whole) * 100.0
+        return (session.cpu_peak, session.gpu_peak, share(session.ram_peak_gb, session.ram_total_gb),
+                share(session.vram_peak_mb, session.vram_total_mb))
+
+    def paintEvent(self, event):
+        import datetime
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        left, right, top, bottom = 34, 8, 8, 52
+        plot = QRectF(left, top, max(40, w - left - right), h - top - bottom)
+        p.setFont(_font(self.font(), 10))
+        for fraction in (0, .25, .5, .75, 1):
+            y = plot.bottom() - plot.height() * fraction
+            p.setPen(QPen(QColor("#15222c" if fraction not in (0, 1) else "#26343f"), 1, Qt.DashLine if fraction not in (0, 1) else Qt.SolidLine))
+            p.drawLine(QPointF(plot.left(), y), QPointF(plot.right(), y))
+            p.setPen(QColor("#5b6e7c"))
+            p.drawText(QRectF(0, y - 7, left - 6, 14), Qt.AlignRight | Qt.AlignVCenter, f"{round(fraction * 100)}%")
+        if not self.sessions:
+            p.setPen(QColor("#6c7a86"))
+            p.setFont(_font(self.font(), 12))
+            p.drawText(plot, Qt.AlignCenter, "Record a play session to see its peaks here")
+            return
+        count = len(self.sessions)
+        group_w = plot.width() / max(count, 4)
+        bar_w = max(4.0, min(16.0, (group_w - 14) / 4))
+        for index, session in enumerate(self.sessions):
+            gx = plot.left() + group_w * index + (group_w - bar_w * 4 - 3 * 2) / 2
+            for k, ((_name, color), value) in enumerate(zip(self.SERIES, self.values(session))):
+                if value is None:
+                    continue
+                x = gx + k * (bar_w + 2)
+                height = max(2.0, plot.height() * value / 100.0)
+                rect = QRectF(x, plot.bottom() - height, bar_w, height)
+                gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+                gradient.setColorAt(0, QColor(color))
+                gradient.setColorAt(1, QColor(color).darker(220))
+                p.setPen(Qt.NoPen)
+                p.setBrush(gradient)
+                p.drawRoundedRect(rect, 2, 2)
+            centre = plot.left() + group_w * index + group_w / 2
+            when = datetime.datetime.fromtimestamp(session.started).strftime("%b %d")
+            p.setPen(QColor("#9aa7b3"))
+            p.setFont(_font(self.font(), 10, True))
+            p.drawText(QRectF(centre - group_w / 2, plot.bottom() + 4, group_w, 14), Qt.AlignHCenter | Qt.AlignVCenter, when)
+            p.setPen(QColor("#5b6e7c"))
+            p.setFont(_font(self.font(), 10))
+            minutes = session.seconds // 60
+            p.drawText(QRectF(centre - group_w / 2, plot.bottom() + 18, group_w, 14), Qt.AlignHCenter | Qt.AlignVCenter,
+                       f"{minutes // 60} h {minutes % 60:02d}" if minutes >= 60 else f"{minutes} min")
+        x = plot.left()
+        for name, color in self.SERIES:
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(color))
+            p.drawRoundedRect(QRectF(x, h - 12, 9, 9), 2, 2)
+            p.setPen(QColor("#9aa7b3"))
+            p.setFont(_font(self.font(), 10))
+            width = 14 + len(name) * 6 + 14
+            p.drawText(QRectF(x + 14, h - 15, width, 14), Qt.AlignLeft | Qt.AlignVCenter, name)
+            x += width
+
+
+# ---------------------------------------------------------------- storage overview
+class StorageDonut(QWidget):
+    """All drives in one ring: each drive's used space is a coloured arc, free space is the empty track."""
+
+    COLORS = ("#42D4F2", "#DFAC46", "#df83ec", "#35DC7C", "#ff7a59", "#8fa8ff")
+
+    def __init__(self, drives=()):
+        super().__init__()
+        self.drives = list(drives)
+        self.setFixedHeight(112)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.setAccessibleName("All drives together")
+
+    def set_drives(self, drives):
+        self.drives = list(drives)
+        self.update()
+
+    def paintEvent(self, event):
+        total = sum(d.total for d in self.drives if d.total)
+        if not total:
+            return
+        used = sum(max(0, d.total - d.free) for d in self.drives if d.total)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        box = QRectF(8, 8, 96, 96)
+        p.setPen(QPen(TRACK, 11))
+        p.drawEllipse(box)
+        angle = 90 * 16
+        for index, d in enumerate(self.drives):
+            if not d.total:
+                continue
+            span = -int(360 * 16 * max(0, d.total - d.free) / total)
+            if span == 0:
+                continue
+            pen = QPen(QColor(self.COLORS[index % len(self.COLORS)]), 11)
+            pen.setCapStyle(Qt.FlatCap)
+            p.setPen(pen)
+            p.drawArc(box, angle, span)
+            angle += span
+        p.setPen(QColor("#f1f4f7"))
+        p.setFont(_font(self.font(), 18, bold=True))
+        p.drawText(QRectF(8, 34, 96, 26), Qt.AlignCenter, f"{round(100 * used / total)}%")
+        p.setPen(QColor("#8794a1"))
+        p.setFont(_font(self.font(), 10))
+        p.drawText(QRectF(8, 58, 96, 16), Qt.AlignCenter, "of all drives")
+        y = 18
+        for index, d in enumerate(self.drives[:5]):
+            color = QColor(self.COLORS[index % len(self.COLORS)])
+            p.setPen(Qt.NoPen)
+            p.setBrush(color)
+            p.drawRoundedRect(QRectF(120, y + 3, 10, 10), 3, 3)
+            p.setPen(QColor("#d7dfe7"))
+            p.setFont(_font(self.font(), 11, True))
+            p.drawText(QRectF(136, y, 30, 16), Qt.AlignVCenter | Qt.AlignLeft, f"{d.letter}:")
+            p.setPen(QColor("#9aa7b3"))
+            p.setFont(_font(self.font(), 11))
+            text = f"{human_size(max(0, d.total - d.free))} used of {human_size(d.total)}"
+            p.drawText(QRectF(160, y, max(10, self.width() - 164), 16), Qt.AlignVCenter | Qt.AlignLeft,
+                       QFontMetrics(p.font()).elidedText(text, Qt.ElideRight, max(10, self.width() - 164)))
+            y += 20

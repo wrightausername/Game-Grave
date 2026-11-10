@@ -171,6 +171,7 @@ def build(window):
     columns.addWidget(ui.parts_panel, 5)
     columns.addWidget(ui.advice_panel, 6)
     page.content.addLayout(columns)
+    page.content.addWidget(ui.peaks_panel)
     bottom = row(spacing=10)
     bottom.addWidget(ui.monitor_panel, 2)
     bottom.addWidget(ui.drives_panel, 1)
@@ -195,6 +196,13 @@ class Body(QObject):
             ("radio", "—", "GPU Temp", "#f8c82c"), ("storage", "—", "Drives Found", "#16baf1")], compact=True)
 
         self.rig = hg.RigMap()
+        self.peaks_panel, peaks = panel(kind="libraryPanel", padding=12, spacing=6)
+        peaks_head = row(spacing=8)
+        peaks_head.addWidget(label("Session Peaks", "sectionTitle"), 1)
+        peaks_head.addWidget(label("The highest reading of each recorded play session. The upgrade notes are built from these.", "caption"))
+        peaks.addLayout(peaks_head)
+        self.peaks = hg.SessionPeaks()
+        peaks.addWidget(self.peaks)
         self.parts_panel, parts = panel(kind="libraryPanel", padding=12, spacing=4)
         head = row(spacing=8)
         head.addWidget(label("Your PC", "sectionTitle"), 1)
@@ -255,12 +263,14 @@ class Body(QObject):
         self.gauges = {}
         for key, title, color, empty in (("cpu", "CPU", "#42D4F2", "Not readable"),
                                          ("gpu", "GPU", "#FF3B57", "Needs an NVIDIA card"),
-                                         ("mem", "MEMORY", "#35DC7C", "Not readable")):
+                                         ("mem", "MEMORY", "#35DC7C", "Not readable"),
+                                         ("vram", "VIDEO MEMORY", "#df83ec", "Needs an NVIDIA card"),
+                                         ("temp", "GPU TEMP", "#f8c82c", "Needs an NVIDIA card")):
             cell = column(spacing=2)
             now = label("—", "readyWhen")
             gauge = hg.RingGauge(color, title, 112)
             cell.addWidget(gauge, 0, Qt.AlignHCenter)
-            chart = hg.AreaChart(color, empty, HISTORY)
+            chart = hg.AreaChart(color, empty, HISTORY, "100 °C" if key == "temp" else "100%")
             chart.setAccessibleName(f"{title} load, last {HISTORY * TICK_SECONDS} seconds")
             cell.addWidget(chart)
             now.hide()   # the gauge above shows the same reading
@@ -273,6 +283,8 @@ class Body(QObject):
 
         self.drives_panel, drives = panel(kind="libraryPanel", padding=12, spacing=8)
         drives.addWidget(label("Drives", "sectionTitle"))
+        self.donut = hg.StorageDonut()
+        drives.addWidget(self.donut)
         self.drives_box = column(spacing=8)
         drives.addLayout(self.drives_box)
         drives.addStretch()
@@ -387,6 +399,7 @@ class Body(QObject):
         n = len(self.sessions)
         self.session_count.setText(f"{n} recorded session{'s' if n != 1 else ''}")
         self.clear_button.setVisible(n > 0)
+        self.peaks.set_sessions(self.sessions)
 
     def show_advice(self):
         for key, chip in self.chip_buttons.items():
@@ -465,7 +478,10 @@ class Body(QObject):
         gpu = [(r.gpu.load if r.gpu else None) for r in history]
         mem = [(100.0 * r.mem_used_gb / r.mem_total_gb if r.mem_used_gb is not None and r.mem_total_gb else None)
                for r in history]
-        for key, values in (("cpu", cpu), ("gpu", gpu), ("mem", mem)):
+        vram = [(100.0 * r.gpu.mem_used_mb / r.gpu.mem_total_mb
+                 if r.gpu and r.gpu.mem_used_mb is not None and r.gpu.mem_total_mb else None) for r in history]
+        temp = [(r.gpu.temp_c if r.gpu and r.gpu.temp_c is not None else None) for r in history]
+        for key, values in (("cpu", cpu), ("gpu", gpu), ("mem", mem), ("vram", vram), ("temp", temp)):
             chart, _now = self.charts[key]
             chart.set_values(values)
         g = live.gpu
@@ -476,6 +492,13 @@ class Body(QObject):
         self.gauges["cpu"].set_value(None if live.cpu is None else live.cpu / 100.0, percent(live.cpu), "in use")
         self.gauges["gpu"].set_value(None if not g or g.load is None else g.load / 100.0, percent(g.load if g else None),
                                      "in use" if g else "needs NVIDIA")
+        has_vram = bool(g and g.mem_used_mb is not None and g.mem_total_mb)
+        self.gauges["vram"].set_value(g.mem_used_mb / g.mem_total_mb if has_vram else None,
+                                      f"{g.mem_used_mb / 1024:.1f}" if has_vram else "—",
+                                      f"GB of {g.mem_total_mb / 1024:.0f}" if has_vram else "needs NVIDIA")
+        has_temp = bool(g and g.temp_c is not None)
+        self.gauges["temp"].set_value(g.temp_c / 100.0 if has_temp else None, f"{round(g.temp_c)}°" if has_temp else "—",
+                                      "celsius" if has_temp else "needs NVIDIA")
         self.gauges["mem"].set_value(mem_fraction, "—" if live.mem_used_gb is None else f"{live.mem_used_gb:.1f}",
                                      "GB of " + f"{live.mem_total_gb:.0f}" if live.mem_total_gb else "GB")
         values = self.metrics.values
@@ -491,6 +514,7 @@ class Body(QObject):
 
     # -------------------------------------------------------------- drives and spec sheet
     def show_drives(self, specs):
+        self.donut.set_drives(specs.drives)
         _clear(self.drives_box)
         if not specs.drives:
             self.drives_box.addWidget(label("Windows did not report any drives.", "readyDetail", wrap=True))
