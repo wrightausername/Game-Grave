@@ -661,6 +661,29 @@ def restore_kit(manifest_path: Path, parent: Path, *, approved: bool = False) ->
         raise
 
 
+# ------------------------------------------------------------------ Windows path length
+def long_paths_enabled() -> bool:
+    """Whether Windows is set to allow paths over 260 characters (a system setting only an administrator changes)."""
+    if os.name != "nt":
+        return True
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\FileSystem") as key:
+            return int(winreg.QueryValueEx(key, "LongPathsEnabled")[0]) == 1
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def path_limit() -> int | None:
+    """The longest full path this PC will accept, or None when there is no such limit."""
+    return None if long_paths_enabled() else 259
+
+
+def too_long(destinations, limit) -> int:
+    """How many of the destination paths are longer than `limit` characters."""
+    return 0 if not limit else sum(1 for path in destinations if len(str(path)) > limit)
+
+
 # ------------------------------------------------------------------ whole-installation restore
 def _folder_name(label) -> str:
     clean = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", str(label)).strip(" .")[:100]
@@ -802,6 +825,19 @@ def restore_installation(manifest_path: Path, library_parent: Path, *, approved:
             raise OSError("Not enough free space in this library for the whole kit.")
         with zipfile.ZipFile(archive_path) as archive:
             infos, _, _ = _scan_archive(archive, manifest["schema"])
+            limit = path_limit()
+            if limit:
+                # Fail before the first file instead of half-way through a 100 GB restore.
+                planned = []
+                for info in infos:
+                    parts = _valid_member(info, manifest["schema"])
+                    if parts[0] in where:
+                        planned.append(Path(where[parts[0]]["destination"]).joinpath(*parts[1:]))
+                over = too_long(planned, limit)
+                if over:
+                    raise ValueError(f"{over} file{'s' if over != 1 else ''} in this kit would land on a path longer than "
+                                     "the 260 characters Windows allows on this PC. Choose a library folder with a shorter "
+                                     "path, or turn on long paths in Windows, then restore again. Nothing was written.")
             for info in infos:
                 if cancel is not None and cancel():
                     raise InterruptedError("Restore was cancelled. Everything this restore wrote was removed.")

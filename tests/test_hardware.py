@@ -220,3 +220,31 @@ class Helpers(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WindowsGpuCounters(unittest.TestCase):
+    A = "luid_0x00000000_0x0000d2e5"
+    B = "luid_0x00000000_0x0000aaaa"
+
+    def test_load_is_the_sum_of_one_cards_3d_rows(self):
+        engine = [(f"pid_10_{self.A}_phys_0_eng_0_engtype_3D", 31.5), (f"pid_22_{self.A}_phys_0_eng_0_engtype_3D", 12.0),
+                  (f"pid_22_{self.A}_phys_0_eng_3_engtype_VideoDecode", 80.0), (f"pid_9_{self.B}_phys_0_eng_0_engtype_3D", 2.0)]
+        memory = [(f"{self.A}_phys_0", 3 * 1024 ** 3), (f"{self.B}_phys_0", 200 * 1024 ** 2)]
+        load, used = hw.combine_gpu_counters(engine, memory)
+        self.assertAlmostEqual(load, 43.5)
+        self.assertAlmostEqual(used, 3 * 1024)
+
+    def test_clamped_idle_and_unreadable(self):
+        self.assertEqual(hw.combine_gpu_counters([(f"pid_1_{self.A}_eng_0_engtype_3D", 250.0)], [])[0], 100.0)
+        self.assertEqual(hw.combine_gpu_counters([], []), (None, None))
+        self.assertEqual(hw.combine_gpu_counters([("junk", 5.0), (f"x_{self.A}_engtype_3D", float("nan"))], None), (None, None))
+        idle = hw.combine_gpu_counters([(f"p_{self.A}_engtype_3D", 0.0), (f"p_{self.B}_engtype_3D", 0.0)],
+                                       [(f"{self.A}_phys_0", 10 * 1024 ** 2), (f"{self.B}_phys_0", 900 * 1024 ** 2)])
+        self.assertEqual(idle[0], 0.0)
+        self.assertAlmostEqual(idle[1], 900.0, msg="With no load anywhere, the card holding the most memory is shown")
+
+    def test_reading_has_no_name_total_or_temperature(self):
+        live = hw.query_windows_gpu(lambda: (12.0, 512.0))
+        self.assertEqual((live.load, live.mem_used_mb, live.mem_total_mb, live.temp_c), (12.0, 512.0, None, None))
+        self.assertIsNone(hw.query_windows_gpu(lambda: None))
+        self.assertIsNone(hw.WindowsGpuCounters().read() if __import__("os").name != "nt" else None)

@@ -156,6 +156,40 @@ def main():
                 again.preview()
                 assert again.plan["blocked"] and not again.go.isEnabled()
                 again.close()
+            # ---- a kit that holds a Mod Organizer 2 profile and mods goes back into Mod Organizer 2
+            old_mo2 = root / "OldMO2"
+            (old_mo2 / "profiles" / "Default").mkdir(parents=True)
+            (old_mo2 / "profiles" / "Default" / "modlist.txt").write_text("+SkyUI\n", encoding="utf-8")
+            (old_mo2 / "mods" / "SkyUI").mkdir(parents=True)
+            (old_mo2 / "mods" / "SkyUI" / "SkyUI.esp").write_bytes(b"skyui")
+            mo2_kit = kits / "mo2.zip"
+            ui.engine.create_complete_kit(name, {"Profiles": old_mo2 / "profiles" / "Default", "Mods": old_mo2 / "mods"},
+                                          mo2_kit, {"kind": "MO2", "profile": "Default", "auto_discovered": True})
+            instance = local / "ModOrganizer" / "Skyrim SE"
+            (instance / "profiles").mkdir(parents=True)
+            (instance / "mods" / "Mine").mkdir(parents=True)
+            (instance / "ModOrganizer.ini").write_text(
+                "[General]\ngamePath=" + str(install) + "\ngameName=" + name + "\n[Settings]\nbase_directory=" + str(instance)
+                + "\nmod_directory=%BASE_DIR%/mods\nprofiles_directory=%BASE_DIR%/profiles\n", encoding="utf-8")
+            plain = ui.EasyRestore(window)
+            plain.set_manifest(str(made[0]) + ".ggkit.json")
+            assert not plain.holds_mo2(), "A kit without a Mod Organizer 2 profile does not offer the reconnect"
+            plain.close()
+            back = ui.EasyRestore(window)
+            back.show()
+            back.set_manifest(str(mo2_kit) + ".ggkit.json")
+            settle(60)
+            assert back.mo2_button.isVisible()
+            back.mo2_button.click()
+            wait_for(lambda: "new profile to Mod Organizer 2" in back.status.text() or "not changed" in back.status.text()
+                     or "stopped" in back.status.text(), "the Mod Organizer 2 reconnect")
+            assert "new profile to Mod Organizer 2" in back.status.text(), back.status.text()
+            assert (instance / "mods" / "SkyUI" / "SkyUI.esp").read_bytes() == b"skyui"
+            assert (instance / "profiles" / "Default_GameGrave" / "modlist.txt").read_text(encoding="utf-8") == "+SkyUI\n"
+            assert sorted(p.name for p in (instance / "mods").iterdir()) == ["Mine", "SkyUI"], "existing mods are left alone"
+            assert not window.cleaning and back.mo2_button.isEnabled()
+            assert back.grab().save(str(args.output / "kit-easy-mo2.png"))
+            back.close()
             # the originals were only read
             assert (install / "SkyrimSE.exe").read_bytes()[:2] == b"MZ"
             error.assert_not_called()

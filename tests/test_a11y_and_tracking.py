@@ -28,3 +28,13 @@ class Pacing(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GamesHeaderWords(unittest.TestCase):
+    def test_full_words_when_they_fit_else_a_whole_short_word(self):
+        from gg_desktop.games_fit import CAPTION_SHORT, TAB_SHORT, choose
+        self.assertEqual(choose("Total Games", "Games", 62, 70), "Total Games")
+        self.assertEqual(choose("Total Games", "Games", 62, 45), "Games")
+        self.assertEqual(choose("Ubisoft", "", 40, 10), "Ubisoft", "No short form: leave it alone")
+        for full, short in {**CAPTION_SHORT, **TAB_SHORT}.items():
+            self.assertLess(len(short), len(full))

@@ -600,13 +600,13 @@ class RigMap(QWidget):
         self._label(p, gpu.name if gpu else "Not reported", QRectF(tx + 40, card.top() + 8, tw - 40, 19), "#f1f4f7", 12, True)
         bar1 = QRectF(tx, card.top() + 38, tw - 56, 6)
         self._bar(p, bar1, load, "#FF3B57")
-        self._label(p, "needs NVIDIA" if load is None else f"{round(load * 100)}% load", QRectF(bar1.right() + 6, card.top() + 32, 60, 17), "#ff9aa9", 11, True)
+        self._label(p, "not readable" if load is None else f"{round(load * 100)}% load", QRectF(bar1.right() + 6, card.top() + 32, 60, 17), "#ff9aa9", 11, True)
         vram = None
         if gpu_live is not None and gpu_live.mem_used_mb is not None and gpu_live.mem_total_mb:
             vram = clamp(gpu_live.mem_used_mb / gpu_live.mem_total_mb)
         bar2 = QRectF(tx, card.top() + 58, tw - 56, 6)
         self._bar(p, bar2, vram, "#df83ec")
-        self._label(p, "" if vram is None else f"{gpu_live.mem_used_mb / 1024:.1f} GB", QRectF(bar2.right() + 6, card.top() + 52, 60, 17), "#e4aef0", 11, True)
+        self._label(p, "" if gpu_live is None or gpu_live.mem_used_mb is None else f"{gpu_live.mem_used_mb / 1024:.1f} GB", QRectF(bar2.right() + 6, card.top() + 52, 60, 17), "#e4aef0", 11, True)
         temp = "" if gpu_live is None or gpu_live.temp_c is None else f"  ·  {round(gpu_live.temp_c)} °C"
         driver = f"Driver {gpu.driver}" if gpu and gpu.driver else ""
         self._label(p, driver + temp, QRectF(tx, card.top() + 72, tw, 17), "#8794a1", 11)

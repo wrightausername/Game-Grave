@@ -289,3 +289,18 @@ class Polish(KitInstallTests):
 
     def test_empty_folder_names_from_a_manifest_are_checked(self):
         self.assertEqual(kit._clean_empty(["Data/Logs", "../Windows", "C:/x", 5, "", "a/../../b"]), ["Data/Logs"])
+
+    def test_paths_too_long_for_this_pc_stop_before_anything_is_written(self):
+        created = self.make()
+        env, library = self.new_pc()
+        before = sorted(str(p) for p in (self.root / "newpc").rglob("*"))
+        real = kit.path_limit
+        try:
+            kit.path_limit = lambda: len(str(library)) + 30      # pretend Windows allows very little here
+            with self.assertRaisesRegex(ValueError, "longer than"):
+                kit.restore_installation(Path(created["manifest"]), library, approved=True, environ=env)
+        finally:
+            kit.path_limit = real
+        self.assertEqual(sorted(str(p) for p in (self.root / "newpc").rglob("*")), before)
+        self.assertEqual(kit.too_long(["a" * 300, "b" * 10], 259), 1)
+        self.assertEqual(kit.too_long(["a" * 300], None), 0)

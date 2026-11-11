@@ -31,6 +31,17 @@ KIND_BY_EVENT = {
     "Scan canceled": "Scans", "Automation enabled": "Settings", "Automation disabled": "Settings",
     "Mod folder added": "Settings", "Mod folder removed": "Settings",
 }
+# Feature events written with short internal names: the words the row shows, its filter group, and where to undo it.
+FEATURE_EVENTS = {
+    "soulbind_apply": ("Soulbind changed game settings", "Settings",
+                       "Game Grave kept a backup of the file. To put it back: Ready Room, Soulbind, Undo."),
+    "soulbind_revert": ("Soulbind change undone", "Restored", "The settings file from before Soulbind was put back."),
+    "exhume_rollback": ("Graphics driver rolled back", "Other", "Done through Windows after you confirmed in Exhume."),
+    "kit_created": ("Resurrection Kit created", "Other", "A new ZIP and manifest were written. No game file was changed."),
+    "kit_restored": ("Resurrection Kit restored", "Other", "Files were restored into new places only. Nothing was overwritten."),
+    "squad_install": ("Squad Sync installed mods", "Other",
+                      "New, switched-off mod folders were added to Mod Organizer 2. Remove one there if you do not want it."),
+}
 STATE_STATUS = {
     "Restored": ("Restored", "blue"), "Available": ("Available", "green"), "Not checked": ("Not checked", "grey"),
     "Not found": ("Not found", "amber"), "Needs review": ("Needs review", "amber"),
@@ -137,6 +148,15 @@ def build_entries(records, events):
             continue  # the record row already shows this restore
         status, tone = status_for_event(kind, e.get("result"))
         shown = path or str(e.get("details", ""))
+        feature = FEATURE_EVENTS.get(kind)
+        if feature is not None:
+            details = str(e.get("details", ""))
+            entries.append(Entry("audit:" + str(index), feature[1], feature[0],
+                                 Path(path).name if path else details[:100], path, _size(e.get("size_bytes")),
+                                 str(e.get("date", "")), timestamp(e.get("date")), str(e.get("result", "Recorded")), status,
+                                 tone, (details + "\n" + feature[2]).strip(), None, str(e.get("source", "Activity log")),
+                                 str(e.get("session_id", ""))))
+            continue
         entries.append(Entry("audit:" + str(index), KIND_BY_EVENT.get(kind, "Other"), kind,
                              Path(path).name if path else shown[:100], path, _size(e.get("size_bytes")),
                              str(e.get("date", "")), timestamp(e.get("date")), str(e.get("result", "Recorded")), status,

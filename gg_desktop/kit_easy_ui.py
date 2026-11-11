@@ -80,7 +80,7 @@ class _Base(QDialog):
             return
         super().reject()
 
-    def run(self, work, done, *, title):
+    def run(self, work, done, *, title, cancellable=True):
         """Run `work(progress)` off the main thread. `progress(percent, text)` updates the strip."""
         window = self.window_
         self.cancel.clear()
@@ -88,8 +88,8 @@ class _Base(QDialog):
         window.cleaning = True
         self.bar.setValue(0)
         self.bar.show()
-        self.cancel_button.setEnabled(True)
-        self.cancel_button.show()
+        self.cancel_button.setEnabled(cancellable)
+        self.cancel_button.setVisible(cancellable)
 
         def finish(result):
             self.working = False
@@ -422,10 +422,102 @@ class EasyRestore(_Base):
         self.restored_folder = ""
         self.open_button = button("Open folder", lambda: self.restored_folder and _open_folder(self.restored_folder))
         self.open_button.hide()
+        self.mo2_button = button("Put mods back into Mod Organizer 2…", self.reconnect,
+                                 tip="For kits that hold a Mod Organizer 2 profile and its mods: adds the kit's mod folders "
+                                     "and one new profile to your Mod Organizer 2. Existing mods and profiles are never "
+                                     "changed. Close Mod Organizer 2 first.")
+        self.mo2_button.hide()
+        buttons.addWidget(self.mo2_button)
         buttons.addWidget(self.open_button)
         buttons.addWidget(self.go)
         buttons.addWidget(self.close_button)
         self.box.addLayout(buttons)
+
+    # ---- Mod Organizer 2
+    def holds_mo2(self) -> bool:
+        """The chosen kit carries a verified Mod Organizer 2 profile and its mods."""
+        try:
+            manifest, _ = engine._manifest_for(self.manifest)
+        except (ValueError, OSError, TypeError):
+            return False
+        roles = {r.get("name") for r in manifest.get("roles", []) if isinstance(r, dict)}
+        context = manifest.get("manager_context")
+        return {"Mods", "Profiles"} <= roles and isinstance(context, dict) and context.get("kind") == "MO2"
+
+    def find_mo2_ini(self):
+        """The ModOrganizer.ini to reconnect to: the instance made for this game when there is one, else you pick it."""
+        try:
+            manifest, _ = engine._manifest_for(self.manifest)
+            from gg_desktop import squad_core
+            found = squad_core.mo2_instance(str(manifest.get("game", "")), squad_core.default_roots())
+            if found and (found[0] / "ModOrganizer.ini").is_file():
+                return found[0] / "ModOrganizer.ini"
+        except (ValueError, OSError):
+            pass
+        chosen, _ = QFileDialog.getOpenFileName(self, "Choose your Mod Organizer 2 instance (ModOrganizer.ini)",
+                                                str(Path.home()), "Mod Organizer settings (ModOrganizer.ini);;All files (*)")
+        return Path(chosen) if chosen else None
+
+    def reconnect(self):
+        if self.manifest is None or self.working or _busy(self.window_):
+            return
+        ini = self.find_mo2_ini()
+        if ini is None:
+            return
+        import mo2_reconnect
+        manifest = self.manifest
+        inventory = self.window_.inventory
+        games, others = list(getattr(inventory, "steam", ())), list(getattr(inventory, "other", ()))
+        for control in (self.go, self.mo2_button, self.close_button):
+            control.setEnabled(False)
+
+        def unlock():
+            self.mo2_button.setEnabled(True)
+            self.close_button.setEnabled(True)
+            self.go.setEnabled(self.plan is not None and not self.plan["blocked"])
+
+        def check(progress):
+            progress(0, "Checking the kit and your Mod Organizer 2 folders. Nothing is written yet…")
+            return mo2_reconnect.preview_mo2_reconnect(manifest, ini, games, others)
+
+        def checked(plan, error):
+            if error:
+                unlock()
+                self.status.setText("Mod Organizer 2 was not changed: " + error.split(": ", 1)[-1][:260]
+                                    + " If the game was just restored, run Scan PC so Game Grave knows it is installed.")
+                return
+            names = ", ".join(plan["mods_to_add"][:6]) + ("…" if plan["mods_count"] > 6 else "")
+            if not self.window_.confirm(
+                    "Put these mods back into Mod Organizer 2?",
+                    f"{plan['game']}\n\n{plan['mods_count']} new mod folder{'s' if plan['mods_count'] != 1 else ''} in:\n"
+                    f"{plan['mod_root']}\n({names})\n\nOne new profile:\n{plan['profile_target']}\n\n"
+                    "No existing mod, profile or setting is changed or overwritten. Close Mod Organizer 2 first, "
+                    "then pick the new profile inside it."):
+                unlock()
+                self.status.setText("Mod Organizer 2 was not changed.")
+                return
+
+            def apply(progress):
+                progress(50, "Adding the mod folders and the new profile…")
+                return mo2_reconnect.reconnect_to_mo2(manifest, ini, games, others, approved=True,
+                                                      expected_fingerprint=plan["fingerprint"])
+
+            def applied(result, problem):
+                unlock()
+                if problem:
+                    self.status.setText("Mod Organizer 2 reconnect stopped: " + problem.split(": ", 1)[-1][:400])
+                    return
+                self.status.setText(f"Added {result['added_mod_folders']} mod folder"
+                                    f"{'s' if result['added_mod_folders'] != 1 else ''} and a new profile to Mod Organizer 2: "
+                                    f"{Path(result['profile']).name}. Open Mod Organizer 2 and pick that profile.")
+                try:
+                    from core import log_event
+                    log_event("kit_restored", f"Resurrection Kit mods reconnected to Mod Organizer 2: "
+                                              f"{result['added_mod_folders']} folders, profile {Path(result['profile']).name}")
+                except Exception:
+                    pass
+            self.run(apply, applied, title="Mod Organizer 2", cancellable=False)
+        self.run(check, checked, title="Mod Organizer 2", cancellable=False)
 
     def choose_kit(self):
         start = kits_folder() if kits_folder().exists() else Path.home()
@@ -436,6 +528,12 @@ class EasyRestore(_Base):
             self.kit_label.setText(str(self.manifest))
             self.preview()
 
+    def set_manifest(self, path):
+        """Choose a kit without the file dialog (used by the checks)."""
+        self.manifest = Path(path)
+        self.kit_label.setText(str(self.manifest))
+        self.preview()
+
     def browse(self):
         chosen = QFileDialog.getExistingDirectory(self, "Choose the library folder to restore into", self.library.currentText())
         if chosen:
@@ -444,6 +542,7 @@ class EasyRestore(_Base):
     def preview(self, *_):
         self.plan = None
         self.go.setEnabled(False)
+        self.mo2_button.setVisible(self.manifest is not None and self.holds_mo2())
         text = self.library.currentText().strip()
         if self.manifest is None or not text:
             self.preview_label.setText("")

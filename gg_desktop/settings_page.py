@@ -41,7 +41,7 @@ NAMES = {"start_minimized": "Start minimized", "scan_on_launch": "Scan when Game
          "files_stale_days": "Files idle after", "graveyard_days": "Graveyard age signal",
          "excluded_folders": "Excluded folders", "steam_artwork_downloads": "Steam artwork downloads",
          "autostart": "Launch with Windows", "assistant_enabled": "AI Assistant tab",
-         "check_updates_on_launch": "Check for updates on launch"}
+         "check_updates_on_launch": "Check for updates on launch", "soulbind_new_games": "Soulbind new games"}
 
 
 # ------------------------------------------------------------------ small widgets
@@ -341,6 +341,9 @@ def startup_panel(window):
                                "Adds the AI Assistant to the sidebar. It is local, read only and off until you turn it on."))
     body.addWidget(bool_switch(window, "check_updates_on_launch", "Check for updates on launch",
                                "Asks GitHub once when Game Grave starts. Nothing is downloaded or installed."))
+    body.addWidget(bool_switch(window, "soulbind_new_games", "Soulbind new games",
+                               "After a scan, applies your Soulbind preferences to newly installed games once "
+                               "their settings file exists. Backup first; undo in Ready Room."))
     body.addStretch()
     return box
 

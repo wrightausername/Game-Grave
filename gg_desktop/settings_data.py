@@ -28,6 +28,7 @@ OWNED = {
     "steam_artwork_downloads": True,
     "assistant_enabled": False,   # the AI Assistant tab is optional and starts switched off
     "check_updates_on_launch": False,   # one question to GitHub when the app starts; off until the owner turns it on
+    "soulbind_new_games": False,        # apply the Soulbind profile to newly installed games; off until switched on
 }
 LIBRARY_KEYS = ("steam_extra_roots", "other_library_roots", "mod_extra_roots", "screenshot_roots", "recording_roots")
 LIBRARY_NAMES = {"steam_extra_roots": "Steam libraries", "other_library_roots": "Other / Xbox libraries",
@@ -70,6 +71,7 @@ def current(settings):
         "steam_artwork_downloads": settings.get("steam_artwork_downloads", True) is not False,
         "assistant_enabled": settings.get("assistant_enabled") is True,
         "check_updates_on_launch": settings.get("check_updates_on_launch") is True,
+        "soulbind_new_games": settings.get("soulbind_new_games") is True,
     }
 
 

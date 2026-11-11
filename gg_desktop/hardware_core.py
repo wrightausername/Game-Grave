@@ -1,7 +1,9 @@
 """Hardware tab data: the parts Windows reports, live load, play sessions you record, and upgrade notes.
 
-Honest by design. Parts come from what Windows reports (CIM) and nothing else. Live graphics numbers come only from
-`nvidia-smi` when it is present; with any other card they are shown as not readable, never guessed. CPU temperature
+Honest by design. Parts come from what Windows reports (CIM) and nothing else. Live graphics numbers come from
+`nvidia-smi` when it is present. With any other card (AMD, Intel), graphics load and video memory in use come from
+Windows' own performance counters, the ones Task Manager shows; graphics temperature and the card's total video
+memory are then not readable and are shown that way, never guessed. CPU temperature
 is not offered because Windows does not report a trustworthy one. An upgrade note appears only when sessions that
 YOU recorded point at it, says what was measured, and says what it cannot tell you. No frame-rate promises, no
 prices, no "safe to upgrade" claims. Nothing here changes Windows or any file except its own sessions file.
@@ -18,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 MIN_SESSIONS = 3          # fewer recorded sessions than this is not evidence
@@ -220,7 +223,7 @@ class Live:
     cpu: float | None          # percent, None when not readable
     mem_used_gb: float | None
     mem_total_gb: float | None
-    gpu: GpuLive | None        # None unless nvidia-smi answered
+    gpu: GpuLive | None        # nvidia-smi, else Windows' GPU counters, else None
 
 
 def _number(value) -> float | None:
@@ -295,10 +298,145 @@ def _win_memory():
     return (status.total - status.avail) / GB, status.total / GB
 
 
+# ------------------------------------------------------------------ any card: Windows' own GPU counters
+_LUID = re.compile(r"luid_(0x[0-9a-f]+_0x[0-9a-f]+)")
+
+
+def combine_gpu_counters(engine_rows, memory_rows):
+    """(load percent or None, video memory in use in MB or None) from Windows' counter rows.
+
+    `engine_rows` are (instance name, percent) of "GPU Engine \\ Utilization Percentage": one row per process and
+    engine. Task Manager's figure for a card is the sum of its 3D engine rows, so that is what this returns, for the
+    busiest card. `memory_rows` are (instance name, bytes) of "GPU Adapter Memory \\ Dedicated Usage"."""
+    loads, memory = {}, {}
+    for name, value in engine_rows or ():
+        low = str(name).casefold()
+        found = _LUID.search(low)
+        if found and "engtype_3d" in low and isinstance(value, (int, float)) and value == value and value >= 0:
+            loads[found.group(1)] = loads.get(found.group(1), 0.0) + float(value)
+    for name, value in memory_rows or ():
+        found = _LUID.search(str(name).casefold())
+        if found and isinstance(value, (int, float)) and value == value and value >= 0:
+            memory[found.group(1)] = max(memory.get(found.group(1), 0.0), float(value))
+    card = None
+    if loads:
+        card = max(loads, key=lambda k: (round(loads[k], 1), memory.get(k, 0.0)))
+    elif memory:
+        card = max(memory, key=memory.get)
+    load = min(100.0, loads[card]) if card in loads else None
+    used = memory[card] / (1024 * 1024) if card in memory else None
+    return load, used
+
+
+class WindowsGpuCounters:
+    """Reads the two counters through Windows' PDH library. One query is kept open so each reading is cheap; no
+    program is started. Any failure simply means "not readable"."""
+
+    MORE_DATA = 0x800007D2
+    DOUBLE = 0x00000200
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._pdh = self._query = self._load = self._memory = None
+        self._dead = os.name != "nt"
+
+    def _open(self):
+        import ctypes
+        from ctypes import wintypes
+
+        class Value(ctypes.Union):
+            _fields_ = [("longValue", ctypes.c_long), ("doubleValue", ctypes.c_double), ("largeValue", ctypes.c_longlong),
+                        ("ansi", ctypes.c_char_p), ("wide", ctypes.c_wchar_p)]
+
+        class Counter(ctypes.Structure):
+            _fields_ = [("status", ctypes.c_ulong), ("value", Value)]
+
+        class Item(ctypes.Structure):
+            _fields_ = [("name", ctypes.c_wchar_p), ("counter", Counter)]
+
+        pdh = ctypes.WinDLL("pdh.dll")
+        handle = wintypes.HANDLE
+        pdh.PdhOpenQueryW.argtypes = [wintypes.LPCWSTR, ctypes.c_size_t, ctypes.POINTER(handle)]
+        pdh.PdhAddEnglishCounterW.argtypes = [handle, wintypes.LPCWSTR, ctypes.c_size_t, ctypes.POINTER(handle)]
+        pdh.PdhCollectQueryData.argtypes = [handle]
+        pdh.PdhGetFormattedCounterArrayW.argtypes = [handle, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
+                                                     ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+        pdh.PdhCloseQuery.argtypes = [handle]
+        for function in (pdh.PdhOpenQueryW, pdh.PdhAddEnglishCounterW, pdh.PdhCollectQueryData,
+                         pdh.PdhGetFormattedCounterArrayW, pdh.PdhCloseQuery):
+            function.restype = ctypes.c_ulong
+        query = handle()
+        if pdh.PdhOpenQueryW(None, 0, ctypes.byref(query)) != 0:
+            raise OSError("PDH query")
+        load, memory = handle(), handle()
+        got_load = pdh.PdhAddEnglishCounterW(query, r"\GPU Engine(*)\Utilization Percentage", 0, ctypes.byref(load)) == 0
+        got_memory = pdh.PdhAddEnglishCounterW(query, r"\GPU Adapter Memory(*)\Dedicated Usage", 0, ctypes.byref(memory)) == 0
+        if not (got_load or got_memory):
+            pdh.PdhCloseQuery(query)
+            raise OSError("no GPU counters")
+        pdh.PdhCollectQueryData(query)
+        self._pdh, self._query, self._item = pdh, query, Item
+        self._load, self._memory = (load if got_load else None), (memory if got_memory else None)
+
+    def _rows(self, counter):
+        import ctypes
+        from ctypes import wintypes
+        if counter is None:
+            return []
+        size, count = wintypes.DWORD(0), wintypes.DWORD(0)
+        status = self._pdh.PdhGetFormattedCounterArrayW(counter, self.DOUBLE, ctypes.byref(size), ctypes.byref(count), None)
+        if status != self.MORE_DATA or not 0 < size.value <= 16 * 1024 * 1024:
+            return []
+        buffer = ctypes.create_string_buffer(size.value)
+        if self._pdh.PdhGetFormattedCounterArrayW(counter, self.DOUBLE, ctypes.byref(size), ctypes.byref(count), buffer) != 0:
+            return []
+        items = ctypes.cast(buffer, ctypes.POINTER(self._item))
+        limit = min(count.value, size.value // ctypes.sizeof(self._item))
+        rows = []
+        for index in range(limit):
+            item = items[index]
+            if item.counter.status in (0, 1):          # valid data, new data
+                rows.append((item.name or "", item.counter.value.doubleValue))
+        return rows
+
+    def read(self):
+        """(load percent or None, MB in use or None), or None when Windows offers neither."""
+        if self._dead:
+            return None
+        with self._lock:
+            try:
+                if self._pdh is None:
+                    self._open()
+                    return None                         # a rate needs two collections; the next reading has it
+                self._pdh.PdhCollectQueryData(self._query)
+                load, used = combine_gpu_counters(self._rows(self._load), self._rows(self._memory))
+            except Exception:
+                self._dead = True
+                return None
+        return None if load is None and used is None else (load, used)
+
+
+_WINDOWS_GPU = WindowsGpuCounters()
+
+
+def query_windows_gpu(reader=None) -> GpuLive | None:
+    """Graphics load and video memory in use for any card, from Windows. No name, total or temperature: Windows'
+    counters do not carry them, so they stay unknown."""
+    found = (reader or _WINDOWS_GPU.read)()
+    if not found:
+        return None
+    return GpuLive("", found[0], found[1], None, None)
+
+
+def query_gpu() -> GpuLive | None:
+    """NVIDIA's own tool when it answers (it also gives total memory and temperature), else Windows' counters."""
+    return query_nvidia() or query_windows_gpu()
+
+
 class Sampler:
     """One reading at a time. The three sources are injectable so the logic runs anywhere without a real PC."""
 
-    def __init__(self, cpu_times=_win_cpu_times, memory=_win_memory, gpu=query_nvidia, clock=time.time):
+    def __init__(self, cpu_times=_win_cpu_times, memory=_win_memory, gpu=query_gpu, clock=time.time):
         self._cpu_times, self._memory, self._gpu, self._clock = cpu_times, memory, gpu, clock
         self._last = None
 

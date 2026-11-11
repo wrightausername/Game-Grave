@@ -1,6 +1,7 @@
 """The Squad Sync panel in Ready Room: read your real mod list, share it as a code, and see exactly what differs from a
 friend's code or from your own earlier snapshot. Display and confirmation only; every rule lives in squad_core.
-It cannot download or install mods. Steam Workshop items open in Steam, where you press Subscribe."""
+Steam Workshop items open in Steam, where you press Subscribe. With a Nexus Premium account it downloads the missing
+Nexus files and installs the plain zip ones into Mod Organizer 2 as new, switched-off mods (squad_install)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,6 +11,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QComboBox, QInputDialog, QLabel, QLineEdit, QWidget
 
 from gg_desktop import nexus_core as nx
+from gg_desktop import squad_install as installer
 from gg_desktop import squad_core as sq
 from gg_desktop.feature_strip import collapsible
 from gg_desktop.widgets import button, column, label, row
@@ -74,8 +76,9 @@ class SquadBody(QWidget):
                                       tip="Saves your mod list (not the mod files) so you can compare against it later.")
         left.addWidget(self.copy_button, 0, Qt.AlignLeft)
         left.addWidget(self.snapshot_button, 0, Qt.AlignLeft)
-        left.addWidget(label("Squad Sync cannot download or install mods. It shows what differs; Steam Workshop items "
-                             "open in Steam for you to subscribe, and anything else you get where your friend did.",
+        left.addWidget(label("Squad Sync shows what differs. Steam Workshop items open in Steam for you to subscribe. "
+                             "With Nexus Premium it downloads missing Nexus mods and installs the plain ones into Mod "
+                             "Organizer 2, switched off. Anything else you get where your friend did.",
                              "readyDetail", wrap=True))
         left.addStretch()
         columns.addLayout(left, 4)
@@ -94,8 +97,9 @@ class SquadBody(QWidget):
         right.addLayout(self.rows_box)
         fetch = row(spacing=14)
         self.open_button = button("Get what's missing", self.get_missing, kind="primary",
-                                  tip="Opens each missing Steam Workshop item in Steam and each missing Nexus mod's page. "
-                                      "With a Nexus Premium account signed in, it can download the Nexus files too.")
+                                  tip="One press: opens each missing Steam Workshop item in Steam, and with Nexus Premium "
+                                      "downloads the missing Nexus files and installs the plain zip ones into Mod Organizer 2 "
+                                      "as new, switched-off mods. Without Premium it opens each mod's page.")
         self.console_button = button("Use Steam's download command", self.steam_console, kind="actionLink",
                                      tip="Copies Steam's own workshop_download_item commands and opens Steam's console. "
                                          "Steam decides whether it allows this for the game.")
@@ -450,6 +454,14 @@ class SquadBody(QWidget):
         fallback = Path.home() / "Documents" / "Game Grave" / "Nexus Downloads"
         return nx.downloads_folder(found[0] if found else None, fallback)
 
+    def _mods_folder(self):
+        """The Mod Organizer 2 mods folder for the chosen game, or None when there is no instance to install into."""
+        found = sq.mo2_instance(self.games.currentText(), sq.default_roots())
+        if not found:
+            return None
+        folder = installer.mods_folder(found[0], found[1])
+        return folder if folder.is_dir() else None
+
     def _confirm_download(self, items) -> bool:
         folder = self._download_folder()
         return self.window_owner.confirm(
@@ -457,13 +469,19 @@ class SquadBody(QWidget):
             f"Game Grave will ask Nexus for the main file of {len(items)} mod{'s' if len(items) != 1 else ''} and save "
             f"{'them' if len(items) != 1 else 'it'} in:\n{folder}\n\n"
             "This needs a Nexus Premium account; on a free account Game Grave only opens the pages. Files are saved as "
-            "new files, nothing is overwritten and nothing is installed. Install them from Mod Organizer 2's Downloads tab.")
+            "new files and nothing is overwritten.\n\n"
+            + ("Plain zip mods are then installed into Mod Organizer 2 as NEW mods, switched off, under your friend's "
+               "mod names. Mods with an installer that asks questions, and 7z or rar files, wait in Mod Organizer 2's "
+               "Downloads tab for you. No existing mod, profile or load order is changed."
+               if self._mods_folder() is not None else
+               "No Mod Organizer 2 setup was found for this game, so nothing is installed."))
 
     def _download_from_nexus(self, items, key, skipped, notes):
         folder = self._download_folder()
+        mods = self._mods_folder()
 
         def work(_progress):
-            out = {"done": [], "failed": [], "free": False, "error": ""}
+            out = {"done": [], "failed": [], "free": False, "error": "", "installed": [], "waiting": []}
             try:
                 account = nx.validate(key)
             except nx.NexusError as problem:
@@ -479,6 +497,12 @@ class SquadBody(QWidget):
                     url = nx.download_url(item.nexus, choice.file_id, key)
                     path = nx.download(url, folder, choice.name, expected_kb=choice.size_kb)
                     out["done"].append((item.label, path.name))
+                    if mods is not None:
+                        try:
+                            installer.install(path, mods, item.label, item.nexus)
+                            out["installed"].append(item.label)
+                        except installer.InstallError as reason:
+                            out["waiting"].append((item.label, str(reason)))
                 except nx.NexusError as problem:
                     out["failed"].append((item.label, str(problem)))
             return out
@@ -499,8 +523,24 @@ class SquadBody(QWidget):
                                  f"{len(items)} Nexus page{'s' if len(items) != 1 else ''} in your browser instead.")
                 else:
                     if out["done"]:
-                        lines.append(f"Downloaded {len(out['done'])} file{'s' if len(out['done']) != 1 else ''} to {folder}. "
-                                     "Install them from Mod Organizer 2's Downloads tab.")
+                        lines.append(f"Downloaded {len(out['done'])} file{'s' if len(out['done']) != 1 else ''} to {folder}.")
+                    if out["installed"]:
+                        count = len(out["installed"])
+                        lines.append(f"Installed {count} as new mod{'s' if count != 1 else ''}, switched off: "
+                                     f"{', '.join(out['installed'][:5])}{'…' if count > 5 else ''}. In Mod Organizer 2 press F5, "
+                                     "then tick them.")
+                    if out["waiting"]:
+                        count = len(out["waiting"])
+                        lines.append(f"{count} wait{'s' if count == 1 else ''} in Mod Organizer 2's Downloads tab for you to install: "
+                                     + "; ".join(f"{name} ({why})" for name, why in out["waiting"][:4]) + ".")
+                    elif out["done"] and mods is None:
+                        lines.append("Install them from your mod manager.")
+                    if out["installed"]:
+                        try:
+                            from core import log_event
+                            log_event("squad_install", f"Squad Sync installed {len(out['installed'])} new mod folder(s) into Mod Organizer 2")
+                        except Exception:
+                            pass
                     for name, problem in out["failed"][:4]:
                         lines.append(f"{name}: {problem}")
                 if skipped > 0:

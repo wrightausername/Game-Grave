@@ -214,3 +214,23 @@ class Actions(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FeatureEvents(unittest.TestCase):
+    def test_soulbind_and_kit_events_read_in_plain_words(self):
+        events = [event("soulbind_apply", details="Skyrim: Field of view 80 to 95", path=r"C:\Games\Skyrim\Prefs.ini",
+                        result="applied", source="soulbind"),
+                  event("soulbind_revert", details="Skyrim: restored", result="restored"),
+                  event("kit_created", details="Resurrection Kit for Skyrim: 9 files, 1 GB")]
+        rows = {e.action: e for e in data.build_entries([], events)}
+        apply = rows["Soulbind changed game settings"]
+        self.assertEqual(apply.category, "Settings")
+        self.assertEqual(apply.name, "Prefs.ini")
+        self.assertIn("Field of view 80 to 95", apply.note)
+        self.assertIn("Ready Room, Soulbind, Undo", apply.note)
+        self.assertFalse(apply.restorable, "Undo Center itself restores only Recycle Bin records")
+        self.assertEqual(rows["Soulbind change undone"].category, "Restored")
+        self.assertEqual(rows["Resurrection Kit created"].category, "Other")
+        for words, category, _ in data.FEATURE_EVENTS.values():
+            self.assertIn(category, data.CATEGORIES)
+            self.assertNotIn("_", words)

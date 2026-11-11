@@ -41,6 +41,8 @@ class GamesScreens:
             ("Recently Played", "clock"), ("Not Installed", "archive"), ("Updates", "refresh"),
         ])
         contents.addWidget(self.game_tabs)
+        from gg_desktop import games_fit
+        games_fit.install(self.game_metrics, self.game_tabs)   # whole words at 1280 instead of cut ones
         searchbar = row(spacing=8)
         self.game_search = _search("Search your games…", "Search installed games")
         searchbar.addWidget(self.game_search, 1)
@@ -245,6 +247,9 @@ class GamesScreens:
                     if item.objectName() == "detailValue":
                         item.setProperty("gamesLiveField", field)
                         item.setToolTip(control.source_text(game, field))
+        for item in self.game_details.findChildren(QLabel):
+            if item.objectName() == "detailKey":
+                item.setFixedWidth(104)        # "Tracked Playtime" and "Install Location" in full
         actions = row(spacing=5)
         actions.addWidget(tile_action("Game DNA", "dna", lambda: self.page.games.show_dna(game)))
         actions.addWidget(tile_action("Mods", "mods", lambda: self.navigate("Mods")))
@@ -257,15 +262,20 @@ class GamesScreens:
         actions.addWidget(folder)
         for text, symbol, action in (("Verify Files…", "check", "validate"), ("Manage DLC…", "box", "details")):
             caption = text if game.launcher == "Steam" else ("Verify in launcher…" if action == "validate" else "DLC in launcher…")
-            quick = tile_action(caption, symbol, lambda _=False, action=action: self._steam_game_action(game, action))
+            quick = tile_action("Verify" if action == "validate" else "DLC", symbol,
+                                lambda _=False, action=action: self._steam_game_action(game, action))
+            quick.setAccessibleName(caption.rstrip("…"))
             quick.setProperty("gameNativeAction", action)
             quick.setEnabled(control.is_installed(game) or action == "details" and control.fact(game).get("owned", False))
-            quick.setToolTip("Open this game's " + game.launcher + " controls")
+            quick.setToolTip(("Verify files: opens " if action == "validate" else "Manage DLC: opens ") + game.launcher
+                             + ("'s file check for this game. " if action == "validate" else "'s page for this game's add-ons. ")
+                             + game.launcher + " does the work; Game Grave changes nothing.")
             actions.addWidget(quick)
-        uninstall = tile_action("Uninstall…" if game.launcher == "Steam" else "Uninstall in launcher…", "trash", lambda: self._steam_uninstall(game))
+        uninstall = tile_action("Uninstall", "trash", lambda: self._steam_uninstall(game))
+        uninstall.setAccessibleName("Uninstall" if game.launcher == "Steam" else "Uninstall in launcher")
         uninstall.setProperty("gameNativeAction", "uninstall")
         uninstall.setEnabled(control.is_installed(game) and "open_folder" in game.capabilities)
-        uninstall.setToolTip("Open this game's native uninstall controls")
+        uninstall.setToolTip("Opens " + game.launcher + "'s own uninstall for this game. Nothing is removed until you confirm there.")
         actions.addWidget(uninstall)
         contents.addWidget(_widget(actions))
         contents.addStretch()

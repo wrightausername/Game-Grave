@@ -84,13 +84,24 @@ FEATURES = (
         "soulbind", "Soulbind",
         ("soulbind",),
         "Soulbind lets you set your game preferences once and apply them to every game Game Grave can verify.",
-        (), "", "Ready Room, then Soulbind.", "Ready Room",
+        ("A preference counts for a game only when its exact key is found in that game's real settings file.",
+         "Apply keeps a dated backup of the file first, and Undo puts it back if the file has not changed since.",
+         "The Soulbind new games switch in Settings applies your preferences to newly installed games after a scan, "
+         "once their settings file exists. It is off until you turn it on."),
+        "It never touches a game it cannot verify and never runs while a game is running.",
+        "Ready Room, then Soulbind.", "Ready Room",
         "Set your game preferences once and apply them to every game Game Grave can verify."),
     Feature(
         "squad_sync", "Squad Sync",
         ("squad sync", "squadsync", "co-op mods", "coop mods"),
-        "Squad Sync reads your setup and lets you compare it with a friend's so a co-op group can match mods.",
-        (), "", "Ready Room, then Squad Sync.", "Ready Room",
+        "Squad Sync reads your mod setup, turns it into a code for friends, and shows what differs from a friend's "
+        "code so a co-op group can match mods.",
+        ("Get what's missing opens each missing Steam Workshop item in Steam, where you press Subscribe.",
+         "With a Nexus Premium account it downloads the missing Nexus files and installs the plain zip ones into Mod "
+         "Organizer 2 as new mods, switched off. Mods with an installer that asks questions, and 7z or rar files, "
+         "wait in Mod Organizer 2's Downloads tab."),
+        "It never overwrites a mod and never changes a profile or load order. You tick the new mods on yourself.",
+        "Ready Room, then Squad Sync.", "Ready Room",
         "Reads your mod setup so you can compare it with a friend's."),
     Feature(
         "undo_center", "Undo Center",

@@ -380,6 +380,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
                 f"{len(inventory.mods)} mod locations, {len(inventory.graveyard)} Graveyard findings."
                 + ("  •  Some sources unavailable." if inventory.warnings else ""))
             self.navigate(self.current_route)
+            from gg_desktop import soulbind_auto
+            soulbind_auto.after_scan(self)      # only acts when the owner switched it on in Settings
         self.job(lambda emitter: scan_inventory(settings, self.cancel.is_set, emitter),
                  finish, error_title="Local scan incomplete", progress=progress)
 

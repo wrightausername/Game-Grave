@@ -559,26 +559,32 @@ class Body(QObject):
         mem_fraction = (live.mem_used_gb / live.mem_total_gb if live.mem_used_gb is not None and live.mem_total_gb else None)
         self.gauges["cpu"].set_value(None if live.cpu is None else live.cpu / 100.0, percent(live.cpu), "in use")
         self.gauges["gpu"].set_value(None if not g or g.load is None else g.load / 100.0, percent(g.load if g else None),
-                                     "in use" if g else "needs NVIDIA")
+                                     "in use" if g and g.load is not None else "not readable")
         has_vram = bool(g and g.mem_used_mb is not None and g.mem_total_mb)
+        used_only = bool(g and g.mem_used_mb is not None and not g.mem_total_mb)   # Windows' counters: no total
         self.gauges["vram"].set_value(g.mem_used_mb / g.mem_total_mb if has_vram else None,
-                                      f"{g.mem_used_mb / 1024:.1f}" if has_vram else "—",
-                                      f"GB of {g.mem_total_mb / 1024:.0f}" if has_vram else "needs NVIDIA")
+                                      f"{g.mem_used_mb / 1024:.1f}" if has_vram or used_only else "—",
+                                      f"GB of {g.mem_total_mb / 1024:.0f}" if has_vram else
+                                      "GB in use" if used_only else "not readable")
         has_temp = bool(g and g.temp_c is not None)
         self.gauges["temp"].set_value(g.temp_c / 100.0 if has_temp else None, f"{round(g.temp_c)}°" if has_temp else "—",
-                                      "celsius" if has_temp else "needs NVIDIA")
+                                      "celsius" if has_temp else "NVIDIA only")
         self.gauges["mem"].set_value(mem_fraction, "—" if live.mem_used_gb is None else f"{live.mem_used_gb:.1f}",
                                      "GB of " + f"{live.mem_total_gb:.0f}" if live.mem_total_gb else "GB")
         values = self.metrics.values
         values[0].setText(percent(live.cpu))
         values[1].setText(percent(g.load if g else None))
         values[2].setText("—" if live.mem_used_gb is None else f"{live.mem_used_gb:.1f} of {live.mem_total_gb:.0f} GB")
-        values[3].setText("—" if not g or g.mem_used_mb is None or not g.mem_total_mb
-                          else f"{g.mem_used_mb / 1024:.1f} of {g.mem_total_mb / 1024:.0f} GB")
+        values[3].setText("—" if not g or g.mem_used_mb is None else
+                          f"{g.mem_used_mb / 1024:.1f} GB in use" if not g.mem_total_mb else
+                          f"{g.mem_used_mb / 1024:.1f} of {g.mem_total_mb / 1024:.0f} GB")
         values[4].setText("—" if not g or g.temp_c is None else f"{round(g.temp_c)} °C")
         self.monitor_note.setText(
-            "" if g else "Graphics load, video memory and graphics temperature can be read only from NVIDIA cards "
-                         "(through nvidia-smi). Windows does not report a trustworthy CPU temperature, so none is shown.")
+            "" if g and g.temp_c is not None else
+            "Graphics load and video memory in use come from Windows' own counters. Graphics temperature and the card's "
+            "total video memory can be read only from NVIDIA cards (through nvidia-smi)." if g else
+            "Windows did not report graphics load or video memory on this PC. Windows does not report a trustworthy "
+            "CPU temperature, so none is shown.")
 
     # -------------------------------------------------------------- drives and spec sheet
     def show_drives(self, specs):

@@ -181,7 +181,10 @@ def main():
             def fake_download(url, folder, name, **kw):
                 target = Path(folder) / name
                 Path(folder).mkdir(parents=True, exist_ok=True)
-                target.write_bytes(b"zip")
+                import zipfile
+                with zipfile.ZipFile(target, "w") as z:
+                    z.writestr("Extra Mod 1.0/Data/ExtraMod.esp", b"plugin")
+                    z.writestr("Extra Mod 1.0/Data/meshes/extra.nif", b"mesh")
                 return target
             with patch.object(window, "confirm", return_value=False):
                 body.open_button.click()
@@ -194,9 +197,16 @@ def main():
                  patch("gg_desktop.squad_ui.nx.download_url", return_value="https://x.nexus-cdn.com/a.zip"), \
                  patch("gg_desktop.squad_ui.nx.download", side_effect=fake_download):
                 body.open_button.click()
-                assert "nothing is overwritten and nothing is installed" in confirm.call_args[0][1]
+                assert "nothing is overwritten" in confirm.call_args[0][1] and "switched off" in confirm.call_args[0][1]
                 wait_for(lambda: "Downloaded 1 file" in live(window).fetch_note.text(), "the Nexus download")
+                note = live(window).fetch_note.text()
+                assert "Installed 1 as new mod, switched off" in note and "press F5" in note, note
             assert (mo2 / "downloads" / "Extra Mod.zip").is_file(), "saved into the Mod Organizer 2 downloads folder"
+            assert (mo2 / "mods" / "Extra Mod" / "ExtraMod.esp").read_bytes() == b"plugin", "installed as a new mod folder"
+            assert (mo2 / "mods" / "Extra Mod" / "meshes" / "extra.nif").is_file()
+            assert nx.read_meta(mo2 / "mods" / "Extra Mod" / "meta.ini") == "skyrimspecialedition/999"
+            assert (mo2 / "profiles" / "Co-op" / "modlist.txt").read_text(encoding="utf-8") == "+SkyUI\n-Off\n+USSEP\n", \
+                "the profile and load order are never touched"
             opened.clear()
 
             # A free account is told so and gets the page instead.

@@ -344,3 +344,34 @@ Bug pass (owner instruction, 2026-11-10, "do some passes ... fix any bugs you ca
   (older games order plugins by file time); kits without role details restore to the review folder; parts that overlap or are empty
   are flagged on the setup screen instead of failing at the end; the restore note no longer says the install was restored when the kit
   had none.
+
+Checklist pass (owner instruction, 2026-11-11, after viewing the finish checklist: "Skip number 2 for now and complete and polish the
+rest. Go"; number 2 was real-PC testing). Each item below names the tab it reopens; everything else in those tabs stays as locked.
+- More Tools / kits: kits record empty folders (names in the manifest, the ZIP still holds files only) and a restore recreates them;
+  GOG, Epic and Microsoft Store copies of Bethesda games use their own load-order folder; the kit menu shows the two everyday
+  actions with the rest behind "More kit tools"; a restore stops before writing when a path would be too long for this PC; the
+  restore screen offers "Put mods back into Mod Organizer 2" for kits that hold a verified MO2 profile and mods (`mo2_reconnect.py`,
+  unchanged: new mod folders and one new profile only, never an overwrite, MO2 must be closed).
+- Ready Room / Squad Sync (owner's original ask, "one-push download all and install"): with Nexus Premium, Get what's missing
+  downloads the missing Nexus files and `gg_desktop/squad_install.py` installs the plain zip ones into Mod Organizer 2 as NEW,
+  switched-off mod folders under the host's mod names, with a meta.ini. It never overwrites a mod and never edits a profile or load
+  order. FOMOD installers, 7z and rar archives and unknown layouts wait in MO2's Downloads tab with the reason. No outside program is
+  run. Switching the mods on and matching the host's order is still done in MO2; a profile copy for that needs the owner's approval.
+- Hardware: for cards without nvidia-smi (AMD, Intel), graphics load and video memory in use come from Windows' own performance
+  counters through PDH (`hardware_core.WindowsGpuCounters`), the figures Task Manager shows. Temperature and total video memory stay
+  NVIDIA-only and are shown as such. This replaces the earlier rule "graphics load and video memory only through nvidia-smi".
+- Games: at narrow widths the launcher strip and tab row swap a long caption for a whole short word (`gg_desktop/games_fit.py`) instead
+  of being cut; inspector labels are wider; the quick actions read Verify, DLC and Uninstall with specific tooltips.
+- Mods: the Gallery / List choice is remembered (`mods_library_view`).
+- Overview / Other Storage / Game DNA: every storage dial shows the cut-out GG mark.
+- Undo Center: Soulbind, kit, Exhume and Squad Sync events read in plain words with where to undo them (`undo_data.FEATURE_EVENTS`).
+  Undo Center itself still restores only Recycle Bin records.
+- Settings: "Check for updates on launch" is a real switch, off by default (one request at start, nothing downloaded, no pop-up);
+  "Soulbind new games" (off by default) applies the saved Soulbind profile after a scan to games that were not installed before, once
+  their settings file exists, with the usual backup and log (`gg_desktop/soulbind_auto.py`); the Appearance button opens More Tools.
+- AI Assistant: feature answers for Mod Bisect, Hardware, Check for Updates; Squad Sync and Soulbind answers updated.
+- Shell: screen-reader names are filled in for unnamed controls on every page (`gg_desktop/a11y.py`); the running-game check slows
+  down while a game runs or nothing has run for a while (`games_tracking.next_interval`), always under the 20-second playtime gap.
+- Not done, by design: code signing (needs a certificate), licensing, referrals and the command center (need a server), widening
+  Other Storage deletion and Undo Center custom restore (protected engines), Bisect writes for Vortex (its state is a database Game
+  Grave will not edit), accent colour and interface scale.
