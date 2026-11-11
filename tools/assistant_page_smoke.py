@@ -204,6 +204,8 @@ def main():
             w.switch.click()
             settle()
             assert window.settings.get("local_ai_enabled") is False
+            import shutil
+            shutil.rmtree(root / "AI")  # the stand-in model files this check made; the app itself wrote nothing
             # The only allowed "safe to remove" is the refusal itself and the user's own question.
             low = transcript(window).lower().replace("i can't tell you that something is safe to remove", "")
             low = low.replace("is it safe to remove", "")
