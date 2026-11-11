@@ -424,3 +424,8 @@ Polish pass (owner instruction, 2026-11-11, "continue polishing... make sure eve
 - Settings General: the two new switches made Startup & Behavior taller and cut off the Language & Region panel at 1280x790.
   Its three fixed rows are now one Language row plus a caption naming the fixed size unit and date format (same facts).
 - More Tools: the Startup Manager tile now opens Hardware > Drivers & Startup instead of a second, older startup list.
+- Shared page header (owner approval 2026-11-11, "Yes why not", for every tab): at narrow windows (about 1100 px) the
+  AI Assistant and Settings subtitles were squeezed onto two lines and ran into the title. `PageBanner`'s text column now takes
+  the free width instead of sharing it with an empty stretch, so the subtitle keeps its own 445 / 750 px cap at any width.
+  Wide windows look the same; Ready Room and Overview draw their own headers and are untouched. `tools/banner_art_smoke.py`
+  now checks at 1100, 1440 and 2400 px that every wrapped subtitle fits and never overlaps its title.

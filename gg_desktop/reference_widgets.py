@@ -350,8 +350,11 @@ class PageBanner(QWidget):
         if compact:
             sub.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         text.addWidget(sub)
+        self.subtitle = sub
+        self.title_label = heading
+        # The text column takes the free width so a narrow window never squeezes the subtitle below its own cap
+        # (it is capped at 445 or 750 px and left aligned, so wide windows look the same as before).
         layout.addLayout(text, 1)
-        layout.addStretch(0 if compact else 1)
 
     def paintEvent(self, event):
         p = QPainter(self)

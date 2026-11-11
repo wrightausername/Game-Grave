@@ -76,6 +76,13 @@ def main():
                         assert not marks, route + " heading still uses the slash instead of the menu symbol"
                         pictured = [w for w in heading.findChildren(QLabel) if w.pixmap() is not None and not w.pixmap().isNull()]
                         assert pictured, route + " heading shows no menu symbol"
+                        sub = getattr(heading, "subtitle", None)
+                        if sub is not None and sub.wordWrap():
+                            needed = sub.heightForWidth(sub.width())
+                            assert needed <= sub.height() + 2, f"{route} {width}px: subtitle needs {needed}px, has {sub.height()}px"
+                            title = getattr(heading, "title_label", None)
+                            if title is not None:
+                                assert title.geometry().bottom() <= sub.geometry().top() + 2, f"{route} {width}px: subtitle overlaps the title"
                     shot = window.grab().toImage()
                     left = window.top_bar.mapTo(window, QPoint()).x()
                     top = window.top_bar.mapTo(window, QPoint()).y()
