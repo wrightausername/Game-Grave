@@ -251,7 +251,7 @@ def main():
                        side_effect=lambda script, **kw: elevated.append(script) or
                        (json.dumps({"found": 1, "reboot": False, "results": [{"title": "NVIDIA", "code": 2}]})
                         if "UpdateInstaller" in script else "")):
-                pressed(window, "Drivers & Startup").click()
+                pressed(window, "Drivers && Startup").click()
                 tab = body(window).upkeep_tab
                 wait_for(lambda: tab.apps, "the startup list")
                 wait_for(lambda: tab.old_box.count() > 0, "the installed drivers")

@@ -194,6 +194,7 @@ class UpkeepTab(QWidget):
             box.toggled.connect(self.sync_install)
             self.update_checks[update.update_id] = box
             self.update_box.addWidget(box)
+        self.update_box.addStretch(1)
         self.install_button.show()
         self.sync_install()
 

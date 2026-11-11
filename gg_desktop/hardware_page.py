@@ -204,6 +204,7 @@ def build(window):
     ui = page.hardware = Body(self, monitor)
     ui.tabs = TabStrip([("Your PC", "chip"), ("Upgrade Advisor", "radio"), ("Drivers & Startup", "settings")],
                        selected=getattr(self, "hardware_tab", "Your PC"))
+    ui.tabs.buttons["Drivers & Startup"].setText("Drivers && Startup")   # a single & would become a keyboard hint
     ui.tabs.setMinimumWidth(560)
     ui.tabs.setMaximumWidth(780)
     page.content.addWidget(ui.metrics)
