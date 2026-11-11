@@ -142,7 +142,8 @@ FEATURES = (
         ("mods library", "mod radar", "mod conflicts", "conflicts tab"),
         "The Mods tab lists mod locations the scan found with the evidence for each. Cards that Game Grave flags "
         "offer Review or Details.",
-        (), "Game Grave never installs, enables, disables or changes mods.", "Mods in the sidebar.", "Mods",
+        (), "The Mods tab never installs, enables, disables or changes mods. The only installs are Squad Sync's: missing "
+        "plain zip mods from a friend's code, added to Mod Organizer 2 as new, switched-off mods.", "Mods in the sidebar.", "Mods",
         "Lists detected mod locations with the evidence behind each. Game Grave never changes mods."),
     Feature(
         "mod_bisect", "Mod Bisect",

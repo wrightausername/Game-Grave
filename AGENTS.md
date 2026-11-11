@@ -429,3 +429,21 @@ Polish pass (owner instruction, 2026-11-11, "continue polishing... make sure eve
   the free width instead of sharing it with an empty stretch, so the subtitle keeps its own 445 / 750 px cap at any width.
   Wide windows look the same; Ready Room and Overview draw their own headers and are untouched. `tools/banner_art_smoke.py`
   now checks at 1100, 1440 and 2400 px that every wrapped subtitle fits and never overlaps its title.
+
+AI Assistant answers (owner instruction, 2026-11-11, "and the ai assistant actually answers questions instead of giving me
+bullshit??"). AI Assistant is reopened for its answers only; layout and controls are unchanged. Tested against 60 everyday
+questions: before, about half were sent to the wrong topic or a generic "I can't answer that"; now none are.
+- New answers in `assistant_engine.py` (helpers in `assistant_more.py`): greetings and thanks, counts (games, mods, captures,
+  saves, history), "where to look to free space" (big games not played in 180+ days, then caches, old files and captures,
+  each with the tab that acts on it), saves for a game (only folders the save scanner labeled), moving a game (the launcher
+  does it; drives with room are listed), game updates (Patch Watch; launchers install them), mod conflicts (where the check
+  runs), performance and stutter (Autopsy, Hardware, Drivers & Startup, Exhume, Mod Bisect), verifying game files (launcher
+  verify), backups (Resurrection Kit, Save Vault), whether Game Grave installs mods, and exactly what Game Grave can change.
+- Game questions lead with the direct answer (last played, install drive, size). Short names find a game ("cyberpunk") only
+  when one title has that word; otherwise it does not guess.
+- Hardware questions (graphics card, processor, memory, Windows version, free space, "do I have room for a 100 GB game")
+  answer from what Windows reports to the Hardware tab. If the parts were not read yet, the assistant asks Windows once
+  through the same read-only call as Hardware's Re-read, then answers. "Can my PC run X" says plainly that Game Grave has no
+  system requirements and shows the parts to compare.
+- Rules unchanged: nothing is called safe to remove, sizes stay reported, every answer names its source and hands off to
+  the owning tab. Covered by `tests/test_assistant_answers.py` and the AI Assistant smoke.

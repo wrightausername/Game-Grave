@@ -150,7 +150,13 @@ def main():
             assert "Resurrection Kit:" in text and "single ZIP file" in text and "Open More Tools" in buttons(window), text
             assert text.count("I answer from what Game Grave has already scanned") == 0, "A feature question is answered, not deflected"
             ask(window, "tell me a joke")
-            assert "can't answer that from your scan data" in transcript(window)
+            assert "don't have an answer for that one yet" in transcript(window)
+            ask(window, "hi")
+            assert "Ask me anything about your games" in transcript(window)
+            ask(window, "how many games do I have")
+            assert "You have " in transcript(window) and " games across " in transcript(window), transcript(window)
+            ask(window, "which game should I uninstall")
+            assert "where the most space sits" in transcript(window) or "Nothing big stands out" in transcript(window)
             # The only allowed "safe to remove" is the refusal itself and the user's own question.
             low = transcript(window).lower().replace("i can't tell you that something is safe to remove", "")
             low = low.replace("is it safe to remove", "")

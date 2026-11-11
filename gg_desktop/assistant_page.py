@@ -155,7 +155,8 @@ def make_facts(window):
         records, events = get_records(), get_activity()
     except Exception:  # unreadable history must not stop the assistant; the history source simply stays empty
         records, events = [], []
-    state.facts = data.build_facts(window.inventory, records, events, enabled=state.enabled, scope=state.scope)
+    state.facts = data.build_facts(window.inventory, records, events, enabled=state.enabled, scope=state.scope,
+                                   hardware=getattr(window, "hardware_specs", None))
     return state.facts
 
 
@@ -517,6 +518,26 @@ def send(window, question=None):
         return
     facts = make_facts(window)
     result = engine.answer(text, facts)
+    if result.intent == "hardware_unread" and not getattr(window, "_assistant_parts_tried", False):
+        # Ask Windows for the parts once (read only, the same call as Hardware's Re-read), then answer again.
+        window._assistant_parts_tried = True  # once per run; Hardware's Re-read still works after a failure
+        window.status.setText("Asking Windows for your parts…")
+
+        def work(_progress):
+            from gg_desktop import hardware_core as hw
+            try:
+                return hw.read_specs()
+            except OSError:
+                return None
+
+        def arrived(specs):
+            if specs is not None:
+                window.hardware_specs = specs
+            if live(window):
+                window.assistant_input.setText(text)
+                send(window)
+        window.job(work, arrived, error_title="Could not read the hardware")
+        return
     chat = current_chat(window)
     if chat is None:
         chat = actions.new_chat(time.time())

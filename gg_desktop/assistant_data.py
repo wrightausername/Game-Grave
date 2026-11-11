@@ -33,6 +33,8 @@ class Facts:
     enabled: frozenset = frozenset(DEFAULT_ENABLED)
     now: float = 0.0
     scope: str = ""  # a game key, or "" for every game
+    saves: tuple = ()      # save folders the save scanner labeled (part of the storage scan)
+    hardware: object = None  # hardware_core.Specs once Windows has reported the parts, else None
 
     def on(self, key):
         return key in self.enabled
@@ -60,7 +62,7 @@ def with_sources(settings, keys):
     return dict(settings, **{SOURCE_KEY: ordered})
 
 
-def build_facts(inventory, records=(), events=(), *, enabled=None, now=None, scope=""):
+def build_facts(inventory, records=(), events=(), *, enabled=None, now=None, scope="", hardware=None):
     now = float(now if now is not None else datetime.now().timestamp())
     try:
         history = tuple(undo_data.build_entries(list(records), list(events)))
@@ -71,7 +73,8 @@ def build_facts(inventory, records=(), events=(), *, enabled=None, now=None, sco
         segments=tuple(overview_storage_segments(inventory)), captures=tuple(capture_items(inventory)),
         mods=tuple(inventory.mods), old_files=tuple(inventory.files), history=history,
         scanned_at=str(inventory.scanned_at or ""),
-        enabled=frozenset(DEFAULT_ENABLED if enabled is None else enabled), now=now, scope=scope or "")
+        enabled=frozenset(DEFAULT_ENABLED if enabled is None else enabled), now=now, scope=scope or "",
+        saves=tuple(getattr(inventory, "saves", None) or ()), hardware=hardware)
 
 
 def _launchers(games):
