@@ -261,7 +261,7 @@ def main():
                 live(window).open_button.click()
                 wait_for(lambda: "not Premium" in live(window).fetch_note.text(), "the free-account message")
             settle(1300)
-            assert "https://www.nexusmods.com/skyrimspecialedition/mods/999?tab=files" in opened, opened
+            assert "https://www.nexusmods.com/skyrimspecialedition/mods/1000?tab=files" in opened, opened
             live(window).nexus_button.click()
             assert nx.load_key() == "" and live(window).nexus_label.text() == "Nexus: not signed in"
 

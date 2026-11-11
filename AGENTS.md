@@ -389,3 +389,8 @@ code but wtf are you supposed to do with that"). Ready Room is reopened for the 
   off. It asks first, only reads your own profile, never overwrites, never deletes (you remove it in MO2), and says that plugin order
   is not part of a code. A profile that keeps its own saves is allowed and the result says the copy starts without them.
 - Still not built: 7z and rar installs (need an unpacking library in the build).
+- Squad Sync shows a missing Mod Organizer 2 mod whose folder is already installed as "Installed, switched off", leaves it out of
+  Get what's missing, and the Next line moves on to Make squad profile and then "pick the profile in Mod Organizer 2".
+- Settings / Appearance: "Interface scale" is a real choice (100% native, 110%, 125%, 150%). It sets Qt's scale factor before the
+  window is created, so the whole window grows evenly and no tab's layout changes; it is used at the next start and never overrides
+  a QT_SCALE_FACTOR the user set themselves. Accent colour stays fixed.
