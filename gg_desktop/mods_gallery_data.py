@@ -135,6 +135,10 @@ def health(facts) -> dict:
         "outdated": None,
         "conflicts": None,
     }
+    # The bar splits the mods that are ON. A flagged mod that is off stays in the "off" share, so it is counted here
+    # only when it is on, and once (a conflict outranks an update, as on the card).
+    out["on_conflict"] = sum(f.word == "On" and bool(f.conflicts) for f in mods)
+    out["on_outdated"] = sum(f.word == "On" and not f.conflicts and bool(f.outdated) for f in mods)
     if any(f.outdated is not None for f in mods):
         out["outdated"] = sum(bool(f.outdated) for f in mods)
     if any(f.conflicts is not None for f in mods):
@@ -148,8 +152,8 @@ def bar_parts(h: dict):
     total = on + off + rest
     if not total:
         return None
-    outdated = min(on, h["outdated"] or 0)
-    conflict = min(on - outdated, h["conflicts"] or 0)
+    outdated = min(on, h.get("on_outdated", h["outdated"] or 0))
+    conflict = min(on - outdated, h.get("on_conflict", h["conflicts"] or 0))
     parts = (on - outdated - conflict, outdated, conflict, off, rest)
     return tuple(p / total for p in parts)
 

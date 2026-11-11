@@ -142,3 +142,12 @@ class TileTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BarHonesty(unittest.TestCase):
+    def test_a_flagged_mod_that_is_off_does_not_shrink_the_on_share(self):
+        h = gd.health([facts("a", is_mod=True, word="On", outdated=False, conflicts=0),
+                       facts("b", is_mod=True, word="Off", outdated=True, conflicts=2)])
+        self.assertEqual(gd.bar_parts(h), (.5, 0.0, 0.0, .5, 0.0))
+        both = gd.health([facts("a", is_mod=True, word="On", outdated=True, conflicts=1)])
+        self.assertEqual(gd.bar_parts(both), (0.0, 0.0, 1.0, 0.0, 0.0))

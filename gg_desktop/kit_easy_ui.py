@@ -37,7 +37,12 @@ def _game_running(window) -> bool:
 
 
 def kits_folder() -> Path:
-    return Path.home() / "Documents" / "Game Grave Kits"
+    """Where kits go unless the owner picks another folder: the real Documents folder, or the home folder when
+    Documents is synced by OneDrive (a whole-game kit should not start uploading itself)."""
+    documents = engine.documents_dir()
+    if documents is None or "onedrive" in str(documents).casefold():
+        return Path.home() / "Game Grave Kits"
+    return documents / "Game Grave Kits"
 
 
 def _open_folder(path):
