@@ -374,9 +374,9 @@ def startup_panel(window):
 def language_panel(window):
     box, body = frame("settingsLanguage", "cyan", "Language & Region", "help")
     body.addWidget(line("Language", "", pill("English (US)")))
-    body.addWidget(line("Size units", "", pill("GB (1024)")))
-    body.addWidget(line("Date format", "", pill("YYYY-MM-DD")))
-    note = label("Fixed in this version, so every tab shows the same units and dates.", "caption", wrap=True)
+    note = label("Sizes in GB (1024), dates as YYYY-MM-DD. Fixed in this version, so every tab shows the same "
+                 "units and dates.", "caption", wrap=True)
+    note.setToolTip("Size units: GB (1024)\nDate format: YYYY-MM-DD")
     body.addWidget(note)
     body.addStretch()
     return box

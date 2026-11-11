@@ -54,7 +54,7 @@ CATEGORIES = (
         Tile("game_optimizer", "Game Optimizer", "play", RUN, "game_optimizer", "Turn on Game Mode, turn off background recording or switch the power plan. Undo restores your values."),
         Tile("shader_cache", "Shader Cache", "dna", GO, "Game DNA", "Opens Game DNA, which lists the shader caches Game Grave can prove belong to a game (by Steam app ID). Display only."),
         Tile("memory_optimizer", "Memory Optimizer", "storage", RUN, "memory_optimizer", "Choose open apps to close politely, largest memory first. Windows itself is never listed."),
-        Tile("startup_manager", "Startup Manager", "clock", RUN, "startup_manager", "Turn your startup programs off or on with the same switch Task Manager uses."))),
+        Tile("startup_manager", "Startup Manager", "clock", RUN, "startup_manager", "Opens Hardware, Drivers & Startup: every app that starts with Windows, with Task Manager's own on/off switch."))),
     Category("backup", "Backup and Recovery", "Back up and restore what matters most.", "purple", (
         Tile("game_backup", "Game Backup", "archive", RUN, "save_vault", "Back up a folder you choose into a verified Save Vault ZIP."),
         Tile("save_backup", "Save Backup", "shield", RUN, "save_vault", "Back up a save folder you choose into a verified Save Vault ZIP."),

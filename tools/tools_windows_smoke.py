@@ -139,19 +139,13 @@ def main():
             wait_for(lambda: logged and logged[-1][0] == "Memory Optimizer")
             snap(dialog, "tools-windows-memory.png")
 
-            # 4. Startup Manager: flips the approval switch, never deletes the entry.
-            dialog = open_tool("startup_manager")
-            assert dialog.table.count() == 1 and "On" in dialog.table.item(0).text()
-            dialog.table.item(0).setSelected(True)
-            dialog.disable_button.click()
-            assert reg.read(winpc.HKCU, winpc.APPROVED + "\\Run", "Discord")[0][0] == 3
-            assert reg.read(winpc.HKCU, winpc.RUN_KEY, "Discord") is not None
-            assert logged[-1][0] == "Startup Manager" and "Discord" in asked[-1][1]
-            assert "Off" in dialog.table.item(0).text()
-            dialog.table.item(0).setSelected(True)
-            dialog.enable_button.click()
-            assert reg.read(winpc.HKCU, winpc.APPROVED + "\\Run", "Discord")[0][0] == 2
-            snap(dialog, "tools-windows-startup.png")
+            # 4. Startup Manager now hands off to the one startup list: Hardware, Drivers & Startup.
+            with patch("gg_desktop.upkeep_core._powershell", return_value="[]"):
+                window.tools_tiles["startup_manager"].click()
+                wait_for(lambda: window.current_route == "Hardware")
+                assert window.hardware_tab == "Drivers & Startup" and window.page.hardware.upkeep_tab.isVisible()
+                window.navigate("More Tools")
+                wait_for(lambda: window.current_route == "More Tools")
 
             # 5. Command Runner: shows the exact line before running it, shows the output, logs it.
             dialog = open_tool("command_runner")

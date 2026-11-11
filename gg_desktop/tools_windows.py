@@ -589,6 +589,12 @@ def junction_manager(window):
     dialog.exec()
 
 
+def open_startup_tab(window):
+    """One place for startup apps: Hardware, Drivers & Startup (it also covers all-users apps, Store apps and sign-in tasks)."""
+    window.hardware_tab = "Drivers & Startup"
+    window.navigate("Hardware")
+
+
 HANDLERS = {"windows_cleanup": windows_cleanup, "game_optimizer": game_optimizer, "memory_optimizer": memory_optimizer,
-            "startup_manager": startup_manager, "command_runner": command_runner, "file_associations": file_associations,
+            "startup_manager": open_startup_tab, "command_runner": command_runner, "file_associations": file_associations,
             "junction_manager": junction_manager}

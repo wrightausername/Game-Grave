@@ -419,3 +419,8 @@ easily"). Placed as a third inner tab of Hardware, "Drivers & Startup" (`gg_desk
   switches, a scheduled task it creates and removes, the Store app list, the Windows Update driver search, and a real download and
   install through the same installer code (a driver when one is offered, else a small Windows Update item such as Defender
   definitions, which only proves the install path).
+
+Polish pass (owner instruction, 2026-11-11, "continue polishing... make sure everything works"). Fixes only:
+- Settings General: the two new switches made Startup & Behavior taller and cut off the Language & Region panel at 1280x790.
+  Its three fixed rows are now one Language row plus a caption naming the fixed size unit and date format (same facts).
+- More Tools: the Startup Manager tile now opens Hardware > Drivers & Startup instead of a second, older startup list.
