@@ -16,14 +16,18 @@ import re
 import shutil
 import stat
 
-from resurrection_v2 import ORIGIN_TOKENS, _ordinary_ancestry
+from resurrection_v2 import ORIGIN_TOKENS, _ordinary_ancestry, documents_dir
 
 # Load-order files that live outside the game folder. Only files that exist are offered.
 # game name (casefolded, no trademark signs) -> (Local AppData sub-folder, file names)
 LOAD_ORDER_FILES = {
     "the elder scrolls v: skyrim special edition": ("Skyrim Special Edition", ("plugins.txt", "loadorder.txt")),
     "the elder scrolls v: skyrim": ("Skyrim", ("plugins.txt", "loadorder.txt")),
+    "the elder scrolls v: skyrim vr": ("Skyrim VR", ("plugins.txt", "loadorder.txt")),
     "the elder scrolls iv: oblivion": ("Oblivion", ("plugins.txt",)),
+    "the elder scrolls iv: oblivion game of the year edition": ("Oblivion", ("plugins.txt",)),
+    "fallout 4 vr": ("Fallout4VR", ("plugins.txt", "loadorder.txt")),
+    "fallout 3 - game of the year edition": ("Fallout3", ("plugins.txt",)),
     "fallout 4": ("Fallout4", ("plugins.txt", "loadorder.txt")),
     "fallout 3": ("Fallout3", ("plugins.txt",)),
     "fallout: new vegas": ("FalloutNV", ("plugins.txt",)),
@@ -94,8 +98,9 @@ def templatize(path, environ=None) -> str | None:
     env = os.environ if environ is None else environ
     profile = env.get("USERPROFILE")
     roots = []
-    if profile:
-        roots.append(("%DOCUMENTS%", Path(profile) / "Documents"))
+    documents = documents_dir(environ)   # the real Documents folder, which OneDrive may have moved
+    if documents:
+        roots.append(("%DOCUMENTS%", documents))
     if env.get("LOCALAPPDATA"):
         roots.append(("%LOCALAPPDATA%", Path(env["LOCALAPPDATA"])))
     if env.get("APPDATA"):
@@ -246,6 +251,19 @@ def build_plan(game, *, saves=(), links=(), discovery=None, environ=None, measur
             f, b = measure_files(found_files)
             plan.parts.append(Part("LoadOrder", "Plugin load order", f"{', '.join(x.name for x in found_files)} from the game's Windows folder.",
                                    found_files, f, b, origin=templatize(folder, env)))
+    # Two parts can never hold the same folder (a settings folder that contains the saves folder, say). The engine
+    # refuses that, so say it here and keep the first one.
+    kept = []
+    for part in plan.parts:
+        if not part.files and not part.problem:
+            part.problem = "This folder has no files in it, so there is nothing to save."
+        folder = None if isinstance(part.source, (list, tuple)) else part.source
+        if folder is not None and not part.problem:
+            clash = next((other for other in kept if _overlaps(folder, other.source)), None)
+            if clash is not None:
+                part.problem = f"This folder overlaps the {clash.title} folder, so it can't be a separate part of the same kit."
+                continue
+            kept.append(part)
     if not any(p.role in ("Profiles", "LoadOrder") for p in plan.parts):
         plan.notes.append("No load-order file was found for this game. If you use a mod manager Game Grave can't read yet, the mods inside the install are still saved.")
     return plan

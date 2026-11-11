@@ -155,15 +155,28 @@ def _padded(text):
     return " " + re.sub(r"[^a-z0-9.' -]+", " ", text.casefold()) + " "
 
 
-def find_feature(question):
-    """The feature the question is about, or None. The longest matching phrase wins so 'save vault' beats 'save'."""
+def match(question):
+    """(feature, matched phrase) for the question, or (None, ""). The longest phrase wins so 'save vault' beats 'save'."""
     text = _padded(question)
-    best, length = None, 0
+    best, phrase = None, ""
     for feature in FEATURES:
         for word in feature.keywords:
-            if f" {word} " in text and len(word) > length:
-                best, length = feature, len(word)
-    return best
+            if f" {word} " in text and len(word) > len(phrase):
+                best, phrase = feature, word
+    return best, phrase
+
+
+def find_feature(question, game_name=""):
+    """The feature the question is about, or None. A phrase that is only there as part of the named game's title
+    ("Graveyard Keeper", "First Aid Kit Simulator") does not count."""
+    feature, phrase = match(question)
+    if feature is None:
+        return None
+    if game_name and f" {phrase} " in _padded(game_name):
+        without = _padded(question).replace(_padded(game_name).strip(), " ")
+        again, _ = match(without)
+        return again
+    return feature
 
 
 def explain(feature):

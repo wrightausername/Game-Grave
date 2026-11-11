@@ -333,3 +333,14 @@ pass unchanged).
 - Honest limits shown on screen: launcher accounts and licences are not part of a kit, so a launcher may sign in or re-verify the first
   time; a restored game is not promised to run, only restored. Nothing is called safe.
 - Covered by `tests/test_kit_install.py`, `tests/test_kit_easy.py` and `tools/kit_easy_smoke.py` on Windows CI.
+
+Bug pass (owner instruction, 2026-11-10, "do some passes ... fix any bugs you can find"). Fixes only; no layout or feature change.
+- Ready Room strips remember whether they were open for this run of the app (`feature_strip._REMEMBERED`), so the page rebuilding
+  itself for live news no longer snaps an open panel shut. Every panel still starts closed when Game Grave starts.
+- `app.Job` no longer raises when its window was closed while the job was still running.
+- AI Assistant: a game whose title contains a feature word (Graveyard Keeper) is answered as a game, not as the feature.
+- Kits: Documents is asked from Windows (OneDrive can move it) instead of assumed; the kit check and fingerprint steps show progress
+  and can be cancelled; restore refuses a blocked destination before the long check; restored files get their recorded time back
+  (older games order plugins by file time); kits without role details restore to the review folder; parts that overlap or are empty
+  are flagged on the setup screen instead of failing at the end; the restore note no longer says the install was restored when the kit
+  had none.

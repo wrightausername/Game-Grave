@@ -156,6 +156,7 @@ def main():
             window.navigate("Ready Room")
             settle()
             assert live(window).report is not None and live(window).report.game == "Cyberpunk 2077"
+            assert window.page.blackbox.strip_open, "A panel that was open stays open when Ready Room rebuilds itself"
             assert live(window).games.currentText() == "Cyberpunk 2077", "The dropdown follows the shown report"
             error.assert_not_called()
     print("Black Box smoke passed")

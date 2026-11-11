@@ -211,3 +211,63 @@ class KitInstallTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Polish(KitInstallTests):
+    def test_every_phase_reports_progress_and_checks_can_be_cancelled(self):
+        phases = []
+        created = self.make(progress=lambda phase, done, total, note: phases.append(phase))
+        for wanted in ("Copying", "Checking the ZIP", "Fingerprinting", "Done"):
+            self.assertIn(wanted, phases)
+        env, library = self.new_pc()
+        seen = []
+        kit.restore_installation(Path(created["manifest"]), library, approved=True, environ=env,
+                                 progress=lambda phase, *rest: seen.append(phase))
+        self.assertIn("Final check", seen)
+        big = self.root / "big"
+        big.mkdir()
+        (big / "blob.bin").write_bytes(os.urandom(3 * 2 ** 20))
+        made = kit.create_complete_kit("Big", {"Saves": big}, self.out / "big.zip")
+        import time
+        def slow_cancel():
+            time.sleep(.25)
+            return True
+        with self.assertRaises(InterruptedError):
+            kit.inspect_restore(Path(made["manifest"]), cancel=slow_cancel)
+
+    def test_kits_without_role_details_restore_to_the_review_folder(self):
+        created = self.make()
+        manifest_path = Path(created["manifest"])
+        data = json.loads(manifest_path.read_text())
+        data["roles"] = ["Game", "Saves"]          # an old shape: names only
+        manifest_path.write_text(json.dumps(data))
+        env, library = self.new_pc()
+        plan = kit.plan_installation(manifest_path, library, environ=env)
+        modes = {p["role"]: p["mode"] for p in plan["parts"]}
+        self.assertEqual(modes["Game"], "new_folder")
+        self.assertEqual(modes["Saves"], "review")
+
+    def test_note_is_honest_when_the_kit_has_no_install(self):
+        made = kit.create_complete_kit("S", {"Saves": self.saves}, self.out / "s.zip",
+                                       origins={"Saves": "%DOCUMENTS%" + chr(92) + "My Games" + chr(92) + "X"})
+        env, library = self.new_pc()
+        result = kit.restore_installation(Path(made["manifest"]), library, approved=True, environ=env)
+        self.assertIn("did not hold the game install", result["note"])
+
+    def test_documents_folder(self):
+        self.assertEqual(kit.documents_dir({"USERPROFILE": str(self.root)}), self.root / "Documents")
+        self.assertIsNone(kit.documents_dir({}))
+        if os.name == "nt":
+            real = kit.documents_dir()
+            self.assertTrue(real is not None and real.is_absolute())
+
+    def test_restored_files_keep_their_recorded_time(self):
+        old = 1_600_000_000
+        os.utime(self.game / "Data" / "SkyUI.esp", (old, old))
+        os.utime(self.game / "Data" / "Skyrim.esm", (old - 86400, old - 86400))
+        created = self.make()
+        env, library = self.new_pc()
+        kit.restore_installation(Path(created["manifest"]), library, approved=True, environ=env)
+        data = library / "Skyrim Special Edition" / "Data"
+        self.assertLess(abs((data / "SkyUI.esp").stat().st_mtime - old), 3)
+        self.assertLess((data / "Skyrim.esm").stat().st_mtime, (data / "SkyUI.esp").stat().st_mtime)

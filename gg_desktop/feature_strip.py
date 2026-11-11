@@ -11,6 +11,9 @@ from gg_desktop.widgets import button
 
 STRIP_HEIGHT = 50
 BIG = 16777215
+# Ready Room rebuilds itself when live news arrives. Without this a panel you had open would snap shut mid-use.
+# Kept for this run of the app only; every panel starts closed the next time Game Grave starts.
+_REMEMBERED = {}
 
 
 def collapsible(panel_cls, title, subtitle, glyph, *, open_height, open_text="Open", close_text="Hide",
@@ -24,6 +27,7 @@ def collapsible(panel_cls, title, subtitle, glyph, *, open_height, open_text="Op
 
     def set_open(opened: bool):
         panel.strip_open = bool(opened)
+        _REMEMBERED[title] = panel.strip_open
         panel.body.setVisible(panel.strip_open)
         toggle.setText(close_text if panel.strip_open else open_text)
         toggle.setAccessibleName(f"{toggle.text()} {title}")
@@ -38,5 +42,5 @@ def collapsible(panel_cls, title, subtitle, glyph, *, open_height, open_text="Op
 
     toggle.clicked.connect(lambda _=False: set_open(not panel.strip_open))
     panel.set_open = set_open
-    set_open(expanded)
+    set_open(_REMEMBERED.get(title, expanded))
     return panel

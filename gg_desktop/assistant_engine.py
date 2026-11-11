@@ -126,7 +126,8 @@ def classify(question, facts):
     words = set(text.split())
     if not words:
         return "help", None
-    if features.find_feature(question):
+    named = find_entity(facts, question)
+    if features.find_feature(question, named.name if named else ""):
         return "feature", None
     if _has(words, text, "help", "what can you", "what can i ask", "how do you work"):
         return "help", None
@@ -168,7 +169,8 @@ def classify(question, facts):
 def answer(question, facts):
     intent, game = classify(question, facts)
     if intent == "feature":
-        return _feature(question)
+        named = find_entity(facts, question)
+        return _feature(question, named.name if named else "")
     handler = {"help": _help, "safety": _safety, "unknown": _unknown}.get(intent)
     if handler:
         return handler()
@@ -185,9 +187,9 @@ def _unknown():
     return Answer("unknown", UNKNOWN_TEXT)
 
 
-def _feature(question):
+def _feature(question, game_name=""):
     """How one of Game Grave's own features works. Described from the code, not from scan data, so no source is used."""
-    feature = features.find_feature(question)
+    feature = features.find_feature(question, game_name)
     text = features.explain(feature)
     asked_safe = any(w in question.casefold() for w in ("safe", "safely", "delete", "remove"))
     note = SAFETY_TEXT if asked_safe else ""

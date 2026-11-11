@@ -121,6 +121,62 @@ def _sha256(file: Path) -> str:
     return digest.hexdigest()
 
 
+def _sha256_ticked(file: Path, tick) -> str:
+    """Same digest as _sha256, calling tick(bytes_read) so a long check can show progress or be cancelled."""
+    digest = hashlib.sha256()
+    with file.open("rb") as source:
+        for chunk in iter(lambda: source.read(2**20), b""):
+            digest.update(chunk)
+            tick(len(chunk))
+    return digest.hexdigest()
+
+
+def _ticker(progress, cancel, phase, total, message="The check was cancelled. Nothing was changed."):
+    """A tick(n) callable that reports at most five times a second and raises on cancel."""
+    import time as _time
+    state = {"done": 0, "last": 0.0}
+
+    def tick(amount):
+        state["done"] += amount
+        now = _time.monotonic()
+        if now - state["last"] > .2:
+            state["last"] = now
+            if cancel is not None and cancel():
+                raise InterruptedError(message)
+            if progress is not None:
+                progress(phase, min(state["done"], total), total, "")
+    return tick
+
+
+def documents_dir(environ=None):
+    """The real Documents folder. Windows can move it (OneDrive does), so ask Windows when no test environment is given."""
+    if environ is None and os.name == "nt":
+        try:
+            import ctypes
+            import uuid
+            from ctypes import wintypes
+
+            class _Guid(ctypes.Structure):
+                _fields_ = [("a", wintypes.DWORD), ("b", wintypes.WORD), ("c", wintypes.WORD), ("d", ctypes.c_ubyte * 8)]
+            known = uuid.UUID("FDD39AD0-238F-46AF-ADB4-6C85480369C7")
+            guid = _Guid(known.time_low, known.time_mid, known.time_hi_version, (ctypes.c_ubyte * 8)(*known.bytes[8:]))
+            found = ctypes.c_wchar_p()
+            call = ctypes.windll.shell32.SHGetKnownFolderPath
+            call.argtypes = [ctypes.POINTER(_Guid), wintypes.DWORD, wintypes.HANDLE, ctypes.POINTER(ctypes.c_wchar_p)]
+            call.restype = ctypes.c_long
+            if call(ctypes.byref(guid), 0, None, ctypes.byref(found)) == 0 and found.value:
+                value = found.value
+                free = ctypes.windll.ole32.CoTaskMemFree
+                free.argtypes = [ctypes.c_void_p]
+                free(ctypes.cast(found, ctypes.c_void_p))
+                if Path(value).is_absolute():
+                    return Path(value)
+        except Exception:
+            pass
+    env = os.environ if environ is None else environ
+    return Path(env["USERPROFILE"]) / "Documents" if env.get("USERPROFILE") else None
+
+
 def _valid_member(info: zipfile.ZipInfo, schema: int) -> tuple[str, ...]:
     # ZIP directory or symlink records are not needed for regular-file backups.
     if info.is_dir():
@@ -163,21 +219,32 @@ def _scan_archive(archive: zipfile.ZipFile, schema: int):
                                  for parts in [_valid_member(info, schema)]})
 
 
-def inspect_restore(manifest_path: Path, parent: Path | None = None) -> dict:
+def inspect_restore(manifest_path: Path, parent: Path | None = None, *, progress=None, cancel=None) -> dict:
     """Read-only full checksum+CRC validation and safe restore preview."""
     manifest, archive_path = _manifest_for(manifest_path)
-    if _sha256(archive_path).lower() != manifest["archive_sha256"].lower():
+    watched = progress is not None or cancel is not None
+    if watched:
+        size = archive_path.stat().st_size
+        digest = _sha256_ticked(archive_path, _ticker(progress, cancel, "Checking the kit (1 of 2)", size))
+    else:
+        digest = _sha256(archive_path)
+    if digest.lower() != manifest["archive_sha256"].lower():
         raise ValueError("Backup checksum mismatch. Restore was not attempted.")
     try:
         with zipfile.ZipFile(archive_path, "r") as archive:
             infos, total, roles = _scan_archive(archive, manifest["schema"])
             if len(infos) != manifest.get("files"):
                 raise ValueError("Backup file count differs from its manifest.")
+            tick = _ticker(progress, cancel, "Checking the kit (2 of 2)", total) if watched else None
             for info in infos:
                 # ZIP CRC validation streams data through bounded chunks.
                 with archive.open(info) as source:
-                    while source.read(1024 * 1024):
-                        pass
+                    while True:
+                        chunk = source.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        if tick is not None:
+                            tick(len(chunk))
     except (zipfile.BadZipFile, EOFError, RuntimeError) as exc:
         raise ValueError("Backup failed ZIP integrity verification.") from exc
     outcome = {
@@ -318,9 +385,10 @@ def expand_origin(origin, environ=None):
         return None
     env = os.environ if environ is None else environ
     token, _, rest = origin.partition("\\")
+    documents = documents_dir(environ)
     base = {"%LOCALAPPDATA%": env.get("LOCALAPPDATA"), "%APPDATA%": env.get("APPDATA"),
             "%USERPROFILE%": env.get("USERPROFILE"),
-            "%DOCUMENTS%": (str(Path(env["USERPROFILE"]) / "Documents") if env.get("USERPROFILE") else None)}.get(token)
+            "%DOCUMENTS%": str(documents) if documents else None}.get(token)
     if not base:
         return None
     path = Path(base)
@@ -452,15 +520,27 @@ def create_complete_kit(game: str, sources: dict, destination: Path,
                     if not _ordinary_ancestry(path) or path.stat().st_mtime_ns != modified:
                         raise RuntimeError(f"Source or parent changed during backup: {path.name}")
         check_cancel()
-        report("Checking the ZIP", total, total, "")
+        report("Checking the ZIP", 0, total, "")
+        cancelled = "Kit creation was cancelled. Nothing was kept."
         with zipfile.ZipFile(partial) as archive:
             infos, actual_total, roles = _scan_archive(archive, 2)
             if len(infos) != count or actual_total != total or len(roles) != len(captured):
                 raise RuntimeError("Kit content count and size verification failed.")
-            if archive.testzip() is not None:
-                raise RuntimeError("Kit failed ZIP CRC verification.")
+            tick = _ticker(progress, cancel, "Checking the ZIP", total, cancelled)
+            try:
+                for info in infos:
+                    with archive.open(info) as member:
+                        while True:
+                            chunk = member.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            tick(len(chunk))
+            except (zipfile.BadZipFile, EOFError) as exc:
+                raise RuntimeError("Kit failed ZIP CRC verification.") from exc
         check_cancel()
-        report("Fingerprinting", total, total, "")
+        packed = partial.stat().st_size
+        report("Fingerprinting", 0, packed, "")
+        fingerprint = _sha256_ticked(partial, _ticker(progress, cancel, "Fingerprinting", packed, cancelled))
         entries_out = []
         for role, (root, entries) in captured.items():
             item = {"name": role, "folder_label": labels[role], "files": len(entries)}
@@ -469,7 +549,7 @@ def create_complete_kit(game: str, sources: dict, destination: Path,
             entries_out.append(item)
         manifest = {
             "schema": 2, "game": game.strip(),
-            "archive": destination.name, "archive_sha256": _sha256(partial),
+            "archive": destination.name, "archive_sha256": fingerprint,
             "files": count, "source_bytes": total, "roles": entries_out,
             "includes_game_install": "Game" in captured,
             "automatic_game_repair": False,
@@ -583,7 +663,17 @@ def plan_installation(manifest_path: Path, library_parent: Path, *, place_back: 
     if not _ordinary_ancestry(parent, directory=True):
         raise ValueError("Choose a library folder without linked or redirected folders.")
     game = str(manifest.get("game", "Unknown game"))[:120]
-    metas = {r.get("name"): r for r in manifest.get("roles", []) if isinstance(r, dict)}
+    listed = manifest.get("roles", [])
+    metas = {r.get("name"): r for r in (listed if isinstance(listed, list) else []) if isinstance(r, dict)}
+    if not metas:
+        # Kits made before roles were recorded: read the ZIP's own list. They carry no original places, so every
+        # part goes to the review folder.
+        try:
+            with zipfile.ZipFile(archive_path) as archive:
+                _, _, found = _scan_archive(archive, manifest["schema"])
+        except (zipfile.BadZipFile, EOFError, OSError) as exc:
+            raise ValueError("The kit ZIP could not be read.") from exc
+        metas = {role: {"name": role} for role in found}
     review = parent / (_safe_label(game) + "_Restored")
     parts, uses_review = [], False
     for role in sorted(metas, key=lambda r: ("Game", "Launcher", "Saves", "Configs", "LoadOrder", "Profiles", "Mods").index(r)
@@ -640,10 +730,11 @@ def restore_installation(manifest_path: Path, library_parent: Path, *, approved:
     import time as _time
     if approved is not True:
         raise PermissionError("Explicit user approval is required to restore a kit.")
-    verified = inspect_restore(manifest_path)            # full SHA-256 and CRC check before anything is written
+    # Cheap refusals first, then the full SHA-256 and CRC check, all before anything is written.
     plan = plan_installation(manifest_path, library_parent, place_back=place_back, environ=environ)
     if plan["blocked"]:
         raise FileExistsError(plan["blocked"][0])
+    verified = inspect_restore(manifest_path, progress=progress, cancel=cancel)
     manifest, archive_path = _manifest_for(manifest_path)
     if (manifest["archive_sha256"].lower() != verified["archive_sha256"] or str(archive_path) != verified["archive"]):
         raise ValueError("Kit manifest or archive changed since approval preview.")
@@ -710,9 +801,19 @@ def restore_installation(manifest_path: Path, library_parent: Path, *, approved:
                             report("Restoring", done, total, destination.name)
                 if (not _ordinary_ancestry(destination) or destination.stat().st_size != info.file_size):
                     raise RuntimeError("Restore file verification failed.")
+                # Give the file back its recorded time. Older games order plugins by file time, and launchers
+                # compare it when they check an install.
+                try:
+                    stamp = _time.mktime(tuple(info.date_time) + (0, 0, -1))
+                    os.utime(destination, (stamp, stamp))
+                except (OverflowError, OSError, ValueError):
+                    pass
                 placed[parts[0]] = placed.get(parts[0], 0) + 1
-        report("Checking", total, total, "")
-        if _sha256(archive_path).lower() != verified["archive_sha256"]:
+        packed = archive_path.stat().st_size
+        report("Final check", 0, packed, "")
+        final = _sha256_ticked(archive_path, _ticker(progress, cancel, "Final check", packed,
+                                                     "Restore was cancelled. Everything this restore wrote was removed."))
+        if final.lower() != verified["archive_sha256"]:
             raise ValueError("Resurrection Kit archive changed during restore; extracted files discarded.")
         report("Done", total, total, "")
         return {"restored": True, "no_overwrite": True, "game": plan["game"], "files": len(created_files),
@@ -721,7 +822,9 @@ def restore_installation(manifest_path: Path, library_parent: Path, *, approved:
                 "game_folder": where.get("Game", {}).get("destination", ""),
                 "review_folder": plan["review_folder"],
                 "note": ("The whole install was restored. Open your launcher (or the game's own exe) to start it. "
-                         "Launcher accounts and licences are not part of a kit, so a launcher may sign in or re-verify first.")}
+                         "Launcher accounts and licences are not part of a kit, so a launcher may sign in or re-verify first."
+                         if "Game" in placed else
+                         "This kit did not hold the game install, so only the parts listed were restored.")}
     except BaseException:
         for file in reversed(created_files):
             if _regular(file):

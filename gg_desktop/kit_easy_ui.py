@@ -131,7 +131,8 @@ class EasySetup(_Base):
         super().__init__(window, "Set up a Resurrection Kit")
         self.plan = None
         self.checks = {}
-        self.games = [g for g in window.inventory.games if getattr(g, "install_path", "")]
+        self.games = sorted((g for g in window.inventory.games if getattr(g, "install_path", "")),
+                            key=lambda g: g.name.casefold())
         self.box.addWidget(label("Set up a Resurrection Kit", "sectionTitle"))
         self.box.addWidget(label(
             "Pick a game. Game Grave finds its install, saves, load order and mod manager and saves them into one verified ZIP, so "
@@ -167,7 +168,8 @@ class EasySetup(_Base):
         self.folder.setAccessibleName("Folder for the kit")
         self.folder.textChanged.connect(self.refresh_summary)
         where.addWidget(self.folder, 1)
-        where.addWidget(button("Browse…", self.browse))
+        self.browse_button = button("Browse…", self.browse)
+        where.addWidget(self.browse_button)
         self.box.addLayout(where)
         self.summary = label("", "subtle", wrap=True)
         self.box.addWidget(self.summary)
@@ -180,6 +182,10 @@ class EasySetup(_Base):
         self.create_button = button("Create kit", self.create, kind="primary",
                                     tip="Writes one new ZIP and a small manifest file. Your game files are only read.")
         self.close_button = button("Close", self.reject)
+        self.made_folder = None
+        self.open_button = button("Open folder", lambda: self.made_folder and _open_folder(self.made_folder))
+        self.open_button.hide()
+        buttons.addWidget(self.open_button)
         buttons.addWidget(self.create_button)
         buttons.addWidget(self.close_button)
         self.box.addLayout(buttons)
@@ -205,6 +211,8 @@ class EasySetup(_Base):
         window = self.window_
         self.clear_parts()
         self.plan = None
+        self.create_button.show()
+        self.open_button.hide()
         self.create_button.setEnabled(False)
         self.status.setText("Looking at this game's install, saves and mods…")
         self.summary.setText("")
@@ -261,6 +269,7 @@ class EasySetup(_Base):
             self.parts_box.addWidget(box)
             self.parts_box.addWidget(label(part.problem or part.why, "caption", wrap=True))
             self.checks[part.role] = box
+        self.parts_box.addStretch(1)
         self.notes.setText(" ".join(self.plan.notes))
         self.refresh_summary()
 
@@ -310,16 +319,18 @@ class EasySetup(_Base):
             self.status.setText("Could not create the folder: " + str(exc)[:160])
             return
         game_name = self.plan.game
-        for control in (self.create_button, self.combo, self.folder):
+        for control in (self.create_button, self.combo, self.folder, self.browse_button, *self.checks.values()):
             control.setEnabled(False)
         self.close_button.setEnabled(False)
         cancel = self.cancel
+        parts = list(self.plan.parts)
 
         def work(progress):
             def report(phase, done, total, note):
-                text = {"Copying": f"Copying {note}", "Reading folders": "Reading folders…",
-                        "Checking the ZIP": "Checking the finished ZIP…", "Fingerprinting": "Fingerprinting the ZIP…"}.get(phase, phase)
-                progress(_percent(done, total) if phase == "Copying" else (99 if phase != "Reading folders" else 0), text)
+                text = {"Copying": f"Step 1 of 3: copying {note}", "Reading folders": "Reading folders…",
+                        "Checking the ZIP": "Step 2 of 3: checking the finished ZIP…",
+                        "Fingerprinting": "Step 3 of 3: fingerprinting the ZIP…"}.get(phase, phase)
+                progress(_percent(done, total), text)
             return engine.create_complete_kit(game_name, sources, destination, manager, origins=origins,
                                               progress=report, cancel=cancel.is_set)
 
@@ -327,15 +338,22 @@ class EasySetup(_Base):
             self.close_button.setEnabled(True)
             self.close_button.setText("Close")
             if error:
-                for control in (self.create_button, self.combo, self.folder):
+                for control in (self.create_button, self.combo, self.folder, self.browse_button):
                     control.setEnabled(True)
+                for part in parts:
+                    if part.role in self.checks:
+                        self.checks[part.role].setEnabled(not part.problem)
                 self.status.setText(("Cancelled. Nothing was kept." if "cancel" in error.lower() else "The kit was not made: " + error[:220]))
                 self.refresh_summary()
                 return
             self.status.setText(f"Kit saved and checked: {result['archive']}\n{result['files']:,} files, {human_size(result['bytes'])}. "
                                 f"Parts: {', '.join(result['roles'])}.")
             self.create_button.hide()
-            self.box.addWidget(button("Open folder", lambda: _open_folder(Path(result["archive"]).parent)))
+            self.combo.setEnabled(True)   # pick another game to make the next kit
+            self.folder.setEnabled(True)
+            self.browse_button.setEnabled(True)
+            self.open_button.setVisible(True)
+            self.made_folder = Path(result["archive"]).parent
             try:
                 from core import log_event
                 log_event("kit_created", f"Resurrection Kit for {game_name}: {result['files']} files, {human_size(result['bytes'])}")
@@ -396,6 +414,10 @@ class EasyRestore(_Base):
         self.go = button("Restore", self.restore, kind="primary", tip="Checks the whole kit first, then restores. Never overwrites.")
         self.go.setEnabled(False)
         self.close_button = button("Close", self.reject)
+        self.restored_folder = ""
+        self.open_button = button("Open folder", lambda: self.restored_folder and _open_folder(self.restored_folder))
+        self.open_button.hide()
+        buttons.addWidget(self.open_button)
         buttons.addWidget(self.go)
         buttons.addWidget(self.close_button)
         self.box.addLayout(buttons)
@@ -421,6 +443,9 @@ class EasyRestore(_Base):
         if self.manifest is None or not text:
             self.preview_label.setText("")
             return
+        if not Path(text).is_dir():
+            self.preview_label.setText("That library folder does not exist. Choose a folder that is already there.")
+            return
         try:
             self.plan = engine.plan_installation(self.manifest, Path(text))
         except (ValueError, OSError) as exc:
@@ -435,8 +460,12 @@ class EasyRestore(_Base):
         if not self.plan["includes_install"]:
             lines.append("This kit does not hold the game install, only the parts listed.")
         lines.extend(self.plan["blocked"])
+        free = kit_easy.free_bytes(text)
+        short = free is not None and free < self.plan["bytes"] + 64 * 1024 ** 2
+        if short:
+            lines.append(f"Not enough free space there: {human_size(free)} free, about {human_size(self.plan['bytes'])} needed.")
         self.preview_label.setText("\n".join(lines))
-        self.go.setEnabled(not self.plan["blocked"])
+        self.go.setEnabled(not self.plan["blocked"] and not short)
 
     def restore(self):
         if self.plan is None or self.working or _busy(self.window_):
@@ -454,7 +483,11 @@ class EasyRestore(_Base):
             progress(0, "Checking the whole kit before anything is written…")
 
             def report(phase, done, total, note):
-                progress(_percent(done, total) if phase == "Restoring" else 99, f"Restoring {note}" if phase == "Restoring" else phase)
+                text = {"Checking the kit (1 of 2)": "Step 1 of 4: checking the kit's fingerprint…",
+                        "Checking the kit (2 of 2)": "Step 2 of 4: checking every file in the kit…",
+                        "Restoring": f"Step 3 of 4: restoring {note}",
+                        "Final check": "Step 4 of 4: final check of the kit…"}.get(phase, phase)
+                progress(_percent(done, total), text)
             return engine.restore_installation(manifest, library, approved=True, progress=report, cancel=cancel.is_set)
 
         def done(result, error):
@@ -471,8 +504,8 @@ class EasyRestore(_Base):
                 log_event("kit_restored", f"Resurrection Kit restored for {result['game']}: {result['files']} files")
             except Exception:
                 pass
-            if result["game_folder"]:
-                self.box.addWidget(button("Open game folder", lambda: _open_folder(result["game_folder"])))
+            self.restored_folder = result["game_folder"] or result["review_folder"]
+            self.open_button.setVisible(bool(self.restored_folder))
         self.run(work, done, title="Restore")
 
 

@@ -284,3 +284,10 @@ class FeatureQuestions(unittest.TestCase):
         for key, title, hint in tools_data.KIT_ACTIONS:
             self.assertGreater(len(hint.split()), 12, key)
         self.assertIn("verified ZIP", tools_data.tile("resurrection_kit").note)
+
+    def test_a_game_named_like_a_feature_is_still_a_game_question(self):
+        inv = inventory(games=[game("Graveyard Keeper", size=2 * GB), game("Hades")])
+        f = facts(inv)
+        self.assertEqual(engine.answer("how big is Graveyard Keeper?", f).intent, "profile")
+        self.assertEqual(engine.answer("what is the graveyard?", f).intent, "feature")
+        self.assertEqual(engine.answer("make a resurrection kit for Graveyard Keeper", f).intent, "feature")

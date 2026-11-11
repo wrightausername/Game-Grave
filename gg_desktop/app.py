@@ -51,11 +51,23 @@ class Job(QRunnable):
         self.setAutoDelete(True)
 
     def run(self):
+        def progress(*args):
+            try:
+                self.signals.progress.emit(*args)
+            except RuntimeError:
+                pass  # the window was closed while this job was still running
         try:
-            result = self.fn(self.signals.progress.emit)
-            self.signals.done.emit(result)
+            result = self.fn(progress)
         except Exception as exc:
-            self.signals.failed.emit(type(exc).__name__ + ": " + str(exc)[:300])
+            try:
+                self.signals.failed.emit(type(exc).__name__ + ": " + str(exc)[:300])
+            except RuntimeError:
+                pass
+            return
+        try:
+            self.signals.done.emit(result)
+        except RuntimeError:
+            pass
 
 
 class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWindow):

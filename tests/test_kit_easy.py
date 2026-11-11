@@ -124,3 +124,26 @@ class PlanTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Overlap(PlanTests):
+    def test_settings_folder_that_contains_the_saves_is_not_a_second_part(self):
+        parent = self.saves.parent
+        plan = kit_easy.build_plan(self.game, environ=self.env,
+                                   links=[{"category": "Saves", "path": str(self.saves)},
+                                          {"category": "Configs / Settings", "path": str(parent)}])
+        configs = next(p for p in plan.parts if p.role == "Configs")
+        self.assertIn("overlaps", configs.problem)
+        sources, origins, manager = kit_easy.to_sources(plan)
+        self.assertNotIn("Configs", sources)
+        out = self.root / "K"
+        out.mkdir()
+        kit.create_complete_kit(self.game.name, sources, out / "k.zip", manager, origins=origins)
+
+    def test_an_empty_folder_is_not_offered_as_a_part(self):
+        empty = self.root / "EmptySaves"
+        empty.mkdir()
+        plan = kit_easy.build_plan(self.game, environ=self.env, links=[{"category": "Saves", "path": str(empty)}])
+        saves = next(p for p in plan.parts if p.role == "Saves")
+        self.assertIn("no files", saves.problem)
+        self.assertNotIn("Saves", kit_easy.to_sources(plan)[0])
