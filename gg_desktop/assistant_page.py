@@ -537,7 +537,18 @@ def send(window, question=None):
                    if msgs[i]["role"] == "user" and msgs[i + 1]["role"] == "assistant"]
         window.assistant_input.setEnabled(False)
         window.assistant_send.setEnabled(False)
-        window.status.setText("Local AI is writing the answer on this PC…")
+        starting = local_ai_ui.state_of(window).server is None
+        window.status.setText("Local AI is starting on this PC (the first answer can take up to a minute)…" if starting
+                              else "Local AI is writing the answer on this PC…")
+        # Show the question and a thinking line right away; the real answer replaces them.
+        layout = window.assistant_messages
+        if layout.count() and layout.itemAt(layout.count() - 1).spacerItem() is not None:
+            layout.takeAt(layout.count() - 1)
+        layout.addWidget(bubble(text))
+        add_assistant_text(window, "Starting the local AI model, this first answer can take up to a minute…" if starting
+                           else "Thinking…")
+        layout.addStretch()
+        scroll_down(window)
         chat_id = chat["id"]
 
         def deliver(answer):

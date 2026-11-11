@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Game Grave: Mods tab mockup</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#020609}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width:1440px;height:960px;box-sizing:border-box;display:flex;background:#020609;color:#e6e9ee;font-family:'Segoe UI',Arial,'Liberation Sans',sans-serif;font-size:12px;overflow:hidden">
+
+<!-- ============ SIDEBAR ============ -->
+<nav aria-label="Main menu" style="width:219px;flex:none;box-sizing:border-box;background:#04090b;border-right:1px solid #171e25;display:flex;flex-direction:column;position:relative;overflow:hidden">
+<div style="display:flex;align-items:center;gap:9px;padding:20px 18px 24px">
+<div style="font-family:'Segoe UI',Arial,sans-serif;font-style:italic;font-weight:900;font-size:24px;letter-spacing:-2px;color:#ff2a4d">GG</div>
+<div style="font-weight:700;font-size:15px;letter-spacing:1.4px;color:#fff">GAME GRAVE</div>
+</div>
+<sc-for list="{{nav}}" as="item" hint-placeholder-count="13">
+<div style="{{item.style}}">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{item.stroke}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{item.d}}"/></svg>
+<span style="font-size:14px;color:{{item.color}}">{{item.label}}</span>
+</div>
+</sc-for>
+<!-- faint abstract backdrop, only below the menu -->
+<div aria-hidden="true" style="position:absolute;left:0;right:0;bottom:0;height:150px;background:radial-gradient(ellipse at 20% 100%,rgba(255,42,77,.22),transparent 65%),repeating-linear-gradient(110deg,rgba(255,42,77,.10) 0 2px,transparent 2px 22px);-webkit-mask-image:linear-gradient(0deg,#000,transparent);mask-image:linear-gradient(0deg,#000,transparent)"></div>
+</nav>
+
+<!-- ============ MAIN ============ -->
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+<!-- top bar + banner share one picture -->
+<div style="position:relative;height:128px;flex:none;background:#02070a;overflow:hidden">
+<div aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 130% at 82% 50%,rgba(255,42,77,.30),transparent 70%),radial-gradient(ellipse 40% 120% at 96% 50%,rgba(24,201,235,.16),transparent 70%)"></div>
+<div aria-hidden="true" style="position:absolute;inset:0;background:repeating-linear-gradient(110deg,rgba(255,42,77,.20) 0 4px,transparent 4px 52px);-webkit-mask-image:linear-gradient(90deg,transparent 42%,#000 92%);mask-image:linear-gradient(90deg,transparent 42%,#000 92%)"></div>
+<div aria-hidden="true" style="position:absolute;inset:0;background:linear-gradient(0deg,#020609 0,transparent 30%)"></div>
+
+<!-- top bar -->
+<div style="position:relative;height:46px;display:flex;align-items:center;padding:0 12px 0 20px;gap:10px">
+<div style="width:550px;max-width:60%;height:30px;box-sizing:border-box;border:1px solid #384048;border-radius:6px;background:rgba(5,9,12,.85);display:flex;align-items:center;padding:0 8px;gap:8px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9ced6" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.3-4.3"/></svg>
+<span style="flex:1;color:#8c96a1;font-size:12px">Search games, mods, files, and more…</span>
+<span style="border:1px solid #3b424a;border-radius:3px;color:#c0c3cb;font-size:10px;padding:1px 4px">Ctrl + K</span>
+</div>
+<div style="flex:1"></div>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e1e3e7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 17V11a6 6 0 0112 0v6l2 2H4zM10 21h4"/></svg>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e1e3e7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 115 0c0 1.5-2.5 2-2.5 4M12 17h.01"/></svg>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e1e3e7" stroke-width="1.6" aria-hidden="true"><path d="M5 18h14"/></svg>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e1e3e7" stroke-width="1.6" aria-hidden="true"><rect x="5" y="5" width="14" height="14"/></svg>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e1e3e7" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+</div>
+
+<!-- banner -->
+<div style="position:relative;height:82px;display:flex;align-items:center;gap:12px;padding:0 24px 0 24px">
+<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ff183b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13v5a2 2 0 01-2 2h-4v-2a2 2 0 10-4 0v2H6a2 2 0 01-2-2v-4h2a2 2 0 100-4H4V6a2 2 0 012-2h4V3a2 2 0 114 0v1h4a2 2 0 012 2v4h-1a2 2 0 100 4z"/></svg>
+<div>
+<h1 style="margin:0;font-size:36px;font-weight:750;line-height:44px;color:#f3f3f6">Mods</h1>
+<div style="font-size:12px;color:#d6d6dc;line-height:15px">Everything that changes your games, in one place. Game Grave only reads this;<br>you make changes in your mod manager.</div>
+</div>
+</div>
+</div>
+
+<!-- page body -->
+<div style="flex:1;min-height:0;padding:0 24px 14px 16px;display:flex;flex-direction:column;gap:8px">
+
+<!-- metric strip -->
+<div style="height:70px;flex:none;box-sizing:border-box;border:1px solid #27353e;border-radius:8px;background:linear-gradient(180deg,#111b24,#060d13 25%,#040a0e 82%,#17222c);display:flex;align-items:center;padding:5px 4px">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="6">
+<div style="flex:1;min-width:0;display:flex;align-items:center;gap:9px;padding:0 10px;border-right:{{t.divider}}">
+<div style="width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle,{{t.glow}},transparent 72%)">
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="{{t.color}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="{{t.iconFx}}" aria-hidden="true"><path d="{{t.d}}"/></svg>
+</div>
+<div style="min-width:0;flex:1">
+<div style="font-size:20px;font-weight:650;color:#f1f1f5;line-height:22px">{{t.value}}</div>
+<div style="font-size:11px;color:#d5d6dd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{t.caption}}</div>
+<div style="{{t.barOuter}}"><div style="{{t.barInner}}"></div></div>
+</div>
+</div>
+</sc-for>
+</div>
+
+<!-- plain summary -->
+<div style="flex:none;display:flex;align-items:center;gap:12px;font-size:13px;color:#e6e9ee;padding:1px 4px">
+<svg width="34" height="34" viewBox="0 0 28 28" aria-hidden="true" style="flex:none;filter:drop-shadow(0 0 5px rgba(60,218,99,.45))">
+<circle cx="14" cy="14" r="10.5" fill="none" stroke="#1b2833" stroke-width="4"/>
+<circle cx="14" cy="14" r="10.5" fill="none" stroke="#3cda63" stroke-width="4" stroke-linecap="round" stroke-dasharray="39.6 66" transform="rotate(-90 14 14)"/>
+<text x="14" y="17.2" text-anchor="middle" font-size="9" font-weight="700" fill="#f1f1f5" font-family="Segoe UI,Arial,sans-serif">3/5</text>
+</svg>
+<div>You have <b>5 mods</b> for 1 game: <b style="color:#3cda63">3 turned on</b>, <b style="color:#eab464">1 update available</b>, <b style="color:#ff7f96">1 conflict found</b> <span style="color:#a6b4c2">(the check was partial, so some may be missed)</span>.</div>
+</div>
+
+<!-- tab strip -->
+<div style="flex:none;display:flex;gap:6px;padding:4px;box-sizing:border-box;background:#050c12;border:1px solid #29353e;border-radius:7px;width:calc(100% - 306px)">
+<sc-for list="{{tabs}}" as="tab" hint-placeholder-count="6">
+<div style="{{tab.style}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{tab.d}}"/></svg>{{tab.label}}</div>
+</sc-for>
+</div>
+
+<!-- three panels -->
+<div style="flex:1;min-height:0;display:flex;gap:8px">
+
+<!-- left filters -->
+<aside aria-label="Filters" style="width:202px;flex:none;box-sizing:border-box;border:1px solid #27333d;border-radius:9px;background:linear-gradient(180deg,#080e14,#030a0f 14%,#050a0e);padding:9px;display:flex;flex-direction:column;gap:7px;overflow:hidden">
+<div style="font-size:11px;font-weight:600;color:#d9e0e7;padding:3px 0">Game Filters</div>
+<div style="display:flex;align-items:center;gap:6px;height:30px;box-sizing:border-box;border:1px solid #3a454f;border-radius:5px;background:linear-gradient(180deg,#020508,#0a1219);padding:0 7px;color:#8c96a1;font-size:11px">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aabbc" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.3-4.3"/></svg>Search mods…</div>
+<div style="display:flex;align-items:center;gap:8px;padding:6px 6px;font-size:11px;color:#fff;border-left:2px solid #ff1a40;background:linear-gradient(90deg,#970d26,#15101a)">All Games (5)</div>
+<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:11px;color:#d6d8dc">Skyrim Special Edition (5)</div>
+
+<div style="font-size:11px;font-weight:600;color:#d9e0e7;padding:10px 0 2px">Show only</div>
+<sc-for list="{{chips}}" as="chip" hint-placeholder-count="5">
+<div onClick="{{chip.pick}}" style="{{chip.style}}"><span style="{{chip.dot}}"></span><span style="flex:1">{{chip.label}}</span><span style="color:#a6b4c2">{{chip.count}}</span></div>
+</sc-for>
+
+<div style="flex:1"></div>
+<div style="font-size:11px;font-weight:600;color:#d9e0e7;padding:3px 0">Mod Manager Filters</div>
+<div style="display:flex;align-items:center;gap:7px;font-size:11px"><span style="width:10px;height:10px;border:1px solid #798795;border-radius:2px;background:#070b10"></span>Mod Organizer 2 (5)</div>
+<div style="text-align:center;color:#4dd2e9;font-size:12px;padding:6px 0 2px">Clear All</div>
+</aside>
+
+<!-- center library -->
+<section aria-label="Mod list" style="flex:1;min-width:0;box-sizing:border-box;border:1px solid #27333d;border-radius:9px;background:linear-gradient(180deg,#080e14,#030a0f 14%,#050a0e);padding:8px;display:flex;flex-direction:column;gap:6px;overflow:hidden">
+
+<div style="display:flex;align-items:center;gap:6px">
+<span style="font-size:10px;color:#a6b4c2">Sort by</span>
+<div style="flex:1;height:28px;box-sizing:border-box;border:1px solid #3a454f;border-radius:5px;background:linear-gradient(180deg,#020508,#0a1219);padding:0 8px;display:flex;align-items:center;justify-content:space-between;font-size:11px">Needs attention first<span style="color:#9aabbc">▾</span></div>
+<span style="font-size:10px;color:#a6b4c2">Filter</span>
+<div style="flex:1;height:28px;box-sizing:border-box;border:1px solid #3a454f;border-radius:5px;background:linear-gradient(180deg,#020508,#0a1219);padding:0 8px;display:flex;align-items:center;justify-content:space-between;font-size:11px">All Types<span style="color:#9aabbc">▾</span></div>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;background:#07121a;padding:7px 8px;font-size:10px;color:#9aabbc;border-radius:3px">
+<span style="width:10px"></span><span style="flex:1">Mod</span><span style="width:78px">Status</span><span style="width:118px">Needs a look</span><span style="width:64px;text-align:right">Size</span><span style="width:78px;text-align:right">Modified</span>
+</div>
+
+<div style="flex:1;min-height:0;overflow:hidden">
+<sc-for list="{{rows}}" as="row" hint-placeholder-count="5">
+<div onClick="{{row.pick}}" style="{{row.style}}">
+<span style="width:10px;height:10px;border:1px solid #72818e;border-radius:2px;background:#060b0f;flex:none"></span>
+<div style="flex:1;min-width:0;display:flex;align-items:center;gap:10px">
+<div style="{{row.thumb}}"><span aria-hidden="true" style="{{row.thumbBars}}"></span><span style="position:relative">{{row.initials}}</span></div>
+<div style="min-width:0">
+<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{row.name}}</div>
+<div style="font-size:10px;color:#a6b4c2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{row.game}} · Mod Organizer 2 · v{{row.version}}</div>
+</div>
+</div>
+<div style="width:78px"><span style="{{row.pill}}"><span style="{{row.pillDot}}"></span>{{row.statusText}}</span></div>
+<div style="width:118px;display:flex;gap:5px;align-items:center">
+<sc-if value="{{row.update}}" hint-placeholder-val="{{true}}"><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:#eab464;border:1px solid #6b5120;border-radius:10px;background:rgba(234,180,100,.10);padding:2px 7px 2px 4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#eab464" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>Update</span></sc-if>
+<sc-if value="{{row.conflict}}" hint-placeholder-val="{{true}}"><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:#ff8ea3;border:1px solid #6b2433;border-radius:10px;background:rgba(255,42,77,.10);padding:2px 7px 2px 4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ff8ea3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2zM12 10v4"/></svg>Conflict</span></sc-if>
+<sc-if value="{{row.clear}}" hint-placeholder-val="{{false}}"><span style="font-size:11px;color:#7d8e9d">Nothing</span></sc-if>
+</div>
+<div style="width:64px;text-align:right;font-size:11px;color:#d5d6dd">{{row.size}}<div style="height:3px;border-radius:2px;background:#13202b;margin-top:4px;overflow:hidden"><div style="{{row.sizeBar}}"></div></div></div>
+<div style="width:78px;text-align:right;font-size:11px;color:#d5d6dd">{{row.modified}}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;align-items:center;gap:5px">
+<span style="flex:1;font-size:10px;color:#a6b4c2">0 selected · {{shownCount}} of 5 mods shown · sample data</span>
+<div style="border:1px solid #364049;border-radius:5px;background:linear-gradient(180deg,#16212a,#090f15 30%,#04080c);padding:6px 12px;font-size:11px">☰ Actions</div>
+<div style="border:1px solid #364049;border-radius:5px;background:linear-gradient(180deg,#16212a,#090f15 30%,#04080c);padding:6px 12px;font-size:11px">⭳ Add Source</div>
+<div style="border:1px solid #ff2847;border-radius:5px;background:linear-gradient(180deg,#ff3048,#b60020 13%,#690212 50%,#a5001b 86%,#f91b38);padding:6px 14px;font-size:11px;color:#fff;font-weight:600">⟳ Scan for Mods</div>
+</div>
+</section>
+
+<!-- right detail -->
+<aside aria-label="Selected mod" style="width:282px;flex:none;box-sizing:border-box;border:1px solid #5a1b29;border-radius:9px;background:#050a0f;padding:12px 12px 10px;display:flex;flex-direction:column;gap:8px;overflow:hidden;margin-top:-52px;height:calc(100% + 52px)">
+
+<div style="{{sel.hero}}">
+<div aria-hidden="true" style="{{sel.heroBars}}"></div>
+<div style="position:relative;font-size:30px;font-weight:800;color:#f1f4f7;letter-spacing:1px;text-shadow:0 0 14px rgba(255,255,255,.25)">{{sel.initials}}</div>
+<div style="position:absolute;top:7px;right:8px;border:1px solid rgba(255,255,255,.28);border-radius:10px;background:rgba(2,6,9,.55);padding:1px 8px;font-size:10px;font-weight:600;color:#fff">v{{sel.version}}</div>
+<div style="position:absolute;left:8px;bottom:7px;display:flex;align-items:center;gap:5px;border-radius:10px;background:rgba(2,6,9,.6);padding:2px 8px 2px 6px;font-size:10px;font-weight:600;color:{{sel.statusColor}}"><span style="width:7px;height:7px;border-radius:50%;background:{{sel.statusColor}};box-shadow:0 0 6px {{sel.statusColor}}"></span>{{sel.statusTitle}}</div>
+</div>
+<div style="font-size:18px;font-weight:650">{{sel.name}}</div>
+<div style="font-size:10px;color:#a6b4c2">{{sel.game}} · Mod Organizer 2 · version {{sel.version}}</div>
+
+<div style="{{sel.statusBox}}">
+<span style="width:9px;height:9px;border-radius:50%;background:{{sel.statusColor}};flex:none"></span>
+<div><div style="font-size:13px;font-weight:700">{{sel.statusTitle}}</div><div style="font-size:10px;opacity:.85;margin-top:1px">{{sel.statusNote}}</div></div>
+</div>
+
+<div style="font-size:12px;font-weight:600;padding:5px 2px;border-top:1px solid #48222d;background:linear-gradient(180deg,#211018,#090e13)">⌃  When your game starts</div>
+<div style="display:flex;flex-direction:column;gap:3px;position:relative">
+<div style="display:flex;align-items:center;gap:5px;color:#8c99a6;font-size:10px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8c99a6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>Loads first</div>
+<div aria-hidden="true" style="position:absolute;left:14px;top:20px;bottom:30px;width:2px;background:linear-gradient(180deg,#1a2530,#ff2847 60%,#1a2530)"></div>
+<sc-for list="{{orderList}}" as="o" hint-placeholder-count="5">
+<div style="{{o.style}}"><span style="{{o.numStyle}}">{{o.n}}</span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{o.name}}</span><span style="{{o.tagStyle}}">{{o.tag}}</span></div>
+</sc-for>
+<div style="display:flex;align-items:center;gap:5px;color:#8c99a6;font-size:10px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ff8ea3" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>Loads last. When two mods change the same file, the later one wins.</div>
+</div>
+
+<sc-if value="{{sel.conflict}}" hint-placeholder-val="{{true}}">
+<div style="border:1px solid #6b2433;border-radius:6px;background:#14090d;padding:7px 9px">
+<div style="color:#ff8ea3;font-size:11px;font-weight:700">Conflict with {{sel.otherName}}</div>
+<div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+<svg width="92" height="46" viewBox="0 0 92 46" aria-hidden="true" style="flex:none">
+<circle cx="32" cy="23" r="19" fill="rgba(255,42,77,.22)" stroke="#ff2847" stroke-width="1.2"/>
+<circle cx="60" cy="23" r="19" fill="rgba(75,210,233,.18)" stroke="#4dd2e9" stroke-width="1.2"/>
+<text x="46" y="26" text-anchor="middle" font-size="9" font-weight="700" fill="#fff" font-family="Segoe UI,Arial,sans-serif">214</text>
+</svg>
+<div style="color:#e2b9c2;font-size:10px">Both change the same 214 files. {{sel.winnerText}}</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{sel.update}}" hint-placeholder-val="{{true}}">
+<div style="border:1px solid #6b5120;border-radius:6px;background:#15110a;padding:7px 9px">
+<div style="color:#eab464;font-size:11px;font-weight:700">A newer version is available</div>
+<div style="display:flex;align-items:center;gap:7px;margin:5px 0 3px">
+<span style="border:1px solid #4a3a1a;border-radius:10px;background:#0e0b06;padding:2px 10px;font-size:11px;color:#b9a77a">2.0</span>
+<svg width="26" height="12" viewBox="0 0 26 12" fill="none" stroke="#eab464" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h22M18 1l6 5-6 5"/></svg>
+<span style="border:1px solid #eab464;border-radius:10px;background:rgba(234,180,100,.14);box-shadow:0 0 10px rgba(234,180,100,.35);padding:2px 10px;font-size:11px;font-weight:700;color:#ffd596">2.5</span>
+</div>
+<div style="color:#d9c9a0;font-size:10px">Your mod manager recorded the newer version. Game Grave does not go online to check.</div>
+</div>
+</sc-if>
+
+<div style="flex:1"></div>
+<div style="border:1px solid #ff2847;border-radius:5px;background:linear-gradient(180deg,#ff3048,#b60020 13%,#690212 50%,#a5001b 86%,#f91b38);padding:7px;font-size:12px;color:#fff;font-weight:600;text-align:center">▭ Open Folder</div>
+<div style="display:flex;gap:4px">
+<div style="flex:1;border:1px solid #364049;border-radius:5px;background:linear-gradient(180deg,#16212a,#090f15 30%,#04080c);padding:6px 0;font-size:10px;text-align:center">Details</div>
+<div style="flex:1;border:1px solid #364049;border-radius:5px;background:linear-gradient(180deg,#16212a,#090f15 30%,#04080c);padding:6px 0;font-size:10px;text-align:center">Mod Page</div>
+<div style="flex:1;border:1px solid #364049;border-radius:5px;background:linear-gradient(180deg,#16212a,#090f15 30%,#04080c);padding:6px 0;font-size:10px;text-align:center">Mod Organizer</div>
+</div>
+</aside>
+
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'all', selected: 'mt' };
+  }
+  renderVals() {
+    const mods = [
+      { id: 'mt', hue: 345, mb: 842, name: 'Mountain Textures', version: '2.0', on: true, size: '842 MB', order: 2, update: true, conflict: true, otherId: 'st', other: 'Snow Textures', winner: 'Snow Textures loads later, so its files win.', modified: '09 Nov 2026' },
+      { id: 'st', hue: 190, mb: 516, name: 'Snow Textures', version: '1.1', on: true, size: '516 MB', order: 3, conflict: true, otherId: 'mt', other: 'Mountain Textures', winner: 'This mod loads later, so its files win.', modified: '09 Nov 2026' },
+      { id: 'bl', hue: 40, mb: 38, name: 'Better Lighting', version: '3.2', on: true, size: '38 MB', order: 4, modified: '02 Nov 2026' },
+      { id: 'fw', hue: 150, mb: 12, name: 'Framework', version: '1.4', on: false, size: '12 MB', order: 1, modified: '21 Oct 2026' },
+      { id: 'ow', hue: 275, mb: 96, name: 'Old Weapons Pack', version: '0.9', on: false, size: '96 MB', order: 5, modified: '14 Aug 2026' },
+    ];
+    const game = 'Skyrim Special Edition';
+    const f = this.state.filter;
+    const sel = mods.find((m) => m.id === this.state.selected) || mods[0];
+    const keep = (m) => f === 'all' || (f === 'on' && m.on) || (f === 'off' && !m.on) || (f === 'update' && m.update) || (f === 'conflict' && m.conflict);
+    const initials = (n) => n.split(' ').map((w) => w[0]).slice(0, 2).join('');
+    const rows = mods.filter(keep).map((m) => ({
+      initials: initials(m.name), name: m.name, game, version: m.version, size: m.size, modified: m.modified,
+      update: !!m.update, conflict: !!m.conflict, clear: !m.update && !m.conflict,
+      statusText: m.on ? 'On' : 'Off', statusColor: m.on ? '#3cda63' : '#8794a1',
+      thumb: 'position:relative;overflow:hidden;width:48px;height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#f1f4f7;flex:none;border:1px solid hsla(' + m.hue + ',70%,55%,.55);box-shadow:0 0 8px hsla(' + m.hue + ',80%,50%,.35);background:linear-gradient(135deg,hsl(' + m.hue + ',55%,22%),#0a1219 85%)' + (m.on ? '' : ';filter:saturate(.35) brightness(.8)'),
+      thumbBars: 'position:absolute;inset:0;background:repeating-linear-gradient(110deg,hsla(' + m.hue + ',90%,65%,.28) 0 2px,transparent 2px 9px)',
+      pill: 'display:inline-flex;align-items:center;gap:6px;border-radius:10px;padding:2px 10px 2px 7px;font-size:11px;font-weight:600;color:' + (m.on ? '#7bf0a6' : '#9aa7b3') + ';background:' + (m.on ? 'rgba(60,218,99,.12)' : 'rgba(135,148,161,.10)') + ';border:1px solid ' + (m.on ? '#1d5a38' : '#2a3b4b'),
+      pillDot: 'width:7px;height:7px;border-radius:50%;background:' + (m.on ? '#3cda63' : '#8794a1') + (m.on ? ';box-shadow:0 0 6px #3cda63' : ''),
+      sizeBar: 'height:3px;width:' + Math.max(4, Math.round(m.mb / 842 * 100)) + '%;margin-left:auto;background:linear-gradient(90deg,hsl(' + m.hue + ',70%,45%),hsl(' + m.hue + ',90%,65%))',
+      style: 'display:flex;align-items:center;gap:10px;padding:0 8px;height:46px;cursor:pointer;border-bottom:1px solid #1b2833;background:' + (m.id === sel.id ? '#35121e' : 'transparent'),
+      pick: () => this.setState({ selected: m.id }),
+    }));
+    const chipDef = [
+      ['all', 'Everything', mods.length, '#9aabbc'], ['on', 'Turned on', mods.filter((m) => m.on).length, '#3cda63'], ['off', 'Turned off', mods.filter((m) => !m.on).length, '#8794a1'],
+      ['update', 'Has an update', mods.filter((m) => m.update).length, '#eab464'], ['conflict', 'Has a conflict', mods.filter((m) => m.conflict).length, '#ff7f96'],
+    ];
+    const chips = chipDef.map(([id, label, count, col]) => ({
+      label, count,
+      dot: 'width:8px;height:8px;border-radius:50%;background:' + col,
+      style: 'cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 6px;font-size:11px;color:' + (f === id ? '#fff' : '#d6d8dc') + ';border-left:2px solid ' + (f === id ? '#ff1a40' : 'transparent') + ';background:' + (f === id ? 'linear-gradient(90deg,#970d26,#15101a)' : 'transparent'),
+      pick: () => this.setState({ filter: id }),
+    }));
+    const orderList = mods.slice().sort((a, b) => a.order - b.order).map((m) => ({
+      n: m.order, name: m.name, tag: m.id === sel.id ? 'selected' : (sel.conflict && m.id === sel.otherId ? 'overlaps' : (m.on ? '' : 'off')),
+      tagStyle: 'font-size:9px;font-weight:600;color:' + (m.id === sel.id ? '#ff8ea3' : '#9ad8e6'),
+      style: 'display:flex;align-items:center;gap:8px;border-radius:5px;padding:4px 7px;font-size:11px;border:1px solid ' + (m.id === sel.id ? '#ff2847' : '#1b2833') + ';background:' + (m.id === sel.id ? '#2a0f18' : '#070d12') + ';color:' + (m.on ? '#e6e9ee' : '#7d8e9d'),
+      numStyle: 'position:relative;width:16px;height:16px;border-radius:50%;background:' + (m.id === sel.id ? '#b60020' : '#1a2530') + ';display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex:none',
+    }));
+    const barOuter = 'height:4px;border-radius:2px;background:#1b2833;margin-top:4px;overflow:hidden';
+    const segOuter = 'height:4px;margin-top:4px;background:repeating-linear-gradient(90deg,#1b2833 0 calc(20% - 3px),transparent calc(20% - 3px) 20%)';
+    const segInner = 'height:4px;width:60%;background:repeating-linear-gradient(90deg,#27dc74 0 calc(33.333% - 3px),transparent calc(33.333% - 3px) 33.333%);filter:drop-shadow(0 0 3px #27dc74)';
+    const stack = 'height:4px;width:100%;background:linear-gradient(90deg,#ff3048 0 56%,#df83ec 56% 90.2%,#27dc74 90.2% 92.7%,#f7b737 92.7% 93.5%,#9bcde4 93.5% 100%)';
+    const none = { barOuter: 'display:none', barInner: '' };
+    const tiles = [
+      { d: 'M20 13v5a2 2 0 01-2 2h-4v-2a2 2 0 10-4 0v2H6a2 2 0 01-2-2v-4h2a2 2 0 100-4H4V6a2 2 0 012-2h4V3a2 2 0 114 0v1h4a2 2 0 012 2v4h-1a2 2 0 100 4z', color: '#df83ec', glow: 'rgba(223,131,236,.30)', value: '5', caption: 'Mods Found', ...none },
+      { d: 'M12 3a9 9 0 100 18 9 9 0 000-18zM8 12.5l3 3 5-6', color: '#27dc74', glow: 'rgba(39,220,116,.28)', value: '3', caption: 'Turned On · 2 off', barOuter: segOuter, barInner: segInner },
+      { d: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 16V8M8.5 11.5L12 8l3.5 3.5', color: '#f7b737', glow: 'rgba(247,183,55,.28)', value: '1', caption: 'Updates Available', ...none },
+      { d: 'M12 3l10 18H2zM12 10v5M12 18h.01', color: '#fa2245', glow: 'rgba(250,34,69,.32)', value: '1', caption: 'Conflict · partial check', ...none },
+      { d: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z', color: '#9ca8bd', glow: 'rgba(156,168,189,.18)', value: '0', caption: 'Not In Use', ...none },
+      { d: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6', color: '#9bcde4', glow: 'rgba(155,205,228,.25)', value: '1.5 GB', caption: 'Space Used by 5 mods', barOuter: barOuter, barInner: stack },
+    ].map((t, i, all) => ({ ...t, iconFx: 'filter:drop-shadow(0 0 5px ' + t.color + ')', divider: i < all.length - 1 ? '1px solid #30343c' : '0' }));
+    const tabDefs = [['Library', 'M3 4h18v4H3zM5 8v12h14V8M10 12h4'], ['Mod Radar', 'M4.9 19.1a10 10 0 010-14.2M19.1 4.9a10 10 0 010 14.2M12 12h.01'], ['Load Order', 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01'], ['Profiles', 'M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.3-4.3'], ['Conflicts', 'M12 3l10 18H2zM12 10v5M12 18h.01'], ['Cleanup', 'M4 4v6h6M20 20v-6h-6M20 10a8 8 0 00-14-4M4 14a8 8 0 0014 4']];
+    const tabs = tabDefs.map(([label, d], i) => ({
+      label, d,
+      style: 'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:5px;padding:5px 4px;min-height:23px;font-size:12px;color:#fff;border:1px solid ' + (i === 0 ? '#ff2847' : '#364049') + ';background:' + (i === 0 ? 'linear-gradient(180deg,#ff3048,#b60020 13%,#690212 50%,#a5001b 86%,#f91b38)' : 'linear-gradient(180deg,#16212a,#090f15 30%,#04080c)'),
+    }));
+    const navDefs = [
+      ['Overview', 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10'], ['Ready Room', 'M4.9 19.1a10 10 0 010-14.2M19.1 4.9a10 10 0 010 14.2M8 16a6 6 0 010-8M16 8a6 6 0 010 8M12 12h.01'],
+      ['Games', 'M6 11h4M8 9v4M15 12h.01M18 10h.01M17.3 5H6.7a4 4 0 00-3.9 3.1l-1.4 6.6A2.5 2.5 0 005.8 17l1.6-2h9.2l1.6 2a2.5 2.5 0 004.4-2.3l-1.4-6.6A4 4 0 0017.3 5z'],
+      ['Mods', 'M20 13v5a2 2 0 01-2 2h-4v-2a2 2 0 10-4 0v2H6a2 2 0 01-2-2v-4h2a2 2 0 100-4H4V6a2 2 0 012-2h4V3a2 2 0 114 0v1h4a2 2 0 012 2v4h-1a2 2 0 100 4z'],
+      ['Old Files', 'M3 4h18v4H3zM5 8v12h14V8M10 12h4'], ['Other Storage', 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6'],
+      ['Captures', 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 100-8 4 4 0 000 8z'], ['Graveyard', 'M6 21V9a6 6 0 0112 0v12zM12 8v6M9.5 10.5h5'],
+      ['Game DNA', 'M7 3c0 6 10 6 10 12M17 3c0 6-10 6-10 12M7 21c0-3 2-4.5 5-5.5M17 21c0-3-2-4.5-5-5.5M8.5 7h7M8.5 17h7'], ['Undo Center', 'M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3'],
+      ['AI Assistant', 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z'],
+      ['More Tools', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'], ['Settings', 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M14 4v4M8 10v4M16 16v4'],
+    ];
+    const nav = navDefs.map(([label, d]) => {
+      const on = label === 'Mods';
+      return {
+        label, d, stroke: on ? '#ffffff' : '#d6d8dc', color: on ? '#ffffff' : '#d6d8dc',
+        style: 'display:flex;align-items:center;gap:12px;height:35px;box-sizing:border-box;padding:0 22px;' + (on ? 'border-top:1px solid #821022;border-bottom:1px solid #821022;background:linear-gradient(90deg,#22070e,#bb001f 38%,#640d1c 62%,#060b0e)' : ''),
+      };
+    });
+    return {
+      nav, tabs, tiles, chips, rows, orderList, shownCount: rows.length,
+      sel: {
+        hero: 'position:relative;overflow:hidden;height:92px;border-radius:6px;display:flex;align-items:center;justify-content:center;border:1px solid hsla(' + sel.hue + ',70%,55%,.5);box-shadow:0 0 18px hsla(' + sel.hue + ',80%,50%,.25);background:radial-gradient(ellipse 70% 120% at 70% 40%,hsla(' + sel.hue + ',80%,50%,.45),transparent 70%),linear-gradient(135deg,hsl(' + sel.hue + ',50%,16%),#060b0f)',
+        heroBars: 'position:absolute;inset:0;background:repeating-linear-gradient(110deg,hsla(' + sel.hue + ',90%,70%,.20) 0 3px,transparent 3px 20px);-webkit-mask-image:linear-gradient(90deg,transparent 10%,#000 90%);mask-image:linear-gradient(90deg,transparent 10%,#000 90%)',
+        initials: initials(sel.name), name: sel.name, game, version: sel.version, conflict: !!sel.conflict, update: !!sel.update, otherName: sel.other || '', winnerText: sel.winner || '',
+        statusTitle: sel.on ? 'Turned on' : 'Turned off', statusColor: sel.on ? '#3cda63' : '#8794a1',
+        statusNote: sel.on ? 'Your mod manager has this switched on in the Default profile.' : 'Installed, but switched off in the Default profile.',
+        statusBox: 'display:flex;gap:9px;align-items:center;border-radius:6px;padding:8px 10px;' + (sel.on ? 'background:#08150e;border:1px solid #1d5a38;color:#7bf0a6' : 'background:#0b1117;border:1px solid #2a3b4b;color:#c3d0db'),
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

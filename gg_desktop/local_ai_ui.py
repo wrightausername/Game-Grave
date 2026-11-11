@@ -136,7 +136,9 @@ def sync(window):
     have = key in ai.installed_models()
     engine = ai.installed_runtime()
     if st.downloading:
-        text = "Downloading…"
+        text = "Downloading… You can keep using Game Grave."
+    elif getattr(st, "last_error", "") and not (have and engine):
+        text = "Last download didn't finish: " + st.last_error[:160]
     elif have and engine:
         size = human_size(ai.model_path(key).stat().st_size)
         text = (f"{model_name(key)} is ready ({size}). " +
@@ -189,6 +191,7 @@ def download(window):
                           "Remove takes it all away again."):
         return
     st.downloading = True
+    st.last_error = ""
     st.cancel.clear()
     sync(window)
     refresh_chat(window)
@@ -225,14 +228,25 @@ def download(window):
         window.status.setText(f"Local AI ready: {model_name(key)}. Ask a question to try it.")
         sync(window)
         refresh_chat(window)
+        window.info("Local AI is ready",
+                    f"{model_name(key)} is downloaded, checked and switched on.\n\nAsk the assistant anything. The first "
+                    "answer takes a little longer (up to a minute) while the model loads; after that it's quicker. You "
+                    "can switch it off or remove it in the Local AI panel.")
 
     def failed(message):
         st.downloading = False
         canceled = st.cancel.is_set()
+        reason = message.split(":", 1)[-1].strip() if ":" in message else message
+        st.last_error = "" if canceled else reason
         window.status.setText("Download canceled; nothing was kept." if canceled else
-                              "The local AI download didn't finish: " + message[:140])
+                              "The local AI download didn't finish: " + reason[:140])
         sync(window)
         refresh_chat(window)
+        if not canceled:
+            log_event("local_ai_download", f"Local AI download did not finish: {reason[:300]}", result="failed",
+                      source="assistant")
+            window.error("Local AI download didn't finish",
+                         f"{reason}\n\nNothing half-downloaded was kept. You can press Download to try again.")
 
     _job(window, work, finished, failed, progressed)
 

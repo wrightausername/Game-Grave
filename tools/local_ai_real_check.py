@@ -30,6 +30,10 @@ def main():
         if pct >= shown["pct"] + 10:
             shown["pct"] = pct
             print(f"  {pct}% of {total / ai.GB:.2f} GB", flush=True)
+    for key in ("medium", "large"):  # the other two sizes resolve to one published, fingerprinted file
+        remote = ai.resolve_model(key)
+        print(f"{key}: {remote.name} {remote.size / ai.GB:.2f} GB sha256 {remote.sha256[:12]}…")
+        assert remote.size > 0.5 * ai.BY_KEY[key].approx_bytes
     print("Engine:", ai.RUNTIMES["vulkan"])
     ai.install_runtime("vulkan", report, base=base)
     shown["pct"] = -10
