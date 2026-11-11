@@ -181,8 +181,9 @@ FEATURES = (
          "ticked ones after Windows asks for administrator permission.",
          "Oldest drivers lists the oldest game-related drivers. An old date is a hint, not proof a newer one exists.",
          "Graphics card makers often have newer drivers than Windows Update; the tab links to their official app.",
-         "Starts with Windows lists the same apps as Task Manager's Startup apps, each with an on/off switch. Apps for "
-         "all users ask for administrator permission."),
+         "Starts with Windows lists the same apps as Task Manager's Startup apps, including Store apps, plus scheduled "
+         "tasks that run at sign-in, each with an on/off switch. Apps for all users ask for administrator permission.",
+         "When a driver needs it, Restart now restarts Windows after 60 seconds, and Cancel restart stops it."),
         "It never deletes a startup entry or an app, and drivers come only from Windows Update. A restart may be needed "
         "after a driver update.",
         "Hardware, then Drivers & Startup.", "Hardware",

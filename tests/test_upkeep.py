@@ -122,3 +122,42 @@ class Startup(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoreAppsAndTasks(unittest.TestCase):
+    def rows(self):
+        return up.parse_startup(json.dumps([
+            {"Name": "SpotifyStartupTask", "Command": "SpotifyAB.Spotify_zpdnekdrzrea0", "Scope": "user", "Source": "StoreApp",
+             "Ref": "SpotifyAB.Spotify_zpdnekdrzrea0\\SpotifyStartupTask", "State": 2, "Description": "Spotify"},
+            {"Name": "PolicyTask", "Scope": "user", "Source": "StoreApp", "Ref": "Pkg\\PolicyTask", "State": 3},
+            {"Name": "NoRef", "Scope": "user", "Source": "StoreApp", "State": 2},
+            {"Name": "Vendor Logon", "Command": "C:\\V\\v.exe /tray", "Scope": "machine", "Source": "Task",
+             "Ref": "\\Vendor\\Vendor Logon", "State": False, "Description": "Vendor Tray"},
+            {"Name": "My Task", "Command": "C:\\a.exe", "Scope": "user", "Source": "Task", "Ref": "\\My Task", "State": True}]))
+
+    def test_states(self):
+        apps = {a.name: a for a in self.rows()}
+        self.assertEqual(set(apps), {"SpotifyStartupTask", "PolicyTask", "Vendor Logon", "My Task"})
+        self.assertTrue(apps["SpotifyStartupTask"].enabled and not apps["SpotifyStartupTask"].locked)
+        self.assertTrue(apps["PolicyTask"].locked and not apps["PolicyTask"].enabled)
+        self.assertFalse(apps["Vendor Logon"].enabled)
+        self.assertTrue(apps["My Task"].enabled)
+
+    def test_store_toggle_writes_only_the_state(self):
+        apps = {a.name: a for a in self.rows()}
+        writes = []
+        up.set_enabled_user(apps["SpotifyStartupTask"], False, writer=lambda *a: writes.append(a))
+        self.assertEqual(writes, [(up.STORE_TASKS + "\\SpotifyAB.Spotify_zpdnekdrzrea0\\SpotifyStartupTask", "State", 1)])
+        with self.assertRaisesRegex(up.UpkeepError, "policy"):
+            up.set_enabled(apps["PolicyTask"], True)
+
+    def test_task_script(self):
+        apps = {a.name: a for a in self.rows()}
+        self.assertEqual(up.task_script(apps["Vendor Logon"], True),
+                         "$ErrorActionPreference='Stop'\nEnable-ScheduledTask -TaskPath '\\Vendor\\' -TaskName 'Vendor Logon' | Out-Null\n")
+        self.assertIn("Disable-ScheduledTask -TaskPath '\\' -TaskName 'My Task'", up.task_script(apps["My Task"], False))
+        self.assertIn("Disable-ScheduledTask", up.toggle_script(apps["Vendor Logon"], False))
+
+    def test_install_criteria_can_be_chosen(self):
+        self.assertIn("Type='Software'", up.install_script([ID], "__RESULT__", criteria="IsInstalled=0 and Type='Software'"))
+        self.assertIn("Type='Driver'", up.install_script([ID], "__RESULT__"))

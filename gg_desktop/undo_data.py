@@ -41,6 +41,7 @@ FEATURE_EVENTS = {
     "kit_restored": ("Resurrection Kit restored", "Other", "Files were restored into new places only. Nothing was overwritten."),
     "driver_update": ("Driver updates installed", "Other",
                       "Installed through Windows Update. To go back, use Device Manager (Roll Back Driver) or Exhume for graphics."),
+    "driver_restart": ("Restart scheduled for drivers", "Other", "Cancelled with Cancel restart, or shutdown /a."),
     "startup_toggle": ("Startup app switched", "Settings",
                        "Only Task Manager's on/off value changed. Switch it back in Hardware, Drivers & Startup, or in Task Manager."),
     "squad_profile": ("Squad Sync made a profile", "Other",

@@ -411,3 +411,11 @@ easily"). Placed as a third inner tab of Hardware, "Drivers & Startup" (`gg_desk
   ask first and go through the Windows prompt. Scheduled tasks, services and Store apps are not listed, and the tab says so.
 - Nothing runs automatically: the startup list and installed drivers are read when the tab is first opened, Windows Update only on a
   press. Covered by `tests/test_upkeep.py` and the Drivers & Startup part of `tools/hardware_smoke.py`.
+- Completed (owner instruction, 2026-11-11, "fully implement them already"): Starts with Windows also lists Microsoft Store apps'
+  startup tasks (State 2 on, 1 off by the user; policy states 3 and 4 are shown locked) and non-Microsoft scheduled tasks with a
+  sign-in or start-up trigger (Enable-/Disable-ScheduledTask, trying without admin first, then the Windows prompt). Services stay out.
+  A driver install that needs a restart shows Restart now (60-second `shutdown /r` with a message) and Cancel restart (`shutdown /a`).
+- `tools/upkeep_real_check.py` runs the REAL calls on the Windows CI machine: installed drivers, the startup list, both registry
+  switches, a scheduled task it creates and removes, the Store app list, the Windows Update driver search, and a real download and
+  install through the same installer code (a driver when one is offered, else a small Windows Update item such as Defender
+  definitions, which only proves the install path).

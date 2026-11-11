@@ -13,10 +13,12 @@ Drivers, honestly:
     installed without that prompt, and every attempt is written to the activity log.
 
 Startup, honestly:
-  * Lists exactly what Task Manager's Startup apps lists from: the Run keys (for you, and for all users) and the two
-    Startup folders. Programs started by scheduled tasks, services or Store apps are not listed, and the tab says so.
-  * The switch is Task Manager's own switch (the StartupApproved value). Turning an app off never deletes its entry or
-    its files, and turning it back on puts it back. Apps for all users need administrator rights (Windows asks).
+  * Lists what Task Manager's Startup apps lists (the Run keys for you and for all users, the two Startup folders and
+    Microsoft Store apps' startup tasks) plus scheduled tasks that start a program when you sign in or Windows starts.
+    Microsoft's own scheduled tasks and Windows services are left out, and the tab says so.
+  * Each switch is the one Windows itself uses: Task Manager's StartupApproved value, a Store app's startup-task state,
+    or the scheduled task's Enabled flag. Nothing is ever deleted, and switching back on puts it back. Changes that
+    need administrator rights go through the Windows prompt.
 """
 from __future__ import annotations
 
@@ -175,12 +177,14 @@ class StartupApp:
     name: str
     command: str
     scope: str            # "user" or "machine"
-    source: str           # "Run", "Run32" or "StartupFolder"
+    source: str           # "Run", "Run32", "StartupFolder", "StoreApp" or "Task"
     enabled: bool
     target: str = ""      # the program file, when it can be read from the command
     company: str = ""
     description: str = ""
     exists: bool | None = None
+    ref: str = ""         # StoreApp: "<package family>\\<task id>"; Task: the task's full path
+    locked: bool = False  # set by a policy; Windows does not let it be switched here
 
     @property
     def key(self):
@@ -241,13 +245,21 @@ def parse_startup(text) -> list[StartupApp]:
         name = str(row.get("Name") or "").strip()
         scope = str(row.get("Scope") or "")
         source = str(row.get("Source") or "")
-        if not name or scope not in ("user", "machine") or source not in ("Run", "Run32", "StartupFolder"):
+        if not name or scope not in ("user", "machine") or source not in SOURCES:
+            continue
+        ref = str(row.get("Ref") or "")
+        if source in ("StoreApp", "Task") and not ref:
             continue
         key = (scope, source, name.casefold())
         if key in seen:
             continue
         seen.add(key)
         raw = row.get("Approved")
+        state = row.get("State")
+        if source == "StoreApp":
+            enabled, locked = state in (2, 4), state in (3, 4)
+        elif source == "Task":
+            enabled, locked = state is not False, False
         if isinstance(raw, str):
             try:
                 raw = bytes.fromhex(raw)
@@ -256,11 +268,22 @@ def parse_startup(text) -> list[StartupApp]:
         command = str(row.get("Command") or "")
         target = str(row.get("Target") or "") or program_path(command)
         exists = row.get("Exists")
-        found.append(StartupApp(name[:200], command[:1000], scope, source, approved_enabled(raw), target[:500],
+        if source not in ("StoreApp", "Task"):
+            enabled, locked = approved_enabled(raw), False
+        found.append(StartupApp(name[:200], command[:1000], scope, source, enabled, target[:500],
                                 str(row.get("Company") or "")[:120], str(row.get("Description") or "")[:160],
-                                exists if isinstance(exists, bool) else None))
+                                exists if isinstance(exists, bool) else None, ref[:500], locked))
     found.sort(key=lambda a: (not a.enabled, a.title.casefold()))
     return found
+
+
+SOURCES = ("Run", "Run32", "StartupFolder", "StoreApp", "Task")
+STORE_TASKS = r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData"
+
+
+def store_state_value(enabled: bool) -> int:
+    """A Store app startup task's State: 2 enabled, 1 disabled by the user (what Task Manager writes)."""
+    return 2 if enabled else 1
 
 
 def ps_quote(text: str) -> str:
@@ -274,8 +297,18 @@ def approved_path(app: StartupApp) -> str:
     return APPROVED + "\\" + sub
 
 
+def task_script(app: StartupApp, enabled: bool) -> str:
+    """PowerShell that switches one scheduled task on or off. Nothing else about the task changes."""
+    folder, _, name = app.ref.rpartition("\\")
+    return ("$ErrorActionPreference='Stop'\n"
+            f"{'Enable' if enabled else 'Disable'}-ScheduledTask -TaskPath {ps_quote(folder + chr(92))} "
+            f"-TaskName {ps_quote(name)} | Out-Null\n")
+
+
 def toggle_script(app: StartupApp, enabled: bool, now: datetime | None = None) -> str:
     """PowerShell that writes only this app's StartupApproved value (used for all-users apps, run with admin rights)."""
+    if app.source == "Task":
+        return task_script(app, enabled)
     hive = "HKLM:" if app.scope == "machine" else "HKCU:"
     value = ",".join(str(b) for b in approved_value(enabled, now))
     path = hive + "\\" + approved_path(app)
@@ -289,6 +322,21 @@ def set_enabled_user(app: StartupApp, enabled: bool, *, writer=None) -> None:
     """For apps that start for you only: write Task Manager's value in your own registry. No admin rights needed."""
     if app.needs_admin:
         raise UpkeepError("This app starts for all users, so Windows needs administrator rights to change it.")
+    if app.locked:
+        raise UpkeepError("A policy on this PC controls this app's startup, so Windows does not let it be changed here.")
+    if app.source == "StoreApp":
+        pkg, _, task = app.ref.partition("\\")
+        if not pkg or not task or "\\" in task or ".." in app.ref:
+            raise UpkeepError("This Store app's startup entry could not be read.")
+        if writer is not None:
+            writer(STORE_TASKS + "\\" + app.ref, "State", store_state_value(enabled))
+            return
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, STORE_TASKS + "\\" + app.ref, 0, winreg.KEY_SET_VALUE) as key:
+            winreg.SetValueEx(key, "State", 0, winreg.REG_DWORD, store_state_value(enabled))
+        return
+    if app.source == "Task":
+        raise UpkeepError("Scheduled tasks are switched with PowerShell, not here.")
     data = approved_value(enabled)
     if writer is not None:
         writer(approved_path(app), app.name, data)
@@ -355,6 +403,40 @@ foreach ($d in @(@([Environment]::GetFolderPath('Startup'), 'user', 'HKCU:'), @(
       Approved = (Approved $d[2] 'StartupFolder' $file.Name); Company = $f.Company; Description = $f.Description; Exists = $f.Exists }
   }
 }
+# Microsoft Store apps' startup tasks (what Task Manager shows for Store apps)
+$store = 'HKCU:\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData'
+if (Test-Path -LiteralPath $store) {
+  $pk = @{}
+  Get-AppxPackage | ForEach-Object { $pk[$_.PackageFamilyName] = $_ }
+  foreach ($p in Get-ChildItem -LiteralPath $store) {
+    foreach ($t in Get-ChildItem -LiteralPath $p.PSPath) {
+      $st = (Get-ItemProperty -LiteralPath $t.PSPath).State
+      if ($null -eq $st) { continue }
+      $a = $pk[$p.PSChildName]; $title = ''; $pub = ''
+      if ($a) {
+        $m = ($a | Get-AppxPackageManifest).Package.Properties
+        if ($m.DisplayName -and $m.DisplayName -notlike 'ms-resource*') { $title = [string]$m.DisplayName } else { $title = $a.Name }
+        if ($m.PublisherDisplayName -and $m.PublisherDisplayName -notlike 'ms-resource*') { $pub = [string]$m.PublisherDisplayName }
+      }
+      $out += [pscustomobject]@{ Name = $t.PSChildName; Command = $p.PSChildName; Scope = 'user'; Source = 'StoreApp';
+        Ref = "$($p.PSChildName)\$($t.PSChildName)"; State = [int]$st; Company = $pub; Description = $title; Exists = [bool]$a }
+    }
+  }
+}
+# Scheduled tasks that start something at sign-in or when Windows starts (Microsoft's own are left out)
+$me = "$env:USERDOMAIN\$env:USERNAME"
+foreach ($t in Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' }) {
+  $starts = @($t.Triggers | Where-Object { $_.CimClass.CimClassName -in @('MSFT_TaskLogonTrigger', 'MSFT_TaskBootTrigger') })
+  if (-not $starts) { continue }
+  $exec = @($t.Actions | Where-Object { $_.Execute }) | Select-Object -First 1
+  if (-not $exec) { continue }
+  $path = [Environment]::ExpandEnvironmentVariables(($exec.Execute).Trim('"')); $f = Info $path
+  $uid = [string]$t.Principal.UserId
+  $scope = if ($uid -and ($uid -eq $env:USERNAME -or $uid -eq $me)) { 'user' } else { 'machine' }
+  $out += [pscustomobject]@{ Name = $t.TaskName; Command = (($exec.Execute) + ' ' + ($exec.Arguments)).Trim(); Scope = $scope;
+    Source = 'Task'; Ref = "$($t.TaskPath)$($t.TaskName)"; State = ($t.State -ne 'Disabled'); Target = $path;
+    Company = $f.Company; Description = $f.Description; Exists = $f.Exists }
+}
 @($out) | ConvertTo-Json -Compress
 """
 
@@ -388,14 +470,19 @@ def read_startup() -> list[StartupApp]:
     return parse_startup(_powershell(STARTUP_SCRIPT, 60))
 
 
-def install_script(update_ids, result_path: str) -> str:
+def search_any(criteria: str):
+    """Same as search_updates for another Windows Update search (used by the real-Windows check)."""
+    return parse_updates(_powershell(UPDATES_SCRIPT.replace(SEARCH, criteria), 600))
+
+
+def install_script(update_ids, result_path: str, criteria: str = SEARCH) -> str:
     ids = ",".join(ps_quote(i) for i in update_ids if re.fullmatch(r"[0-9a-fA-F-]{36}", str(i)))
     return ("$ErrorActionPreference='Stop'\n"
             f"$out = {ps_quote(result_path)}\n"
             "try {\n"
             f"  $ids = @({ids})\n"
             "  $s = New-Object -ComObject Microsoft.Update.Session; $s.ClientApplicationID = 'Game Grave'\n"
-            f"  $r = $s.CreateUpdateSearcher().Search(\"{SEARCH}\")\n"
+            f"  $r = $s.CreateUpdateSearcher().Search(\"{criteria}\")\n"
             "  $c = New-Object -ComObject Microsoft.Update.UpdateColl\n"
             "  foreach ($u in $r.Updates) { if ($ids -contains $u.Identity.UpdateID) { if (-not $u.EulaAccepted) { $u.AcceptEula() }; [void]$c.Add($u) } }\n"
             "  $res = @{ found = $c.Count; results = @(); reboot = $false }\n"
@@ -458,8 +545,33 @@ def install_updates(updates) -> tuple[bool, str, bool]:
 
 
 def set_enabled(app: StartupApp, enabled: bool) -> None:
-    """Turn a startup app on or off with Task Manager's own switch. All-users apps go through the Windows prompt."""
+    """Turn a startup app on or off with Windows' own switch. Changes that need admin rights go through the prompt."""
+    if app.locked:
+        raise UpkeepError("A policy on this PC controls this app's startup, so Windows does not let it be changed here.")
+    if app.source == "Task":
+        try:
+            _powershell(task_script(app, enabled), 60)          # your own tasks change without a prompt
+        except UpkeepError:
+            run_elevated(task_script(app, enabled), timeout=120)
+        return
     if app.needs_admin:
         run_elevated(toggle_script(app, enabled), timeout=120)
     else:
         set_enabled_user(app, enabled)
+
+
+def restart_pc(seconds: int = 60) -> None:
+    """Ask Windows to restart after a short delay, with a message. `shutdown /a` cancels it."""
+    if os.name != "nt":
+        raise UpkeepError("This works on Windows only.")
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    done = subprocess.run(["shutdown", "/r", "/t", str(max(10, int(seconds))), "/c",
+                           "Game Grave: restarting to finish driver updates."],
+                          capture_output=True, text=True, creationflags=flags, errors="replace")
+    if done.returncode != 0:
+        raise UpkeepError("Windows would not schedule the restart: " + (done.stderr or done.stdout).strip()[:160])
+
+
+def cancel_restart() -> None:
+    if os.name == "nt":
+        subprocess.run(["shutdown", "/a"], capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

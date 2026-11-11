@@ -74,12 +74,46 @@ def main():
     finally:
         cleanup()
 
+    # A real scheduled task that runs at sign-in: listed, switched off and on, then removed.
+    task = "GG Real Check Task"
+    up._powershell(f"Register-ScheduledTask -TaskName {up.ps_quote(task)} -Action (New-ScheduledTaskAction -Execute "
+                   f"{up.ps_quote(target)}) -Trigger (New-ScheduledTaskTrigger -AtLogOn) -Force | Out-Null", 60)
     try:
-        updates = up.search_updates()
-        print(f"PASS real: Windows Update driver search answered with {len(updates)} update(s): "
-              + "; ".join(u.title for u in updates[:5]))
-    except up.UpkeepError as problem:
-        print(f"NOTE real: Windows Update driver search did not answer on this machine: {problem}")
+        listed = next((a for a in up.read_startup() if a.source == "Task" and a.name == task), None)
+        assert listed and listed.enabled and listed.ref == "\\" + task, listed
+        up.set_enabled(listed, False)
+        assert not next(a for a in up.read_startup() if a.source == "Task" and a.name == task).enabled
+        up.set_enabled(listed, True)
+        assert next(a for a in up.read_startup() if a.source == "Task" and a.name == task).enabled
+        print("PASS real: scheduled task at sign-in listed, switched off and back on")
+    finally:
+        up._powershell(f"Unregister-ScheduledTask -TaskName {up.ps_quote(task)} -Confirm:$false", 60)
+    store = [a for a in up.read_startup() if a.source == "StoreApp"]
+    print(f"PASS real: Store app startup tasks read: {len(store)} ({', '.join(a.title for a in store[:4]) or 'none on this machine'})")
+
+    updates = up.search_updates()
+    print(f"PASS real: Windows Update driver search answered with {len(updates)} update(s): "
+          + "; ".join(u.title for u in updates[:5]))
+
+    # Prove the download-and-install path for real. This machine rarely has a driver waiting, so if none is offered
+    # the same installer code installs a small Windows Update item instead (Defender definitions, or any small one).
+    if updates:
+        ok, words, reboot = up.install_updates(updates[:1])
+        assert ok, words
+        print(f"PASS real: installed a real driver update through Windows Update: {words}")
+    else:
+        criteria = ("IsInstalled=0 and IsHidden=0 and Type='Software' and "
+                    "CategoryIDs contains 'E0789628-CE08-4437-BE74-2495B842F43B'")          # Definition Updates
+        found = up.search_any(criteria)
+        small = [u for u in found if u.size < 400 * 1024 ** 2]
+        if not small:
+            criteria = "IsInstalled=0 and IsHidden=0 and Type='Software'"
+            small = sorted([u for u in up.search_any(criteria) if 0 < u.size < 200 * 1024 ** 2], key=lambda u: u.size)
+        assert small, "Windows Update offered nothing small enough to prove the install path"
+        text = up.run_elevated(up.install_script([small[0].update_id], "__RESULT__", criteria=criteria))
+        ok, words, reboot = up.summarize_install(text, 1)
+        assert ok, words
+        print(f"PASS real: download and install through the same installer code worked ({small[0].title}): {words}")
     print(f"Drivers & Startup real check passed in {time.time() - started:.0f}s")
 
 

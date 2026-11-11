@@ -16,7 +16,9 @@ from gg_desktop import upkeep_core as up
 from gg_desktop.widgets import button, column, label, panel, row
 
 SOURCE_WORDS = {"Run": "Starts from the registry", "Run32": "Starts from the registry (32-bit)",
-                "StartupFolder": "Starts from the Startup folder"}
+                "StartupFolder": "Starts from the Startup folder", "StoreApp": "Microsoft Store app startup task",
+                "Task": "Scheduled task that runs at sign-in or start-up"}
+KIND_WORDS = {"StoreApp": "Store app", "Task": "scheduled task"}
 
 
 def _scroll(inner_layout, minimum=220):
@@ -75,6 +77,10 @@ class UpkeepTab(QWidget):
                                      tip="Downloads and installs the ticked driver updates through Windows Update.")
         self.install_button.hide()
         act.addWidget(self.install_button)
+        self.restart_button = button("Restart now", self.restart, kind="primary",
+                                     tip="Windows restarts in 60 seconds to finish the driver updates. Save your work first.")
+        self.restart_button.hide()
+        act.addWidget(self.restart_button)
         self.maker_button = button("", self.open_maker, kind="actionLink")
         self.maker_button.hide()
         act.addWidget(self.maker_button)
@@ -103,8 +109,8 @@ class UpkeepTab(QWidget):
         startup.addWidget(self.startup_status)
         self.app_box = column(spacing=2)
         startup.addWidget(_scroll(self.app_box, 300), 1)
-        startup.addWidget(label("Apps started by scheduled tasks, services or the Microsoft Store are not listed here.",
-                                "caption", wrap=True))
+        startup.addWidget(label("Includes Store apps and scheduled tasks that run at sign-in. Microsoft's own tasks and "
+                                "Windows services are left out on purpose.", "caption", wrap=True))
         outer.addWidget(self.startup_panel, 1)
 
     def set_gpus(self, names):
@@ -233,6 +239,7 @@ class UpkeepTab(QWidget):
             self.check_button.setEnabled(True)
             ok, words, reboot = result
             self.driver_status.setText(words)
+            self.restart_button.setVisible(bool(reboot))
             log_event("driver_update", f"Driver updates through Windows Update: {words}",
                       result="installed" if ok else "not installed", source="hardware")
             if ok:
@@ -241,6 +248,29 @@ class UpkeepTab(QWidget):
             else:
                 self.sync_install()
         window.job(work, done, error_title="Driver install did not finish")
+
+    def restart(self):
+        window = self.window_owner
+        if not window.confirm("Restart Windows?", "Windows will restart in 60 seconds to finish the driver updates. "
+                                                  "Save your work and close any game first."):
+            return
+        try:
+            up.restart_pc(60)
+        except up.UpkeepError as problem:
+            window.error("Restart not scheduled", str(problem))
+            return
+        log_event("driver_restart", "Restart scheduled to finish driver updates", result="scheduled", source="hardware")
+        self.restart_button.setText("Cancel restart")
+        self.restart_button.clicked.disconnect()
+        self.restart_button.clicked.connect(self.cancel_restart)
+        self.driver_status.setText("Windows restarts in 60 seconds. Press Cancel restart to stop it.")
+
+    def cancel_restart(self):
+        up.cancel_restart()
+        self.restart_button.setText("Restart now")
+        self.restart_button.clicked.disconnect()
+        self.restart_button.clicked.connect(self.restart)
+        self.driver_status.setText("Restart cancelled. Restart later to finish the driver updates.")
 
     def open_maker(self):
         if self.maker:
@@ -278,12 +308,16 @@ class UpkeepTab(QWidget):
             box = row(spacing=10, margins=(2, 4, 2, 4))
             line.setLayout(box)
             switch = Switch(app.enabled, name=f"Start {app.title} with Windows")
+            switch.setEnabled(not app.locked)
             switch.clicked.connect(lambda checked=False, a=app, s=switch: self.toggle(a, s))
             box.addWidget(switch)
             words = column(spacing=0)
             words.addWidget(label(app.title, "readyGameTitle"))
-            detail = " · ".join(p for p in (app.company, "for all users (asks for admin)" if app.needs_admin else "for you",
-                                            "file is missing" if app.exists is False else "") if p)
+            detail = " · ".join(p for p in (app.company, KIND_WORDS.get(app.source, ""),
+                                            "set by a policy" if app.locked else
+                                            "for all users (asks for admin)" if app.needs_admin else "for you",
+                                            "file is missing" if app.exists is False and app.source != "StoreApp" else "")
+                                if p)
             words.addWidget(label(detail, "caption"))
             box.addLayout(words, 1)
             line.setToolTip(f"{SOURCE_WORDS[app.source]}: {app.name}\n{app.command}")
@@ -296,7 +330,8 @@ class UpkeepTab(QWidget):
         if app.needs_admin and not window.confirm(
                 ("Turn on " if wanted else "Turn off ") + app.title + "?",
                 f"{app.title} starts for every user on this PC, so Windows will ask for administrator permission.\n\n"
-                "Only Task Manager's on/off value changes; the app and its startup entry stay."):
+                + ("Only the scheduled task's Enabled setting changes; the task and the app stay."
+                   if app.source == "Task" else "Only Task Manager's on/off value changes; the app and its startup entry stay.")):
             switch.setChecked(not wanted)
             return
         switch.setEnabled(False)

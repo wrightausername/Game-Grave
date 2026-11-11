@@ -249,7 +249,7 @@ def main():
                  patch("gg_desktop.upkeep_core.set_enabled_user", side_effect=lambda a, on: writes.append((a.name, on))), \
                  patch("gg_desktop.upkeep_core.run_elevated",
                        side_effect=lambda script, **kw: elevated.append(script) or
-                       (json.dumps({"found": 1, "reboot": False, "results": [{"title": "NVIDIA", "code": 2}]})
+                       (json.dumps({"found": 1, "reboot": True, "results": [{"title": "NVIDIA", "code": 2}]})
                         if "UpdateInstaller" in script else "")):
                 pressed(window, "Drivers && Startup").click()
                 tab = body(window).upkeep_tab
@@ -287,6 +287,14 @@ def main():
                     wait_for(lambda: "Installed 1 of 1" in tab.driver_status.text() or elevated and not window.cleaning,
                              "the driver install")
                 assert uid in elevated[0] and not window.cleaning
+                assert tab.restart_button.isVisible(), "a driver that needs a restart offers Restart now"
+                with patch("gg_desktop.upkeep_core.restart_pc") as restart, patch.object(window, "confirm", return_value=True):
+                    tab.restart_button.click()
+                    restart.assert_called_once_with(60)
+                assert tab.restart_button.text() == "Cancel restart"
+                with patch("gg_desktop.upkeep_core.cancel_restart") as cancel:
+                    tab.restart_button.click()
+                    cancel.assert_called_once()
                 pressed(window, "Your PC").click()
                 settle(60)
 
