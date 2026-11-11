@@ -108,9 +108,11 @@ def main():
             second.folder.setText(str(root / "Cancelled"))
             second.show()
             wait_for(lambda: second.plan is not None, "the second plan")
-            second.cancel.set()
-            second.create_button.click()
-            wait_for(lambda: "Cancelled" in second.status.text(), "the cancel")
+            real = ui.engine.create_complete_kit
+            with patch.object(ui.engine, "create_complete_kit",
+                              side_effect=lambda *a, **k: real(*a, **dict(k, cancel=lambda: True))):
+                second.create_button.click()
+                wait_for(lambda: "Cancelled" in second.status.text(), "the cancel")
             assert list((root / "Cancelled").glob("*")) == [], list((root / "Cancelled").glob("*"))
             second.close()
 
