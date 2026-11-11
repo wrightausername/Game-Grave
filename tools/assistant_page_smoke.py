@@ -198,7 +198,8 @@ def main():
                 while "didn't keep Game Grave's rules" not in transcript(window) and time.time() < deadline:
                     settle()
                     time.sleep(0.05)
-            assert "didn't keep Game Grave's rules" in transcript(window) and "safe to delete" not in transcript(window).replace("is it safe to delete", "")
+            low = transcript(window).lower().replace("is it safe to delete", "")
+            assert "didn't keep game grave's rules" in low and "cyberpunk is safe to delete" not in low, low
             local_ai_ui.stop(window)
             w.switch.click()
             settle()
