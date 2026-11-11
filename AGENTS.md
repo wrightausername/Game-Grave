@@ -470,3 +470,7 @@ replaced by a "Local AI" panel; the rest of the tab is unchanged.
 - Covered by `tests/test_local_ai.py`, the AI Assistant smoke (panel states, a stand-in model answer, a rule-breaking reply
   rejected), and `tools/local_ai_real_check.py`, which on the Windows CI machine REALLY downloads the Small model and engine,
   runs llama-server, asks three questions and removes it all.
+- Prominence (owner, 2026-11-11: the chat "distracts from the actual AI assistant download in the corner"): the Local AI panel
+  now sits at the top of the right column, above Data Used, and an empty chat shows a large "Get smarter answers with Local AI"
+  card (pick Small / Medium / Large, Download Local AI, Not now) until a model is downloaded or the owner presses Not now
+  (`local_ai_card_hidden`). The card uses the same confirmed, verified download as the panel.

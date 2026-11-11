@@ -191,6 +191,7 @@ def download(window):
     st.downloading = True
     st.cancel.clear()
     sync(window)
+    refresh_chat(window)
     window.status.setText("Downloading the local AI model. You can keep using Game Grave.")
 
     def work(progress):
@@ -223,6 +224,7 @@ def download(window):
                   source="assistant")
         window.status.setText(f"Local AI ready: {model_name(key)}. Ask a question to try it.")
         sync(window)
+        refresh_chat(window)
 
     def failed(message):
         st.downloading = False
@@ -230,6 +232,7 @@ def download(window):
         window.status.setText("Download canceled; nothing was kept." if canceled else
                               "The local AI download didn't finish: " + message[:140])
         sync(window)
+        refresh_chat(window)
 
     _job(window, work, finished, failed, progressed)
 
@@ -364,3 +367,94 @@ def shutdown(window):
     server, st.server = st.server, None
     if server is not None:
         server.stop()
+
+
+# ------------------------------------------------------------------ setup card in an empty chat
+def show_card(window):
+    """The big 'Get Local AI' card shows in an empty chat until a model is downloaded or the owner says Not now."""
+    return not ai.installed_models() and not window.settings.get("local_ai_card_hidden") and not state_of(window).downloading
+
+
+CARD_LINES = {"small": "Fastest, lightest", "medium": "Recommended for most PCs", "large": "Best answers, 16 GB RAM"}
+
+
+def setup_card(window):
+    from PySide6.QtWidgets import QFrame, QPushButton
+    card = QFrame()
+    card.setObjectName("localAICard")
+    card.setStyleSheet(
+        "QFrame#localAICard{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 rgba(50,214,122,38),"
+        "stop:1 rgba(19,188,245,18));border:1px solid #2a9c5c;border-radius:12px;}"
+        "QPushButton#localAISize{background:#08130d;border:1px solid #1f5a39;border-radius:8px;color:#dfe8ee;"
+        "padding:8px 6px;text-align:left;font-size:12px;}"
+        "QPushButton#localAISize:checked{border:2px solid #32d67a;background:#0d2417;}"
+        "QPushButton#localAISize:hover{border-color:#32d67a;}")
+    lay = column(spacing=8, margins=(16, 14, 16, 14))
+    card.setLayout(lay)
+    head = row(spacing=8)
+    pic = QLabel()
+    pic.setPixmap(icon("sparkles", "#32d67a", 22).pixmap(22, 22))
+    head.addWidget(pic)
+    title = label("Get smarter answers with Local AI", "sectionTitle")
+    title.setStyleSheet("font-size:16px;font-weight:800;color:#f2f7f4;")
+    head.addWidget(title, 1)
+    lay.addLayout(head)
+    blurb = label("Download a free AI model once and the assistant answers in plain language, like a chat. It runs "
+                  "on this PC only: no account, no internet after the download, and nothing you ask leaves your "
+                  "computer. Skip it and you still get the built-in answers.", "subtle", wrap=True)
+    blurb.setStyleSheet("color:#cfd9e2;font-size:12px;")
+    lay.addWidget(blurb)
+    sizes = row(spacing=8)
+    picks = []
+    current = chosen(window)
+
+    def pick(key):
+        for k, b in picks:
+            b.setChecked(k == key)
+        window.settings = dict(window.settings, local_ai_model=key)
+        _save(window)
+        w = state_of(window).widgets
+        if w is not None and _alive(w.combo):
+            w.combo.blockSignals(True)
+            w.combo.setCurrentIndex(max(0, w.combo.findData(key)))
+            w.combo.blockSignals(False)
+            sync(window)
+    for choice in ai.MODELS:
+        b = QPushButton(f"{choice.label}  ·  {choice.approx_bytes / ai.GB:.1f} GB\n{CARD_LINES[choice.key]}")
+        b.setObjectName("localAISize")
+        b.setCheckable(True)
+        b.setChecked(choice.key == current)
+        b.setAccessibleName(f"{choice.label} model, {choice.approx_bytes / ai.GB:.1f} GB")
+        b.setToolTip(f"Needs about {choice.ram_gb} GB of memory.")
+        b.setMinimumHeight(64)
+        b.clicked.connect(lambda _=False, k=choice.key: pick(k))
+        picks.append((choice.key, b))
+        sizes.addWidget(b, 1)
+    lay.addLayout(sizes)
+    actions = row(spacing=8)
+    get = button("Download Local AI", lambda: download(window), kind="primary")
+    get.setFixedHeight(32)
+    later = button("Not now", lambda: dismiss(window))
+    later.setFixedHeight(32)
+    actions.addWidget(get)
+    actions.addWidget(later)
+    actions.addStretch()
+    note = label("You can change the size, switch it off or remove it any time in the Local AI panel.", "caption", wrap=True)
+    actions.addWidget(note, 1)
+    lay.addLayout(actions)
+    card.picks = picks
+    card.download_button = get
+    return card
+
+
+def dismiss(window):
+    window.settings = dict(window.settings, local_ai_card_hidden=True)
+    _save(window)
+    window.status.setText("Local AI stays available in the panel on the right whenever you want it.")
+    refresh_chat(window)
+
+
+def refresh_chat(window):
+    from gg_desktop import assistant_page
+    if assistant_page.live(window):
+        assistant_page.render_chat(window)

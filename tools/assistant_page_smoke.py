@@ -160,6 +160,28 @@ def main():
             ask(window, "which game should I uninstall")
             assert "where the most space sits" in transcript(window) or "Nothing big stands out" in transcript(window)
 
+            # With no model downloaded, an empty chat shows the big Local AI card; Not now hides it for good.
+            from PySide6.QtWidgets import QFrame
+            assistant_page.new_chat(window)
+            settle()
+            cards = [f for f in window.assistant_scroll.widget().findChildren(QFrame) if f.objectName() == "localAICard"]
+            assert cards and cards[0].isVisible(), "the Local AI card shows in an empty chat"
+            assert [k for k, b in cards[0].picks if b.isChecked()] == ["medium"]
+            cards[0].picks[0][1].click()
+            settle()
+            assert window.settings.get("local_ai_model") == "small"
+            cards = [f for f in window.assistant_scroll.widget().findChildren(QFrame) if f.objectName() == "localAICard"]
+            window.grab().save(str(args.output / "assistant-local-ai-card-1280.png"))
+            next(b for b in cards[0].findChildren(QPushButton) if b.text() == "Not now").click()
+            settle()
+            assert window.settings.get("local_ai_card_hidden") is True
+            assert not [f for f in window.assistant_scroll.widget().findChildren(QFrame)
+                        if f.objectName() == "localAICard" and f.isVisible()], "Not now hides the card"
+            from gg_desktop import local_ai_ui as _lui
+            _lui.state_of(window).widgets.combo.setCurrentIndex(1)
+            settle()
+            assert window.settings.get("local_ai_model") == "medium"
+
             # Local AI panel: nothing downloaded, so the switch is off and disabled and Download is offered.
             from gg_desktop import local_ai_core as ai
             from gg_desktop import local_ai_ui

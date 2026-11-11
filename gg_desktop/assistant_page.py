@@ -338,8 +338,8 @@ def build(window):
     right = QWidget()
     right_lay = column(spacing=8)
     right.setLayout(right_lay)
-    right_lay.addWidget(used, 4)
     right_lay.addWidget(can, 4)
+    right_lay.addWidget(used, 4)
 
     page.content.addWidget(_split(_split(left, chat, [222, 580]), _detail_scroll(right), [802, 232]), 1)
     page.assistant_ready = True
@@ -421,6 +421,9 @@ def render_chat(window):
     window.assistant_title.setText(chat["title"] if chat and chat["messages"] else "New chat")
     if not chat or not chat["messages"]:
         add_assistant_text(window, WELCOME)
+        if local_ai_ui.show_card(window):
+            window.assistant_messages.addSpacing(6)
+            window.assistant_messages.addWidget(local_ai_ui.setup_card(window))
     else:
         question = ""
         for message in chat["messages"]:
