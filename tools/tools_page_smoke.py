@@ -158,10 +158,17 @@ def main():
             window.tools_tiles["resurrection_kit"].click()
             settle()
             menu = shown.pop()
-            assert isinstance(menu, actions.KitMenu) and set(menu.buttons) == set(actions.KIT_METHODS)
+            assert isinstance(menu, actions.KitMenu) and set(menu.buttons) == set(actions.KIT_METHODS) | {"easy", "restore_game"}
             for key, control in menu.buttons.items():
+                if key in ("easy", "restore_game"):
+                    continue
                 control.click()
                 assert kit_calls[key].call_count == 1, key
+            from gg_desktop import kit_easy_ui
+            for key, name in (("easy", "open_easy_setup"), ("restore_game", "open_easy_restore")):
+                with patch.object(kit_easy_ui, name) as opened:
+                    menu.buttons[key].click()
+                    assert opened.call_count == 1, key
 
             # Quick actions.
             window.tools_quick_buttons["scan"].click()
