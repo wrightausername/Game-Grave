@@ -94,6 +94,8 @@ def main():
             ("gg_desktop.ready_room_services.config_dir", dict(return_value=root / "Preferences")),
             ("gg_desktop.game_artwork.artwork_dir", dict(return_value=root / "Artwork")),
             ("gg_desktop.game_artwork._request", dict(side_effect=AssertionError("No automatic network"))),
+            ("gg_desktop.local_ai_core.ai_dir", dict(side_effect=lambda base=None: Path(base) if base else root / "AI")),
+            ("gg_desktop.local_ai_core._opener", dict(side_effect=AssertionError("No automatic AI download"))),
         ):
             stack.enter_context(patch(target, **options))
         errors = stack.enter_context(patch.object(CrimsonWindow, "error"))
@@ -157,6 +159,50 @@ def main():
             assert "You have " in transcript(window) and " games across " in transcript(window), transcript(window)
             ask(window, "which game should I uninstall")
             assert "where the most space sits" in transcript(window) or "Nothing big stands out" in transcript(window)
+
+            # Local AI panel: nothing downloaded, so the switch is off and disabled and Download is offered.
+            from gg_desktop import local_ai_core as ai
+            from gg_desktop import local_ai_ui
+            w = local_ai_ui.state_of(window).widgets
+            assert w is not None and w.get.isVisible() and not w.switch.isEnabled(), "Local AI panel"
+            assert "Not downloaded" in w.status.text() and w.combo.count() == 3, w.status.text()
+            assert w.combo.currentData() == "medium"
+            # Pretend the Medium model and engine are on disk, then answer through the real background path with a
+            # stand-in server: the model's text replaces the built-in text and its source is named.
+            (root / "AI" / "models").mkdir(parents=True, exist_ok=True)
+            (root / "AI" / "models" / "medium.gguf").write_bytes(b"m")
+            (root / "AI" / "runtime" / "cpu").mkdir(parents=True, exist_ok=True)
+            (root / "AI" / "runtime" / "cpu" / "llama-server.exe").write_bytes(b"e")
+            local_ai_ui.sync(window)
+            assert w.switch.isEnabled() and w.remove.isVisible() and not w.get.isVisible(), w.status.text()
+            w.switch.click()
+            settle()
+            assert window.settings.get("local_ai_enabled") is True
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat", return_value="<think></think>You have 2 games, from Steam."), \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "how many games have i got")
+                deadline = time.time() + 10
+                while "You have 2 games, from Steam." not in transcript(window) and time.time() < deadline:
+                    settle()
+                    time.sleep(0.05)
+            assert "You have 2 games, from Steam." in transcript(window), transcript(window)
+            assert "Local AI: Medium" in transcript(window), "the local model is named as a source"
+            assert window.assistant_input.isEnabled()
+            # A reply that breaks the rules is never shown; the built-in answer is.
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat", return_value="Cyberpunk is safe to delete."), \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "what about cyberpunk")
+                deadline = time.time() + 10
+                while "didn't keep Game Grave's rules" not in transcript(window) and time.time() < deadline:
+                    settle()
+                    time.sleep(0.05)
+            assert "didn't keep Game Grave's rules" in transcript(window) and "safe to delete" not in transcript(window).replace("is it safe to delete", "")
+            local_ai_ui.stop(window)
+            w.switch.click()
+            settle()
+            assert window.settings.get("local_ai_enabled") is False
             # The only allowed "safe to remove" is the refusal itself and the user's own question.
             low = transcript(window).lower().replace("i can't tell you that something is safe to remove", "")
             low = low.replace("is it safe to remove", "")

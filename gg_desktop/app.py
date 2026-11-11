@@ -413,6 +413,11 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
                        "Cancel the scan or finish the approved recovery operation before closing.")
             event.ignore()
             return
+        try:  # the optional local AI model never outlives the app
+            from gg_desktop import local_ai_ui
+            local_ai_ui.shutdown(self)
+        except Exception:
+            pass
         super().closeEvent(event)
 
 

@@ -447,3 +447,26 @@ questions: before, about half were sent to the wrong topic or a generic "I can't
   system requirements and shows the parts to compare.
 - Rules unchanged: nothing is called safe to remove, sizes stay reported, every answer names its source and hands off to
   the owning tab. Covered by `tests/test_assistant_answers.py` and the AI Assistant smoke.
+
+Local AI, optional download (owner instruction, 2026-11-11, "It should be an ai that's optional to download"; answers: "Built into
+Game Grave", model size "Let the user pick"). AI Assistant is reopened for this: its right column's "What It Can Do" panel is
+replaced by a "Local AI" panel; the rest of the tab is unchanged.
+- `gg_desktop/local_ai_core.py` (no Qt): Small / Medium / Large = Qwen3 1.7B / 4B / 8B Q4_K_M from ggml-org on Hugging Face
+  (Apache 2.0), run by llama.cpp's own `llama-server.exe` (tag b7388; Vulkan build for NVIDIA/AMD/Intel graphics, CPU build as
+  fallback). Downloads only on the owner's press, after a confirmation naming sizes, sources and folder; https only to
+  huggingface.co / hf.co / github.com / githubusercontent.com (redirects checked); every file is checked against the SHA-256
+  its publisher records (Hugging Face's file record, GitHub's asset digest, plus the pinned winget hash of the Vulkan zip) and
+  deleted on mismatch, cancel or failure; free space is checked first; zip entries outside the folder are refused. Everything
+  lives in `<config>/ai`; Remove deletes that model (or the whole folder with the last model). Logged: local_ai_download,
+  local_ai_remove.
+- Running: llama-server listens on 127.0.0.1 only, below normal priority, half the CPU threads, started on the first local
+  answer, stopped after 5 idle minutes, when a game is running (checked every 30 s while it runs) and when Game Grave closes.
+  While a game runs the assistant gives the built-in answer and says why.
+- Answers (`gg_desktop/local_ai_prompt.py`, pure): the built-in answer is always computed first. The model gets a digest of
+  the enabled sources' facts, that built-in answer and the question, and must answer only from them. Its reply is shown only
+  if it passes `clean_reply` (no "safe to delete/remove/clear", no "freed"/"reclaimed", no "I deleted/moved/installed",
+  thinking text removed, no em dashes); otherwise the built-in answer is shown with a note. The rows, sources and hand-off
+  buttons stay the built-in ones, and the model is named as a source ("Local AI: Medium").
+- Covered by `tests/test_local_ai.py`, the AI Assistant smoke (panel states, a stand-in model answer, a rule-breaking reply
+  rejected), and `tools/local_ai_real_check.py`, which on the Windows CI machine REALLY downloads the Small model and engine,
+  runs llama-server, asks three questions and removes it all.

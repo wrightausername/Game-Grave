@@ -218,6 +218,22 @@ FEATURES = (
         "Choose which scan results the assistant may read."),
 )
 
+FEATURES = FEATURES + (
+    Feature(
+        "local_ai", "Local AI",
+        ("local ai", "local model", "ai model", "download the ai", "download ai", "offline ai", "llm", "qwen",
+         "llama.cpp", "language model"),
+        "Local AI is an optional AI model you can download in the AI Assistant tab. It runs on this PC only and writes "
+        "the assistant's answers in plain language from the same facts the built-in answers use.",
+        ("Pick Small (1.3 GB), Medium (2.5 GB, recommended) or Large (5 GB), then press Download. Game Grave asks first.",
+         "The model (Qwen3, from Hugging Face) and llama.cpp's engine (from GitHub) are checked against their published "
+         "SHA-256 before use.",
+         "Switch it off any time to go back to the built-in answers; Remove deletes it.",
+         "It pauses while a game is running and stops after a few idle minutes."),
+        "Nothing you ask leaves this PC, and a reply that breaks Game Grave's rules is never shown; the built-in "
+        "answer is shown instead.", "AI Assistant, Local AI panel on the right.", "AI Assistant",
+        "Optional AI model that runs on this PC only."),
+)
 BY_KEY = {f.key: f for f in FEATURES}
 
 

@@ -18,6 +18,7 @@ from shiboken6 import isValid
 from core import get_activity, save_settings
 from recovery import get_records
 from gg_desktop import assistant_actions as actions
+from gg_desktop import local_ai_ui
 from gg_desktop import assistant_data as data
 from gg_desktop import assistant_engine as engine
 from gg_desktop.grave_page import CheckRow
@@ -333,29 +334,12 @@ def build(window):
     used_lay.addWidget(label("Answers only use what Game Grave has already scanned on this PC.", "caption", wrap=True))
     used_lay.addStretch()
 
-    can, can_lay = panel(kind="fileFilterPanel", padding=9, spacing=5)
-    accent(can, "assistantCan", "green")
-    head4 = row(spacing=6)
-    shield = QLabel()
-    shield.setPixmap(icon("shield", "#32d67a", 18).pixmap(18, 18))
-    head4.addWidget(shield)
-    head4.addWidget(label("What It Can Do", "sectionTitle"), 1)
-    can_lay.addLayout(head4)
-    for symbol, text in (("search", "Explain scan and cleanup results"), ("list", "Compare games and folders by size"),
-                         ("folder", "Open the tab that owns the files")):
-        line = row(spacing=7)
-        pic = QLabel()
-        pic.setPixmap(icon(symbol, "#30d76b", 16).pixmap(16, 16))
-        line.addWidget(pic)
-        line.addWidget(label(text, "subtle", wrap=True), 1)
-        can_lay.addLayout(line)
-    can_lay.addWidget(label("Read only. The assistant never deletes, moves, restores or scans anything.", "warning", wrap=True))
-    can_lay.addStretch()
+    can = local_ai_ui.build_panel(self, accent)
     right = QWidget()
     right_lay = column(spacing=8)
     right.setLayout(right_lay)
-    right_lay.addWidget(used, 5)
-    right_lay.addWidget(can, 3)
+    right_lay.addWidget(used, 4)
+    right_lay.addWidget(can, 4)
 
     page.content.addWidget(_split(_split(left, chat, [222, 580]), _detail_scroll(right), [802, 232]), 1)
     page.assistant_ready = True
@@ -543,8 +527,30 @@ def send(window, question=None):
         chat = actions.new_chat(time.time())
         state.chats.insert(0, chat)
         state.current = chat["id"]
-    actions.add_exchange(chat, text, result, time.time())
     window.assistant_input.clear()
+    if local_ai_ui.enabled(window) and result.intent not in ("greet", "thanks", "off", "hardware_unread"):
+        msgs = chat["messages"]
+        history = [(msgs[i]["text"], msgs[i + 1]["text"]) for i in range(0, len(msgs) - 1, 2)
+                   if msgs[i]["role"] == "user" and msgs[i + 1]["role"] == "assistant"]
+        window.assistant_input.setEnabled(False)
+        window.assistant_send.setEnabled(False)
+        window.status.setText("Local AI is writing the answer on this PC…")
+        chat_id = chat["id"]
+
+        def deliver(answer):
+            target = next((c for c in state.chats if c["id"] == chat_id), None)
+            if target is not None:
+                actions.add_exchange(target, text, answer, time.time())
+                persist_chats(window)
+            if live(window):
+                window.assistant_input.setEnabled(True)
+                window.assistant_send.setEnabled(True)
+                window.assistant_input.setFocus()
+                window.status.setText("Answered on this PC from scanned data. Nothing was changed.")
+                refresh(window)
+        local_ai_ui.answer_async(window, text, result, facts, history, deliver)
+        return
+    actions.add_exchange(chat, text, result, time.time())
     persist_chats(window)
     window.status.setText("Answered from scanned data. Nothing was changed.")
     refresh(window)
