@@ -82,6 +82,8 @@ def main():
                             assert needed <= sub.height() + 2, f"{route} {width}px: subtitle needs {needed}px, has {sub.height()}px"
                             title = getattr(heading, "title_label", None)
                             if title is not None:
+                                assert title.mapTo(heading, QPoint()).x() < 90, f"{route} {width}px: the title is not at the left"
+                            if title is not None:
                                 assert title.geometry().bottom() <= sub.geometry().top() + 2, f"{route} {width}px: subtitle overlaps the title"
                     shot = window.grab().toImage()
                     left = window.top_bar.mapTo(window, QPoint()).x()

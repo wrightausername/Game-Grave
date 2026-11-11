@@ -355,6 +355,7 @@ class PageBanner(QWidget):
         # The text column takes the free width so a narrow window never squeezes the subtitle below its own cap
         # (it is capped at 445 or 750 px and left aligned, so wide windows look the same as before).
         layout.addLayout(text, 1)
+        layout.addStretch(0)  # soaks up width past the caps so the title stays at the left
 
     def paintEvent(self, event):
         p = QPainter(self)
