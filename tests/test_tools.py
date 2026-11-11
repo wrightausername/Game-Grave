@@ -66,7 +66,7 @@ class Registry(unittest.TestCase):
     def test_quick_actions_and_kit_menu_cover_the_existing_kit_workflow(self):
         self.assertEqual(len(data.QUICK_ACTIONS), 5)
         self.assertEqual({k for k, _t, _h in data.KIT_ACTIONS},
-                         {"create", "restore", "rehearse", "missing", "compare", "versions", "transfer"})
+                         {"easy", "restore_game", "create", "restore", "rehearse", "missing", "compare", "versions", "transfer"})
 
 
 class Reports(unittest.TestCase):

@@ -150,11 +150,11 @@ class KitMenu(QDialog):
         box = column(spacing=8, margins=(16, 14, 16, 14))
         self.setLayout(box)
         box.addWidget(label("Resurrection Kit", "sectionTitle"))
-        box.addWidget(label("Kits are built and restored by the existing verified workflow. Nothing is overwritten and "
-                            "every step asks you first.", "subtle", wrap=True))
+        box.addWidget(label("A kit saves a game's whole install, saves and load order into one verified ZIP. Restoring puts "
+                            "it back without overwriting anything, and every step asks you first.", "subtle", wrap=True))
         self.buttons = {}
         for key, title, hint in data.KIT_ACTIONS:
-            control = button(title, lambda _=False, k=key: self.pick(k), kind="primary" if key == "create" else "", tip=hint)
+            control = button(title, lambda _=False, k=key: self.pick(k), kind="primary" if key == "easy" else "", tip=hint)
             control.setAccessibleName(title)
             self.buttons[key] = control
             box.addWidget(control)
@@ -162,6 +162,10 @@ class KitMenu(QDialog):
 
     def pick(self, key):
         self.accept()
+        if key in ("easy", "restore_game"):
+            from gg_desktop import kit_easy_ui
+            (kit_easy_ui.open_easy_setup if key == "easy" else kit_easy_ui.open_easy_restore)(self.window_)
+            return
         getattr(self.window_, KIT_METHODS[key])()
 
 

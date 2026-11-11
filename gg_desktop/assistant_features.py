@@ -27,24 +27,25 @@ FEATURES = (
     Feature(
         "resurrection_kit", "Resurrection Kit",
         ("resurrection", "ressurection", "resurection", "kit", "kits", "resurrection kit", "ggkit"),
-        "A Resurrection Kit is a single ZIP file holding up to four folders you choose, usually a game's saves or "
-        "profile folder and, if you want, its mods folder. It is written with a small manifest file next to it, and "
-        "Game Grave checks the finished ZIP against that manifest so you know the copy matches what was read.",
-        ("Create verified Resurrection Kit: pick the game name, the saves folder and an optional mods folder, then a "
-         "new ZIP name.",
-         "Inspect and restore: check a kit, then restore it into a new, empty folder you pick.",
+        "A Resurrection Kit is a single ZIP file that holds one game's whole install, its saves, its load-order file "
+        "and, if you use Mod Organizer 2, its profile and mods, so the game can be restored and played without "
+        "downloading or setting it up again. A small manifest file sits next to it, and Game Grave checks the "
+        "finished ZIP against that manifest.",
+        ("Set up a kit for a game (easiest): pick the game, see what it found and how big it is, tick or untick parts, "
+         "choose a folder and press Create. It shows progress and you can cancel.",
+         "Restore a game from a kit: pick the kit and a library folder. The install comes back as a new folder, and "
+         "saves and load order go back to their original place only where nothing exists yet.",
          "Rehearse recovery in isolation: extract into a temporary folder and compare file hashes. It never launches "
          "the game.",
          "Check missing pieces: a diagnostic from the kit's own contents, not proof that a kit is complete.",
-         "Compare two kit snapshots: what changed between two verified kits of the same game.",
-         "Browse Time Machine snapshots: lists the kit manifests in a folder, newest first.",
-         "Prepare a portable PC-to-PC kit: builds a new folder with the ZIP and manifest to carry over yourself."),
-        "It only archives the folders you select. It does not include game install files or Steam licenses, does not "
-        "turn mods on, never overwrites an existing file and never changes the source folders. Every action asks "
-        "first.",
+         "Compare two kit snapshots, browse Time Machine snapshots, or prepare a portable PC-to-PC kit."),
+        "There is no size limit, only your free space. It never overwrites a file, never changes your game, and every "
+        "action asks first. Launcher accounts and licences are not part of a kit, so a launcher may sign in or "
+        "re-verify the files the first time you start the restored game. Saves are only included when the save "
+        "scanner labeled the folder with that exact game or you linked it in Game DNA.",
         "More Tools, then Backup and Recovery, then Resurrection Kit.", "More Tools",
-        "Packs the saves (and optional mods) folders you pick into one verified ZIP. Opens a menu to create, inspect, "
-        "rehearse, compare or transfer kits. Nothing changes until you confirm."),
+        "Saves a game's whole install, saves, load order and mods into one verified ZIP you can restore later. Opens "
+        "a menu to set up, restore, inspect, rehearse, compare or transfer kits. Nothing changes until you confirm."),
     Feature(
         "save_vault", "Save Vault",
         ("save vault", "savevault", "game backup", "save backup", "mod backup", "back up my saves", "backup my saves"),

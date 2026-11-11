@@ -59,7 +59,7 @@ CATEGORIES = (
         Tile("game_backup", "Game Backup", "archive", RUN, "save_vault", "Back up a folder you choose into a verified Save Vault ZIP."),
         Tile("save_backup", "Save Backup", "shield", RUN, "save_vault", "Back up a save folder you choose into a verified Save Vault ZIP."),
         Tile("mod_backup", "Mod Backup", "mods", RUN, "save_vault", "Back up a mod folder you choose into a verified Save Vault ZIP."),
-        Tile("resurrection_kit", "Resurrection Kit", "grave", RUN, "kit_menu", "Packs the saves (and optional mods) folders you pick into one verified ZIP. Opens a menu to create, inspect, rehearse, compare or transfer kits. Nothing changes until you confirm."))),
+        Tile("resurrection_kit", "Resurrection Kit", "grave", RUN, "kit_menu", "Saves a game's whole install, saves, load order and mods into one verified ZIP you can restore later. Opens a menu: set up a kit, restore a game, inspect, rehearse, compare or transfer. Nothing changes until you confirm."))),
     Category("analysis", "Analysis and Reporting", "Understand what uses your space.", "magenta", (
         Tile("storage_analyzer", "Storage Analyzer", "storage", GO, "Overview", "Opens Overview, which shows the sizes your last scan reported, grouped by type. They are reported sizes, not measured disk use."),
         Tile("game_size_report", "Game Size Report", "game", RUN, "game_report", "Save a CSV of installed games and their reported sizes."),
@@ -109,12 +109,14 @@ QUICK_ACTIONS = (
     ("size_report", "Game Size Report", "game", "cyan", "Save a CSV of installed games and their reported sizes."),
     ("caches", "Review Game Caches", "trash", "green", "Open Other Storage to review cache and temp findings."),
     ("saves", "Back Up My Saves", "download", "yellow", "Create a verified Save Vault ZIP of a folder you choose."),
-    ("kit", "Open Resurrection Kit", "grave", "purple", "Packs the saves (and optional mods) folders you pick into one verified ZIP. Opens a menu to create, inspect, rehearse, compare or transfer kits. Nothing changes until you confirm."),
+    ("kit", "Open Resurrection Kit", "grave", "purple", "Saves a game's whole install, saves, load order and mods into one verified ZIP you can restore later. Opens a menu: set up a kit, restore a game, inspect, rehearse, compare or transfer. Nothing changes until you confirm."),
 )
 
 KIT_ACTIONS = (
-    ("create", "Create verified Resurrection Kit", "Pick a game name, a saves folder and an optional mods folder. Writes one new ZIP plus a manifest, then checks the ZIP. Your original folders are not changed and no game install files are included."),
-    ("restore", "Inspect and restore a kit to a NEW folder", "Checks a kit you pick, shows what is inside, then restores it into an empty folder you choose. Nothing is overwritten."),
+    ("easy", "Set up a kit for a game (easiest)", "Pick a game. Game Grave finds its whole install, saves, load order and mod manager, shows the size, and saves them into one verified ZIP. Your game files are only read."),
+    ("restore_game", "Restore a game from a kit", "Pick a kit and a library folder. The install is restored as a new folder, and saves and load order go back to their original place only where nothing exists yet. Nothing is overwritten."),
+    ("create", "Create from folders I choose (advanced)", "Pick a game name, a saves folder and an optional mods folder yourself. Writes one new ZIP plus a manifest, then checks the ZIP. Your original folders are not changed."),
+    ("restore", "Inspect and restore a kit to a NEW folder", "Checks a kit you pick, shows what is inside, then restores it into a fresh review folder you choose. Nothing is overwritten."),
     ("rehearse", "Rehearse recovery in isolation", "Extracts a kit into a temporary folder and compares file hashes to show the restore works. Never touches your game files and never launches the game."),
     ("missing", "Check missing pieces", "Reads a kit's own contents and lists what looks absent. A diagnostic, not proof that a kit is complete."),
     ("compare", "Compare two kit snapshots", "Shows files added, removed or changed between two verified kits of the same game."),

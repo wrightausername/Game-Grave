@@ -309,3 +309,27 @@ Four scoped reopenings; everything else in these tabs stays as locked.
   `gg_desktop/assistant_features.py`, which only states what the code does and never says anything is safe to remove. Scan-data
   intents, sources, safety and hand-offs are unchanged and checked first-class by `tests/test_assistant.py`.
 - More Tools hover text: Resurrection Kit, its seven menu actions and the Go tiles now say what they read, write and never do.
+
+Resurrection Kit, whole installation (owner instruction, 2026-11-10: "must be easy to set up ... not just archiving the mod zips but
+the whole installation so that it works on the game immediately"; answers: engine change approved, "Installs + saves + load order.
+Don't cap at 80 gigs. No cap at the user's preference and discretion"). The protected kit engine `resurrection_v2.py` was changed
+with that approval; every older kit still restores (`tests/test_resurrection_v2.py`, `test_resurrection_lab.py`, `test_m1_safety.py`
+pass unchanged).
+- Engine: new parts "Game" (the whole install folder), "LoadOrder" and "Launcher" (explicit files: plugins.txt, the Steam
+  appmanifest). The 80 GB cap is gone and the file cap is only a structural 5,000,000; free space is checked before anything is
+  written and the owner confirms the size. Already-compressed game data is stored, the rest deflated at level 1. `create_complete_kit`
+  takes `origins` (templated places such as `%LOCALAPPDATA%\...`, never a user name or a drive path), `progress` and `cancel`
+  (a cancel removes everything it wrote). Links and junctions are still refused, now naming the item.
+- Restore: `plan_installation` (read-only preview) and `restore_installation`: the install goes into a NEW folder in a library the
+  owner picks; the Steam manifest only into a `steamapps` folder; saves, settings and load order back to their original place only
+  where it is free (an existing file or non-empty folder is never touched, the kit's copy goes to a review folder); mod-manager
+  parts always go to the review folder. The whole kit is verified (SHA-256 and CRC) first, and any error or cancel removes exactly
+  what the restore created. `restore_kit` (review folder) is unchanged.
+- `kit_easy.py` (pure) offers parts for one game only from proof: install and Steam record from the launcher record, saves only when
+  the save scanner labeled the folder with that exact game or the owner linked it in Game DNA, settings and extra mods only from Game DNA
+  links, Profiles and Mods from verified Mod Organizer 2 discovery, and the load-order file from a small table of games whose
+  plugins.txt or modsettings.lsx location is known. `gg_desktop/kit_easy_ui.py` is the Qt layer (Set up a kit for a game, Restore a game
+  from a kit; progress bar, Cancel, confirmation first), reached from the Resurrection Kit menu in More Tools.
+- Honest limits shown on screen: launcher accounts and licences are not part of a kit, so a launcher may sign in or re-verify the first
+  time; a restored game is not promised to run, only restored. Nothing is called safe.
+- Covered by `tests/test_kit_install.py`, `tests/test_kit_easy.py` and `tools/kit_easy_smoke.py` on Windows CI.
