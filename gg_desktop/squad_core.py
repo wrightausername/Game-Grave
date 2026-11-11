@@ -233,19 +233,24 @@ def same_setup(a: Setup | None, b: Setup | None) -> bool:
     return [(i.kind, i.key.casefold()) for i in a.items[:MAX_ITEMS]] == [(i.kind, i.key.casefold()) for i in b.items[:MAX_ITEMS]]
 
 
-def next_step(comparison, *, can_fetch: bool, can_profile: bool) -> str:
-    """One plain sentence telling the joiner what to do now."""
+def next_step(comparison, *, can_fetch: bool, can_profile: bool, still_missing: int | None = None,
+              profile_made: str = "") -> str:
+    """One plain sentence telling the joiner what to do now. `still_missing` leaves out mods that are installed but
+    switched off; `profile_made` is the squad profile's name once it exists."""
     if comparison is None:
         return ""
     if not comparison.comparable:
         return ""
-    if comparison.missing and can_fetch:
+    if profile_made:
+        return f"Last step: open Mod Organizer 2 and pick the profile \"{profile_made}\"."
+    left = len(comparison.missing) if still_missing is None else still_missing
+    if left and can_fetch:
         return "Next: press Get what's missing."
-    if comparison.missing:
-        return ("Next: get the missing mods where your friend did. Game Grave has no download source for them "
-                "in this code.")
+    if left:
+        return (f"Next: get the {left} missing mod{'s' if left != 1 else ''} where your friend did (this code has no download "
+                "source for them)" + (", then press Make squad profile." if can_profile else "."))
     if can_profile:
-        return ("You have every mod your friend has. Next: press Make squad profile to switch them on in your "
+        return ("Every mod your friend has is installed. Next: press Make squad profile to switch them on in your "
                 "friend's order.")
     if comparison.different:
         return "You have every mod, but some were updated at a different time. Open those in Steam to update them."

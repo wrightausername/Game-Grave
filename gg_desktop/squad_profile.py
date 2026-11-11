@@ -155,8 +155,7 @@ def make(original: Path, host_names, mods_folder: Path) -> dict:
 
 def result_text(result: dict) -> str:
     on, absent = len(result["on"]), len(result["not_installed"])
-    parts = [f"Made the profile \"{result['name']}\" with {on} of your friend's mod{'s' if on != 1 else ''} switched on "
-             "in their order."]
+    parts = [f"Made the profile \"{result['name']}\" with {on} of your friend's mods switched on in their order."]
     if absent:
         parts.append(f"{absent} {'are' if absent != 1 else 'is'} not installed here yet and {'were' if absent != 1 else 'was'} left out.")
     parts.append("Open Mod Organizer 2, pick that profile, and check the Plugins tab (plugin order is not part of a "

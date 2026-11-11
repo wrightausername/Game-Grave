@@ -246,9 +246,16 @@ def main():
                 (made / "modlist.txt").read_text(encoding="utf-8")
             assert (mo2 / "profiles" / "Co-op" / "modlist.txt").read_text(encoding="utf-8") == "+SkyUI\n-Off\n+USSEP\n"
             assert "Your own profile was not changed" in body.fetch_note.text() and "1 is not installed here yet" in body.fetch_note.text()
+            assert body.next_label.text() == 'Last step: open Mod Organizer 2 and pick the profile "GG Squad - Co-op".', body.next_label.text()
+            assert "1 of the missing is installed but switched off" in body.result_summary.text(), body.result_summary.text()
             assert window.grab().save(str(args.output / "ready-room-squad-flow-1280.png"))
 
             # A free account is told so and gets the page instead.
+            other = sq.Setup("Skyrim Special Edition", [
+                sq.Item("mo2", "another mod", "Another Mod", "", "skyrimspecialedition/1000")], read_any=True)
+            with patch("gg_desktop.squad_ui.QInputDialog.getMultiLineText", return_value=(sq.make_code(other), True)):
+                live(window).import_button.click()
+            settle(100)
             with patch.object(window, "confirm", return_value=True), \
                  patch("gg_desktop.squad_ui.nx.validate", return_value=nx.Account("Sam", False)):
                 live(window).open_button.click()

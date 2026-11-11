@@ -416,7 +416,25 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         super().closeEvent(event)
 
 
+def apply_interface_scale(environ=None, loader=None):
+    """Before Qt starts: use the interface size saved in Settings. Never overrides a scale the user set for Qt themselves."""
+    import os
+    env = os.environ if environ is None else environ
+    if env.get("QT_SCALE_FACTOR"):
+        return None
+    try:
+        from gg_desktop import settings_data
+        factor = settings_data.scale_factor((loader or load_settings)())
+    except Exception:
+        return None
+    if factor:
+        env["QT_SCALE_FACTOR"] = factor
+    return factor
+
+
 def main() -> int:
+    if QApplication.instance() is None:
+        apply_interface_scale()
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Game Grave")
     app.setOrganizationName("Game Grave")

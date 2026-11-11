@@ -46,6 +46,7 @@ class SquadBody(QWidget):
         self.setup = None
         self.comparison = None
         self.theirs = None
+        self.profile_made = ""
         self.on_status = None
         self._pending = []
         layout = column(spacing=8)
@@ -56,7 +57,7 @@ class SquadBody(QWidget):
         self.games.setMinimumWidth(300)
         self.games.setAccessibleName("Game for Squad Sync")
         top.addWidget(self.games)
-        self.read_button = button("Read my setup", self.read, kind="primary",
+        self.read_button = button("Read again", self.read,
                                   tip="Reads the Steam Workshop manifest, a Mod Organizer 2 profile and the Bethesda plugin list. Changes nothing.")
         top.addWidget(self.read_button)
         top.addStretch()
@@ -174,6 +175,7 @@ class SquadBody(QWidget):
 
     def _game_changed(self, *_):
         self.setup = self.comparison = self.theirs = None
+        self.profile_made = ""
         self._clear_rows()
         self.result_summary.setText("")
         self.fetch_note.setText("")
@@ -190,11 +192,14 @@ class SquadBody(QWidget):
         self.open_file_button.setEnabled(ready)
         game = self.games.currentText()
         self.compare_snapshot_button.setEnabled(ready and bool(game and sq.list_snapshots(game)))
-        missing = [i for i in (self.comparison.missing if self.comparison else []) if sq.workshop_url(i) or sq.nexus_url(i)]
+        off = self._installed_off()
+        waiting = [i for i in (self.comparison.missing if self.comparison else []) if i.label.casefold() not in off]
+        missing = [i for i in waiting if sq.workshop_url(i) or sq.nexus_url(i)]
         self.open_button.setVisible(bool(missing))
         can_profile = self._can_profile()
         self.profile_button.setVisible(can_profile)
-        self.next_label.setText(sq.next_step(self.comparison, can_fetch=bool(missing), can_profile=can_profile))
+        self.next_label.setText(sq.next_step(self.comparison, can_fetch=bool(missing), can_profile=can_profile,
+                                             still_missing=len(waiting), profile_made=self.profile_made))
         self.next_label.setVisible(bool(self.next_label.text()))
         self.console_button.setVisible(bool([i for i in (self.comparison.missing if self.comparison else [])
                                              if sq.workshop_url(i)]))
@@ -329,6 +334,7 @@ class SquadBody(QWidget):
 
     def _compare(self, theirs):
         self.theirs = theirs
+        self.profile_made = ""
         self.comparison = sq.compare(theirs, self.setup)
         self._show_comparison()
         self._save_state()
@@ -361,7 +367,9 @@ class SquadBody(QWidget):
         if result is None:
             self.result_summary.setText("")
             return
-        self.result_summary.setText(result.summary)
+        off = self._installed_off()
+        self.result_summary.setText(result.summary + (
+            f" {len(off)} of the missing {'are' if len(off) != 1 else 'is'} installed but switched off." if off else ""))
         shown = 0
         for item in result.missing:
             if shown >= SHOWN:
@@ -369,6 +377,10 @@ class SquadBody(QWidget):
             shown += 1
             line = row(spacing=8)
             line.addWidget(label(item.label, "readyDetail"), 1)
+            if item.label.casefold() in off:
+                line.addWidget(self._pill("Installed, switched off", "green"))
+                self.rows_box.addLayout(line)
+                continue
             line.addWidget(self._pill("Missing", "amber"))
             if sq.workshop_url(item):
                 open_one = button("Open in Steam", lambda _=False, i=item: self.open_item(i), kind="actionLink")
@@ -404,6 +416,19 @@ class SquadBody(QWidget):
         profile, mods = instance / "profiles" / chosen, installer.mods_folder(instance, ini)
         return (profile, mods) if profile.is_dir() and mods.is_dir() else None
 
+    def _installed_off(self) -> set:
+        """Missing Mod Organizer 2 mods whose folder is already installed here (so only switching on is left)."""
+        if not (self.comparison and self.comparison.missing):
+            return set()
+        where = self._mo2()
+        if where is None:
+            return set()
+        try:
+            folders = {p.name.casefold() for p in where[1].iterdir() if p.is_dir()}
+        except OSError:
+            return set()
+        return {i.label.casefold() for i in self.comparison.missing if i.kind == "mo2" and i.label.casefold() in folders}
+
     def _host_mods(self):
         return [i.label for i in (self.theirs.items if self.theirs else []) if i.kind == "mo2"]
 
@@ -437,6 +462,8 @@ class SquadBody(QWidget):
             window.error("Squad Sync", str(problem))
             return
         self.fetch_note.setText(profiles.result_text(result))
+        self.profile_made = result["name"]
+        self._sync()
         window.status.setText(f"Squad profile made: {result['name']}.")
         try:
             from core import log_event
@@ -495,9 +522,11 @@ class SquadBody(QWidget):
         comparison = self.comparison
         if comparison is None:
             return
-        workshop = [i for i in comparison.missing if sq.workshop_url(i)][:OPEN_MAX]
-        nexus = [i for i in comparison.missing if sq.nexus_url(i) and not sq.workshop_url(i)][:nx.BATCH]
-        skipped = len(comparison.missing) - len(workshop) - len(nexus)
+        off = self._installed_off()
+        wanted = [i for i in comparison.missing if i.label.casefold() not in off]
+        workshop = [i for i in wanted if sq.workshop_url(i)][:OPEN_MAX]
+        nexus = [i for i in wanted if sq.nexus_url(i) and not sq.workshop_url(i)][:nx.BATCH]
+        skipped = len(wanted) - len(workshop) - len(nexus)
         notes = []
         urls = [sq.workshop_url(i) for i in workshop]
         if workshop:
@@ -695,6 +724,8 @@ class SquadBody(QWidget):
                 if skipped > 0:
                     lines.append(f"{skipped} more item{'s were' if skipped != 1 else ' was'} left for you.")
                 self.fetch_note.setText(" ".join(lines))
+                self._show_comparison()          # mods just installed now read "Installed, switched off"
+                self._sync()
                 window.status.setText("Squad Sync finished asking Nexus.")
             except RuntimeError:
                 pass

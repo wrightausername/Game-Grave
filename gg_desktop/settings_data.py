@@ -17,6 +17,7 @@ MAX_NEVER_TOUCH = 200
 MAX_PATH = 4096
 FILE_DAYS = (30, 90, 180, 365, 730)
 GRAVE_DAYS = (90, 180, 365, 730)
+SCALES = (100, 110, 125, 150)        # interface size in percent; 100 is the approved native layout
 
 # Preferences the Settings tab owns, with their defaults. Reset puts exactly these back.
 OWNED = {
@@ -29,6 +30,7 @@ OWNED = {
     "assistant_enabled": False,   # the AI Assistant tab is optional and starts switched off
     "check_updates_on_launch": False,   # one question to GitHub when the app starts; off until the owner turns it on
     "soulbind_new_games": False,        # apply the Soulbind profile to newly installed games; off until switched on
+    "interface_scale": 100,             # whole-window size in percent; used the next time the app starts
 }
 LIBRARY_KEYS = ("steam_extra_roots", "other_library_roots", "mod_extra_roots", "screenshot_roots", "recording_roots")
 LIBRARY_NAMES = {"steam_extra_roots": "Steam libraries", "other_library_roots": "Other / Xbox libraries",
@@ -72,7 +74,14 @@ def current(settings):
         "assistant_enabled": settings.get("assistant_enabled") is True,
         "check_updates_on_launch": settings.get("check_updates_on_launch") is True,
         "soulbind_new_games": settings.get("soulbind_new_games") is True,
+        "interface_scale": pick_days(settings.get("interface_scale"), SCALES, 100),
     }
+
+
+def scale_factor(settings):
+    """The Qt scale factor for a saved interface size, as text, or None for the native 100%."""
+    percent = pick_days(settings.get("interface_scale") if isinstance(settings, dict) else None, SCALES, 100)
+    return None if percent == 100 else f"{percent / 100:.2f}"
 
 
 def defaults():

@@ -41,7 +41,8 @@ NAMES = {"start_minimized": "Start minimized", "scan_on_launch": "Scan when Game
          "files_stale_days": "Files idle after", "graveyard_days": "Graveyard age signal",
          "excluded_folders": "Excluded folders", "steam_artwork_downloads": "Steam artwork downloads",
          "autostart": "Launch with Windows", "assistant_enabled": "AI Assistant tab",
-         "check_updates_on_launch": "Check for updates on launch", "soulbind_new_games": "Soulbind new games"}
+         "check_updates_on_launch": "Check for updates on launch", "soulbind_new_games": "Soulbind new games",
+         "interface_scale": "Interface scale"}
 
 
 # ------------------------------------------------------------------ small widgets
@@ -282,6 +283,29 @@ def bool_switch(window, key, title, caption, *, name=None):
     switch.toggled.connect(toggled)
     register(window, key, switch, refresh)
     return line(title, caption, switch)
+
+
+def scale_combo(window):
+    state = state_of(window)
+    box = QComboBox()
+    box.setAccessibleName("Interface scale")
+    box.setMinimumWidth(96)
+    box.setMaximumWidth(150)
+    box.setToolTip("Makes everything in the window larger. Used the next time Game Grave starts.")
+    for percent in data.SCALES:
+        box.addItem("100% native" if percent == 100 else f"{percent}%", percent)
+
+    def refresh():
+        with QSignalBlocker(box):
+            box.setCurrentIndex(max(0, box.findData(state.pending["interface_scale"])))
+
+    def picked(_index):
+        state.pending["interface_scale"] = box.currentData()
+        sync(window)
+    box.currentIndexChanged.connect(picked)
+    register(window, "interface_scale", box, refresh)
+    refresh()
+    return box
 
 
 def autostart_switch(window):
@@ -596,8 +620,9 @@ def remove_rule(window):
 def appearance_panel(window):
     box, body = frame("settingsAppearance", "red", "Appearance", "sparkles")
     body.addWidget(line("Theme", "", pill("Crimson Command")))
-    body.addWidget(line("Interface scale", "", pill("100% native")))
-    body.addWidget(label("The look is fixed so every tab keeps its approved layout.", "caption", wrap=True))
+    body.addWidget(line("Interface scale", "", scale_combo(window)))
+    body.addWidget(label("The theme is fixed so every tab keeps its approved layout. A larger scale enlarges the whole "
+                         "window evenly and is used the next time Game Grave starts.", "caption", wrap=True))
     classic = tool("Open More Tools…", "more", lambda: window.navigate("More Tools"),
                    tip="Backups, Resurrection Kits, Windows tools and utilities live in More Tools")
     classic.setFixedHeight(28)

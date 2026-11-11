@@ -124,3 +124,14 @@ class Profile(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NextStepAfterInstall(unittest.TestCase):
+    def test_installed_but_off_and_profile_made(self):
+        missing = sq.compare(setup(names=("A", "B")), setup(names=("A",)))
+        self.assertIn("Every mod your friend has is installed", sq.next_step(missing, can_fetch=False, can_profile=True, still_missing=0))
+        both = sq.next_step(missing, can_fetch=False, can_profile=True, still_missing=1)
+        self.assertIn("get the 1 missing mod where your friend did", both)
+        self.assertTrue(both.endswith("then press Make squad profile."))
+        self.assertEqual(sq.next_step(missing, can_fetch=True, can_profile=True, profile_made="GG Squad - Default"),
+                         'Last step: open Mod Organizer 2 and pick the profile "GG Squad - Default".')

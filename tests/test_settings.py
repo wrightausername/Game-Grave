@@ -231,3 +231,12 @@ class UpdateAtLaunch(unittest.TestCase):
         self.assertIs(data.current({"check_updates_on_launch": 1})["check_updates_on_launch"], False)
         self.assertIs(data.current({"check_updates_on_launch": True})["check_updates_on_launch"], True)
         self.assertIn("check_updates_on_launch", data.EXPORT_KEYS)
+
+    def test_interface_scale_defaults_to_native_and_ignores_junk(self):
+        self.assertEqual(data.current({})["interface_scale"], 100)
+        self.assertEqual(data.current({"interface_scale": 999})["interface_scale"], 100)
+        self.assertEqual(data.current({"interface_scale": "125"})["interface_scale"], 100)
+        self.assertIsNone(data.scale_factor({}))
+        self.assertIsNone(data.scale_factor(None))
+        self.assertEqual(data.scale_factor({"interface_scale": 125}), "1.25")
+        self.assertEqual(data.scale_factor({"interface_scale": 150}), "1.50")

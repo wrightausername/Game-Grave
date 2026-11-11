@@ -305,7 +305,15 @@ def main():
             window.settings_tab_buttons["Appearance"].click()
             settle()
             texts = " ".join(l.text() for l in window.findChildren(settings_page.QLabel))
-            assert "Crimson Command" in texts and "100% native" in texts
+            assert "Crimson Command" in texts
+            from PySide6.QtWidgets import QComboBox
+            scale = next(c for c in window.findChildren(QComboBox) if c.accessibleName() == "Interface scale")
+            assert scale.currentText() == "100% native" and scale.count() == 4, "the native size is the default"
+            from gg_desktop import app as app_module
+            env = {}
+            assert app_module.apply_interface_scale(env, lambda: {"interface_scale": 125}) == "1.25" and env["QT_SCALE_FACTOR"] == "1.25"
+            assert app_module.apply_interface_scale({}, lambda: {"interface_scale": 100}) is None
+            assert app_module.apply_interface_scale({"QT_SCALE_FACTOR": "2"}, lambda: {"interface_scale": 150}) is None
             assert window.grab().save(str(args.output / "settings-appearance-1280.png"))
 
             # Unapplied edits survive a page rebuild (a scan finishing re-renders the tab) and show as unapplied.
