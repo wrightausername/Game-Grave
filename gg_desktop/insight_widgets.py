@@ -107,7 +107,7 @@ class ReferenceArt(QWidget):
 
 
 class FootprintRing(QWidget):
-    brand_mark = False  # True: draw the real GG mark (transparent, full resolution) instead of the photo crop
+    brand_mark = True  # the real GG mark (transparent, full resolution); False falls back to the old photo crop
 
     def __init__(self, *, caption="REPORTED SIZE"):
         super().__init__()

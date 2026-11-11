@@ -271,8 +271,26 @@ def inspect_restore(manifest_path: Path, parent: Path | None = None, *, progress
     return outcome
 
 
-def _safe_tree(source: Path, dest_zip: Path):
-    """Bounded preflight; never follow symlink/reparse directories or files."""
+MAX_EMPTY_FOLDERS = 5000   # per kit part; a manifest stays small
+
+
+def _clean_empty(values) -> list:
+    """Empty-folder names from a manifest: plain relative paths only, anything else is dropped."""
+    out = []
+    for value in values if isinstance(values, list) else []:
+        if len(out) >= MAX_EMPTY_FOLDERS:
+            break
+        try:
+            if isinstance(value, str) and 0 < len(value) <= 400:
+                out.append("/".join(_relative_name(value)))
+        except ValueError:
+            continue
+    return out
+
+
+def _safe_tree(source: Path, dest_zip: Path, empties: list | None = None):
+    """Bounded preflight; never follow symlink/reparse directories or files. When `empties` is a list, the relative
+    names of folders that hold nothing are added to it, so a restore can recreate them."""
     if not _ordinary_ancestry(source, directory=True):
         raise ValueError("Choose source folders without links or redirected ancestors.")
     source = source.resolve(strict=True)
@@ -286,6 +304,12 @@ def _safe_tree(source: Path, dest_zip: Path):
     for here, folders, files in os.walk(source, topdown=True, followlinks=False,
                                         onerror=_walk_error):
         directory = Path(here)
+        if empties is not None and not folders and not files and directory != source \
+                and len(empties) < MAX_EMPTY_FOLDERS:
+            try:
+                empties.append("/".join(_relative_name(directory.relative_to(source).as_posix())))
+            except ValueError:
+                pass
         for name in folders:
             if not _regular(directory / name, directory=True):
                 raise ValueError("The folder contains a linked or unsupported folder (a link or junction), which a kit does not follow: "
@@ -457,7 +481,7 @@ def create_complete_kit(game: str, sources: dict, destination: Path,
         if cancel is not None and cancel():
             raise InterruptedError("Kit creation was cancelled. Nothing was kept.")
 
-    captured, labels, overlap = {}, {}, []
+    captured, labels, overlap, hollow = {}, {}, [], {}
     report("Reading folders", 0, 0, "")
     for role, raw in sources.items():
         check_cancel()
@@ -468,7 +492,8 @@ def create_complete_kit(game: str, sources: dict, destination: Path,
             overlap.extend(Path(path).resolve(strict=True) for path, *_ in rows)
         else:
             root = Path(raw).expanduser()
-            rows = _safe_tree(root, destination)
+            hollow[role] = []
+            rows = _safe_tree(root, destination, hollow[role])
             captured[role] = (root, rows)
             labels[role] = root.name
             overlap.append(root.resolve(strict=True))
@@ -544,6 +569,8 @@ def create_complete_kit(game: str, sources: dict, destination: Path,
         entries_out = []
         for role, (root, entries) in captured.items():
             item = {"name": role, "folder_label": labels[role], "files": len(entries)}
+            if hollow.get(role):
+                item["empty_folders"] = sorted(hollow[role])
             if origins.get(role):
                 item["origin"] = origins[role]
             entries_out.append(item)
@@ -559,9 +586,15 @@ def create_complete_kit(game: str, sources: dict, destination: Path,
         }
         if manager_hint is not None:
             manifest["manager_context"] = manager_hint
+        text = json.dumps(manifest, indent=2)
+        if len(text.encode("utf-8")) > MAX_MANIFEST_BYTES // 2:
+            # Thousands of empty folders: leave their names out so the manifest stays readable by every version.
+            for item in entries_out:
+                item.pop("empty_folders", None)
+            text = json.dumps(manifest, indent=2)
         with partial_manifest.open("x", encoding="utf-8") as out:
             manifest_owned = True
-            json.dump(manifest, out, indent=2)
+            out.write(text)
         _publish_no_replace(partial, destination)
         try:
             _publish_no_replace(partial_manifest, sidecar)
@@ -682,7 +715,8 @@ def plan_installation(manifest_path: Path, library_parent: Path, *, place_back: 
             continue
         meta = metas[role]
         label = _folder_name(meta.get("folder_label", role))
-        part = {"role": role, "files": int(meta.get("files", 0) or 0), "folder_label": label}
+        part = {"role": role, "files": int(meta.get("files", 0) or 0), "folder_label": label,
+                "empty_folders": _clean_empty(meta.get("empty_folders"))}
         if role == "Game":
             dest = parent / label
             part.update(mode="new_folder", destination=str(dest))
@@ -809,6 +843,14 @@ def restore_installation(manifest_path: Path, library_parent: Path, *, approved:
                 except (OverflowError, OSError, ValueError):
                     pass
                 placed[parts[0]] = placed.get(parts[0], 0) + 1
+        # Folders that were empty when the kit was made (some games expect them to exist).
+        for part in plan["parts"]:
+            if part["mode"] == "place_files":
+                continue
+            for name in part.get("empty_folders", ()):
+                folder = Path(part["destination"]).joinpath(*name.split("/"))
+                if not folder.exists() and not folder.is_symlink():
+                    make_dirs(folder)
         packed = archive_path.stat().st_size
         report("Final check", 0, packed, "")
         final = _sha256_ticked(archive_path, _ticker(progress, cancel, "Final check", packed,

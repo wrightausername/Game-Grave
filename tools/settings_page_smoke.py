@@ -105,14 +105,14 @@ def main():
             assert window.settings_path.full() == str(core.config_dir())
             assert window.grab().save(str(args.output / "settings-general-1280.png"))
 
-            # Protection switches are locked on; the update switch is off and unavailable; none stage a change.
+            # Protection switches are locked on and stage nothing; the update-at-launch switch is real and off.
             for switch in [s for s in window.findChildren(settings_page.Switch) if s.locked]:
                 was = switch.isChecked()
                 switch.click()
                 assert switch.isChecked() == was
             assert sum(1 for s in window.findChildren(settings_page.Switch) if s.locked and s.isChecked()) == 6, "three locked switches on each of the two pages that show Protection"
             update = next(s for s in window.findChildren(settings_page.Switch) if s.accessibleName() == "Check for updates on launch")
-            assert not update.isEnabled() and not update.isChecked()
+            assert update.isEnabled() and not update.isChecked(), "The update check at launch is a real switch, off by default"
             assert not window.settings_apply.isEnabled()
 
             # Staging then Cancel changes nothing on disk.

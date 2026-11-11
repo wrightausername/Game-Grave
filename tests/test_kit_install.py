@@ -271,3 +271,21 @@ class Polish(KitInstallTests):
         data = library / "Skyrim Special Edition" / "Data"
         self.assertLess(abs((data / "SkyUI.esp").stat().st_mtime - old), 3)
         self.assertLess((data / "Skyrim.esm").stat().st_mtime, (data / "SkyUI.esp").stat().st_mtime)
+
+    def test_empty_folders_come_back(self):
+        (self.game / "Data" / "Logs").mkdir()
+        (self.game / "Mods" / "Later").mkdir(parents=True)
+        created = self.make()
+        manifest = json.loads(Path(created["manifest"]).read_text())
+        game = next(r for r in manifest["roles"] if r["name"] == "Game")
+        self.assertEqual(game["empty_folders"], ["Data/Logs", "Mods/Later"])
+        with zipfile.ZipFile(self.zip) as z:
+            self.assertFalse(any(i.is_dir() for i in z.infolist()), "The ZIP still holds files only")
+        env, library = self.new_pc()
+        kit.restore_installation(Path(created["manifest"]), library, approved=True, environ=env)
+        restored = library / "Skyrim Special Edition"
+        self.assertTrue((restored / "Data" / "Logs").is_dir())
+        self.assertTrue((restored / "Mods" / "Later").is_dir())
+
+    def test_empty_folder_names_from_a_manifest_are_checked(self):
+        self.assertEqual(kit._clean_empty(["Data/Logs", "../Windows", "C:/x", 5, "", "a/../../b"]), ["Data/Logs"])

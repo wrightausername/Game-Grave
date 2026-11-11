@@ -147,3 +147,13 @@ class Overlap(PlanTests):
         saves = next(p for p in plan.parts if p.role == "Saves")
         self.assertIn("no files", saves.problem)
         self.assertNotIn("Saves", kit_easy.to_sources(plan)[0])
+
+    def test_gog_copy_uses_its_own_load_order_folder(self):
+        gog = Path(self.env["LOCALAPPDATA"]) / "Skyrim Special Edition GOG"
+        gog.mkdir()
+        (gog / "plugins.txt").write_text("*gog.esp\n")
+        self.game.launcher = "GOG"
+        plan = kit_easy.build_plan(self.game, environ=self.env)
+        part = next(p for p in plan.parts if p.role == "LoadOrder")
+        self.assertEqual(part.origin, "%LOCALAPPDATA%\\Skyrim Special Edition GOG")
+        self.assertNotIn("Launcher", [p.role for p in plan.parts])

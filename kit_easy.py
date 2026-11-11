@@ -32,8 +32,21 @@ LOAD_ORDER_FILES = {
     "fallout 3": ("Fallout3", ("plugins.txt",)),
     "fallout: new vegas": ("FalloutNV", ("plugins.txt",)),
     "starfield": ("Starfield", ("plugins.txt",)),
+    "enderal: forgotten stories": ("Enderal", ("plugins.txt", "loadorder.txt")),
+    "enderal: forgotten stories (special edition)": ("Enderal Special Edition", ("plugins.txt", "loadorder.txt")),
+    "the elder scrolls v: skyrim anniversary edition": ("Skyrim Special Edition", ("plugins.txt", "loadorder.txt")),
+    "fallout 4: game of the year edition": ("Fallout4", ("plugins.txt", "loadorder.txt")),
+    "fallout: new vegas ultimate edition": ("FalloutNV", ("plugins.txt",)),
+    "fallout 3: game of the year edition": ("Fallout3", ("plugins.txt",)),
+    "the elder scrolls iv: oblivion - game of the year edition": ("Oblivion", ("plugins.txt",)),
+    "the elder scrolls iv: oblivion game of the year edition deluxe": ("Oblivion", ("plugins.txt",)),
     "baldur's gate 3": ("Larian Studios\\Baldur's Gate 3\\PlayerProfiles\\Public", ("modsettings.lsx",)),
 }
+
+
+# launcher (casefolded) -> suffix the store's copy adds to the game's Local AppData folder
+STORE_SUFFIX = {"gog": " GOG", "gog galaxy": " GOG", "epic": " EPIC", "epic games": " EPIC", "xbox": " MS",
+                "microsoft store": " MS", "xbox / microsoft store": " MS"}
 
 
 @dataclass
@@ -245,7 +258,13 @@ def build_plan(game, *, saves=(), links=(), discovery=None, environ=None, measur
     entry = LOAD_ORDER_FILES.get(clean_name(title))
     local = env.get("LOCALAPPDATA")
     if entry and local:
+        # GOG, Epic and Microsoft Store copies of Bethesda games keep the same files in a folder with a suffix.
+        suffix = STORE_SUFFIX.get(str(getattr(game, "launcher", "")).casefold(), "")
         folder = Path(local).joinpath(*entry[0].split("\\"))
+        if suffix and "\\" not in entry[0]:
+            other = Path(local) / (entry[0] + suffix)
+            if any((other / name).is_file() for name in entry[1]):
+                folder = other
         found_files = [folder / name for name in entry[1] if (folder / name).is_file() and _ordinary_ancestry(folder / name)]
         if found_files:
             f, b = measure_files(found_files)

@@ -25,8 +25,8 @@ jobs:
     name: Run path-free prebeta report on hosted Windows
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Run read-only launcher metadata and fabricated multi-root recovery QA
@@ -49,7 +49,7 @@ jobs:
           Write-Host 'PASS: synthetic field report has no release authorization.'
       - name: Retain counts-only diagnostic
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: GameGrave-M1-M5-Private-Field-Diagnostic
           path: _ci_temp/prebeta-private-summary.json

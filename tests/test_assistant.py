@@ -291,3 +291,11 @@ class FeatureQuestions(unittest.TestCase):
         self.assertEqual(engine.answer("how big is Graveyard Keeper?", f).intent, "profile")
         self.assertEqual(engine.answer("what is the graveyard?", f).intent, "feature")
         self.assertEqual(engine.answer("make a resurrection kit for Graveyard Keeper", f).intent, "feature")
+
+    def test_newer_features_are_explained(self):
+        for q, title in (("how does mod bisect work", "Mod Bisect"), ("which mod is crashing my game", "Mod Bisect"),
+                         ("what does the hardware tab do", "Hardware"), ("how do I update game grave", "Check for Updates")):
+            a = engine.answer(q, facts())
+            self.assertEqual(a.intent, "feature", q)
+            self.assertTrue(a.text.startswith(title), (q, a.text[:40]))
+        self.assertEqual(engine.classify("any mods taking space?", facts())[0], "mods")

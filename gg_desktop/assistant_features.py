@@ -127,6 +127,46 @@ FEATURES = (
         (), "Game Grave never installs, enables, disables or changes mods.", "Mods in the sidebar.", "Mods",
         "Lists detected mod locations with the evidence behind each. Game Grave never changes mods."),
     Feature(
+        "mod_bisect", "Mod Bisect",
+        ("bisect", "mod bisect", "which mod is crashing", "which mod crashes", "find the crashing mod",
+         "find the bad mod", "mod causing the crash", "mod causing crashes"),
+        "Mod Bisect hunts for the mod, or group of mods, that makes a game crash. It proposes one test at a time "
+        "(exactly these mods on), you launch the game yourself and answer crashed, fine or not sure, and it narrows "
+        "the list until your own launches prove the cause.",
+        ("Tell it when the crashes started or which mods you added last. Clues only order the search; a wrong clue "
+         "costs launches, never the answer.",
+         "With Mod Organizer 2 it writes each test into a copy of your profile named GG Bisect. Other mod managers get "
+         "a list to apply by hand.",
+         "It handles one mod, a pair, a group, or several separate causes, and crashes that do not happen every time."),
+        "It never launches the game, never changes your original profile and never deletes anything. If it cannot "
+        "prove a cause within its launch limit it says undetermined and shows what it narrowed to.",
+        "Mods, then the Bisect tab.", "Mods",
+        "Guided hunt for the mod that makes a game crash. You launch and answer; it narrows the list."),
+    Feature(
+        "hardware", "Hardware",
+        ("hardware", "hardware tab", "upgrade advisor", "pc specs", "my specs", "what should i upgrade"),
+        "Hardware shows the parts Windows reports for this PC, live load, and upgrade notes based on play sessions "
+        "you record.",
+        ("Your PC: parts as cards, live gauges and charts, drives, Copy Specs and Save as .txt.",
+         "Upgrade Advisor: press Record Play Session while you play. Notes appear after at least 3 sessions of at "
+         "least 2 minutes, and each says what was measured and what it cannot tell."),
+        "It never shows a CPU temperature, a frame rate or a price, and it does not tell you what to buy.",
+        "Hardware in the sidebar.", "Hardware",
+        "The parts Windows reports for this PC, live load, and upgrade notes from sessions you record."),
+    Feature(
+        "updates", "Check for Updates",
+        ("check for updates", "updater", "update game grave", "new version", "new build", "latest version",
+         "latest build", "how do i update"),
+        "Check for Updates in Settings asks GitHub whether a newer Game Grave build exists and tells you in words. "
+        "Open Updater starts the separate Game Grave Updater, which downloads and installs after its own "
+        "confirmation.",
+        ("Settings, version box, Check for Updates.",
+         "The Check for updates on launch switch asks once each time Game Grave starts. It is off until you turn it on."),
+        "The check itself downloads and installs nothing. If this PC has no record of which build is installed, it "
+        "says so instead of guessing.",
+        "Settings, in the version box.", "Settings",
+        "Asks GitHub whether a newer build exists. Downloads and installs nothing."),
+    Feature(
         "hash_checker", "Hash Checker",
         ("hash checker", "checksum", "sha-256", "sha256"),
         "Hash Checker computes the SHA-256 checksum of any file you choose and compares it with one you paste.",

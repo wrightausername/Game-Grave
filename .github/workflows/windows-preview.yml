@@ -13,9 +13,9 @@ jobs:
     name: Build Windows preview executable
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -42,7 +42,7 @@ jobs:
           if (-not (Test-Path 'dist/GameGrave.exe')) { throw 'Windows executable was not created' }
 
       - name: Upload unsigned preview executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: GameGrave-Windows-Preview
           path: dist/GameGrave.exe

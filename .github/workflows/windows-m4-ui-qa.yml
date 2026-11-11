@@ -27,8 +27,8 @@ jobs:
     name: Native Tk widgets on hosted Windows
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install only existing runtime dependencies
@@ -45,7 +45,7 @@ jobs:
           }
       - name: Upload counts-only M4 UI result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: GameGrave-M4-UI-Hosted-Windows
           path: _ci_temp/m4-ui-smoke.json

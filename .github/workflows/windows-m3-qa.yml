@@ -31,8 +31,8 @@ jobs:
       matrix:
         os: [windows-2022, windows-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Run multi-root archive, staged restore, rehearsal, Time Machine, transfer and tamper QA
@@ -46,7 +46,7 @@ jobs:
           }
       - name: Store path-free M3 QA results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: GameGrave-M3-Disposable-${{ matrix.os }}
           path: _ci_temp/m3-disposable-report.json

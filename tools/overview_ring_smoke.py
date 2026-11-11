@@ -36,7 +36,7 @@ def main():
     new = OverviewRing(segments, scanned=True)
     old = FootprintRing(caption="DETECTED STORAGE")
     old.set_segments(segments, "61 GB")
-    assert new.brand_mark and not old.brand_mark, "Only the Overview dial uses the brand mark"
+    assert new.brand_mark and old.brand_mark, "Every storage dial shows the cut-out brand mark"
     for scale in (1, 3):
         image = grab(new, scale)
         assert image.save(str(args.output / f"overview-ring-{scale}x.png"))

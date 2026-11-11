@@ -222,3 +222,12 @@ class Autostart(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UpdateAtLaunch(unittest.TestCase):
+    def test_off_by_default_and_only_true_turns_it_on(self):
+        self.assertIs(data.OWNED["check_updates_on_launch"], False)
+        self.assertIs(data.current({})["check_updates_on_launch"], False)
+        self.assertIs(data.current({"check_updates_on_launch": 1})["check_updates_on_launch"], False)
+        self.assertIs(data.current({"check_updates_on_launch": True})["check_updates_on_launch"], True)
+        self.assertIn("check_updates_on_launch", data.EXPORT_KEYS)

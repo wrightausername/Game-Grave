@@ -97,6 +97,11 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.navigate("Ready Room" if reference_preview else "Overview")
         if self.settings.get("scan_on_launch", False) and not reference_preview:
             QTimer.singleShot(0, self.start_scan)
+        if self.settings.get("check_updates_on_launch") is True and not reference_preview:
+            def ask():
+                from gg_desktop import settings_page
+                settings_page.check_updates_on_launch(self)
+            QTimer.singleShot(4000, ask)
 
     def _create_shell(self):
         root = QWidget()
@@ -302,6 +307,16 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             "More Tools": self.tools_page,
         }
         methods[route]()
+        self._name_controls()
+        QTimer.singleShot(400, self._name_controls)   # tables and panels that fill in a moment later
+
+    def _name_controls(self):
+        """Screen-reader names for any control a page left unnamed. Invisible to sighted users."""
+        try:
+            from gg_desktop import a11y
+            a11y.name_controls(self)
+        except RuntimeError:
+            pass  # the page was replaced while this ran
 
     def job(self, fn, on_success, *, error_title="Operation not completed", progress=None):
         job = Job(fn)

@@ -153,12 +153,28 @@ class KitMenu(QDialog):
         box.addWidget(label("A kit saves a game's whole install, saves and load order into one verified ZIP. Restoring puts "
                             "it back without overwriting anything, and every step asks you first.", "subtle", wrap=True))
         self.buttons = {}
+        self.advanced = []
+        self.more = button("More kit tools", self.toggle_more,
+                           tip="Create from folders you choose, inspect, rehearse, check, compare, browse snapshots or prepare a transfer.")
+        self.more.setAccessibleName("More kit tools")
         for key, title, hint in data.KIT_ACTIONS:
             control = button(title, lambda _=False, k=key: self.pick(k), kind="primary" if key == "easy" else "", tip=hint)
             control.setAccessibleName(title)
             self.buttons[key] = control
+            if key not in ("easy", "restore_game"):
+                if not self.advanced:
+                    box.addWidget(self.more)
+                self.advanced.append(control)
+                control.hide()
             box.addWidget(control)
         box.addWidget(button("Close", self.reject))
+
+    def toggle_more(self):
+        opened = not self.advanced[0].isVisibleTo(self)
+        for control in self.advanced:
+            control.setVisible(opened)
+        self.more.setText("Fewer kit tools" if opened else "More kit tools")
+        self.adjustSize()
 
     def pick(self, key):
         self.accept()

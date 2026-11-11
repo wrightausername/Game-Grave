@@ -28,8 +28,8 @@ jobs:
     name: Verify disposable file round-trip through native Windows Shell
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Create private QA scratch folder
@@ -66,7 +66,7 @@ jobs:
           }
       - name: Upload privacy-limited disposable M1 QA report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: GameGrave-M1-Windows-QA-Report
           path: _ci_temp/m1-report.json

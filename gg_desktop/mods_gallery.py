@@ -826,7 +826,7 @@ class ViewBar(QWidget):
 # ---------------------------------------------------------------- hooks used by mods_page
 def install(window, contents):
     """Add the gallery above the table. The table, filters and pager stay exactly as they were (List view)."""
-    window._mod_gallery_on = True
+    window._mod_gallery_on = window.settings.get("mods_library_view") != "list"
     window.mod_gallery = ModsGallery(window)
     window.mod_view_bar = ViewBar(window, lambda on: set_mode(window, on))
     table_at = contents.indexOf(window.mod_table)
@@ -849,6 +849,16 @@ def is_gallery(window):
 
 def set_mode(window, gallery_on):
     window._mod_gallery_on = bool(gallery_on)
+    wanted = "gallery" if gallery_on else "list"
+    if window.settings.get("mods_library_view", "gallery") != wanted:
+        updated = dict(window.settings)
+        updated["mods_library_view"] = wanted
+        try:
+            from core import save_settings
+            save_settings(updated)
+            window.settings = updated
+        except OSError:
+            pass  # the view still switches; it just is not remembered this time
     window._fill_mods(requested_page=window.mod_pager.page)
 
 

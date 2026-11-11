@@ -40,7 +40,8 @@ FOOTER = "Changes save to this PC when you press Apply. Reset to Defaults never 
 NAMES = {"start_minimized": "Start minimized", "scan_on_launch": "Scan when Game Grave starts",
          "files_stale_days": "Files idle after", "graveyard_days": "Graveyard age signal",
          "excluded_folders": "Excluded folders", "steam_artwork_downloads": "Steam artwork downloads",
-         "autostart": "Launch with Windows", "assistant_enabled": "AI Assistant tab"}
+         "autostart": "Launch with Windows", "assistant_enabled": "AI Assistant tab",
+         "check_updates_on_launch": "Check for updates on launch"}
 
 
 # ------------------------------------------------------------------ small widgets
@@ -338,8 +339,8 @@ def startup_panel(window):
                                "Runs a read-only scan each time the app opens."))
     body.addWidget(bool_switch(window, "assistant_enabled", "AI Assistant tab",
                                "Adds the AI Assistant to the sidebar. It is local, read only and off until you turn it on."))
-    body.addWidget(fixed_switch("Check for updates on launch", "Update service not connected in this preview. Nothing is contacted.",
-                                on=False, enabled=False))
+    body.addWidget(bool_switch(window, "check_updates_on_launch", "Check for updates on launch",
+                               "Asks GitHub once when Game Grave starts. Nothing is downloaded or installed."))
     body.addStretch()
     return box
 
@@ -594,10 +595,9 @@ def appearance_panel(window):
     box, body = frame("settingsAppearance", "red", "Appearance", "sparkles")
     body.addWidget(line("Theme", "", pill("Crimson Command")))
     body.addWidget(line("Interface scale", "", pill("100% native")))
-    body.addWidget(label("The look is fixed so every tab keeps its approved layout. Older themes stay in the classic tools.",
-                         "caption", wrap=True))
-    classic = tool("Classic Appearance and Advanced…", "more", window._launch_classic_tools,
-                   tip="Open the classic tools, which hold the older appearance themes")
+    body.addWidget(label("The look is fixed so every tab keeps its approved layout.", "caption", wrap=True))
+    classic = tool("Open More Tools…", "more", lambda: window.navigate("More Tools"),
+                   tip="Backups, Resurrection Kits, Windows tools and utilities live in More Tools")
     classic.setFixedHeight(28)
     body.addWidget(classic)
     body.addStretch()
@@ -677,6 +677,26 @@ def check_updates(window):
         window.settings_update.setEnabled(True)
         window.settings_update_note.setText(sentence)
         window.settings_update_open.setVisible(kind in {"available", "unknown", "error"})
+
+    window.job(work, finish, error_title="Update check failed")
+
+
+def check_updates_on_launch(window):
+    """Runs once at start, only when the owner switched it on in Settings. One request, nothing downloaded or
+    installed, no pop-up: a newer build is mentioned in the status line and shown in Settings."""
+    def work(progress=None):
+        try:
+            return update_check.check()
+        except Exception:
+            return None  # offline or not allowed to see the builds: stay quiet at launch
+
+    def finish(result):
+        if not result:
+            return
+        window.launch_update = result
+        kind, sentence = result
+        if kind == "available" and isValid(window.status):
+            window.status.setText(sentence + " Open Settings to update.")
 
     window.job(work, finish, error_title="Update check failed")
 
@@ -901,7 +921,11 @@ def build(window):
     data_row.addWidget(_widget(buttons), 3)
     version = column(spacing=1)
     version.addWidget(label("Game Grave " + __version__, "detailValue"))
-    self.settings_update_note = label("Nothing is contacted until you press Check for Updates.", "caption", wrap=True)
+    found = getattr(self, "launch_update", None)   # the answer from the optional check at launch, if it ran
+    self.settings_update_note = label(found[1] if found else "Nothing is contacted until you press Check for Updates."
+                                      if self.settings.get("check_updates_on_launch") is not True else
+                                      "Checked when Game Grave starts. Press Check for Updates to ask again.",
+                                      "caption", wrap=True)
     self.settings_update_note.setMinimumWidth(0)
     self.settings_update_note.setMaximumWidth(300)
     version.addWidget(self.settings_update_note)
