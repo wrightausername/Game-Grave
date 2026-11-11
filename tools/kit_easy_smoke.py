@@ -65,7 +65,14 @@ def main():
         game = SteamGame("489830", name, str(library), str(install), 60000, None, "Steam manifest")
         env = {"USERPROFILE": str(profile), "LOCALAPPDATA": str(local), "APPDATA": str(profile / "AppData" / "Roaming")}
         kits = root / "Kits"
+        # Windows caches its answer for the Documents folder inside one process, so this check, which pretends to be
+        # two PCs in one run, reads it from the pretend profile instead. The real call is covered by test_kit_install.
+        def pretend_documents(environ=None):
+            source = os.environ if environ is None else environ
+            return Path(source["USERPROFILE"]) / "Documents"
         with patch.dict(os.environ, env), patch("gg_desktop.app.load_settings", side_effect=default_settings), \
+             patch("resurrection_v2.documents_dir", side_effect=pretend_documents), \
+             patch("kit_easy.documents_dir", side_effect=pretend_documents), \
              patch("core.config_dir", return_value=root / "Prefs"), \
              patch.object(CrimsonWindow, "confirm", return_value=True), patch.object(CrimsonWindow, "info"), \
              patch.object(CrimsonWindow, "error") as error:
