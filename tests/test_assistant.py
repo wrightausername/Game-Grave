@@ -299,3 +299,10 @@ class FeatureQuestions(unittest.TestCase):
             self.assertEqual(a.intent, "feature", q)
             self.assertTrue(a.text.startswith(title), (q, a.text[:40]))
         self.assertEqual(engine.classify("any mods taking space?", facts())[0], "mods")
+
+    def test_drivers_and_startup_are_explained(self):
+        for q in ("how do I update my drivers", "how do I stop apps that start with windows", "what are startup apps"):
+            a = engine.answer(q, facts())
+            self.assertEqual(a.intent, "feature", q)
+            self.assertTrue(a.text.startswith("Drivers & Startup"), (q, a.text[:40]))
+        self.assertEqual(engine.answer("check for updates", facts()).text.split(":")[0], "Check for Updates")

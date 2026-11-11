@@ -172,6 +172,22 @@ FEATURES = (
         "Hardware in the sidebar.", "Hardware",
         "The parts Windows reports for this PC, live load, and upgrade notes from sessions you record."),
     Feature(
+        "drivers_startup", "Drivers & Startup",
+        ("drivers", "driver update", "driver updates", "update drivers", "update my drivers", "outdated drivers",
+         "startup apps", "startup programs", "start with windows", "starts with windows", "startup", "boot faster"),
+        "Drivers & Startup is the third tab inside Hardware. It checks Windows Update for driver updates and installs them, "
+        "and lists the apps that start with Windows so you can switch off the ones you don't need.",
+        ("Check for driver updates asks Windows Update which driver updates it offers this PC. Update all installs the "
+         "ticked ones after Windows asks for administrator permission.",
+         "Oldest drivers lists the oldest game-related drivers. An old date is a hint, not proof a newer one exists.",
+         "Graphics card makers often have newer drivers than Windows Update; the tab links to their official app.",
+         "Starts with Windows lists the same apps as Task Manager's Startup apps, each with an on/off switch. Apps for "
+         "all users ask for administrator permission."),
+        "It never deletes a startup entry or an app, and drivers come only from Windows Update. A restart may be needed "
+        "after a driver update.",
+        "Hardware, then Drivers & Startup.", "Hardware",
+        "Driver updates from Windows Update, and on/off switches for apps that start with Windows."),
+    Feature(
         "updates", "Check for Updates",
         ("check for updates", "updater", "update game grave", "new version", "new build", "latest version",
          "latest build", "how do i update"),

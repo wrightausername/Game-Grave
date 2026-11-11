@@ -202,9 +202,10 @@ def build(window):
     page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Hardware",
                                               scene="undo", source=(915, 28, 365, 83), excluded=((1090, 0, 190, 40),))
     ui = page.hardware = Body(self, monitor)
-    ui.tabs = TabStrip([("Your PC", "chip"), ("Upgrade Advisor", "radio")], selected=getattr(self, "hardware_tab", "Your PC"))
-    ui.tabs.setMinimumWidth(420)
-    ui.tabs.setMaximumWidth(560)
+    ui.tabs = TabStrip([("Your PC", "chip"), ("Upgrade Advisor", "radio"), ("Drivers & Startup", "settings")],
+                       selected=getattr(self, "hardware_tab", "Your PC"))
+    ui.tabs.setMinimumWidth(560)
+    ui.tabs.setMaximumWidth(780)
     page.content.addWidget(ui.metrics)
     page.content.addWidget(ui.tabs)
     ui.pc_tab, pc = QWidget(), column(spacing=10)
@@ -223,8 +224,12 @@ def build(window):
     side.addWidget(ui.sessions_panel)
     side.addStretch()
     adv.addLayout(side, 5)
+    from gg_desktop.upkeep_ui import UpkeepTab
+    specs = getattr(self, "hardware_specs", None)
+    ui.upkeep_tab = UpkeepTab(self, [g.name for g in getattr(specs, "gpus", ()) or ()])
     page.content.addWidget(ui.pc_tab)
     page.content.addWidget(ui.adv_tab)
+    page.content.addWidget(ui.upkeep_tab, 1)
     page.content.addStretch()
     ui.tabs.changed.connect(ui.show_tab)
     ui.show_tab(getattr(self, "hardware_tab", "Your PC"))
@@ -393,6 +398,9 @@ class Body(QObject):
             pass
 
     def show_parts(self, specs, error=""):
+        upkeep = getattr(self, "upkeep_tab", None)
+        if upkeep is not None and specs is not None:
+            upkeep.set_gpus([g.name for g in specs.gpus])
         _clear(self.parts_box)
         if specs is None:
             self.parts_when.setText("")
@@ -442,10 +450,13 @@ class Body(QObject):
         self.draw_metrics_static(specs)
 
     def show_tab(self, name):
-        name = name if name in ("Your PC", "Upgrade Advisor") else "Your PC"
+        name = name if name in ("Your PC", "Upgrade Advisor", "Drivers & Startup") else "Your PC"
         self.window_owner.hardware_tab = name
         self.pc_tab.setVisible(name == "Your PC")
         self.adv_tab.setVisible(name == "Upgrade Advisor")
+        upkeep = getattr(self, "upkeep_tab", None)
+        if upkeep is not None:
+            upkeep.setVisible(name == "Drivers & Startup")
         self.tabs.select(name)
 
     def draw_metrics_static(self, specs):

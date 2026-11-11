@@ -223,6 +223,73 @@ def main():
             assert hw.load_sessions() == [] and body(window).sessions == []
             assert sum(1 for t in texts(window) if t == "NEEDS SESSIONS") == 3
 
+            # Drivers & Startup: Windows answers are faked; the tab reads, lists, toggles and installs only on a press.
+            from gg_desktop import upkeep_core as up
+            uid = "3f1c9b2e-1111-4a2b-9c3d-123456789abc"
+            update_json = json.dumps([{"Id": uid, "Title": "NVIDIA - Display - 32.0.15.6094", "Class": "Display",
+                                       "Maker": "NVIDIA", "Model": "RTX 3060 Ti", "Date": "2024-09-12", "Size": 700000000}])
+            installed_json = json.dumps([{"DeviceName": "Old Sound Card", "DeviceClass": "MEDIA", "Date": "2016-03-01"},
+                                         {"DeviceName": "RTX 3060 Ti", "DeviceClass": "DISPLAY", "Date": "2025-01-01"}])
+            startup_json = json.dumps([
+                {"Name": "Steam", "Command": "\"C:\\Steam\\steam.exe\" -silent", "Scope": "user", "Source": "Run",
+                 "Approved": "", "Company": "Valve", "Description": "Steam Client Bootstrapper", "Exists": True},
+                {"Name": "Vendor Updater", "Command": "C:\\V\\upd.exe", "Scope": "machine", "Source": "Run32",
+                 "Approved": "030000000000000000000000", "Company": "Vendor", "Description": "Vendor Updater", "Exists": True}])
+            calls = []
+
+            def fake_ps(script, timeout=60):
+                calls.append(script[:40])
+                if "Win32_PnPSignedDriver" in script:
+                    return installed_json
+                if "CreateUpdateSearcher" in script:
+                    return update_json
+                return startup_json
+            writes, elevated = [], []
+            with patch("gg_desktop.upkeep_core._powershell", side_effect=fake_ps), \
+                 patch("gg_desktop.upkeep_core.set_enabled_user", side_effect=lambda a, on: writes.append((a.name, on))), \
+                 patch("gg_desktop.upkeep_core.run_elevated",
+                       side_effect=lambda script, **kw: elevated.append(script) or
+                       (json.dumps({"found": 1, "reboot": False, "results": [{"title": "NVIDIA", "code": 2}]})
+                        if "UpdateInstaller" in script else "")):
+                pressed(window, "Drivers & Startup").click()
+                tab = body(window).upkeep_tab
+                wait_for(lambda: tab.apps, "the startup list")
+                wait_for(lambda: tab.old_box.count() > 0, "the installed drivers")
+                settle(100)
+                assert tab.isVisible() and not body(window).pc_tab.isVisible() and window.hardware_tab == "Drivers & Startup"
+                assert not any("CreateUpdateSearcher" in c for c in calls), "Windows Update is only asked on a press"
+                assert [a.title for a in tab.apps] == ["Steam Client Bootstrapper", "Vendor Updater"]
+                assert "2 apps can start with Windows; 1 is on." in tab.startup_status.text(), tab.startup_status.text()
+                assert any("Old Sound Card" in t for t in texts(window))
+                assert tab.maker_button.isVisible() and "NVIDIA App" in tab.maker_button.text()
+                from gg_desktop.settings_page import Switch
+                switches = {s.accessibleName(): s for s in tab.findChildren(Switch)}
+                switches["Start Steam Client Bootstrapper with Windows"].click()
+                wait_for(lambda: writes, "the startup switch")
+                assert writes == [("Steam", False)] and not elevated, "an app for you changes without admin"
+                with patch.object(window, "confirm", return_value=True) as asked:
+                    switches["Start Vendor Updater with Windows"].click()
+                    wait_for(lambda: elevated, "the all-users switch")
+                assert "administrator permission" in asked.call_args[0][1]
+                assert "StartupApproved\\Run32" in elevated[0] and "-Name 'Vendor Updater'" in elevated[0]
+                elevated.clear()
+                pressed(window, "Check for driver updates").click()
+                wait_for(lambda: tab.updates, "the driver list")
+                settle(60)
+                assert "Windows Update offers 1 driver update" in tab.driver_status.text(), tab.driver_status.text()
+                assert tab.install_button.isVisible() and tab.install_button.text() == "Update all"
+                assert window.grab().save(str(args.output / "hardware-drivers-startup-1366.png"))
+                with patch.object(window, "confirm", return_value=False):
+                    tab.install_button.click()
+                assert not elevated, "declining installs nothing"
+                with patch.object(window, "confirm", return_value=True):
+                    tab.install_button.click()
+                    wait_for(lambda: "Installed 1 of 1" in tab.driver_status.text() or elevated and not window.cleaning,
+                             "the driver install")
+                assert uid in elevated[0] and not window.cleaning
+                pressed(window, "Your PC").click()
+                settle(60)
+
             assert error.call_count == 0 and info.call_count == 0, (error.call_args_list, info.call_args_list)
             window.navigate("Overview")
             settle(200)

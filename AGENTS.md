@@ -394,3 +394,20 @@ code but wtf are you supposed to do with that"). Ready Room is reopened for the 
 - Settings / Appearance: "Interface scale" is a real choice (100% native, 110%, 125%, 150%). It sets Qt's scale factor before the
   window is created, so the whole window grows evenly and no tab's layout changes; it is used at the next start and never overrides
   a QT_SCALE_FACTOR the user set themselves. Accent colour stays fixed.
+
+Drivers & Startup (owner instruction, 2026-11-11: "somewhere where ever makes the most sense add a section that detects outdated
+drivers and a way to update them all along with what starts up automatically when windows does so i can turn off unwanted apps
+easily"). Placed as a third inner tab of Hardware, "Drivers & Startup" (`gg_desktop/upkeep_core.py` pure plus Windows calls,
+`gg_desktop/upkeep_ui.py` Qt). Hardware is reopened for this tab only; Your PC and Upgrade Advisor are unchanged.
+- Drivers: "update available" comes only from Windows Update's own driver search (Windows Update Agent, IsInstalled=0 and
+  Type='Driver'), asked only when the owner presses Check. Update all / Update N selected installs exactly those update IDs through
+  Windows Update in a separate PowerShell that Windows asks to allow (UAC, `run_elevated`); declining changes nothing. The result is
+  read back per update (installed / failed / restart needed) and logged. "Oldest drivers" lists game-related classes older than 3 years
+  as a hint, never as "outdated"; Windows' inbox 2006-06-21 drivers are left out. The graphics maker's official app page is linked
+  (NVIDIA App, AMD Adrenalin, Intel DSA); nothing is downloaded from anywhere else.
+- Startup: the same sources Task Manager lists (HKCU/HKLM Run, HKLM WOW6432Node Run, the user and common Startup folders), with
+  publisher and description from the program file. The switch writes only Task Manager's StartupApproved value (02 on, 03 + time
+  off), so entries and apps are never deleted and Task Manager shows the same state. Apps for you change directly; apps for all users
+  ask first and go through the Windows prompt. Scheduled tasks, services and Store apps are not listed, and the tab says so.
+- Nothing runs automatically: the startup list and installed drivers are read when the tab is first opened, Windows Update only on a
+  press. Covered by `tests/test_upkeep.py` and the Drivers & Startup part of `tools/hardware_smoke.py`.
