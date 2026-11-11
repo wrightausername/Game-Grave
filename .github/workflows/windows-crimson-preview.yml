@@ -120,6 +120,7 @@ on:
       - 'tools/blackbox_smoke.py'
       - 'tools/kit_easy_smoke.py'
       - 'tools/first_run_smoke.py'
+      - 'tools/upkeep_real_check.py'
       - 'gg_desktop/a11y.py'
       - 'gg_desktop/games_fit.py'
       - 'kit_easy.py'
@@ -369,6 +370,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Overview storage dial or GG mark failed in native Qt.' }
           python tools/kit_easy_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'Easy Resurrection Kit set up, create, cancel or restore failed in native Qt.' }
+          python tools/upkeep_real_check.py
+          if ($LASTEXITCODE -ne 0) { throw 'Drivers & Startup failed against the real Windows calls.' }
           python tools/first_run_smoke.py --output _ci_temp
           if ($LASTEXITCODE -ne 0) { throw 'A tab failed to open before the first scan, or a field has no screen-reader name.' }
           python tools/autopsy_smoke.py --output _ci_temp
