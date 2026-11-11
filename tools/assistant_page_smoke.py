@@ -192,7 +192,7 @@ def main():
             settle()
             assert window.assistant_scope.text() == "Starfield" and saved[-1]["assistant_scope"].startswith("Steam:"), saved[-1]
             ask(window, "how big is it?")
-            assert "Starfield is installed through Steam" in transcript(window) and "Mod locations inside it" in transcript(window)
+            assert "Starfield reports " in transcript(window) and "Mod locations inside it" in transcript(window), transcript(window)
             chooser.return_value = ("All games", True)
             window.assistant_scope.click()
             settle()
