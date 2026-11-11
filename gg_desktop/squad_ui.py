@@ -8,10 +8,11 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QApplication, QComboBox, QInputDialog, QLabel, QLineEdit, QWidget
+from PySide6.QtWidgets import QApplication, QComboBox, QFileDialog, QInputDialog, QLabel, QLineEdit, QWidget
 
 from gg_desktop import nexus_core as nx
 from gg_desktop import squad_install as installer
+from gg_desktop import squad_profile as profiles
 from gg_desktop import squad_core as sq
 from gg_desktop.feature_strip import collapsible
 from gg_desktop.widgets import button, column, label, row
@@ -20,11 +21,11 @@ TONES = {"green": "#35DC7C", "amber": "#DFAC46", "muted": "#9AA4AC"}
 SHOWN = 8
 OPEN_MAX = 10
 PACE_MS = 900                 # pause between opened pages so Steam and the browser are never flooded
-IDLE = "Match your co-op group's mods. Open to read your setup and compare it with a friend's."
+IDLE = "Match your co-op group's mods. The host copies a code, friends paste it, and Game Grave shows and gets what is missing."
 
 
 def build_panel(panel_cls, window):
-    panel = collapsible(panel_cls, "Squad Sync", IDLE, "sync", open_height=420)
+    panel = collapsible(panel_cls, "Squad Sync", IDLE, "sync", open_height=500)
     body = SquadBody(window)
     body.on_status = panel.set_subtitle
     panel.body_layout.setContentsMargins(14, 8, 14, 10)
@@ -44,6 +45,7 @@ class SquadBody(QWidget):
         self.window_owner = window
         self.setup = None
         self.comparison = None
+        self.theirs = None
         self.on_status = None
         self._pending = []
         layout = column(spacing=8)
@@ -69,25 +71,43 @@ class SquadBody(QWidget):
         layout.addWidget(self.summary)
         columns = row(spacing=20)
         left = column(spacing=6)
-        left.addWidget(label("Share your setup", "readyGameTitle"))
-        self.copy_button = button("Copy squad code", self.copy_code, kind="actionLink",
-                                  tip="A code for your friends. It holds mod names and Workshop numbers only, no paths or user name.")
-        self.snapshot_button = button("Save a snapshot", self.snapshot, kind="actionLink",
-                                      tip="Saves your mod list (not the mod files) so you can compare against it later.")
-        left.addWidget(self.copy_button, 0, Qt.AlignLeft)
-        left.addWidget(self.snapshot_button, 0, Qt.AlignLeft)
-        left.addWidget(label("Squad Sync shows what differs. Steam Workshop items open in Steam for you to subscribe. "
-                             "With Nexus Premium it downloads missing Nexus mods and installs the plain ones into Mod "
-                             "Organizer 2, switched off. Anything else you get where your friend did.",
+        left.addWidget(label("Hosting? Share your setup", "readyGameTitle"))
+        left.addWidget(label("1. Press Copy squad code.\n"
+                             "2. Paste it to your friends in Discord or a text.\n"
+                             "3. They open Squad Sync on their PC and press Paste a friend's code.",
                              "readyDetail", wrap=True))
+        share = row(spacing=14)
+        self.copy_button = button("Copy squad code", self.copy_code, kind="primary",
+                                  tip="Copies a code for your friends. It holds mod names and Workshop numbers only: "
+                                      "no files, no paths, no user name.")
+        self.save_code_button = button("Save code as file…", self.save_code_file, kind="actionLink",
+                                       tip="Saves the same code as a small text file you can send, for codes too long to paste.")
+        share.addWidget(self.copy_button)
+        share.addWidget(self.save_code_button)
+        share.addStretch()
+        left.addLayout(share)
+        self.share_note = label("", "readyDetail", wrap=True)
+        left.addWidget(self.share_note)
+        self.snapshot_button = button("Save a snapshot for myself", self.snapshot, kind="actionLink",
+                                      tip="Saves your mod list (not the mod files) on this PC so you can compare against it later.")
+        left.addWidget(self.snapshot_button, 0, Qt.AlignLeft)
         left.addStretch()
         columns.addLayout(left, 4)
         right = column(spacing=6)
-        right.addWidget(label("Match a friend or a snapshot", "readyGameTitle"))
+        right.addWidget(label("Joining? Match a friend", "readyGameTitle"))
+        right.addWidget(label("1. Copy the code your friend sent (or save the file they sent).\n"
+                              "2. Press Paste a friend's code. Game Grave reads it from your clipboard.\n"
+                              "3. Press Get what's missing, then Make squad profile.",
+                              "readyDetail", wrap=True))
         pick = row(spacing=14)
-        self.import_button = button("Paste a squad code…", self.import_code, kind="actionLink")
+        self.import_button = button("Paste a friend's code", self.import_code, kind="primary",
+                                    tip="Reads the squad code from your clipboard, even inside a whole chat message. "
+                                        "If there is none, it asks you to paste it.")
+        self.open_file_button = button("Open a code file…", self.open_code_file, kind="actionLink",
+                                       tip="For a code sent as a file, such as Discord's message.txt.")
         self.compare_snapshot_button = button("Compare with a snapshot…", self.compare_snapshot, kind="actionLink")
         pick.addWidget(self.import_button)
+        pick.addWidget(self.open_file_button)
         pick.addWidget(self.compare_snapshot_button)
         pick.addStretch()
         right.addLayout(pick)
@@ -95,15 +115,21 @@ class SquadBody(QWidget):
         right.addWidget(self.result_summary)
         self.rows_box = column(spacing=3)
         right.addLayout(self.rows_box)
+        self.next_label = label("", "readyGameTitle", wrap=True)
+        right.addWidget(self.next_label)
         fetch = row(spacing=14)
         self.open_button = button("Get what's missing", self.get_missing, kind="primary",
                                   tip="One press: opens each missing Steam Workshop item in Steam, and with Nexus Premium "
                                       "downloads the missing Nexus files and installs the plain zip ones into Mod Organizer 2 "
                                       "as new, switched-off mods. Without Premium it opens each mod's page.")
+        self.profile_button = button("Make squad profile…", self.make_profile, kind="actionLink",
+                                     tip="Makes a NEW Mod Organizer 2 profile with your friend's mods switched on in your "
+                                         "friend's order. Your own profile is never changed.")
         self.console_button = button("Use Steam's download command", self.steam_console, kind="actionLink",
                                      tip="Copies Steam's own workshop_download_item commands and opens Steam's console. "
                                          "Steam decides whether it allows this for the game.")
         fetch.addWidget(self.open_button)
+        fetch.addWidget(self.profile_button)
         fetch.addWidget(self.console_button)
         fetch.addStretch()
         right.addLayout(fetch)
@@ -120,6 +146,7 @@ class SquadBody(QWidget):
             if at >= 0:
                 self.games.setCurrentIndex(at)
             self.setup, self.comparison = state["setup"], state["comparison"]
+            self.theirs = state.get("theirs")
             self._show_setup()
             self._show_comparison()
         elif self.games.count():
@@ -132,7 +159,8 @@ class SquadBody(QWidget):
     # ------------------------------------------------------------ state
     def _save_state(self):
         game = self.games.currentText()
-        self.window_owner.squad_state = {"game": game, "setup": self.setup, "comparison": self.comparison}
+        self.window_owner.squad_state = {"game": game, "setup": self.setup, "comparison": self.comparison,
+                                         "theirs": self.theirs}
 
     def refresh_games(self):
         self.games.clear()
@@ -145,22 +173,29 @@ class SquadBody(QWidget):
         self.read_button.setEnabled(self.games.count() > 0)
 
     def _game_changed(self, *_):
-        self.setup = self.comparison = None
+        self.setup = self.comparison = self.theirs = None
         self._clear_rows()
         self.result_summary.setText("")
         self.fetch_note.setText("")
+        self.share_note.setText("")
         self.read()
 
     def _sync(self):
         have = bool(self.setup and self.setup.items)
         self.copy_button.setEnabled(have)
+        self.save_code_button.setEnabled(have)
         self.snapshot_button.setEnabled(bool(self.setup and self.setup.read_any))
         ready = bool(self.setup and self.setup.read_any)
         self.import_button.setEnabled(ready)
+        self.open_file_button.setEnabled(ready)
         game = self.games.currentText()
         self.compare_snapshot_button.setEnabled(ready and bool(game and sq.list_snapshots(game)))
         missing = [i for i in (self.comparison.missing if self.comparison else []) if sq.workshop_url(i) or sq.nexus_url(i)]
         self.open_button.setVisible(bool(missing))
+        can_profile = self._can_profile()
+        self.profile_button.setVisible(can_profile)
+        self.next_label.setText(sq.next_step(self.comparison, can_fetch=bool(missing), can_profile=can_profile))
+        self.next_label.setVisible(bool(self.next_label.text()))
         self.console_button.setVisible(bool([i for i in (self.comparison.missing if self.comparison else [])
                                              if sq.workshop_url(i)]))
         self.report_status()
@@ -173,7 +208,7 @@ class SquadBody(QWidget):
         library = next((s.library for s in getattr(self.window_owner.inventory, "steam", ())
                         if str(s.app_id) == str(game.app_id)), None)
         self.setup = sq.read_setup(game.name, game.app_id, library)
-        self.comparison = None
+        self.comparison = self.theirs = None
         self._clear_rows()
         self.result_summary.setText("")
         self._show_setup()
@@ -192,8 +227,39 @@ class SquadBody(QWidget):
     # ------------------------------------------------------------ sharing
     def copy_code(self):
         if self.setup and self.setup.items:
-            QApplication.clipboard().setText(sq.make_code(self.setup))
-            self.window_owner.status.setText("Squad code copied. It holds mod names and Workshop numbers only.")
+            code = sq.make_code(self.setup)
+            QApplication.clipboard().setText(code)
+            self.share_note.setText(sq.share_steps(self.setup, code))
+            self.window_owner.status.setText("Squad code copied. Paste it to your friends.")
+
+    def save_code_file(self):
+        if not (self.setup and self.setup.items):
+            return
+        code = sq.make_code(self.setup)
+        start = Path.home() / "Documents" / (sq._slug(self.setup.game) + "-squad-code.txt")
+        chosen, _ = QFileDialog.getSaveFileName(self.window_owner, "Save your squad code", str(start), "Text file (*.txt)")
+        if not chosen:
+            return
+        try:
+            with open(chosen, "x" if not Path(chosen).exists() else "w", encoding="utf-8") as out:
+                out.write(f"Game Grave squad code for {self.setup.game}.\n"
+                          "In Game Grave: Ready Room, Squad Sync, Open a code file (or copy the line below and press "
+                          "Paste a friend's code).\n\n" + code + "\n")
+        except OSError as problem:
+            self.window_owner.error("Squad Sync", f"Could not save the code file: {problem}")
+            return
+        self.share_note.setText(f"Saved {Path(chosen).name}. Send that file to your friends. They press Open a code file.")
+
+    def open_code_file(self):
+        chosen, _ = QFileDialog.getOpenFileName(self.window_owner, "Open the code file your friend sent",
+                                                str(Path.home() / "Downloads"), "Text files (*.txt);;All files (*)")
+        if not chosen:
+            return
+        code = sq.read_code_file(chosen)
+        if not code:
+            self.window_owner.error("Squad Sync", "That file has no squad code in it. A code starts with " + sq.CODE_PREFIX)
+            return
+        self._use_code(code, "Read the code from " + Path(chosen).name + ".")
 
     def snapshot(self):
         if not (self.setup and self.setup.read_any):
@@ -208,14 +274,44 @@ class SquadBody(QWidget):
 
     # ------------------------------------------------------------ comparing
     def import_code(self):
-        code, ok = QInputDialog.getText(self.window_owner, "Paste a squad code", "Paste the code your friend sent:")
+        """One press: use the code on the clipboard when there is one that is not your own, else ask for it."""
+        held = sq.find_code(QApplication.clipboard().text())
+        if held:
+            try:
+                if not sq.same_setup(sq.read_code(held), self.setup):
+                    self._use_code(held, "Read the code from your clipboard.")
+                    return
+            except ValueError:
+                pass                    # a damaged code on the clipboard: ask instead
+        code, ok = QInputDialog.getMultiLineText(
+            self.window_owner, "Paste a friend's code",
+            "Paste the code your friend sent (Ctrl+V). You can paste their whole message; Game Grave finds the code in it.")
         if not ok or not code.strip():
             return
+        self._use_code(code, "")
+
+    def _use_code(self, code, how):
         try:
             theirs = sq.read_code(code)
+        except ValueError as problem:
+            self.window_owner.error("Squad Sync", str(problem))
+            return
+        if theirs.game.casefold() != self.games.currentText().casefold():
+            at = next((i for i in range(self.games.count())
+                       if self.games.itemText(i).casefold() == theirs.game.casefold()), -1)
+            if at < 0:
+                self.window_owner.error("Squad Sync", f"This code is for {theirs.game}, which Game Grave has not found on "
+                                                      "this PC. Install it, press Scan PC, then paste the code again.")
+                return
+            self.games.setCurrentIndex(at)          # reads your setup for that game
+            how = (how + " " if how else "") + f"Switched to {theirs.game}, the game the code is for."
+        try:
             self._compare(theirs)
         except ValueError as problem:
             self.window_owner.error("Squad Sync", str(problem))
+            return
+        if how:
+            self.result_summary.setText(how + " " + self.result_summary.text())
 
     def compare_snapshot(self):
         game = self.games.currentText()
@@ -232,6 +328,7 @@ class SquadBody(QWidget):
             self.window_owner.error("Squad Sync", str(problem))
 
     def _compare(self, theirs):
+        self.theirs = theirs
         self.comparison = sq.compare(theirs, self.setup)
         self._show_comparison()
         self._save_state()
@@ -297,6 +394,57 @@ class SquadBody(QWidget):
         if hidden > 0:
             self.rows_box.addWidget(label(f"and {hidden} more", "readyDetail"))
 
+    # ------------------------------------------------------------ squad profile (Mod Organizer 2)
+    def _mo2(self):
+        """(profile folder, mods folder) of the Mod Organizer 2 setup for the chosen game, or None."""
+        found = sq.mo2_instance(self.games.currentText(), sq.default_roots())
+        if not found:
+            return None
+        instance, ini, chosen = found
+        profile, mods = instance / "profiles" / chosen, installer.mods_folder(instance, ini)
+        return (profile, mods) if profile.is_dir() and mods.is_dir() else None
+
+    def _host_mods(self):
+        return [i.label for i in (self.theirs.items if self.theirs else []) if i.kind == "mo2"]
+
+    def _can_profile(self) -> bool:
+        return bool(self.comparison and self.comparison.comparable and self._host_mods() and self._mo2())
+
+    def make_profile(self):
+        where = self._mo2()
+        if where is None or not self._host_mods():
+            return
+        window = self.window_owner
+        try:
+            plan = profiles.preview(where[0], self._host_mods(), where[1])
+        except profiles.ProfileError as problem:
+            window.error("Squad Sync", str(problem))
+            return
+        absent = len(plan["not_installed"])
+        if not window.confirm(
+                "Make a squad profile in Mod Organizer 2?",
+                f"Game Grave will add one NEW profile:\n{plan['folder']}\n\n"
+                f"{len(plan['on'])} of your friend's mods will be switched on in it, in your friend's order. Every other "
+                "mod is listed switched off."
+                + (f"\n{absent} of their mods {'are' if absent != 1 else 'is'} not installed here yet and will be left out."
+                   if absent else "")
+                + f"\n\nYour own profile ({plan['source']}) is only read and is not changed. Nothing is overwritten. "
+                  "You pick the new profile in Mod Organizer 2, and remove it there when you no longer need it."):
+            return
+        try:
+            result = profiles.make(where[0], self._host_mods(), where[1])
+        except profiles.ProfileError as problem:
+            window.error("Squad Sync", str(problem))
+            return
+        self.fetch_note.setText(profiles.result_text(result))
+        window.status.setText(f"Squad profile made: {result['name']}.")
+        try:
+            from core import log_event
+            log_event("squad_profile", f"Squad Sync made the Mod Organizer 2 profile {result['name']} "
+                                       f"({len(result['on'])} mods switched on)")
+        except Exception:
+            pass
+
     # ------------------------------------------------------------ status line for the closed strip
     def status_line(self) -> str:
         if self.setup is None:
@@ -306,7 +454,8 @@ class SquadBody(QWidget):
             if not self.setup.read_any:
                 return f"Could not read any mod list for {self.setup.game}."
             found = len(self.setup.items)
-            return f"{found} mod item{'s' if found != 1 else ''} read for {self.setup.game}. Paste a friend's code to compare."
+            return (f"{found} mod item{'s' if found != 1 else ''} read for {self.setup.game}. Hosting: copy your squad code. "
+                    "Joining: paste a friend's code.")
         if not comparison.comparable:
             return comparison.summary
         if comparison.missing or comparison.different:
@@ -527,8 +676,8 @@ class SquadBody(QWidget):
                     if out["installed"]:
                         count = len(out["installed"])
                         lines.append(f"Installed {count} as new mod{'s' if count != 1 else ''}, switched off: "
-                                     f"{', '.join(out['installed'][:5])}{'…' if count > 5 else ''}. In Mod Organizer 2 press F5, "
-                                     "then tick them.")
+                                     f"{', '.join(out['installed'][:5])}{'…' if count > 5 else ''}. Press Make squad profile "
+                                     "to switch them on in your friend's order, or in Mod Organizer 2 press F5 and tick them.")
                     if out["waiting"]:
                         count = len(out["waiting"])
                         lines.append(f"{count} wait{'s' if count == 1 else ''} in Mod Organizer 2's Downloads tab for you to install: "

@@ -114,12 +114,19 @@ def main():
             code = QApplication.clipboard().text()
             assert code.startswith("GGSQ1-") and str(root) not in code
             assert {i.label: i.nexus for i in sq.read_code(code).items}["SkyUI"] == "skyrimspecialedition/12604"
+            # The host is told what to do with the code.
+            assert "paste it to your friends" in body.share_note.text() and "Paste a friend's code" in body.share_note.text()
+            saved = root / "my-code.txt"
+            with patch("gg_desktop.squad_ui.QFileDialog.getSaveFileName", return_value=(str(saved), "")):
+                body.save_code_button.click()
+            assert sq.read_code_file(saved) == code and "Send that file" in body.share_note.text()
+            # My own code on the clipboard is not "a friend's code": the paste box is asked instead.
 
             friend = sq.Setup("Skyrim Special Edition", [
                 sq.Item("workshop", "1111111", "w", "1700000000"), sq.Item("workshop", "2222222", "w", "1700009999"),
                 sq.Item("workshop", "3333333", "w", "1700000000"), sq.Item("mo2", "skyui", "SkyUI"),
                 sq.Item("plugin", "skyui_se.esp", "SkyUI_SE.esp")], read_any=True)
-            with patch("gg_desktop.squad_ui.QInputDialog.getText", return_value=(sq.make_code(friend), True)):
+            with patch("gg_desktop.squad_ui.QInputDialog.getMultiLineText", return_value=(sq.make_code(friend), True)):
                 body.import_button.click()
             settle(100)
             body = live(window)
@@ -145,12 +152,30 @@ def main():
             assert opened == ["steam://nav/console"], opened
             opened.clear()
 
+            # A joiner presses one button: the code is read straight from the clipboard, even inside a chat message.
+            QApplication.clipboard().setText("yo paste this in game grave: " + sq.make_code(friend) + " cya tonight")
+            with patch("gg_desktop.squad_ui.QInputDialog.getMultiLineText") as asked:
+                live(window).import_button.click()
+                asked.assert_not_called()
+            settle(100)
+            assert live(window).result_summary.text().startswith("Read the code from your clipboard."), live(window).result_summary.text()
+            assert live(window).next_label.isVisibleTo(live(window)) and live(window).next_label.text().startswith("Next:")
+            # ...or opens the file the host sent.
+            sent = root / "message.txt"
+            sent.write_text("squad code\n" + sq.make_code(friend), encoding="utf-8")
+            with patch("gg_desktop.squad_ui.QFileDialog.getOpenFileName", return_value=(str(sent), "")):
+                live(window).open_file_button.click()
+            settle(100)
+            assert "Read the code from message.txt." in live(window).result_summary.text()
+            QApplication.clipboard().setText("")
+            body = live(window)
+
             # Nexus: a mod with a Nexus reference gets its own page; no key means pages, never a download.
             nexus_friend = sq.Setup("Skyrim Special Edition", [
                 sq.Item("workshop", "3333333", "w", "1700000000"),
                 sq.Item("mo2", "extra mod", "Extra Mod", "", "skyrimspecialedition/999"),
                 sq.Item("mo2", "no source", "No Source")], read_any=True)
-            with patch("gg_desktop.squad_ui.QInputDialog.getText", return_value=(sq.make_code(nexus_friend), True)):
+            with patch("gg_desktop.squad_ui.QInputDialog.getMultiLineText", return_value=(sq.make_code(nexus_friend), True)):
                 body.import_button.click()
             settle(100)
             body = live(window)
@@ -209,6 +234,20 @@ def main():
                 "the profile and load order are never touched"
             opened.clear()
 
+            # Last step: a NEW Mod Organizer 2 profile with the friend's mods on in the friend's order.
+            body = live(window)
+            assert body.profile_button.isVisibleTo(body)
+            with patch.object(window, "confirm", return_value=True) as confirm:
+                body.profile_button.click()
+                assert "is only read and is not changed" in confirm.call_args[0][1]
+            made = mo2 / "profiles" / "GG Squad - Co-op"
+            assert made.is_dir() and (made / "gg-squad.json").is_file()
+            assert (made / "modlist.txt").read_text(encoding="utf-8") == "+Extra Mod\n-SkyUI\n-Off\n-USSEP\n", \
+                (made / "modlist.txt").read_text(encoding="utf-8")
+            assert (mo2 / "profiles" / "Co-op" / "modlist.txt").read_text(encoding="utf-8") == "+SkyUI\n-Off\n+USSEP\n"
+            assert "Your own profile was not changed" in body.fetch_note.text() and "1 is not installed here yet" in body.fetch_note.text()
+            assert window.grab().save(str(args.output / "ready-room-squad-flow-1280.png"))
+
             # A free account is told so and gets the page instead.
             with patch.object(window, "confirm", return_value=True), \
                  patch("gg_desktop.squad_ui.nx.validate", return_value=nx.Account("Sam", False)):
@@ -221,10 +260,10 @@ def main():
 
             # A code for another game and a junk code are refused in words.
             wrong = sq.make_code(sq.Setup("Fallout 4", [sq.Item("mo2", "a", "A")], read_any=True))
-            with patch("gg_desktop.squad_ui.QInputDialog.getText", return_value=(wrong, True)):
+            with patch("gg_desktop.squad_ui.QInputDialog.getMultiLineText", return_value=(wrong, True)):
                 body.import_button.click()
             assert "This code is for Fallout 4" in error.call_args[0][1]
-            with patch("gg_desktop.squad_ui.QInputDialog.getText", return_value=("nonsense", True)):
+            with patch("gg_desktop.squad_ui.QInputDialog.getMultiLineText", return_value=("nonsense", True)):
                 body.import_button.click()
             assert "not a Squad Sync code" in error.call_args[0][1]
 

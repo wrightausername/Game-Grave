@@ -180,8 +180,80 @@ def make_code(setup: Setup) -> str:
     return CODE_PREFIX + base64.urlsafe_b64encode(packed).decode("ascii").rstrip("=")
 
 
+_CODE = re.compile(re.escape(CODE_PREFIX) + r"[A-Za-z0-9_\-]{8,}")
+DISCORD_LIMIT = 2000          # characters in one ordinary Discord message
+MAX_CODE_FILE_BYTES = 256 * 1024
+
+
+def find_code(text: str) -> str:
+    """The squad code inside whatever was pasted: a whole chat message, a code broken over lines, or the code alone.
+    Returns '' when there is none."""
+    text = str(text or "")[:MAX_CODE_CHARS * 4]
+    joined = re.sub(r"\s+", "", text)
+    if joined.startswith(CODE_PREFIX) and _CODE.fullmatch(joined):
+        return joined                                    # only the code, perhaps wrapped by the chat app
+    found = _CODE.findall(text)
+    return max(found, key=len) if found else ""
+
+
+def share_steps(setup: Setup, code: str) -> str:
+    """What to do with a code that was just copied, in plain words."""
+    count = len(setup.items[:MAX_ITEMS])
+    lines = [f"Copied your {setup.game} setup ({count} mod item{'s' if count != 1 else ''}). "
+             "Now paste it to your friends in Discord or a text (Ctrl+V)."]
+    if len(code) > DISCORD_LIMIT:
+        lines.append(f"This code is {len(code):,} characters, more than one Discord message holds. Discord will offer to "
+                     "send it as a file, or press Save code as file and send that. Your friends press Open a code file.")
+    lines.append("Each friend opens Game Grave, Ready Room, Squad Sync, picks the same game and presses "
+                 "Paste a friend's code.")
+    return " ".join(lines)
+
+
+def read_code_file(path) -> str:
+    """The squad code inside a text file a friend sent (a saved code, or Discord's message.txt). '' when none."""
+    path = Path(path)
+    try:
+        if path.stat().st_size > MAX_CODE_FILE_BYTES:
+            return ""
+        raw = path.read_bytes()
+    except OSError:
+        return ""
+    for encoding in ("utf-8-sig", "utf-16", "cp1252"):
+        try:
+            return find_code(raw.decode(encoding))
+        except UnicodeError:
+            continue
+    return ""
+
+
+def same_setup(a: Setup | None, b: Setup | None) -> bool:
+    """Two setups list the same items for the same game (used to notice your own code on the clipboard)."""
+    if a is None or b is None or a.game.casefold() != b.game.casefold():
+        return False
+    return [(i.kind, i.key.casefold()) for i in a.items[:MAX_ITEMS]] == [(i.kind, i.key.casefold()) for i in b.items[:MAX_ITEMS]]
+
+
+def next_step(comparison, *, can_fetch: bool, can_profile: bool) -> str:
+    """One plain sentence telling the joiner what to do now."""
+    if comparison is None:
+        return ""
+    if not comparison.comparable:
+        return ""
+    if comparison.missing and can_fetch:
+        return "Next: press Get what's missing."
+    if comparison.missing:
+        return ("Next: get the missing mods where your friend did. Game Grave has no download source for them "
+                "in this code.")
+    if can_profile:
+        return ("You have every mod your friend has. Next: press Make squad profile to switch them on in your "
+                "friend's order.")
+    if comparison.different:
+        return "You have every mod, but some were updated at a different time. Open those in Steam to update them."
+    return "You match your friend's setup. Nothing left to do."
+
+
 def read_code(text: str) -> Setup:
-    text = (text or "").strip()
+    text = find_code(text) or (text or "").strip()
     if not text.startswith(CODE_PREFIX) or len(text) > MAX_CODE_CHARS:
         raise ValueError("That is not a Squad Sync code. It should start with " + CODE_PREFIX)
     body = text[len(CODE_PREFIX):]

@@ -93,14 +93,21 @@ FEATURES = (
         "Set your game preferences once and apply them to every game Game Grave can verify."),
     Feature(
         "squad_sync", "Squad Sync",
-        ("squad sync", "squadsync", "co-op mods", "coop mods"),
-        "Squad Sync reads your mod setup, turns it into a code for friends, and shows what differs from a friend's "
-        "code so a co-op group can match mods.",
-        ("Get what's missing opens each missing Steam Workshop item in Steam, where you press Subscribe.",
-         "With a Nexus Premium account it downloads the missing Nexus files and installs the plain zip ones into Mod "
-         "Organizer 2 as new mods, switched off. Mods with an installer that asks questions, and 7z or rar files, "
-         "wait in Mod Organizer 2's Downloads tab."),
-        "It never overwrites a mod and never changes a profile or load order. You tick the new mods on yourself.",
+        ("squad sync", "squadsync", "squad code", "co-op mods", "coop mods", "match mods with a friend"),
+        "Squad Sync gets a co-op group onto the same mods. One person hosts and shares a code; everyone else pastes "
+        "it and Game Grave shows what they are missing and helps get it.",
+        ("Hosting: pick the game, press Copy squad code, and paste it to your friends in Discord or a text. For a "
+         "long code, press Save code as file and send the file.",
+         "Joining: copy the code your friend sent and press Paste a friend's code. Game Grave reads it from your "
+         "clipboard, even inside a whole chat message. Or press Open a code file.",
+         "Get what's missing opens each missing Steam Workshop item in Steam, where you press Subscribe. With Nexus "
+         "Premium it downloads the missing Nexus files and installs the plain zip ones into Mod Organizer 2, "
+         "switched off. Mods with an installer that asks questions, and 7z or rar files, wait in Mod Organizer 2's "
+         "Downloads tab.",
+         "Make squad profile adds a NEW Mod Organizer 2 profile with your friend's mods switched on in your "
+         "friend's order. You pick it in Mod Organizer 2."),
+        "The code holds mod names and Workshop numbers only: no files, paths or user name. Squad Sync never "
+        "overwrites a mod and never changes your own profile. Plugin order is not part of a code.",
         "Ready Room, then Squad Sync.", "Ready Room",
         "Reads your mod setup so you can compare it with a friend's."),
     Feature(

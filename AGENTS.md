@@ -375,3 +375,17 @@ rest. Go"; number 2 was real-PC testing). Each item below names the tab it reope
 - Not done, by design: code signing (needs a certificate), licensing, referrals and the command center (need a server), widening
   Other Storage deletion and Undo Center custom restore (protected engines), Bisect writes for Vortex (its state is a database Game
   Grave will not edit), accent colour and interface scale.
+
+Squad Sync, made obvious (owner instruction, 2026-11-11: "continue the checklist... also refine the squad sync... ya it gives you a
+code but wtf are you supposed to do with that"). Ready Room is reopened for the Squad Sync panel only.
+- The panel is two plain flows with numbered steps: "Hosting? Share your setup" (Copy squad code, Save code as file) and "Joining? Match
+  a friend" (Paste a friend's code, Open a code file). After a copy the panel says what to do with the code, and warns when it is too
+  long for one Discord message. A bold "Next:" line always says the next step (`squad_core.next_step`).
+- Paste a friend's code reads the clipboard first; `squad_core.find_code` finds the code inside a whole chat message or broken over
+  lines. Your own code on the clipboard is not treated as a friend's. A code for another installed game switches the game for you.
+- Make squad profile (`gg_desktop/squad_profile.py`, pure): the same copy model the owner approved for Mod Bisect. It adds ONE new
+  Mod Organizer 2 profile, "GG Squad - <your profile>" (numbered if taken), with a `gg-squad.json` marker, copies of your profile's own
+  files, and a modlist with the host's switched-on mods that are installed here switched on in the host's order and everything else
+  off. It asks first, only reads your own profile, never overwrites, never deletes (you remove it in MO2), and says that plugin order
+  is not part of a code. A profile that keeps its own saves is allowed and the result says the copy starts without them.
+- Still not built: 7z and rar installs (need an unpacking library in the build).

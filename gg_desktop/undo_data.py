@@ -39,6 +39,8 @@ FEATURE_EVENTS = {
     "exhume_rollback": ("Graphics driver rolled back", "Other", "Done through Windows after you confirmed in Exhume."),
     "kit_created": ("Resurrection Kit created", "Other", "A new ZIP and manifest were written. No game file was changed."),
     "kit_restored": ("Resurrection Kit restored", "Other", "Files were restored into new places only. Nothing was overwritten."),
+    "squad_profile": ("Squad Sync made a profile", "Other",
+                      "A new Mod Organizer 2 profile was added. Your own profile was not changed. Remove it in Mod Organizer 2."),
     "squad_install": ("Squad Sync installed mods", "Other",
                       "New, switched-off mod folders were added to Mod Organizer 2. Remove one there if you do not want it."),
 }
