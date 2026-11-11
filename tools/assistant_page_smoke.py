@@ -162,6 +162,7 @@ def main():
 
             # With no model downloaded, an empty chat shows the big Local AI card; Not now hides it for good.
             from PySide6.QtWidgets import QFrame
+            previous = state_of(window).current
             assistant_page.new_chat(window)
             settle()
             cards = [f for f in window.assistant_scroll.widget().findChildren(QFrame) if f.objectName() == "localAICard"]
@@ -177,6 +178,11 @@ def main():
             assert window.settings.get("local_ai_card_hidden") is True
             assert not [f for f in window.assistant_scroll.widget().findChildren(QFrame)
                         if f.objectName() == "localAICard" and f.isVisible()], "Not now hides the card"
+            empty = state_of(window).current
+            state_of(window).chats = [c for c in state_of(window).chats if c["id"] != empty]
+            state_of(window).current = previous
+            assistant_page.refresh(window)
+            settle()
             from gg_desktop import local_ai_ui as _lui
             _lui.state_of(window).widgets.combo.setCurrentIndex(1)
             settle()
