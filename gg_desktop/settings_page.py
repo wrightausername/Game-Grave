@@ -342,8 +342,7 @@ def startup_panel(window):
     body.addWidget(bool_switch(window, "check_updates_on_launch", "Check for updates on launch",
                                "Asks GitHub once when Game Grave starts. Nothing is downloaded or installed."))
     body.addWidget(bool_switch(window, "soulbind_new_games", "Soulbind new games",
-                               "After a scan, applies your Soulbind preferences to newly installed games once "
-                               "their settings file exists. Backup first; undo in Ready Room."))
+                               "Applies your Soulbind preferences to newly installed games after a scan. Backup first."))
     body.addStretch()
     return box
 
