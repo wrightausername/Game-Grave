@@ -126,6 +126,7 @@ def main():
             with patch.dict(os.environ, new_env):
                 restore = ui.EasyRestore(window)
                 restore.manifest = Path(str(made[0]) + ".ggkit.json")
+                restore.kit_label.setText(str(restore.manifest))
                 restore.library.setEditText(str(new_library))
                 restore.show()
                 restore.preview()
