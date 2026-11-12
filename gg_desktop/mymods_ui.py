@@ -32,7 +32,7 @@ CARD_STYLE = ("QFrame#mmCard{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop
               "border:1px solid #1c2836;border-radius:14px;}"
               "QFrame#mmCard:hover{border-color:%s;}")
 LIST_STYLE = ("QListWidget#mmList{background:transparent;border:none;outline:0;}"
-              "QListWidget#mmList::item{background:#0d141c;border:1px solid #17212c;border-radius:12px;margin:3px 2px;}"
+              "QListWidget#mmList::item{background:#0d141c;border:1px solid #17212c;border-radius:12px;padding:0;}"
               "QListWidget#mmList::item:hover{background:#111b26;border-color:#26364a;}"
               "QListWidget#mmList::item:selected{background:#13202e;border-color:#ff2a4d;}")
 INPUT_STYLE = ("QLineEdit{background:#0d141c;border:1px solid #1c2836;border-radius:10px;padding:7px 10px;color:#e8eef5;"
@@ -256,7 +256,8 @@ class MyModsView(QWidget):
         self.list.setObjectName("mmList")
         self.list.setAccessibleName("Your mods")
         self.list.setStyleSheet(LIST_STYLE)
-        self.list.setSpacing(0)
+        self.list.setSpacing(4)
+        self.list.setUniformItemSizes(False)
         self.list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.list.model().rowsMoved.connect(self.dropped)
         lay.addWidget(self.list, 1)
@@ -657,7 +658,7 @@ class MyModsView(QWidget):
         for entry in rows[:3000]:
             item = QListWidgetItem()
             widget = self.mo2_row(entry) if self.instance is not None else self.ws_row(entry)
-            item.setSizeHint(QSize(10, 34 if getattr(entry, "kind", "") == "separator" else 64))
+            item.setSizeHint(QSize(10, 34 if getattr(entry, "kind", "") == "separator" else 62))
             item.setData(Qt.UserRole, getattr(entry, "name", ""))
             self.list.addItem(item)
             self.list.setItemWidget(item, widget)
