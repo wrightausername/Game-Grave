@@ -272,13 +272,29 @@ def _guard(profile_folder: Path, running):
         raise ModsError("This profile's mod list isn't an ordinary file, so Game Grave won't change it.")
 
 
+def _replace(temp: Path, target: Path, tries=20, wait=0.1):
+    """os.replace, retried: on Windows a file another program is reading (an antivirus scan, Game Grave's own detailed
+    view loading) refuses to be replaced for a moment. If it stays locked, the text is written into the file directly."""
+    for _ in range(tries):
+        try:
+            os.replace(temp, target)
+            return
+        except PermissionError:
+            time.sleep(wait)
+    data = temp.read_bytes()
+    with target.open("r+b") as out:
+        out.write(data)
+        out.truncate()
+    temp.unlink()
+
+
 def _write(profile_folder: Path, rows, label: str, running, root=None) -> Path:
     _guard(profile_folder, running)
     snap = take_snapshot(profile_folder, label, root)
     text = render_modlist(rows)
     temp = profile_folder / "modlist.txt.gg-tmp"
     temp.write_text(text, encoding="utf-8", newline="")
-    os.replace(temp, profile_folder / "modlist.txt")
+    _replace(temp, profile_folder / "modlist.txt")
     (snap / "written.sha256").write_text(hashlib.sha256(text.encode("utf-8")).hexdigest(), encoding="utf-8")
     return snap
 
@@ -337,7 +353,10 @@ def undo(profile_folder: Path, *, running=None, root=None) -> str:
         if src.is_file():
             temp = profile_folder / (name + ".gg-tmp")
             shutil.copy2(src, temp)
-            os.replace(temp, profile_folder / name)
+            if (profile_folder / name).exists():
+                _replace(temp, profile_folder / name)
+            else:
+                os.replace(temp, profile_folder / name)
     label = last.name.split("-", 3)[-1].replace("-", " ")
     shutil.rmtree(last, ignore_errors=True)
     return label

@@ -190,3 +190,16 @@ class Workshop(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LockedFile(unittest.TestCase):
+    def test_replace_falls_back_to_writing_in_place(self):
+        from unittest.mock import patch
+        tmp = Path(tempfile.mkdtemp())
+        target, temp = tmp / "modlist.txt", tmp / "modlist.txt.gg-tmp"
+        target.write_text("old old old\n")
+        temp.write_text("new\n")
+        with patch("gg_desktop.mymods_core.os.replace", side_effect=PermissionError("locked")):
+            mc._replace(temp, target, tries=2, wait=0)
+        self.assertEqual(target.read_text(), "new\n")
+        self.assertFalse(temp.exists())
