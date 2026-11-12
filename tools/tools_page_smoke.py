@@ -159,6 +159,16 @@ def main():
             settle()
             menu = shown.pop()
             assert isinstance(menu, actions.KitMenu) and set(menu.buttons) == set(actions.KIT_METHODS) | {"easy", "restore_game"}
+            menu.show()
+            settle()
+            assert menu.buttons["easy"].isVisible() and menu.buttons["restore_game"].isVisible()
+            assert not any(menu.buttons[k].isVisible() for k in actions.KIT_METHODS), "Advanced kit tools start folded"
+            assert menu.grab().save(str(args.output / "tools-kit-menu.png"))
+            menu.more.click()
+            settle()
+            assert all(menu.buttons[k].isVisible() for k in actions.KIT_METHODS)
+            assert menu.grab().save(str(args.output / "tools-kit-menu-more.png"))
+            menu.hide()
             for key, control in menu.buttons.items():
                 if key in ("easy", "restore_game"):
                     continue
@@ -252,8 +262,13 @@ def main():
             assert result.state == "invalid"
             result.expected.setText(result.digest.upper() + "  setup.bin")
             assert result.state == "match" and "safe" not in result.verdict.text().casefold()
+            assert result.verdict.tone == "good" and result.steps.current == 3
+            result.show()
+            settle()
+            assert result.grab().save(str(args.output / "tools-hash-result.png"))
+            result.hide()
             result.expected.setText("0" * 64)
-            assert result.state == "different"
+            assert result.state == "different" and result.verdict.tone == "bad"
             result.copy()
             assert app.clipboard().text() == result.digest
             open_dialog.return_value = (str(work), "")

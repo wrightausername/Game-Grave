@@ -23,7 +23,7 @@ def main():
     sys.path.insert(0, str(root_dir))
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QLabel
     from gg_desktop import tools_windows as tw, winpc
     from gg_desktop.app import CrimsonWindow
     from tests.test_winpc import FakeRegistry, FakeRunner, TASKLIST, reg_key
@@ -111,14 +111,30 @@ def main():
             assert asked[-1][0] == "Delete temporary files" and str(temp_root) in asked[-1][1] and "Recycle Bin" in asked[-1][1]
             assert fresh.exists() and outside.exists() and temp_root.exists()
             assert logged[-1][0] == "Windows Cleanup" and "Deleted 1 files" in logged[-1][1]
+            # The shared layout: plain header, steps finished, technical lines folded, a green result.
+            assert dialog.steps.current == 3 and dialog.result_line.tone == "good"
+            assert dialog.details.isVisibleTo(dialog) and not dialog.details.body.isVisibleTo(dialog)
+            assert str(temp_root) in dialog.details.body.text()
+            assert dialog.footer.itemAt(0).widget() is dialog.close_button, "Close sits on the left"
             snap(dialog, "tools-windows-cleanup.png")
 
             # 2. Game Optimizer: names the registry values, applies, then Undo restores them.
             dialog = open_tool("game_optimizer")
             assert set(dialog.checks) == {"game_mode", "background_recording", "power_plan"}
+            visible_words = " ".join(w.text() for w in dialog.findChildren(QLabel) if w.isVisibleTo(dialog))
+            assert "AutoGameModeEnabled" not in visible_words and "powercfg" not in visible_words, "Technical lines are folded"
+            assert "AutoGameModeEnabled" in dialog.details.body.text() and "powercfg" in dialog.details.body.text()
+            assert "Not set, Windows decides" in visible_words and "Balanced" in visible_words
+            assert not dialog.apply_button.isEnabled() and dialog.apply_button.text() == "Apply"
             dialog.checks["game_mode"].setChecked(True)
             dialog.checks["background_recording"].setChecked(True)
+            assert dialog.apply_button.isEnabled() and dialog.apply_button.text() == "Apply 2 changes…"
+            dialog.details.toggle.click()
+            assert dialog.details.body.isVisibleTo(dialog) and "Hide" in dialog.details.toggle.text()
+            snap(dialog, "tools-windows-optimizer-details.png")
+            dialog.details.toggle.click()
             dialog.apply_button.click()
+            assert dialog.result_line.tone == "good" and dialog.steps.current == 3
             assert "AutoGameModeEnabled = 1" in asked[-1][1] and "GameDVR_Enabled = 0" in asked[-1][1]
             assert reg.read(*winpc.GAME_MODE)[0] == 1 and reg.read(*winpc.DVR_STORE)[0] == 0
             assert logged[-1][0] == "Game Optimizer" and dialog.undo_button.isEnabled()
@@ -132,6 +148,7 @@ def main():
             wait_for(lambda: dialog.listing.count() == 2)
             assert "chrome.exe" in dialog.listing.item(0).text()
             dialog.listing.item(0).setCheckState(Qt.Checked)
+            assert dialog.close_button.text() == "Close 1 app…"
             dialog.close_button.click()
             wait_for(lambda: ["taskkill", "/PID", "1200"] in runner.calls)
             assert all("/F" not in c for c in runner.calls if c and c[0] == "taskkill")
@@ -156,6 +173,7 @@ def main():
             wait_for(lambda: "hello from the fake shell" in dialog.output.toPlainText())
             assert "echo hello" in asked[-1][1] and ["cmd.exe", "/d", "/s", "/c", "echo hello"] in runner.calls
             assert logged[-1][0] == "Command Runner" and "echo hello" in logged[-1][1]
+            assert dialog.result_line.tone == "good" and "exit code 0" in dialog.result_line.text()
             snap(dialog, "tools-windows-command.png")
 
             # 6. File Associations: read-only lookup.
@@ -164,6 +182,7 @@ def main():
             dialog.kind.setCurrentText("zip")
             dialog.lookup.click()
             assert ".zip opens with: CompressedFolder" in dialog.answer.text(), dialog.answer.text()
+            assert dialog.steps.current == 2
             dialog.kind.setCurrentText("not valid!")
             dialog.lookup.click()
             assert "Type an extension" in dialog.answer.text()

@@ -100,6 +100,7 @@ def main():
             titles["Saves"].setChecked(True)
             dialog.create_button.click()
             wait_for(lambda: "Kit saved and checked" in dialog.status.text(), "the kit to finish")
+            assert dialog.steps.current == 3 and dialog.status.tone == "good", (dialog.steps.current, dialog.status.tone)
             assert not window.cleaning
             made = sorted(kits.glob("*.zip"))
             assert len(made) == 1, made
@@ -143,6 +144,7 @@ def main():
                 assert restore.grab().save(str(args.output / "kit-easy-restore.png"))
                 restore.go.click()
                 wait_for(lambda: "Restored" in restore.status.text(), "the restore")
+                assert restore.steps.current == 3 and restore.status.tone == "good", restore.status.tone
                 assert (new_library / "Skyrim Special Edition" / "SkyrimSE.exe").read_bytes()[:2] == b"MZ"
                 assert (new_library.parent / "appmanifest_489830.acf").is_file()
                 assert (new_profile / "Documents" / "My Games" / "Skyrim Special Edition" / "Saves" / "Save1.ess").read_bytes() == b"progress"

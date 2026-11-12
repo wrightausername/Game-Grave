@@ -59,15 +59,29 @@ class _Base(QDialog):
         self.setMinimumWidth(640)
         self.cancel = threading.Event()
         self.working = False
-        self.box = column(spacing=10, margins=(18, 16, 18, 14))
+        from gg_desktop import tools_shell as shell
+        self.setStyleSheet(shell.STYLE)
+        self.box = column(spacing=10, margins=(20, 18, 20, 16))
         self.setLayout(self.box)
-        self.status = label("", "subtle", wrap=True)
+        self.status = shell.Banner(title + " status")
+        self.steps = None
         self.bar = QProgressBar()
         self.bar.setRange(0, 100)
         self.bar.setTextVisible(True)
         self.bar.hide()
         self.cancel_button = button("Cancel", self.stop)
         self.cancel_button.hide()
+
+    def add_header(self, symbol, title, summary, step_names):
+        from gg_desktop import tools_shell as shell
+        color = shell.HEX["purple"]
+        self.box.addLayout(shell.header(symbol, title, summary, color))
+        self.steps = shell.Steps(step_names, color)
+        self.box.addWidget(self.steps)
+
+    def step(self, index):
+        if self.steps is not None:
+            self.steps.set(index)
 
     def stop(self):
         self.cancel.set()
@@ -138,10 +152,10 @@ class EasySetup(_Base):
         self.checks = {}
         self.games = sorted((g for g in window.inventory.games if getattr(g, "install_path", "")),
                             key=lambda g: g.name.casefold())
-        self.box.addWidget(label("Set up a Resurrection Kit", "sectionTitle"))
-        self.box.addWidget(label(
-            "Pick a game. Game Grave finds its install, saves, load order and mod manager and saves them into one verified ZIP, so "
-            "the game can be restored and played without downloading or setting it up again.", "subtle", wrap=True))
+        self.add_header("plus", "Set up a Resurrection Kit",
+                        "Pick a game. Game Grave finds its install, saves, load order and mod manager and saves them into "
+                        "one checked file, so the game can be put back and played without downloading it again.",
+                        ("Pick a game", "Choose what goes in", "Save the kit"))
         top = row(spacing=8)
         top.addWidget(label("Game", "caption"))
         self.combo = QComboBox()
@@ -182,6 +196,7 @@ class EasySetup(_Base):
         self.box.addWidget(self.status)
         self.box.addWidget(self.bar)
         buttons = row(spacing=8)
+        self.footer_row = buttons
         buttons.addStretch()
         buttons.addWidget(self.cancel_button)
         self.create_button = button("Create kit", self.create, kind="primary",
@@ -192,7 +207,7 @@ class EasySetup(_Base):
         self.open_button.hide()
         buttons.addWidget(self.open_button)
         buttons.addWidget(self.create_button)
-        buttons.addWidget(self.close_button)
+        buttons.insertWidget(0, self.close_button)
         self.box.addLayout(buttons)
         self.combo.currentIndexChanged.connect(self.load_plan)
         self.create_button.setEnabled(False)
@@ -264,6 +279,7 @@ class EasySetup(_Base):
 
     def show_plan(self):
         self.status.setText("")
+        self.step(1)
         for part in sorted(self.plan.parts, key=lambda p: ROLE_ORDER.index(p.role) if p.role in ROLE_ORDER else 99):
             box = QCheckBox(f"{part.title}   ·   {human_size(part.bytes)}, {part.files:,} file{'s' if part.files != 1 else ''}")
             box.setChecked(part.on and not part.problem)
@@ -327,6 +343,7 @@ class EasySetup(_Base):
         for control in (self.create_button, self.combo, self.folder, self.browse_button, *self.checks.values()):
             control.setEnabled(False)
         self.close_button.setEnabled(False)
+        self.step(2)
         cancel = self.cancel
         parts = list(self.plan.parts)
 
@@ -351,6 +368,7 @@ class EasySetup(_Base):
                 self.status.setText(("Cancelled. Nothing was kept." if "cancel" in error.lower() else "The kit was not made: " + error[:220]))
                 self.refresh_summary()
                 return
+            self.step(3)
             self.status.setText(f"Kit saved and checked: {result['archive']}\n{result['files']:,} files, {human_size(result['bytes'])}. "
                                 f"Parts: {', '.join(result['roles'])}.")
             self.create_button.hide()
@@ -381,11 +399,10 @@ class EasyRestore(_Base):
         super().__init__(window, "Restore a game from a kit")
         self.manifest = None
         self.plan = None
-        self.box.addWidget(label("Restore a game from a kit", "sectionTitle"))
-        self.box.addWidget(label(
-            "Choose a kit and the library folder the game should go into. The install is restored as a new folder there, and saves, "
-            "settings and load-order files go back to where they came from only if nothing is there yet. Nothing is overwritten.",
-            "subtle", wrap=True))
+        self.add_header("undo", "Restore a game from a kit",
+                        "Choose a kit and the library folder the game should go into. The install comes back as a new "
+                        "folder, and saves, settings and load order go back to their old place only if nothing is there "
+                        "yet. Nothing is overwritten.", ("Pick a kit", "Pick a library", "Restore"))
         pick = row(spacing=8)
         self.kit_label = label("No kit chosen", "caption", wrap=True)
         pick.addWidget(self.kit_label, 1)
@@ -430,7 +447,7 @@ class EasyRestore(_Base):
         buttons.addWidget(self.mo2_button)
         buttons.addWidget(self.open_button)
         buttons.addWidget(self.go)
-        buttons.addWidget(self.close_button)
+        buttons.insertWidget(0, self.close_button)
         self.box.addLayout(buttons)
 
     # ---- Mod Organizer 2
@@ -526,12 +543,14 @@ class EasyRestore(_Base):
         if chosen:
             self.manifest = Path(chosen)
             self.kit_label.setText(str(self.manifest))
+            self.step(1)
             self.preview()
 
     def set_manifest(self, path):
         """Choose a kit without the file dialog (used by the checks)."""
         self.manifest = Path(path)
         self.kit_label.setText(str(self.manifest))
+        self.step(1)
         self.preview()
 
     def browse(self):
@@ -570,6 +589,7 @@ class EasyRestore(_Base):
             lines.append(f"Not enough free space there: {human_size(free)} free, about {human_size(self.plan['bytes'])} needed.")
         self.preview_label.setText("\n".join(lines))
         self.go.setEnabled(not self.plan["blocked"] and not short)
+        self.step(2 if self.go.isEnabled() else 1)
 
     def restore(self):
         if self.plan is None or self.working or _busy(self.window_):
@@ -602,6 +622,7 @@ class EasyRestore(_Base):
                 return
             skipped = f" Left alone because they already existed: {', '.join(result['skipped_existing'][:6])}." if result["skipped_existing"] else ""
             review = f" Parts for you to place yourself are in {result['review_folder']}." if result["review_folder"] else ""
+            self.step(3)
             self.status.setText(f"Restored {result['files']:,} files.{skipped}{review} {result['note']}")
             try:
                 from core import log_event

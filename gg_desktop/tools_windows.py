@@ -1,6 +1,9 @@
-"""Screens for the seven Windows tools. Each one shows exactly what it will change, asks first, and writes the activity log.
+"""Screens for the Windows tools. Each one shows exactly what it will change, asks first, and writes the activity log.
 
-The logic and every outside effect live in `winpc` (tested without a real PC). This module is only dialogs.
+The logic and every outside effect live in `winpc` (tested without a real PC). This module is only dialogs, all built on
+`tools_shell.ToolDialog`: plain words up front, numbered steps, the exact technical lines folded under "Show technical
+details" (and always repeated in the confirmation), a coloured result banner, Close on the left and the main action on
+the right.
 """
 from __future__ import annotations
 
@@ -8,64 +11,23 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QFileDialog, QInputDialog, QLineEdit, QListWidget, QListWidgetItem,
-    QPlainTextEdit,
-)
+from PySide6.QtWidgets import QComboBox, QFileDialog, QInputDialog, QLineEdit, QListWidget, QListWidgetItem, QPlainTextEdit
 from shiboken6 import isValid
 
 from core import human_size
-from gg_desktop import winpc
-from gg_desktop.widgets import button, column, label, row
+from gg_desktop import tools_shell as shell, tools_words as words, winpc
+from gg_desktop.widgets import button, row
 
 BACKUP_NAME = "game-optimizer-backup.json"
 
 
-DARK = ("QDialog{background:#05090c;color:#e8eef5;} QLabel{color:#e8eef5;background:transparent;} "
-        "QCheckBox{color:#e8eef5;spacing:8px;} "
-        "QCheckBox::indicator,QListView::indicator{width:15px;height:15px;border:1px solid #6b7788;background:#0a1118;border-radius:3px;} "
-        "QCheckBox::indicator:checked,QListView::indicator:checked{background:#ff284a;border-color:#ff284a;} "
-        "QListWidget,QPlainTextEdit,QComboBox,QLineEdit{background:#0a1118;color:#e8eef5;border:1px solid #243242;border-radius:5px;} "
-        "QListWidget::item{padding:4px;} QListWidget::item:selected{background:#2a0f17;color:#ffffff;} "
-        "QPlainTextEdit{font-family:Consolas,monospace;} QComboBox QAbstractItemView{background:#0a1118;color:#e8eef5;}")
-
-
-class WinDialog(QDialog):
+class WinDialog(shell.ToolDialog):
     """The one dialog class for these tools (also lets tests open them without blocking)."""
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setStyleSheet(DARK)
 
-
-def _text(widget_text, role="subtle", wrap=True):
-    item = label(widget_text, role, wrap=wrap)
-    item.setTextFormat(Qt.PlainText)
-    item.setMinimumWidth(0)
-    return item
-
-
-def _dialog(window, title, intro, width=560):
-    dialog = WinDialog(window)
-    dialog.setWindowTitle("Game Grave · " + title)
-    dialog.setMinimumWidth(width)
-    box = column(spacing=8, margins=(16, 14, 16, 14))
-    dialog.setLayout(box)
-    box.addWidget(label(title, "sectionTitle"))
-    box.addWidget(_text(intro))
-    dialog.result_line = _text("", "caption")
-    dialog.result_line.setAccessibleName(title + " result")
-    return dialog, box
-
-
-def _close_row(dialog, box, *extra):
-    actions = row(spacing=8)
-    for control in extra:
-        actions.addWidget(control)
-    actions.addStretch()
-    actions.addWidget(button("Close", dialog.accept))
-    box.addWidget(dialog.result_line)
-    box.addLayout(actions)
+def _dialog(window, key, title, symbol, width=600):
+    dialog = WinDialog(window, key, title, symbol, width=width)
+    return dialog, dialog.body
 
 
 def _job(window, work, done, title):
@@ -98,6 +60,11 @@ def _mb(kb):
     return f"{kb / 1024:,.0f} MB"
 
 
+def _show(window, dialog):
+    window._tools_dialog = dialog
+    dialog.exec()
+
+
 # ------------------------------------------------------------------ 1. Windows Cleanup
 def windows_cleanup(window):
     if _busy(window):
@@ -114,25 +81,35 @@ def _cleanup_dialog(window, roots, plan, error):
     if error:
         window.error("Windows Cleanup could not look", error)
         return
-    dialog, box = _dialog(window, "Windows Cleanup",
-                          f"Looks only in these temporary folders and lists files that have not changed for "
-                          f"{winpc.MIN_AGE_DAYS} days. Files are deleted permanently, not sent to the Recycle Bin. "
-                          "Files that Windows or an app is using are skipped, never forced.")
-    box.addWidget(_text("\n".join(str(r) for r in roots), "detailValue"))
+    dialog, box = _dialog(window, "windows_cleanup", "Windows Cleanup", "trash")
+    dialog.step(1)
+    frame, inner = shell.card(spacing=8, margins=(14, 12, 14, 12))
+    count = f"{len(plan.items):,}{'+' if plan.truncated else ''}"
     if plan.items:
-        summary = (f"{len(plan.items):,}{'+' if plan.truncated else ''} files found, {human_size(plan.total)} reported. "
-                   "Nothing has been deleted yet.")
+        lead = f"{count} old temporary files, {human_size(plan.total)}"
+        note = (f"None of these have changed for {winpc.MIN_AGE_DAYS} days. They are deleted for good, not sent to the "
+                "Recycle Bin. Anything Windows or an app is using is skipped, never forced.")
     else:
-        summary = "No files older than that were found in these folders. Nothing to delete."
-    box.addWidget(_text(summary, "detailValue"))
+        lead = "Nothing to clear"
+        note = f"No temporary files older than {winpc.MIN_AGE_DAYS} days were found."
+    inner.addWidget(shell.text(lead, "toolLead"))
+    inner.addWidget(shell.text(note))
     names = QListWidget()
     names.setAccessibleName("Files that would be deleted")
-    names.setMaximumHeight(150)
+    names.setMaximumHeight(180)
     for item in sorted(plan.items, key=lambda i: -i.size)[:40]:
-        names.addItem(f"{Path(item.path).name}   {human_size(item.size)}")
+        entry = QListWidgetItem(f"{Path(item.path).name}    {human_size(item.size)}")
+        entry.setToolTip(str(item.path))
+        names.addItem(entry)
+    if len(plan.items) > 40:
+        names.addItem(f"…and {len(plan.items) - 40:,} more")
     names.setVisible(bool(plan.items))
-    box.addWidget(names)
-    delete = button("Delete these files…", kind="danger")
+    inner.addWidget(names)
+    box.addWidget(frame)
+    dialog.details.set_lines(["Folders searched:"] + [str(r) for r in roots] +
+                             [f"Only files unchanged for {winpc.MIN_AGE_DAYS}+ days. Each is checked again just before it "
+                              "is deleted."])
+    delete = button(("Delete " + words.plain_count(len(plan.items), "file")) if plan.items else "Delete", kind="danger")
     delete.setEnabled(bool(plan.items))
     delete.setAccessibleName("Delete the listed temporary files")
 
@@ -144,25 +121,28 @@ def _cleanup_dialog(window, roots, plan, error):
         if not window.confirm("Delete temporary files", message, destructive=True):
             return
         delete.setEnabled(False)
-        dialog.result_line.setText("Deleting…")
+        dialog.step(2)
+        dialog.result("Deleting…", words.WORKING)
         items = list(plan.items)
 
         def finished(result, err):
             if err:
                 window.error("Windows Cleanup stopped", err)
-            else:
-                text = (f"Deleted {result.removed:,} files ({human_size(result.reported_bytes)} reported). "
-                        f"{result.skipped:,} skipped because they changed, were in use or could not be removed.")
-                winpc.activity("Windows Cleanup", text, size_bytes=result.reported_bytes, result="Permanently deleted")
-                window.status.setText("Windows Cleanup finished. " + text)
                 if isValid(dialog):
-                    dialog.result_line.setText(text)
+                    dialog.result("Windows Cleanup stopped: " + err, words.BAD)
+                return
+            text = (f"Deleted {result.removed:,} files ({human_size(result.reported_bytes)} reported). "
+                    f"{result.skipped:,} skipped because they changed, were in use or could not be removed.")
+            winpc.activity("Windows Cleanup", text, size_bytes=result.reported_bytes, result="Permanently deleted")
+            window.status.setText("Windows Cleanup finished. " + text)
+            if isValid(dialog):
+                dialog.step(3)
+                dialog.result(text, words.GOOD if result.removed else words.WARN)
         _job(window, lambda: winpc.run_cleanup(items, roots), finished, "Windows Cleanup")
     delete.clicked.connect(go)
     dialog.delete_button = delete
-    _close_row(dialog, box, delete)
-    window._tools_dialog = dialog
-    dialog.exec()
+    dialog.add_actions(delete)
+    _show(window, dialog)
 
 
 # ------------------------------------------------------------------ 2. Game Optimizer
@@ -174,12 +154,23 @@ def game_optimizer(window):
         window.info("Game Optimizer needs Windows", "These settings only exist on Windows.")
         return
     backup = _config_file(BACKUP_NAME)
-    dialog, box = _dialog(window, "Game Optimizer",
-                          "Three Windows settings that can help games. Tick the ones you want. Your current values are "
-                          "remembered first, and Undo puts them back exactly. Game Grave does not claim any speed gain.")
+    dialog, box = _dialog(window, "game_optimizer", "Game Optimizer", "play")
+    frame, holder = shell.card()
+    box.addWidget(frame)
+    box.addWidget(shell.text("Your current values are saved first, so Undo puts them back exactly. Game Grave does not "
+                             "promise any speed gain."))
+    dialog.details.set_lines([spec["title"] + ":\n  " + spec["detail"] for spec in winpc.OPTIMIZER_SETTINGS])
     checks = {}
-    holder = column(spacing=6)
-    box.addLayout(holder)
+    undo = button("Undo my changes…")
+    undo.setAccessibleName("Undo Game Optimizer changes")
+    apply_button = button("Apply", kind="primary")
+    apply_button.setAccessibleName("Apply selected")
+
+    def recount():
+        picked = sum(1 for c in checks.values() if c.isChecked())
+        apply_button.setText(words.apply_label(picked) + ("…" if picked else ""))
+        apply_button.setEnabled(bool(picked))
+        dialog.step(0)
 
     def refresh():
         while holder.count():
@@ -188,36 +179,45 @@ def game_optimizer(window):
                 item.widget().hide()
                 item.widget().deleteLater()
         checks.clear()
-        for state in winpc.read_optimizer(reg, runner):
-            check = QCheckBox(state.title + ("  (already set)" if state.applied else ""))
-            check.setEnabled(not state.applied)
-            check.setAccessibleName(state.title)
-            holder.addWidget(check)
-            holder.addWidget(_text(state.detail + "\n" + state.current, "caption"))
-            checks[state.key] = check
+        states = winpc.read_optimizer(reg, runner)
+        for n, state in enumerate(states):
+            spec = next(s for s in winpc.OPTIMIZER_SETTINGS if s["key"] == state.key)
+            values = [winpc._dword(reg, target) for target, _want in spec["targets"]]
+            now, tone = words.optimizer_state(state.key, values, state.current, state.applied)
+            name, plain = words.optimizer_plain(state.key)
+            line = shell.ChoiceRow(name, plain + ("  Already set." if state.applied else ""), now, tone,
+                                   last=n == len(states) - 1, accessible=state.title)
+            line.check.setEnabled(not state.applied)
+            line.check.toggled.connect(recount)
+            holder.addWidget(line)
+            checks[state.key] = line.check
         undo.setEnabled(winpc.has_backup(backup))
-    undo = button("Undo my changes…")
-    undo.setAccessibleName("Undo Game Optimizer changes")
-    apply_button = button("Apply selected…", kind="primary")
+        recount()
 
     def apply():
         keys = {k for k, c in checks.items() if c.isChecked()}
         if not keys:
-            dialog.result_line.setText("Tick at least one setting first.")
+            dialog.result("Tick at least one setting first.", words.WARN)
             return
         lines = [spec["title"] + ": " + spec["detail"] for spec in winpc.OPTIMIZER_SETTINGS if spec["key"] in keys]
+        dialog.step(1)
         if not window.confirm("Change Windows settings", "Game Grave will change:\n\n" + "\n\n".join(lines) +
                               "\n\nYour current values are saved first so Undo can restore them."):
+            dialog.step(0)
             return
         try:
             notes = winpc.apply_optimizer(reg, runner, keys, backup)
         except Exception as exc:
             window.error("Game Optimizer stopped", str(exc)[:300])
+            dialog.result("Game Optimizer stopped: " + str(exc)[:300], words.BAD)
             return
         winpc.activity("Game Optimizer", "Applied: " + "; ".join(spec["title"] for spec in winpc.OPTIMIZER_SETTINGS
                                                                    if spec["key"] in keys), result="Changed")
-        dialog.result_line.setText(" ".join(notes))
         refresh()
+        dialog.step(3)
+        problem = any("not" in n.lower() for n in notes)
+        dialog.result(" ".join(notes) + ("" if problem else " Undo puts it back any time."),
+                      words.WARN if problem else words.GOOD)
 
     def undo_all():
         if not window.confirm("Undo Game Optimizer", "Put every setting Game Grave changed back to the value it had "
@@ -225,15 +225,14 @@ def game_optimizer(window):
             return
         notes = winpc.undo_optimizer(reg, runner, backup)
         winpc.activity("Game Optimizer", "Undone: " + " ".join(notes), result="Restored")
-        dialog.result_line.setText(" ".join(notes))
         refresh()
+        dialog.result(" ".join(notes), words.GOOD)
     apply_button.clicked.connect(apply)
     undo.clicked.connect(undo_all)
     dialog.apply_button, dialog.undo_button, dialog.checks = apply_button, undo, checks
-    _close_row(dialog, box, apply_button, undo)
+    dialog.add_actions(undo, apply_button)
     refresh()
-    window._tools_dialog = dialog
-    dialog.exec()
+    _show(window, dialog)
 
 
 # ------------------------------------------------------------------ 3. Memory Optimizer
@@ -241,36 +240,55 @@ def memory_optimizer(window):
     if _busy(window):
         return
     runner = winpc.Runner()
-    dialog, box = _dialog(window, "Memory Optimizer",
-                          "Lists the apps you have open, largest memory first. Tick the ones to close. Each is asked "
-                          "to close normally and never forced, so unsaved work can still prompt you. Windows itself and "
-                          "Game Grave are never listed.")
-    usage = _text("", "detailValue")
-    box.addWidget(usage)
+    dialog, box = _dialog(window, "memory_optimizer", "Memory Optimizer", "storage")
+    head = row(spacing=10)
+    usage = shell.text("Reading open apps…", "toolLead", wrap=False)
+    memory_pill = shell.pill("Memory …", words.IDLE)
+    head.addWidget(usage, 1)
+    head.addWidget(memory_pill)
+    box.addLayout(head)
+    box.addWidget(shell.text("Each app is asked to close normally, like pressing its X, so anything unsaved can still ask "
+                             "you first. Windows itself and Game Grave are never listed."))
     listing = QListWidget()
     listing.setAccessibleName("Open apps")
-    listing.setMinimumHeight(190)
+    listing.setMinimumHeight(220)
     box.addWidget(listing, 1)
-    close_button = button("Close selected apps…", kind="primary")
+    dialog.details.set_lines(["Each ticked app gets:  taskkill /PID <its id>", "No /F, so nothing is forced closed.",
+                              "The list comes from:  tasklist (your own session only)"])
+    close_button = button("Close selected apps", kind="primary")
+    close_button.setAccessibleName("Close selected apps")
     refresh_button = button("Refresh list")
+
+    def recount(*_):
+        picked = sum(1 for i in range(listing.count()) if listing.item(i).checkState() == Qt.Checked)
+        close_button.setText(words.close_label(picked) + ("…" if picked else ""))
+        close_button.setEnabled(listing.count() > 0)
+    listing.itemChanged.connect(recount)
 
     def fill(procs, error=""):
         if not isValid(dialog):
             return
+        listing.blockSignals(True)
         listing.clear()
         for proc in procs[:40]:
-            item = QListWidgetItem(f"{proc.name}   ·   {_mb(proc.kb)}   ·   PID {proc.pid}")
+            item = QListWidgetItem(f"{proc.name}    {_mb(proc.kb)}")
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Unchecked)
             item.setData(Qt.UserRole, (proc.pid, proc.name))
+            item.setToolTip(f"{proc.name}, process ID {proc.pid}, {_mb(proc.kb)} in use")
             listing.addItem(item)
+        listing.blockSignals(False)
         from gg_desktop import tools_system
         percent = tools_system.memory_percent()
-        usage.setText(("Memory in use: " + f"{percent}%" if percent is not None else "Memory use could not be read.") +
-                      (f"   ·   {len(procs)} apps found" if procs else "   ·   No apps to list"))
-        close_button.setEnabled(bool(procs))
+        usage.setText(words.plain_count(len(procs), "app") + " open" if procs else "No apps to list")
+        if percent is None:
+            shell.set_pill(memory_pill, "Memory use unknown", words.IDLE)
+        else:
+            shell.set_pill(memory_pill, f"Memory {percent}% used",
+                           words.BAD if percent >= 90 else words.WARN if percent >= 75 else words.GOOD)
+        recount()
         if error:
-            dialog.result_line.setText(error)
+            dialog.result(error, words.BAD)
 
     def load():
         _job(window, lambda: winpc.list_processes(runner), lambda procs, err: fill(procs or [], err), "Memory Optimizer")
@@ -279,13 +297,16 @@ def memory_optimizer(window):
         chosen = [listing.item(i).data(Qt.UserRole) for i in range(listing.count())
                   if listing.item(i).checkState() == Qt.Checked]
         if not chosen:
-            dialog.result_line.setText("Tick at least one app first.")
+            dialog.result("Tick at least one app first.", words.WARN)
             return
         names = "\n".join(f"{name} (PID {pid})" for pid, name in chosen)
+        dialog.step(1)
         if not window.confirm("Close apps", f"Ask these {len(chosen)} apps to close?\n\n{names}\n\n"
                               "They are asked politely, not forced. Save your work first."):
+            dialog.step(0)
             return
         pids = [pid for pid, _ in chosen]
+        dialog.result("Asking " + words.plain_count(len(pids), "app") + " to close…", words.WORKING)
 
         def work():
             notes = winpc.close_processes(runner, pids)
@@ -305,128 +326,77 @@ def memory_optimizer(window):
             winpc.activity("Memory Optimizer", "Asked to close: " + ", ".join(n for _p, n in chosen) + ". " + text,
                            result="Closed" if not left else "Some still running")
             if isValid(dialog):
-                dialog.result_line.setText(text)
                 load()
+                dialog.step(3)
+                dialog.result(text.strip(), words.WARN if left else words.GOOD)
         _job(window, work, finished, "Memory Optimizer")
     close_button.clicked.connect(close_selected)
     refresh_button.clicked.connect(load)
     dialog.listing, dialog.close_button = listing, close_button
     dialog.fill = fill
-    _close_row(dialog, box, close_button, refresh_button)
+    dialog.add_actions(refresh_button, close_button)
     load()
-    window._tools_dialog = dialog
-    dialog.exec()
+    _show(window, dialog)
 
 
-# ------------------------------------------------------------------ 4. Startup Manager
-def startup_manager(window):
-    if _busy(window):
-        return
-    reg = winpc.default_registry()
-    if reg is None:
-        window.info("Startup Manager needs Windows", "Startup entries only exist on Windows.")
-        return
-    dialog, box = _dialog(window, "Startup Manager",
-                          "Programs that start when you sign in. Turning one off uses the same switch as Task Manager's "
-                          "Startup tab: the entry stays, only its approval flips, and you can turn it back on here. "
-                          "Entries for all users need administrator rights and are shown read-only.", 620)
-    table = QListWidget()
-    table.setAccessibleName("Startup entries")
-    table.setMinimumHeight(220)
-    table.setSelectionMode(QListWidget.ExtendedSelection)
-    box.addWidget(table, 1)
-    disable, enable = button("Turn off selected…", kind="primary"), button("Turn on selected…")
-    entries = []
-
-    def refresh():
-        entries[:] = winpc.list_startup(reg)
-        table.clear()
-        for entry in entries:
-            state = "On" if entry.enabled else "Off"
-            lock = "" if entry.can_toggle else "  (all users, read-only)"
-            item = QListWidgetItem(f"{state}   ·   {entry.name}   ·   {entry.source}{lock}\n{entry.command[:140]}")
-            item.setData(Qt.UserRole, entry)
-            item.setToolTip(entry.command)
-            table.addItem(item)
-        if not entries:
-            dialog.result_line.setText("No startup entries were found.")
-
-    def change(target):
-        chosen = [i.data(Qt.UserRole) for i in table.selectedItems()]
-        chosen = [e for e in chosen if e.can_toggle and e.enabled != target]
-        if not chosen:
-            dialog.result_line.setText("Select entries that can be changed first (read-only ones are skipped).")
-            return
-        verb = "on" if target else "off"
-        names = "\n".join(f"{e.name} ({e.source})" for e in chosen)
-        if not window.confirm("Change startup", f"Turn {verb} these {len(chosen)} startup entries?\n\n{names}\n\n"
-                              "Nothing is deleted. Change takes effect the next time you sign in."):
-            return
-        done = []
-        for entry in chosen:
-            try:
-                winpc.set_startup_enabled(reg, entry, target)
-                done.append(entry.name)
-            except Exception as exc:
-                window.error("Startup change failed", f"{entry.name}: {exc}")
-        if done:
-            winpc.activity("Startup Manager", f"Turned {verb}: " + ", ".join(done), result="Changed")
-            dialog.result_line.setText(f"Turned {verb}: " + ", ".join(done))
-        refresh()
-    disable.clicked.connect(lambda: change(False))
-    enable.clicked.connect(lambda: change(True))
-    dialog.table, dialog.disable_button, dialog.enable_button = table, disable, enable
-    _close_row(dialog, box, disable, enable)
-    refresh()
-    window._tools_dialog = dialog
-    dialog.exec()
-
-
-# ------------------------------------------------------------------ 5. Command Runner
+# ------------------------------------------------------------------ 4. Command Runner
 def command_runner(window):
     if _busy(window):
         return
     runner = winpc.Runner()
-    dialog, box = _dialog(window, "Command Runner",
-                          "Runs one command line that you type or pick, with the same permissions as Game Grave. You "
-                          "always see the exact line and confirm before it runs. It stops after 2 minutes. Nothing runs "
-                          "in the background.", 640)
+    dialog, box = _dialog(window, "command_runner", "Command Runner", "list", 660)
     presets = QComboBox()
     presets.setAccessibleName("Example commands")
-    presets.addItem("Pick an example…", "")
+    presets.addItem("Pick a ready-made command…", "")
     for title, command in winpc.PRESETS:
         presets.addItem(title, command)
     box.addWidget(presets)
     line = QLineEdit()
-    line.setPlaceholderText("Command, for example: ipconfig /all")
+    line.setPlaceholderText("Or type one, for example: ipconfig /all")
     line.setAccessibleName("Command to run")
     box.addWidget(line)
+    box.addWidget(shell.text("You see the exact line and confirm before it runs. It has the same permissions as Game "
+                             "Grave and can change your PC if the command does. Nothing runs in the background."))
     output = QPlainTextEdit()
     output.setReadOnly(True)
     output.setAccessibleName("Command output")
-    output.setMinimumHeight(180)
+    output.setPlaceholderText("What the command prints shows up here.")
+    output.setMinimumHeight(190)
     box.addWidget(output, 1)
+    dialog.details.set_lines(["Runs through:  cmd.exe /d /s /c <your line>", "Stops after 2 minutes.",
+                              "Output is kept to the first 64 KB."])
     run_button = button("Run…", kind="primary")
-    presets.currentIndexChanged.connect(lambda: line.setText(presets.currentData() or line.text()))
+    run_button.setAccessibleName("Run")
+
+    def picked():
+        if presets.currentData():
+            line.setText(presets.currentData())
+        dialog.step(0)
+    presets.currentIndexChanged.connect(picked)
 
     def go():
         text = line.text().strip()
         reason = winpc.validate_command(text)
         if reason:
-            dialog.result_line.setText(reason)
+            dialog.result(reason, words.WARN)
             return
+        dialog.step(1)
         if not window.confirm("Run this command", "Game Grave will run exactly this line:\n\n    " + text +
                               "\n\nIt runs through cmd.exe with your own permissions and can change your PC if the "
                               "command does. Only continue if you understand it.", destructive=True):
+            dialog.step(0)
             return
         run_button.setEnabled(False)
-        output.setPlainText("Running…")
+        output.setPlainText("")
+        dialog.result("Running " + text[:80] + "…", words.WORKING)
 
         def finished(result, error):
             if isValid(dialog):
                 run_button.setEnabled(True)
             if error:
                 window.error("Command Runner stopped", error)
+                if isValid(dialog):
+                    dialog.result("Command Runner stopped: " + error, words.BAD)
                 return
             tail = ("\n\n[Stopped after 2 minutes]" if result.timed_out else "") + (
                 "\n\n[Output shortened to 64 KB]" if result.truncated else "")
@@ -434,77 +404,99 @@ def command_runner(window):
             winpc.activity("Command Runner", f"Ran: {text[:300]}. {summary}", result=summary)
             if isValid(dialog):
                 output.setPlainText((result.output or "(no output)") + tail)
-                dialog.result_line.setText(summary)
+                dialog.step(3)
+                plain = summary + (" That usually means it worked." if result.code == 0 and not result.timed_out else
+                                   " A code other than 0 usually means the command reported a problem; read the output.")
+                dialog.result(plain, words.GOOD if result.code == 0 and not result.timed_out else words.WARN)
         _job(window, lambda: winpc.run_command(runner, text), finished, "Command Runner")
     run_button.clicked.connect(go)
     line.returnPressed.connect(go)
     dialog.line, dialog.output, dialog.run_button = line, output, run_button
-    _close_row(dialog, box, run_button)
-    window._tools_dialog = dialog
-    dialog.exec()
+    dialog.add_actions(run_button)
+    _show(window, dialog)
 
 
-# ------------------------------------------------------------------ 6. File Associations
+# ------------------------------------------------------------------ 5. File Associations
 def file_associations(window):
     reg = winpc.default_registry()
     if reg is None:
         window.info("File Associations needs Windows", "File associations only exist on Windows.")
         return
-    dialog, box = _dialog(window, "File Associations",
-                          "Shows which app opens a file type. Windows does not let other apps change your defaults, so "
-                          "Game Grave looks the answer up and opens Windows' Default apps page for you to change it. "
-                          "Nothing is changed here.")
+    dialog, box = _dialog(window, "file_associations", "File Associations", "file")
+    pick = row(spacing=8)
     kind = QComboBox()
     kind.setEditable(True)
     kind.setAccessibleName("File extension")
     kind.addItems(winpc.COMMON_EXTENSIONS)
-    box.addWidget(kind)
-    answer = _text("Choose or type an extension, then press Look up.", "detailValue")
-    box.addWidget(answer)
-    command = _text("", "caption")
-    box.addWidget(command)
+    lookup = button("Look up", kind="primary")
+    pick.addWidget(kind, 1)
+    pick.addWidget(lookup)
+    box.addLayout(pick)
+    frame, inner = shell.card(spacing=4, margins=(14, 12, 14, 12))
+    answer = shell.text("Choose or type a file type, then press Look up.", "toolLead")
+    answer.setAccessibleName("File Associations answer")
+    source = shell.text("")
+    inner.addWidget(answer)
+    inner.addWidget(source)
+    box.addWidget(frame)
+    box.addWidget(shell.text("Windows only lets you change this yourself, so Game Grave opens the right Windows page for "
+                             "you. Nothing is changed here."))
 
     def look():
         try:
             found = winpc.read_association(reg, kind.currentText())
         except ValueError as exc:
             answer.setText(str(exc))
-            command.setText("")
+            source.setText("")
+            dialog.details.set_lines("")
+            dialog.step(0)
             return
-        answer.setText(f"{found.ext} opens with: {found.app}\n{found.source}")
-        command.setText(("Runs: " + found.command) if found.command else "")
+        answer.setText(f"{found.ext} opens with: {found.app}")
+        source.setText(found.source)
+        dialog.details.set_lines(("Starts:  " + found.command) if found.command else "")
+        dialog.step(2)
 
     def settings_page():
         if not QDesktopServices.openUrl(QUrl("ms-settings:defaultapps")):
             window.error("Could not open Windows Settings", "Open Settings, then Apps, then Default apps yourself.")
-    lookup = button("Look up", look, kind="primary")
+    lookup.clicked.connect(look)
     kind.lineEdit().returnPressed.connect(look)
     dialog.kind, dialog.answer, dialog.lookup = kind, answer, lookup
-    _close_row(dialog, box, lookup, button("Open Windows Default apps", settings_page))
+    dialog.add_actions(button("Change it in Windows", settings_page,
+                              tip="Opens Windows Settings, Apps, Default apps. Game Grave changes nothing."))
     look()
-    window._tools_dialog = dialog
-    dialog.exec()
+    _show(window, dialog)
 
 
-# ------------------------------------------------------------------ 7. Junction Manager
+# ------------------------------------------------------------------ 6. Junction Manager
 def junction_manager(window):
     if _busy(window):
         return
     runner = winpc.Runner()
-    dialog, box = _dialog(window, "Junction Manager",
-                          "A junction makes one folder appear in a second place, for example a game folder moved to "
-                          "another drive. Choose a folder to list its links. Removing a link deletes only the link, never "
-                          "the folder it points to. Real folders are never removed here.", 640)
-    where = _text("No folder chosen yet.", "detailValue")
-    box.addWidget(where)
+    dialog, box = _dialog(window, "junction_manager", "Junction Manager", "folder", 660)
+    pick = row(spacing=8)
+    where = shell.text("No folder chosen yet.", "toolLead")
+    choose = button("Choose folder…", kind="primary")
+    choose.setAccessibleName("Choose folder")
+    pick.addWidget(where, 1)
+    pick.addWidget(choose)
+    box.addLayout(pick)
+    box.addWidget(shell.text("A link makes one folder show up in a second place, for example a game moved to another "
+                             "drive. Removing a link deletes only the link, never the folder it points to."))
     listing = QListWidget()
     listing.setAccessibleName("Links found")
-    listing.setMinimumHeight(190)
+    listing.setMinimumHeight(200)
     box.addWidget(listing, 1)
+    dialog.details.set_lines(["New links are made with:  mklink /J <link> <target>",
+                              "Removing uses the link itself only; the target folder is never opened for deleting.",
+                              "Real folders and Never Touch places are refused."])
     state = {"root": ""}
-    remove = button("Remove selected link…")
+    remove = button("Remove link…", kind="danger")
+    remove.setAccessibleName("Remove selected link")
+    remove.setEnabled(False)
     create = button("Create junction…")
-    choose = button("Choose folder…", kind="primary")
+    create.setAccessibleName("Create junction")
+    listing.currentItemChanged.connect(lambda current, _old: remove.setEnabled(current is not None))
 
     def fill(links, error=""):
         if not isValid(dialog):
@@ -512,17 +504,33 @@ def junction_manager(window):
         listing.clear()
         for link in links:
             status = "points to" if link.exists else "BROKEN, points to"
-            item = QListWidgetItem(f"{link.kind}   ·   {link.path}\n    {status}  {link.target or 'unknown'}")
+            item = QListWidgetItem(f"{Path(link.path).name}   ({link.kind})\n    {status}  {link.target or 'unknown'}")
+            item.setToolTip(link.path)
             item.setData(Qt.UserRole, link)
             listing.addItem(item)
-        dialog.result_line.setText(error or (f"{len(links)} links found." if links else "No junctions or links found there."))
+        remove.setEnabled(False)
+        note = state.pop("note", "")
+        dialog.step(3 if note else 1 if links else 0)
+        if note and not error:
+            dialog.result(note + " " + words.plain_count(len(links), "link") + " here now.", words.GOOD)
+        elif error:
+            dialog.result(error, words.BAD)
+        elif links:
+            broken = sum(1 for link in links if not link.exists)
+            dialog.result(words.plain_count(len(links), "link") + " found." + (f" {broken} broken (the folder it pointed to is gone)."
+                                                           if broken else " Select one to remove it."),
+                          words.WARN if broken else words.INFO)
+        else:
+            dialog.result("No junctions or links found there.", words.INFO)
 
     def scan(root):
         state["root"] = root
-        where.setText("Looking in: " + root)
+        where.setText(root)
+        where.setToolTip(root)
+        dialog.result("Looking for links…", words.WORKING)
         _job(window, lambda: winpc.scan_links(root), lambda links, err: fill(links or [], err), "Junction Manager")
 
-    def pick():
+    def pick_folder():
         root = QFileDialog.getExistingDirectory(window, "Choose a folder to look in", state["root"] or str(Path.home()))
         if root:
             scan(root)
@@ -530,7 +538,7 @@ def junction_manager(window):
     def remove_selected():
         item = listing.currentItem()
         if item is None:
-            dialog.result_line.setText("Select a link first.")
+            dialog.result("Select a link first.", words.WARN)
             return
         link = item.data(Qt.UserRole)
         if not window.confirm("Remove link", f"Remove this {link.kind}?\n\n{link.path}\n\nIt points to:\n{link.target}\n\n"
@@ -541,12 +549,16 @@ def junction_manager(window):
             target, kept = winpc.remove_link(link.path, never_touch=_never_touch(window))
         except (OSError, ValueError) as exc:
             window.error("Link not removed", str(exc))
+            dialog.result("Link not removed: " + str(exc), words.BAD)
             return
         text = f"Removed the link {link.path}. " + ("Its target is untouched." if kept else "Its target was not found.")
         winpc.activity("Junction Manager", text, path=link.path, result="Link removed")
-        dialog.result_line.setText(text)
         if state["root"]:
+            state["note"] = text
             scan(state["root"])
+        else:
+            dialog.step(3)
+            dialog.result(text, words.GOOD)
 
     def create_one():
         parent = QFileDialog.getExistingDirectory(window, "Choose the folder that will hold the new link",
@@ -577,16 +589,15 @@ def junction_manager(window):
             return
         text = f"Created junction {link} pointing to {target}."
         winpc.activity("Junction Manager", text, path=link, result="Junction created")
-        dialog.result_line.setText(text)
+        state["note"] = text
         scan(parent)
-    choose.clicked.connect(pick)
+    choose.clicked.connect(pick_folder)
     remove.clicked.connect(remove_selected)
     create.clicked.connect(create_one)
     dialog.listing, dialog.fill, dialog.remove_button, dialog.create_button = listing, fill, remove, create
     dialog.scan = scan
-    _close_row(dialog, box, choose, create, remove)
-    window._tools_dialog = dialog
-    dialog.exec()
+    dialog.add_actions(create, remove)
+    _show(window, dialog)
 
 
 def open_startup_tab(window):

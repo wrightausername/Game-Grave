@@ -12,11 +12,11 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QDialog, QFileDialog, QLabel, QLineEdit
+from PySide6.QtWidgets import QDialog, QFileDialog, QLineEdit
 
 from gg_desktop import tools_data as data
 from gg_desktop import tools_system as system
-from gg_desktop.widgets import button, column, label, row
+from gg_desktop.widgets import button, column, row
 
 KIT_METHODS = {"create": "_create_kit", "restore": "_restore_kit", "rehearse": "_rehearse_kit",
                "missing": "_missing_pieces", "compare": "_compare_kits", "versions": "_kit_versions",
@@ -138,42 +138,91 @@ def _write(window, path, writer, noun, note):
 
 
 # ------------------------------------------------------------------ resurrection kit menu
+KIT_SHORT = {
+    "easy": ("Set up a kit for a game", "Pick a game. Game Grave finds its install, saves and load order and saves them "
+             "into one checked file.", "plus"),
+    "restore_game": ("Restore a game from a kit", "Put a game back from a kit into a new folder. Nothing that is already "
+                     "there is overwritten.", "undo"),
+}
+KIT_SYMBOL = {"create": "folder", "restore": "search", "rehearse": "play", "missing": "warning", "compare": "list",
+              "versions": "clock", "transfer": "download"}
+
+
+def _kit_card(title, plain, symbol, control, color, big=True):
+    from gg_desktop import tools_shell as shell
+    frame, inner = shell.card(spacing=0, margins=(14, 12 if big else 8, 14, 12 if big else 8))
+    line = row(spacing=12)
+    line.addWidget(shell.badge(symbol, color, 40 if big else 30), 0, Qt.AlignVCenter)
+    text_box = column(spacing=2)
+    text_box.addWidget(shell.text(title, "toolLead" if big else "toolLead", wrap=True))
+    text_box.addWidget(shell.text(plain))
+    line.addLayout(text_box, 1)
+    line.addWidget(control, 0, Qt.AlignVCenter)
+    inner.addLayout(line)
+    return frame
+
+
 class KitMenu(QDialog):
     """Every kit action in one place. Each one opens the existing verified workflow and confirms before it changes anything."""
 
     def __init__(self, window):
         super().__init__(window)
+        from gg_desktop import tools_shell as shell
         self.window_ = window
+        self.setStyleSheet(shell.STYLE)
         self.setWindowTitle("Resurrection Kit")
         self.setModal(True)
-        self.setMinimumWidth(420)
-        box = column(spacing=8, margins=(16, 14, 16, 14))
+        self.setMinimumWidth(560)
+        color = shell.HEX["purple"]
+        box = column(spacing=12, margins=(20, 18, 20, 16))
         self.setLayout(box)
-        box.addWidget(label("Resurrection Kit", "sectionTitle"))
-        box.addWidget(label("A kit saves a game's whole install, saves and load order into one verified ZIP. Restoring puts "
-                            "it back without overwriting anything, and every step asks you first.", "subtle", wrap=True))
+        head = row(spacing=14)
+        head.addWidget(shell.badge("grave", color), 0, Qt.AlignTop)
+        words_box = column(spacing=3)
+        words_box.addWidget(shell.text("Resurrection Kit", "toolTitle", wrap=False))
+        words_box.addWidget(shell.text("Save a whole game into one checked file, and put it back later. Every step asks you "
+                                       "first and nothing is overwritten.", "toolSummary"))
+        head.addLayout(words_box, 1)
+        box.addLayout(head)
         self.buttons = {}
         self.advanced = []
-        self.more = button("More kit tools", self.toggle_more,
-                           tip="Create from folders you choose, inspect, rehearse, check, compare, browse snapshots or prepare a transfer.")
-        self.more.setAccessibleName("More kit tools")
-        for key, title, hint in data.KIT_ACTIONS:
-            control = button(title, lambda _=False, k=key: self.pick(k), kind="primary" if key == "easy" else "", tip=hint)
-            control.setAccessibleName(title)
+        for key in ("easy", "restore_game"):
+            title, plain, symbol = KIT_SHORT[key]
+            hint = next(h for k, _t, h in data.KIT_ACTIONS if k == key)
+            control = button("Start" if key == "easy" else "Restore", lambda _=False, k=key: self.pick(k),
+                             kind="primary" if key == "easy" else "", tip=hint)
+            control.setAccessibleName(next(t for k, t, _h in data.KIT_ACTIONS if k == key))
+            control.setMinimumWidth(96)
             self.buttons[key] = control
-            if key not in ("easy", "restore_game"):
-                if not self.advanced:
-                    box.addWidget(self.more)
-                self.advanced.append(control)
-                control.hide()
-            box.addWidget(control)
-        box.addWidget(button("Close", self.reject))
+            box.addWidget(_kit_card(title, plain, symbol, control, color))
+        self.more = button("▸  More kit tools", self.toggle_more,
+                           tip="Create from folders you choose, inspect, rehearse, check, compare, browse snapshots or prepare a transfer.")
+        self.more.setObjectName("toolDetails")
+        self.more.setFlat(True)
+        self.more.setAccessibleName("More kit tools")
+        box.addWidget(self.more, 0, Qt.AlignLeft)
+        for key, title, hint in data.KIT_ACTIONS:
+            if key in ("easy", "restore_game"):
+                continue
+            control = button("Open", lambda _=False, k=key: self.pick(k), tip=hint)
+            control.setAccessibleName(title)
+            control.setMinimumWidth(72)
+            self.buttons[key] = control
+            frame = _kit_card(title, hint.split(". ")[0].rstrip(".") + ".", KIT_SYMBOL.get(key, "file"), control,
+                              shell.HEX["blue"], big=False)
+            frame.hide()
+            self.advanced.append(frame)
+            box.addWidget(frame)
+        footer = row(spacing=8)
+        footer.addWidget(button("Close", self.reject))
+        footer.addStretch()
+        box.addLayout(footer)
 
     def toggle_more(self):
         opened = not self.advanced[0].isVisibleTo(self)
-        for control in self.advanced:
-            control.setVisible(opened)
-        self.more.setText("Fewer kit tools" if opened else "More kit tools")
+        for frame in self.advanced:
+            frame.setVisible(opened)
+        self.more.setText("▾  Fewer kit tools" if opened else "▸  More kit tools")
         self.adjustSize()
 
     def pick(self, key):
@@ -196,34 +245,51 @@ class HashResult(QDialog):
 
     def __init__(self, window, path, size, digest):
         super().__init__(window)
-        self.digest = digest
-        self.setWindowTitle("Hash Checker")
-        self.setMinimumWidth(520)
-        box = column(spacing=8, margins=(16, 14, 16, 14))
-        self.setLayout(box)
-        box.addWidget(label("SHA-256 checksum", "sectionTitle"))
-        name = label(Path(path).name, "detailValue", wrap=True)
-        name.setTextFormat(Qt.PlainText)
-        name.setToolTip(str(path))
-        box.addWidget(name)
         from core import human_size
-        box.addWidget(label(human_size(size) + " read. Nothing was changed.", "caption"))
+        from gg_desktop import tools_shell as shell, tools_words as words
+        self.digest = digest
+        self.setStyleSheet(shell.STYLE)
+        self.setWindowTitle("Hash Checker")
+        self.setMinimumWidth(580)
+        color = shell.HEX["blue"]
+        box = column(spacing=12, margins=(20, 18, 20, 16))
+        self.setLayout(box)
+        head = row(spacing=14)
+        head.addWidget(shell.badge("check", color), 0, Qt.AlignTop)
+        words_box = column(spacing=3)
+        words_box.addWidget(shell.text("Hash Checker", "toolTitle", wrap=False))
+        words_box.addWidget(shell.text(words.summary("hash"), "toolSummary"))
+        head.addLayout(words_box, 1)
+        box.addLayout(head)
+        self.steps = shell.Steps(words.steps("hash"), color)
+        self.steps.set(2)
+        box.addWidget(self.steps)
+        frame, inner = shell.card(spacing=6, margins=(14, 12, 14, 12))
+        name = shell.text(Path(path).name, "toolLead")
+        name.setToolTip(str(path))
+        inner.addWidget(name)
+        inner.addWidget(shell.text(human_size(size) + " read. The file was not changed."))
+        value_row = row(spacing=8)
         self.value = QLineEdit(digest)
         self.value.setReadOnly(True)
         self.value.setAccessibleName("SHA-256 checksum")
-        box.addWidget(self.value)
-        box.addWidget(button("Copy checksum", self.copy))
-        box.addWidget(label("Compare with a checksum you were given", "caption"))
+        self.value.setStyleSheet("font-family:Consolas,monospace;font-size:12px;")
+        value_row.addWidget(self.value, 1)
+        value_row.addWidget(button("Copy", self.copy, tip="Copy the checksum"))
+        inner.addLayout(value_row)
+        box.addWidget(frame)
+        box.addWidget(shell.text("Paste the checksum from the download page", "toolLead"))
         self.expected = QLineEdit()
-        self.expected.setPlaceholderText("Paste the publisher's SHA-256 here")
+        self.expected.setPlaceholderText("Publisher's SHA-256, for example from the download page")
         self.expected.setAccessibleName("Expected checksum")
         self.expected.textChanged.connect(self.compare)
         box.addWidget(self.expected)
-        self.verdict = QLabel("")
-        self.verdict.setWordWrap(True)
-        self.verdict.setAccessibleName("Comparison result")
+        self.verdict = shell.Banner("Comparison result")
         box.addWidget(self.verdict)
-        box.addWidget(button("Close", self.accept))
+        footer = row(spacing=8)
+        footer.addWidget(button("Close", self.accept))
+        footer.addStretch()
+        box.addLayout(footer)
         self.compare()
 
     def copy(self):
@@ -231,10 +297,10 @@ class HashResult(QDialog):
 
     def compare(self):
         state, message = data.compare_hash(self.digest, self.expected.text())
-        color = {"match": "#32d67a", "different": "#ff5f78", "invalid": "#f6be24"}.get(state, "#8fa0b3")
+        tone = {"match": "good", "different": "bad", "invalid": "warn"}.get(state, "info")
         self.state = state
-        self.verdict.setText(message)
-        self.verdict.setStyleSheet(f"color:{color};")
+        self.verdict.setText(message, tone)
+        self.steps.set(3 if state in ("match", "different") else 2)
 
 
 def choose_hash_file(window):

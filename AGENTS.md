@@ -568,3 +568,22 @@ select all button"). Graveyard is reopened for this only: a "Select all" button 
 everything shown is ticked), and the same ticking as Old Files through `old_files_select.TickHelper` (double-click ticks or unticks,
 Shift+click ticks the range from the last clicked row, Ctrl+click flips one). Ticking only marks items; removal is unchanged (the
 existing per-item blockers, Never Touch rules, the per-run limit, Recycle Bin only after confirmation). Covered by the Graveyard smoke.
+
+More Tools, tools made easy to follow (owner instruction, 2026-11-12: "polish the tools INSIDE the tabs and make them easy to
+follow and use"; answers: start with More Tools, and fold technical lines into "Show technical details"). More Tools is reopened
+for its tool windows only; the hub, tiles, tabs and side panels are unchanged. Other tabs' tools wait for the owner to name them.
+- `gg_desktop/tools_shell.py` (display only) is the one layout: icon badge in the hub category's colour, title and one plain
+  sentence, numbered steps that tick off, cards, "Show technical details" folded (registry values, commands, folders searched),
+  a coloured result banner (green done, amber needs you, red stopped, blue working with a moving bar), Close on the left and
+  the main action on the right with a live count ("Apply 2 changes", "Close 1 app", "Delete 12 files").
+- `gg_desktop/tools_words.py` (pure, `tests/test_tools_words.py`) holds the plain sentences, Game Optimizer's plain states
+  ("On", "Off", "Not set, Windows decides", the power plan's own name) and the banner colour for older result wording.
+- Rebuilt on it: Windows Cleanup, Game Optimizer (each setting is a row with its current state as a pill), Memory Optimizer
+  (memory use pill), Command Runner (exit code 0 says it usually worked, other codes say to read the output), File Associations,
+  Junction Manager (Remove only enabled with a link selected; broken links called out), the Resurrection Kit menu (two big
+  cards, the seven other kit tools folded as small cards), the Hash Checker result (green match, red different) and the kit
+  set up / restore windows (steps, banner, Close on the left). The old second Startup list, unreachable since the tile opens
+  Hardware, was removed.
+- Unchanged: every confirmation still names the exact change (the folded technical lines are repeated there), every action
+  is logged, nothing new is changed on the PC, and nothing is called safe. Covered by `tools/tools_windows_smoke.py`,
+  `tools/tools_page_smoke.py` and `tools/kit_easy_smoke.py`.
