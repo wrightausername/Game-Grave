@@ -48,7 +48,9 @@ def pill(text, tone="muted"):
     tag = QLabel(text)
     tag.setStyleSheet(f"color:{TONE_HEX[tone]};background:rgba({color.red()},{color.green()},{color.blue()},38);"
                       f"border:1px solid rgba({color.red()},{color.green()},{color.blue()},90);border-radius:10px;"
-                      "padding:2px 9px;font-size:11px;font-weight:700;")
+                      "padding:0px 9px;font-size:11px;font-weight:700;")
+    tag.setFixedHeight(22)
+    tag.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
     return tag
 
 
