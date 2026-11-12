@@ -562,3 +562,9 @@ bubbles, neural network, chip; More Tools: wrench, keyboard, screwdriver, mouse,
 mirrored into a ceiling, pixel particles and circuit traces. Objects sit in the right two thirds and the middle band, the left stays
 calm behind the title. No characters, logos, brand marks or words (the WASD keycaps are the only letters). Only the picture files
 changed.
+
+Graveyard ticking (owner instruction, 2026-11-12: "the graveyard should also have a way to shift click to select things and a
+select all button"). Graveyard is reopened for this only: a "Select all" button in the footer (it reads "Clear selection" when
+everything shown is ticked), and the same ticking as Old Files through `old_files_select.TickHelper` (double-click ticks or unticks,
+Shift+click ticks the range from the last clicked row, Ctrl+click flips one). Ticking only marks items; removal is unchanged (the
+existing per-item blockers, Never Touch rules, the per-run limit, Recycle Bin only after confirmation). Covered by the Graveyard smoke.

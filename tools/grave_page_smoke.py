@@ -186,6 +186,33 @@ def main():
             assert window.grave_action.text() == "Scan Leftovers" and "Scan Leftovers" in window.grave_notice.text()
             assert window.grab().save(str(args.output / "graveyard-results-1280.png"))
 
+            # Easy ticking: Select all / Clear selection, Shift+click range, Ctrl+click flip, double-click.
+            table = window.grave_table
+
+            def at(row):
+                return table.visualRect(table.model().index(row, 1)).center()
+            assert window.grave_select_button.text() == "Select all"
+            window.grave_select_button.click()
+            settle()
+            assert len(state.checked) == 5 and window.grave_select_button.text() == "Clear selection"
+            window.grave_select_button.click()
+            settle()
+            assert not state.checked and window.grave_select_button.text() == "Select all"
+            QTest.mouseDClick(table.viewport(), Qt.LeftButton, Qt.NoModifier, at(0))
+            settle()
+            first = window._shown_graves[0].key
+            assert state.checked == {first}, state.checked
+            QTest.mouseClick(table.viewport(), Qt.LeftButton, Qt.ShiftModifier, at(2))
+            settle()
+            assert state.checked == {i.key for i in window._shown_graves[:3]}, state.checked
+            assert window.grave_select_all.text().startswith("3 selected")
+            QTest.mouseClick(table.viewport(), Qt.LeftButton, Qt.ControlModifier, at(1))
+            settle()
+            assert state.checked == {window._shown_graves[0].key, window._shown_graves[2].key}, state.checked
+            grave_page.select_visible(window, False)
+            settle()
+            assert not state.checked
+
             # Details are evidence, never a safe-to-remove claim.
             pick(window, "Cyberpunk 2077")
             text = detail_text(window)

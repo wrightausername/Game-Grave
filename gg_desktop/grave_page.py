@@ -376,6 +376,9 @@ def build(window):
     self.grave_select_all.setTristate(False)
     self.grave_select_all.clicked.connect(lambda checked: select_visible(self, checked))
     footer.addWidget(self.grave_select_all)
+    self.grave_select_button = tool("Select all", "check", lambda: toggle_all(self),
+                                    tip="Ticks every item shown (Shift+click ticks a range, Ctrl+click adds one)")
+    footer.addWidget(self.grave_select_button)
     footer.addWidget(tool("Protect", "shield", lambda: protect(self), tip="Adds Never Touch rules for the checked items"))
     footer.addWidget(tool("Unprotect", "shield", lambda: unprotect(self), tip="Removes your own rule for one checked item"))
     footer.addWidget(tool("Restore", "undo", lambda: self.navigate("Undo Center"),
@@ -401,6 +404,8 @@ def build(window):
     self.grave_search.textChanged.connect(lambda *_: fill(self))
     self.grave_table.itemSelectionChanged.connect(lambda: details(self))
     self.grave_table.itemChanged.connect(lambda item: table_checked(self, item))
+    from gg_desktop import old_files_select
+    self.grave_tick_helper = old_files_select.TickHelper(self.grave_table, lambda: ticks_changed(self))
     refresh(self)
 
 
@@ -629,6 +634,23 @@ def table_checked(window, item):
     selection_count(window)
 
 
+def ticks_changed(window):
+    """After a double-click, Shift+click or Ctrl+click changed several boxes at once (signals blocked), read them back."""
+    state = state_of(window)
+    for n, item in enumerate(getattr(window, "_shown_graves", [])):
+        cell = window.grave_table.item(n, 0)
+        if cell is not None:
+            (state.checked.add if cell.checkState() == Qt.Checked else state.checked.discard)(item.key)
+    selection_count(window)
+
+
+def toggle_all(window):
+    """Select all shown; pressed again when everything shown is ticked, it clears the selection."""
+    shown = getattr(window, "_grave_rows", [])
+    everything = bool(shown) and all(i.key in state_of(window).checked for i in shown)
+    select_visible(window, not everything)
+
+
 def selected_items(window, fallback=False):
     state = state_of(window)
     rows = [i for i in universe(window) if i.key in state.checked]
@@ -674,9 +696,13 @@ def selection_count(window):
     rows = selected_items(window)
     box = window.grave_select_all
     total = len(getattr(window, "_grave_rows", []))
+    everything = bool(total) and len(rows) >= total and all(i.key in state_of(window).checked for i in window._grave_rows)
     with QSignalBlocker(box):
         box.setText(f"{len(rows):,} selected ({insight.size_text(rows)})")
-        box.setChecked(bool(total) and len(rows) >= total and all(i.key in state_of(window).checked for i in window._grave_rows))
+        box.setChecked(everything)
+    button = getattr(window, "grave_select_button", None)
+    if button is not None and isValid(button):
+        button.setText("Clear selection" if everything else "Select all")
 
 
 # ------------------------------------------------------------------ details
