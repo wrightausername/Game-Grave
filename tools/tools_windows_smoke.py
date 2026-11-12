@@ -107,10 +107,10 @@ def main():
                 assert dialog.delete_button.isEnabled()
                 dialog.delete_button.click()
                 wait_for(lambda: not old.exists())
-                wait_for(lambda: "Deleted 1 files" in dialog.result_line.text())
+                wait_for(lambda: "Deleted 1 file " in dialog.result_line.text())
             assert asked[-1][0] == "Delete temporary files" and str(temp_root) in asked[-1][1] and "Recycle Bin" in asked[-1][1]
             assert fresh.exists() and outside.exists() and temp_root.exists()
-            assert logged[-1][0] == "Windows Cleanup" and "Deleted 1 files" in logged[-1][1]
+            assert logged[-1][0] == "Windows Cleanup" and "Deleted 1 file " in logged[-1][1]
             # The shared layout: plain header, steps finished, technical lines folded, a green result.
             assert dialog.steps.current == 3 and dialog.result_line.tone == "good"
             assert dialog.details.isVisibleTo(dialog) and not dialog.details.body.isVisibleTo(dialog)
@@ -140,6 +140,7 @@ def main():
             assert logged[-1][0] == "Game Optimizer" and dialog.undo_button.isEnabled()
             dialog.undo_button.click()
             assert reg.read(*winpc.GAME_MODE) is None and reg.read(*winpc.DVR_STORE) is None
+            assert dialog.result_line.text() == "Your previous settings are back, exactly as they were."
             assert not dialog.undo_button.isEnabled()
             snap(dialog, "tools-windows-optimizer.png")
 

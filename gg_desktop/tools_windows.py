@@ -8,6 +8,7 @@ the right.
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -131,7 +132,7 @@ def _cleanup_dialog(window, roots, plan, error):
                 if isValid(dialog):
                     dialog.result("Windows Cleanup stopped: " + err, words.BAD)
                 return
-            text = (f"Deleted {result.removed:,} files ({human_size(result.reported_bytes)} reported). "
+            text = (f"Deleted {words.plain_count(result.removed, 'file')} ({human_size(result.reported_bytes)} reported). "
                     f"{result.skipped:,} skipped because they changed, were in use or could not be removed.")
             winpc.activity("Windows Cleanup", text, size_bytes=result.reported_bytes, result="Permanently deleted")
             window.status.setText("Windows Cleanup finished. " + text)
@@ -215,7 +216,7 @@ def game_optimizer(window):
                                                                    if spec["key"] in keys), result="Changed")
         refresh()
         dialog.step(3)
-        problem = any("not" in n.lower() for n in notes)
+        problem = any(re.search(r"\bnot\b", n, re.IGNORECASE) for n in notes)
         dialog.result(" ".join(notes) + ("" if problem else " Undo puts it back any time."),
                       words.WARN if problem else words.GOOD)
 
@@ -226,7 +227,11 @@ def game_optimizer(window):
         notes = winpc.undo_optimizer(reg, runner, backup)
         winpc.activity("Game Optimizer", "Undone: " + " ".join(notes), result="Restored")
         refresh()
-        dialog.result(" ".join(notes), words.GOOD)
+        dialog.details.set_lines([spec["title"] + ":\n  " + spec["detail"] for spec in winpc.OPTIMIZER_SETTINGS] +
+                                 ["", "Last undo:"] + notes)
+        problem = any(re.search(r"\bnot\b", n, re.IGNORECASE) for n in notes)
+        dialog.result("Some settings could not be put back. Open the technical details to see which." if problem else
+                      "Your previous settings are back, exactly as they were.", words.WARN if problem else words.GOOD)
     apply_button.clicked.connect(apply)
     undo.clicked.connect(undo_all)
     dialog.apply_button, dialog.undo_button, dialog.checks = apply_button, undo, checks
@@ -321,7 +326,7 @@ def memory_optimizer(window):
                 return
             notes, still = result
             left = sum(1 for pid in pids if pid in still)
-            text = f"Asked {len(pids)} apps to close; {left} still running. " + (
+            text = f"Asked {words.plain_count(len(pids), 'app')} to close; {left} still running. " + (
                 "An app can stay open to ask about unsaved work." if left else "")
             winpc.activity("Memory Optimizer", "Asked to close: " + ", ".join(n for _p, n in chosen) + ". " + text,
                            result="Closed" if not left else "Some still running")

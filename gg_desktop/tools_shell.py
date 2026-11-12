@@ -46,6 +46,8 @@ STYLE = (
     "QFrame#toolRowLast{background:transparent;border:none;}"
     "QToolButton#toolDetails{color:#8fa0b3;background:transparent;border:none;font-size:12px;padding:2px 0;}"
     "QToolButton#toolDetails:hover{color:#e8eef5;}"
+    "QPushButton#toolDetails{color:#8fa0b3;background:transparent;border:none;font-size:12px;padding:2px 0;min-height:0;}"
+    "QPushButton#toolDetails:hover{color:#e8eef5;}"
     "QLabel#toolTech{color:#9fb0c2;background:#070d13;border:1px solid #17222d;border-radius:8px;padding:8px 10px;"
     "font-family:Consolas,monospace;font-size:11px;}"
     "QLabel#toolTitle{font-size:20px;font-weight:800;color:#ffffff;}"
@@ -191,7 +193,8 @@ class Details(QWidget):
         self.toggle.setText(("▾  Hide technical details" if opened else "▸  Show technical details"))
         window = self.window()
         if window is not None and window is not self:
-            window.adjustSize()
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: window.isVisible() and window.adjustSize())
 
 
 class Banner(QFrame):
@@ -302,11 +305,12 @@ class ToolDialog(QDialog):
         if self.steps:
             outer.addWidget(self.steps)
         self.body = column(spacing=10)
-        outer.addLayout(self.body, 1)
+        outer.addLayout(self.body)
         self.details = Details()
         outer.addWidget(self.details)
         self.result_line = Banner(title + " result")
         outer.addWidget(self.result_line)
+        outer.addStretch(1)
         self.footer = row(spacing=8)
         self.close_button = button("Close", self.accept)
         self.close_button.setAccessibleName("Close " + title)

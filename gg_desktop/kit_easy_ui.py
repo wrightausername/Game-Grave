@@ -172,7 +172,8 @@ class EasySetup(_Base):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setMinimumHeight(250)
-        scroll.setStyleSheet("QScrollArea{background:transparent;border:none;}")
+        scroll.setStyleSheet("QScrollArea{background:#09121a;border:1px solid #1b2836;border-radius:12px;}")
+        self.parts_box.setContentsMargins(14, 12, 14, 12)
         scroll.viewport().setStyleSheet("background:transparent;")
         holder.setObjectName("kitParts")
         holder.setStyleSheet("#kitParts{background:transparent;} #kitParts QCheckBox{color:#F4F7FC;font-size:13px;font-weight:600;}"
