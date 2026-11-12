@@ -53,7 +53,10 @@ def main():
         deadline = time.monotonic() + 25
         while not predicate() and time.monotonic() < deadline:
             QTest.qWait(15)
-        assert predicate(), what
+        if not predicate():
+            raise AssertionError(f"{what} | errors={getattr(main, 'errors', None) and main.errors.call_args_list} "
+                                 f"| status={getattr(main, 'window', None) and main.window.status.text()} "
+                                 f"| banner={getattr(main, 'view', None) and main.view.banner_text.text()}")
         settle()
 
     def texts(widget):
@@ -124,6 +127,7 @@ def main():
              patch.object(CrimsonWindow, "confirm", return_value=True), \
              patch.object(CrimsonWindow, "start_scan"):
             window = CrimsonWindow()
+            main.errors, main.window = errors, window
             window.resize(1280, 790)
             window.show()
             window.inventory = inventory
@@ -131,6 +135,7 @@ def main():
             window.navigate("Mods")
             settle()
             view = window.mymods_view
+            main.view = view
 
             stage("opens on My Mods, not the number strip")
             assert view.isVisible() and not any(w.isVisible() for w in window.mymods_advanced), "My Mods is the default"
