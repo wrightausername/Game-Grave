@@ -330,6 +330,10 @@ class MyModsView(QWidget):
         self.undo_button.setVisible(True)
         self.undo_button.setEnabled(bool(mc.snapshots(prof.folder)))
         self.list.setDragDropMode(QAbstractItemView.InternalMove)
+        if self.problem_box.isVisible() or self.filter_kind == "problem":
+            self.show_problems()       # keep "What needs you" current after a fix or an undo
+            if not self.problem_box.isVisible() and self.filter_kind == "problem":
+                self.filter_kind = ""
         self.hint.setText("Drag a mod to change its order: the lower one wins when two mods change the same file. "
                           "Close Mod Organizer 2 before changing anything here; every change can be undone.")
         self.fill()
@@ -551,6 +555,9 @@ class MyModsView(QWidget):
         problems = self.report.problems
         if not problems:
             self.problem_box.hide()
+            if self.filter_kind == "problem":
+                self.filter_kind = ""
+                self.fill()
             return
         head = row(spacing=8)
         head.addWidget(label("What needs you", "readyGameTitle"), 1)

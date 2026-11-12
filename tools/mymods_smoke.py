@@ -164,12 +164,16 @@ def main():
             wait_for(lambda: "+SkyUI" in modlist.read_text(encoding="utf-8") and not window.workers and view.report
                      and not view.report.problems, "the fix turned SkyUI on")
             assert view.banner_text.text().startswith("Your mods look healthy"), view.banner_text.text()
+            assert not view.problem_box.isVisible() and view.filter_kind == "", "fixed problems leave the list"
             assert len(mc.snapshots(profile, root / "Snapshots")) == 1
             view.undo_button.click()
             wait_for(lambda: not window.workers and view.report is not None, "undo reloaded")
             assert modlist.read_text(encoding="utf-8") == original, "Undo put the exact list back"
 
             stage("a switch turns one mod on")
+            assert view.filter_kind == "problem" and view.problem_box.isVisible(), "after Undo the problem is back on show"
+            view.clear_filter.click()
+            settle()
             switches = {s.accessibleName(): s for s in view.findChildren(Switch)}
             switches["Static Mesh Improvement on"].click()
             wait_for(lambda: "+Static Mesh Improvement" in modlist.read_text(encoding="utf-8") and not window.workers,
