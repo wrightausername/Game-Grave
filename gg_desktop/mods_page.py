@@ -78,6 +78,8 @@ def build(window, control):
     table.customContextMenuRequested.connect(lambda pos: show_menu(window, table.viewport(), pos))
     gallery.install(window, contents)
     gallery.apply_mode(window)
+    from gg_desktop import mymods_ui
+    mymods_ui.install(window)
 
 
 def sync_profiles(window, control, include_all):

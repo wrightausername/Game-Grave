@@ -68,6 +68,7 @@ def main():
         manager = ini.parent
         before = tree_bytes(manager)
         settings = default_settings()
+        settings["mods_view"] = "advanced"  # this check covers the detailed view
         fake_clues = clues_mod.Clues(hits={}, reports_read=3, notes=("Crash reports were read for the smoke test.",))
         with patch("gg_desktop.app.load_settings", side_effect=lambda: dict(settings)), \
              patch("gg_desktop.ready_room_services.config_dir", return_value=root / "Preferences"), \
@@ -79,6 +80,7 @@ def main():
              patch.object(CrimsonWindow, "confirm", return_value=True), \
              patch.object(CrimsonWindow, "start_scan"):
             window = CrimsonWindow()
+            window.settings = dict(window.settings, mods_view="advanced")  # this check covers the detailed view
             window.resize(1280, 790)
             window.show()
             window.inventory = inventory

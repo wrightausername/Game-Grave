@@ -33,6 +33,11 @@ KIND_BY_EVENT = {
 }
 # Feature events written with short internal names: the words the row shows, its filter group, and where to undo it.
 FEATURE_EVENTS = {
+    "mod_toggle": ("Mods turned on or off in Mod Organizer 2", "Other",
+                   "Game Grave saved your mod list first. To put it back: Mods, Undo."),
+    "mod_order": ("Mod order changed in Mod Organizer 2", "Other",
+                  "Game Grave saved your mod list first. To put it back: Mods, Undo."),
+    "mod_undo": ("Mod change undone", "Restored", "Your mod list from before Game Grave's change was put back."),
     "soulbind_apply": ("Soulbind changed game settings", "Settings",
                        "Game Grave kept a backup of the file. To put it back: Ready Room, Soulbind, Undo."),
     "soulbind_revert": ("Soulbind change undone", "Restored", "The settings file from before Soulbind was put back."),

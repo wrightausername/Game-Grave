@@ -70,6 +70,7 @@ def main():
         exports.mkdir()
         before = tree_bytes(ini.parent)
         settings = default_settings()
+        settings["mods_view"] = "advanced"  # this check covers the detailed view
         settings["mod_extra_roots"] = [str(extra)]
         saved = []
         with patch("gg_desktop.app.load_settings", side_effect=lambda: dict(settings)), \
@@ -80,6 +81,7 @@ def main():
              patch.object(CrimsonWindow, "confirm", return_value=True), \
              patch.object(CrimsonWindow, "start_scan") as scan:
             window = CrimsonWindow()
+            window.settings = dict(window.settings, mods_view="advanced")  # this check covers the detailed view
             window.resize(1280, 790)
             window.show()
             window.inventory = inventory

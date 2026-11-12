@@ -88,6 +88,7 @@ def main():
         inventory = Inventory(steam=steam, games=merge_games(steam, []), mods=mod_inventory.mods,
                               files=records[:1], scanned_at="2026-11-06 12:00")
         settings = default_settings()
+        settings["mods_view"] = "advanced"  # this check covers the detailed view
         settings["scan_folder"] = str(downloads)
         settings["never_touch"] = []
         with patch("gg_desktop.app.load_settings", return_value=settings), \
@@ -101,6 +102,7 @@ def main():
              patch.object(CrimsonWindow, "info") as info, patch.object(CrimsonWindow, "error") as errors, \
              patch.object(CrimsonWindow, "confirm", return_value=False) as confirm:
             window = CrimsonWindow()
+            window.settings = dict(window.settings, mods_view="advanced")  # this check covers the detailed view
             window.inventory = inventory
             window.show()
             window.resize(1280, 720)

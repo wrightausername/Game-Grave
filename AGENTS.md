@@ -519,3 +519,29 @@ along with easy multiple selecting stuff with shift and click"). Old Files is re
 double-click a row to tick or untick it, Shift+click ticks every row from the last clicked one, Ctrl+click flips one row. The
 footer says so when nothing is ticked. Ticking only marks rows for the existing buttons; removal is unchanged (Recycle Bin only
 after confirmation and re-checks). Covered by the Old Files smoke.
+
+My Mods, the simple Mods screen (owner instructions, 2026-11-11: "The mods tab right now is still our biggest hurdle... useless
+right now", "it's still just a fucking jumble of numbers", approved the mockup "That's better yes" after the question that asked for
+direct Mod Organizer 2 writes with snapshots and Undo, plus "a way to better track and know what steam workshop items are what").
+Mods is reopened. The previous detailed view stays whole behind Advanced (setting `mods_view`; the photo-reference preview always
+shows it); the detailed-view smokes open Advanced.
+- `gg_desktop/mymods_ui.py`: opens on one game at a time (game picker; MO2 profile picker when there is more than one), one plain
+  sentence, three cards (Health, Updates, Clashes; for Workshop: still listed, newer on Steam, space), What needs you with fix
+  buttons, a searchable list of real mod names with an on/off switch each, drag to reorder, Undo, Refresh, Advanced.
+- Writes, NEW and approved: `gg_desktop/mymods_core.py` changes only the chosen MO2 profile's modlist.txt: a mod on (+) / off (-),
+  or the order. Before every write modlist.txt, plugins.txt and loadorder.txt are copied to `<config>/mod_snapshots/<profile hash>`
+  (last 30 kept); Undo restores the newest snapshot only while modlist.txt is exactly what Game Grave wrote. Refused while Mod
+  Organizer 2 runs and for links. Mod folders and plugins are never moved or deleted. Logged: mod_toggle, mod_order, mod_undo
+  (readable in Undo Center). Screen order is MO2's order (the file is highest priority first, so it is reversed).
+- Mod Doctor (`gg_desktop/mymods_doctor.py`, read only): plugin masters from each plugin's TES4 header (MAST); a master that only a
+  switched-off mod provides becomes "Turn on <mod>"; masters nobody provides, missing mod folders, the same Nexus mod on twice,
+  updates MO2 recorded (meta.ini newestVersion > version, with the Nexus files page), and clashes between switched-on mods (same
+  file; the lower one in the list wins), bounded to 400,000 files. Nothing is called safe; a clash is explained, not judged.
+- Steam Workshop (`gg_desktop/workshop_core.py`): items from steamapps/workshop/content/<app> and appworkshop_<app>.acf; titles,
+  pictures, descriptions, tags and Steam's update time from Steam's public GetPublishedFileDetails (api.steampowered.com, no key),
+  asked when that game is opened for items not cached in the last 3 days (skipped while a game runs), cached in
+  `<config>/workshop_names.json`; preview pictures only from Steam's image hosts, cached in `<config>/workshop_previews`. "Newer
+  version on Steam" = Steam's update time later than the installed copy's; Steam installs it. Items Steam no longer lists are
+  marked. Open in Steam goes to the item page (unsubscribe there); Game Grave never deletes Workshop folders.
+- Covered by `tests/test_mymods.py` and `tools/mymods_smoke.py` (fix button, Undo, a switch, reorder, refusal while MO2 runs,
+  Workshop names, Advanced and back).
