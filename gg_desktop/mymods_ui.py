@@ -421,7 +421,7 @@ class MyModsView(QWidget):
         total = sum(i.size for i in items)
         self.subtitle.setText(f"{len(items)} Workshop items · {human_size(total)} · names and pictures from Steam")
         if removed:
-            self.set_banner(f"{len(removed)} item{'s' if len(removed) != 1 else ''} you have are no longer on the Workshop. "
+            self.set_banner(f"{len(removed)} item{'s you have are' if len(removed) != 1 else ' you have is'} no longer on the Workshop. "
                             "Open them in Steam to unsubscribe.", "warn")
         elif waiting:
             self.set_banner(f"{len(waiting)} item{'s have' if len(waiting) != 1 else ' has'} a newer version on Steam. Steam "

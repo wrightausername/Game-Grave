@@ -107,6 +107,11 @@ def main():
         print("AMD version file not reachable:", problem)
     amd = vendor.check_graphics("AMD Radeon RX 7800 XT", "32.0.12033.1030", "")
     print(f"AMD live check: latest={amd.latest!r} name={amd.latest_name!r} note={amd.note!r}")
+    from gg_desktop import workshop_core as ws
+    live = ws.fetch_details(["2016612051", "1"])
+    print(f"Steam Workshop live lookup: {live.get('2016612051', {}).get('title')!r}; unknown item removed="
+          f"{live.get('1', {}).get('removed')}")
+    assert live.get("2016612051", {}).get("title"), "Steam's public Workshop lookup should name a real item"
     problems = up.read_problems()
     print(f"PASS real: Device Manager problems read: {len(problems)} ({'; '.join(p.name + ': ' + p.meaning for p in problems[:3]) or 'none'})")
     updates = up.search_updates()

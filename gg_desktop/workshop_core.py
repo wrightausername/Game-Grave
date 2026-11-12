@@ -170,8 +170,9 @@ def fetch_details(item_ids, opener=None, timeout=20) -> dict:
     return out
 
 
-def refresh_names(items, cache: dict, fetch=fetch_details, now=None) -> dict:
+def refresh_names(items, cache: dict, fetch=None, now=None) -> dict:
     """Fetch names for items not cached (or cached more than a few days ago). Returns the updated cache."""
+    fetch = fetch or fetch_details
     now = now or time.time()
     wanted = [i.item_id for i in items if stale(cache.get(i.item_id, {}), now)]
     if not wanted:
