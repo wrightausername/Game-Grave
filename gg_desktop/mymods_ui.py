@@ -77,6 +77,8 @@ def note(text, tone="muted"):
 
 def when(ts):
     try:
+        if int(ts) < 1_104_537_600:      # before 2005: not a real Workshop date
+            return ""
         return datetime.fromtimestamp(int(ts)).strftime("%b %d, %Y")
     except (TypeError, ValueError, OSError, OverflowError):
         return ""
@@ -348,7 +350,7 @@ class MyModsView(QWidget):
             text.setStyleSheet("color:#8fa6c0;font-weight:800;letter-spacing:1px;")
             lay.addWidget(text, 1)
             return frame
-        lay.addWidget(tile(mod.name, 34))
+        lay.addWidget(tile(mod.name, 34), 0, Qt.AlignVCenter)
         words = column(spacing=1)
         name = label(mod.name, "readyDetail")
         name.setStyleSheet("color:#f2f5f8;font-size:13px;font-weight:700;")
@@ -446,14 +448,14 @@ class MyModsView(QWidget):
         frame = QWidget()
         lay = row(spacing=10, margins=(10, 6, 10, 6))
         frame.setLayout(lay)
-        lay.addWidget(tile(item.name, 44, self._previews.get(item.item_id)))
+        lay.addWidget(tile(item.name, 40, self._previews.get(item.item_id)), 0, Qt.AlignVCenter)
         words = column(spacing=1)
         name = label(item.name, "readyDetail")
         name.setStyleSheet("color:#f2f5f8;font-size:13px;font-weight:700;")
         name.setToolTip(item.description or item.name)
         words.addWidget(name)
         bits = [human_size(item.size) if item.size else ""]
-        if item.steam_updated:
+        if when(item.steam_updated):
             bits.append("updated " + when(item.steam_updated))
         if item.tags:
             bits.append(", ".join(item.tags[:3]))
