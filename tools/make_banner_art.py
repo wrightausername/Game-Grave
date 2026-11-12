@@ -1,11 +1,14 @@
 """Generate the panoramic HD header art, one per tab. Run: python3 tools/make_banner_art.py
-Needs rsvg-convert and Pillow. Deterministic. Writes gg_desktop/assets/brand/banner_<tab>.jpg.
+Needs rsvg-convert and Pillow. Deterministic. Writes gg_desktop/assets/brand/banner_<tab>.jpg (6000x500).
 
-Abstract gaming motifs, one per tab, kept clear of the sidebar art (hex grid, circuit traces, gamepad outline):
-pixel equalizer, perspective tunnel, HUD reticle, modular diamonds, glitch bands, HUD health bars, viewfinder,
-pixel sparks, pixel helix, rewind chevrons, processor packages, mixer sliders, constellation and block puzzle. No characters, no logos.
-Every picture is 6000x500 and exactly symmetric top to bottom, so it stays centred however the window crops it.
-The left half stays calm behind the title; the motif builds toward the right, where the light is brightest.
+Owner direction (2026-11-11): "still hd quality abstract but keep it computer and video games themed instead of just random
+shapes". Each tab gets a cluster of recognisable gaming and PC objects drawn as glowing neon line art (controllers, keyboard
+keys, graphics cards, chips, cartridges, floppies, pixel hearts, cameras ...) over a shared retro perspective grid with pixel
+particles. No characters, no logos, no brand marks, no words.
+
+The header crops the picture from the right and centres it vertically, so the objects sit in the right two thirds and in the
+middle band; the left stays calm behind the page title. The grid floor is mirrored into a ceiling so the picture stays
+balanced top to bottom.
 """
 from pathlib import Path
 import io
@@ -18,320 +21,422 @@ from PIL import Image, ImageChops
 OUT = Path(__file__).resolve().parents[1] / "gg_desktop" / "assets" / "brand"
 W, H = 6000, 500
 MID = H / 2
-CX = 4750  # where the light is brightest
+CX = 4700
 
-# slug: (main accent, second accent, motif)
+
+# ---------------------------------------------------------------- icon library (100 x 100 box, outline style)
+def _p(d, c, sw, extra=""):
+    fill = "" if "fill=" in extra else 'fill="none" '
+    return f'<path d="{d}" {fill}stroke="{c}" stroke-width="{sw:.2f}" stroke-linecap="round" stroke-linejoin="round" {extra}/>'
+
+
+def _r(x, y, w, h, rx, c, sw, fill="none", op=1.0):
+    return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" fill-opacity="{op}" stroke="{c}" '
+            f'stroke-width="{sw:.2f}"/>')
+
+
+def _c(x, y, r, c, sw, fill="none", op=1.0):
+    return f'<circle cx="{x}" cy="{y}" r="{r}" fill="{fill}" fill-opacity="{op}" stroke="{c}" stroke-width="{sw:.2f}"/>'
+
+
+def gamepad(c, a, sw):
+    body = ("M22 34 C30 28 42 30 50 30 C58 30 70 28 78 34 C88 41 94 66 90 74 C86 82 76 80 70 70 C66 64 60 62 50 62 "
+            "C40 62 34 64 30 70 C24 80 14 82 10 74 C6 66 12 41 22 34 Z")
+    out = [_p(body, c, sw)]
+    out.append(_p("M26 46 h10 M31 41 v10", c, sw))                                     # d-pad
+    for x, y in ((70, 41), (76, 47), (64, 47), (70, 53)):
+        out.append(_c(x, y, 2.6, a, sw * .8, a, .35))
+    out += [_c(40, 55, 4.5, c, sw * .8), _c(60, 55, 4.5, c, sw * .8)]
+    return "".join(out)
+
+
+def keycaps(c, a, sw):
+    out = []
+    for x, y, letter, hot in ((38, 22, "W", True), (18, 50, "A", True), (38, 50, "S", True), (58, 50, "D", True),
+                              (78, 50, "", False), (-2, 50, "", False)):
+        out.append(_r(x, y, 22, 22, 4, a if hot else c, sw, a if hot else "none", .18 if hot else 1))
+        if letter:
+            out.append(f'<text x="{x + 11}" y="{y + 16}" text-anchor="middle" font-family="DejaVu Sans Mono" '
+                       f'font-weight="bold" font-size="13" fill="{a}">{letter}</text>')
+    out.append(_r(18, 78, 62, 14, 4, c, sw))                                           # space bar
+    return "".join(out)
+
+
+def mouse(c, a, sw):
+    return (_p("M50 14 C70 14 76 30 76 50 C76 76 66 88 50 88 C34 88 24 76 24 50 C24 30 30 14 50 14 Z", c, sw)
+            + _p("M50 14 V42 M24 42 H76", c, sw * .8) + _r(47, 22, 6, 12, 3, a, sw * .8, a, .5))
+
+
+def headset(c, a, sw):
+    return (_p("M18 62 C18 30 32 14 50 14 C68 14 82 30 82 62", c, sw)
+            + _r(10, 56, 16, 28, 6, c, sw, a, .2) + _r(74, 56, 16, 28, 6, c, sw, a, .2)
+            + _p("M18 80 C22 92 36 94 46 92", c, sw * .8) + _c(48, 92, 3, a, sw * .8, a, .6))
+
+
+def monitor(c, a, sw):
+    out = [_r(8, 14, 84, 54, 5, c, sw), _p("M42 68 L38 82 H62 L58 68 M30 84 H70", c, sw)]
+    for i, wdt in enumerate((30, 22, 38)):
+        out.append(_r(16, 22 + i * 9, wdt, 5, 2, a, sw * .6, a, .45))
+    out.append(_c(74, 42, 11, a, sw * .8))
+    out.append(_p("M74 31 V53 M63 42 H85", a, sw * .6))
+    return "".join(out)
+
+
+def cpu(c, a, sw):
+    out = [_r(22, 22, 56, 56, 6, c, sw), _r(36, 36, 28, 28, 3, a, sw, a, .25)]
+    for k in range(5):
+        p = 30 + k * 10
+        out.append(_p(f"M{p} 22 V10 M{p} 78 V90 M22 {p} H10 M78 {p} H90", c, sw * .7))
+    return "".join(out)
+
+
+def gpu(c, a, sw):
+    out = [_r(4, 26, 92, 46, 6, c, sw), _p("M10 72 V84 H40 V72 M4 40 H0", c, sw * .8)]
+    for fx in (28, 68):
+        out.append(_c(fx, 49, 16, c, sw * .9))
+        for k in range(6):
+            ang = k * math.pi / 3
+            out.append(_p(f"M{fx} 49 Q{fx + 10 * math.cos(ang + .7):.1f} {49 + 10 * math.sin(ang + .7):.1f} "
+                          f"{fx + 14 * math.cos(ang):.1f} {49 + 14 * math.sin(ang):.1f}", a, sw * .55))
+        out.append(_c(fx, 49, 3.5, a, sw * .6, a, .7))
+    out.append(_r(80, 30, 12, 4, 2, a, sw * .5, a, .8))
+    return "".join(out)
+
+
+def ram(c, a, sw):
+    out = [_r(4, 34, 92, 30, 3, c, sw), _p("M48 64 v6 M52 64 v6", c, sw * .6)]
+    for k in range(7):
+        out.append(_r(10 + k * 12, 40, 8, 14, 1.5, a, sw * .55, a, .3))
+    for k in range(20):
+        out.append(_p(f"M{7 + k * 4.5:.1f} 64 v4", c, sw * .4))
+    return "".join(out)
+
+
+def ssd(c, a, sw):
+    out = [_r(6, 38, 88, 24, 3, c, sw), _p("M6 44 h-4 M6 56 h-4", c, sw * .6)]
+    for k, wdt in enumerate((18, 18, 18)):
+        out.append(_r(30 + k * 21, 43, wdt, 14, 2, a, sw * .55, a, .3))
+    out.append(_r(12, 45, 12, 10, 2, c, sw * .55))
+    return "".join(out)
+
+
+def hdd(c, a, sw):
+    return (_r(14, 8, 72, 84, 6, c, sw) + _c(48, 44, 26, c, sw * .9) + _c(48, 44, 6, a, sw * .7, a, .5)
+            + _p("M76 80 L60 52", a, sw) + _c(76, 80, 4, a, sw * .7))
+
+
+def floppy(c, a, sw):
+    return (_p("M12 10 H76 L90 24 V90 H12 Z", c, sw) + _r(28, 10, 40, 26, 2, c, sw * .8)
+            + _r(54, 14, 8, 18, 1, a, sw * .6, a, .6) + _r(24, 54, 52, 32, 3, a, sw * .8, a, .15)
+            + _p("M30 64 H70 M30 74 H62", a, sw * .5))
+
+
+def folder(c, a, sw):
+    return (_p("M8 24 H40 L48 32 H92 V84 H8 Z", c, sw) + _p("M8 40 H92", c, sw * .6)
+            + _r(20, 50, 22, 26, 2, a, sw * .6, a, .2) + _r(48, 50, 22, 26, 2, a, sw * .6, a, .2))
+
+
+def cartridge(c, a, sw):
+    return (_p("M14 10 H86 V72 L80 78 V90 H20 V78 L14 72 Z", c, sw) + _r(26, 20, 48, 34, 3, a, sw * .8, a, .2)
+            + "".join(_p(f"M{28 + k * 6} 82 v8", c, sw * .5) for k in range(8)) + _p("M26 62 H74", c, sw * .5))
+
+
+def disc(c, a, sw):
+    return (_c(50, 50, 40, c, sw) + _c(50, 50, 9, c, sw * .8) + _c(50, 50, 3, a, sw * .6, a, .8)
+            + _p("M50 18 A32 32 0 0 1 80 40", a, sw * .7) + _p("M50 26 A24 24 0 0 1 72 42", a, sw * .5))
+
+
+def pixel_heart(c, a, sw, empty=False):
+    rows = ["0110110", "1111111", "1111111", "0111110", "0011100", "0001000"]
+    out = []
+    for y, row_ in enumerate(rows):
+        for x, bit in enumerate(row_):
+            if bit == "1":
+                out.append(_r(8 + x * 12, 16 + y * 12, 11, 11, 1, a, sw * .3, "none" if empty else a, .55))
+    return "".join(out)
+
+
+def coin(c, a, sw):
+    return _c(50, 50, 30, a, sw, a, .15) + _c(50, 50, 22, a, sw * .7) + _p("M50 36 V64", a, sw * 1.2)
+
+
+def trophy(c, a, sw):
+    return (_p("M30 14 H70 V36 C70 52 60 60 50 60 C40 60 30 52 30 36 Z", c, sw)
+            + _p("M30 22 H16 C16 36 22 42 32 44 M70 22 H84 C84 36 78 42 68 44", c, sw * .8)
+            + _p("M50 60 V74 M34 86 H66 L62 74 H38 Z", c, sw) + _p("M44 28 l6 -6 l6 6 l-6 12 z", a, sw * .6))
+
+
+def crosshair(c, a, sw):
+    return (_c(50, 50, 34, c, sw) + _c(50, 50, 18, c, sw * .7) + _c(50, 50, 3, a, sw, a, .9)
+            + _p("M50 4 V30 M50 70 V96 M4 50 H30 M70 50 H96", a, sw * .8))
+
+
+def camera(c, a, sw):
+    return (_r(8, 28, 84, 56, 8, c, sw) + _p("M32 28 L38 16 H62 L68 28", c, sw) + _c(50, 56, 18, c, sw)
+            + _c(50, 56, 9, a, sw * .7, a, .3) + _c(78, 38, 4, "#ff2a4d", sw * .6, "#ff2a4d", .9))
+
+
+def filmstrip(c, a, sw):
+    out = [_r(4, 24, 92, 52, 2, c, sw)]
+    for k in range(8):
+        out += [_r(8 + k * 11.5, 28, 6, 6, 1, c, sw * .4), _r(8 + k * 11.5, 66, 6, 6, 1, c, sw * .4)]
+    for k in range(3):
+        out.append(_r(10 + k * 29, 38, 24, 24, 2, a, sw * .6, a, .2))
+    return "".join(out)
+
+
+def tombstone(c, a, sw):
+    return (_p("M22 92 V40 C22 20 36 10 50 10 C64 10 78 20 78 40 V92 Z", c, sw) + _p("M10 92 H90", c, sw)
+            + _r(44, 26, 12, 34, 1, a, sw * .5, a, .35) + _r(34, 36, 32, 12, 1, a, sw * .5, a, .35))
+
+
+def gear(c, a, sw):
+    teeth = []
+    for k in range(10):
+        ang = k * math.pi / 5
+        x, y = 50 + 36 * math.cos(ang), 50 + 36 * math.sin(ang)
+        teeth.append(f'<rect x="{x - 6:.1f}" y="{y - 6:.1f}" width="12" height="12" rx="2" fill="none" stroke="{c}" '
+                     f'stroke-width="{sw * .7:.2f}" transform="rotate({math.degrees(ang):.0f} {x:.1f} {y:.1f})"/>')
+    return _c(50, 50, 30, c, sw) + "".join(teeth) + _c(50, 50, 11, a, sw * .8, a, .3)
+
+
+def sliders(c, a, sw):
+    out = []
+    for k, pos in enumerate((30, 66, 44)):
+        x = 20 + k * 30
+        out += [_p(f"M{x} 10 V90", c, sw * .7), _r(x - 9, pos, 18, 12, 3, a, sw * .8, a, .35)]
+    return "".join(out)
+
+
+def toggle(c, a, sw):
+    return _r(10, 32, 80, 36, 18, a, sw, a, .2) + _c(72, 50, 13, a, sw, a, .7)
+
+
+def chat(c, a, sw):
+    return (_p("M10 16 H70 V56 H34 L20 70 V56 H10 Z", c, sw)
+            + _p("M44 44 H90 V80 H80 V92 L68 80 H44 Z", a, sw, f'fill="{a}" fill-opacity=".12"')
+            + "".join(_c(56 + k * 11, 62, 2.6, a, sw * .6, a, .9) for k in range(3)))
+
+
+def network(c, a, sw):
+    nodes = [(14, 30), (14, 70), (50, 16), (50, 50), (50, 84), (86, 34), (86, 66)]
+    out = []
+    for i, (x1, y1) in enumerate(nodes[:2]):
+        for x2, y2 in nodes[2:5]:
+            out.append(_p(f"M{x1} {y1} L{x2} {y2}", c, sw * .45))
+    for x1, y1 in nodes[2:5]:
+        for x2, y2 in nodes[5:]:
+            out.append(_p(f"M{x1} {y1} L{x2} {y2}", c, sw * .45))
+    for x, y in nodes:
+        out.append(_c(x, y, 6, a, sw * .7, a, .4))
+    return "".join(out)
+
+
+def wrench(c, a, sw):
+    return (_p("M70 10 C58 10 50 20 52 32 L14 70 C8 76 12 88 18 88 C24 88 26 86 30 82 L68 44 C80 46 90 38 90 26 "
+               "L80 36 L68 32 L64 20 Z", c, sw) + _c(20, 80, 3, a, sw * .6, a, .8))
+
+
+def screwdriver(c, a, sw):
+    return (_r(58, 8, 16, 40, 6, a, sw, a, .25) + _p("M66 48 V84 M60 84 H72 L66 94 Z", c, sw)
+            + _p("M62 18 H70 M62 28 H70 M62 38 H70", a, sw * .5))
+
+
+def puzzle(c, a, sw):
+    return _p("M14 30 H36 C34 22 38 14 46 14 C54 14 58 22 56 30 H80 V52 C88 50 94 54 94 62 C94 70 88 74 80 72 V90 "
+              "H56 C58 82 54 76 46 76 C38 76 34 82 36 90 H14 V70 C22 72 26 66 26 60 C26 54 22 48 14 50 Z", c, sw,
+              f'fill="{a}" fill-opacity=".10"')
+
+
+def cube(c, a, sw):
+    return (_p("M50 10 L86 30 V70 L50 90 L14 70 V30 Z", c, sw) + _p("M14 30 L50 50 L86 30 M50 50 V90", c, sw * .8)
+            + _p("M50 50 L86 30 V70 L50 90 Z", a, sw * .3, f'fill="{a}" fill-opacity=".14"'))
+
+
+def cassette(c, a, sw):
+    return (_r(6, 22, 88, 58, 6, c, sw) + _r(20, 32, 60, 26, 3, a, sw * .7, a, .15) + _c(36, 45, 7, c, sw * .8)
+            + _c(64, 45, 7, c, sw * .8) + _p("M26 80 L32 68 H68 L74 80", c, sw * .8))
+
+
+def rewind(c, a, sw):
+    return (_p("M54 20 L20 50 L54 80 Z", a, sw, f'fill="{a}" fill-opacity=".25"')
+            + _p("M88 20 L54 50 L88 80 Z", a, sw, f'fill="{a}" fill-opacity=".15"') + _p("M12 20 V80", c, sw))
+
+
+def clock(c, a, sw):
+    return (_c(50, 50, 38, c, sw) + _p("M50 50 V24 M50 50 L68 60", a, sw)
+            + "".join(_p(f"M{50 + 32 * math.cos(k * math.pi / 6):.1f} {50 + 32 * math.sin(k * math.pi / 6):.1f} "
+                         f"L{50 + 36 * math.cos(k * math.pi / 6):.1f} {50 + 36 * math.sin(k * math.pi / 6):.1f}", c, sw * .6)
+                      for k in range(12)))
+
+
+def joystick(c, a, sw):
+    return (_r(10, 66, 80, 24, 6, c, sw) + _p("M50 66 V34", c, sw * 1.4) + _c(50, 26, 12, a, sw, a, .45)
+            + _c(76, 74, 5, "#ff2a4d", sw * .7, "#ff2a4d", .7) + _c(24, 74, 5, a, sw * .7, a, .5))
+
+
+def helix(c, a, sw):
+    out = []
+    for k in range(11):
+        t = k / 10
+        x = 6 + t * 88
+        y1 = 50 + 30 * math.sin(t * 2 * math.pi * 1.5)
+        y2 = 50 - 30 * math.sin(t * 2 * math.pi * 1.5)
+        out.append(_p(f"M{x:.1f} {y1:.1f} L{x:.1f} {y2:.1f}", c, sw * .5))
+        out.append(_r(x - 4, y1 - 4, 8, 8, 1, a, sw * .4, a, .6))
+        out.append(_r(x - 4, y2 - 4, 8, 8, 1, c, sw * .4, c, .35))
+    return "".join(out)
+
+
+def battery_bars(c, a, sw):
+    return (_r(6, 30, 80, 40, 6, c, sw) + _r(86, 42, 8, 16, 2, c, sw * .8)
+            + "".join(_r(12 + k * 18, 36, 14, 28, 2, a, sw * .5, a, .5 if k < 3 else .08) for k in range(4)))
+
+
+ICONS = {f.__name__: f for f in (gamepad, keycaps, mouse, headset, monitor, cpu, gpu, ram, ssd, hdd, floppy, folder,
+                                 cartridge, disc, coin, trophy, crosshair, camera, filmstrip, tombstone, gear, sliders,
+                                 toggle, chat, network, wrench, screwdriver, puzzle, cube, cassette, rewind, clock,
+                                 joystick, helix, battery_bars)}
+ICONS["heart"] = pixel_heart
+ICONS["heart_empty"] = lambda c, a, sw: pixel_heart(c, a, sw, empty=True)
+
+# slug: (main accent, line colour, hero cluster as (icon, x, y, size, rotate, depth 0 far .. 1 near))
 TABS = {
-    "overview": ("#ff2a4d", "#13bcf5", "equalizer"),
-    "ready_room": ("#ff3b30", "#ffb46a", "tunnel"),
-    "games": ("#ff2a4d", "#7a5cff", "reticle"),
-    "mods": ("#ff2a6d", "#13d5e2", "diamonds"),
-    "old_files": ("#ff7a3a", "#ff2a4d", "glitch"),
-    "other_storage": ("#18c9eb", "#ff2a4d", "healthbars"),
-    "captures": ("#e175eb", "#ff2a4d", "viewfinder"),
-    "graveyard": ("#9a6bff", "#ff2a4d", "sparks"),
-    "dna": ("#ff2a4d", "#18c9eb", "helix"),
-    "hardware": ("#13bcf5", "#ff2a4d", "chips"),
-    "undo": ("#f2b43a", "#ff2a4d", "rewind"),
-    "settings": ("#7f93ad", "#ff2a4d", "sliders"),
-    "assistant": ("#30d76b", "#18c9eb", "constellation"),
-    "more_tools": ("#ff2a4d", "#f2b43a", "blocks"),
+    "overview": ("#ff2a4d", "#ffd6dd", [("monitor", 4300, 250, 330, 0, 1), ("gamepad", 5050, 270, 300, -8, .9),
+                                         ("heart", 3700, 200, 120, 0, .55), ("heart", 3560, 300, 90, 0, .4),
+                                         ("keycaps", 5650, 250, 230, 6, .6)]),
+    "ready_room": ("#ff3b30", "#ffd9c7", [("joystick", 4400, 250, 320, 0, 1), ("gamepad", 5150, 240, 280, 10, .85),
+                                           ("crosshair", 3750, 250, 200, 0, .55), ("trophy", 5750, 260, 190, -6, .55),
+                                           ("coin", 3400, 210, 90, 0, .35)]),
+    "games": ("#ff2a4d", "#e3dcff", [("cartridge", 4250, 250, 300, -10, 1), ("disc", 4900, 260, 290, 0, .9),
+                                      ("gamepad", 5600, 250, 270, 6, .75), ("cartridge", 3650, 240, 170, 12, .45),
+                                      ("coin", 3300, 280, 80, 0, .3)]),
+    "mods": ("#ff2a6d", "#c9fbff", [("puzzle", 4300, 250, 300, -8, 1), ("wrench", 4950, 250, 280, 20, .9),
+                                     ("cube", 5600, 250, 250, 0, .75), ("puzzle", 3700, 230, 160, 14, .45),
+                                     ("gear", 3350, 270, 110, 0, .3)]),
+    "old_files": ("#ff7a3a", "#ffe3d2", [("floppy", 4300, 250, 290, -8, 1), ("folder", 4950, 250, 290, 4, .9),
+                                          ("floppy", 5600, 250, 230, 10, .7), ("floppy", 3700, 240, 150, -14, .45),
+                                          ("clock", 3350, 260, 100, 0, .3)]),
+    "other_storage": ("#18c9eb", "#d6f6ff", [("hdd", 4300, 250, 300, 0, 1), ("ssd", 4980, 250, 330, -12, .9),
+                                              ("folder", 5650, 250, 230, 6, .7), ("ssd", 3700, 240, 180, 14, .45),
+                                              ("cube", 3350, 260, 100, 0, .3)]),
+    "captures": ("#e175eb", "#fbe3ff", [("camera", 4300, 250, 310, -6, 1), ("filmstrip", 5000, 250, 320, 8, .85),
+                                         ("crosshair", 5650, 250, 220, 0, .65), ("filmstrip", 3700, 250, 170, -10, .45),
+                                         ("monitor", 3350, 260, 110, 0, .3)]),
+    "graveyard": ("#9a6bff", "#e6dcff", [("tombstone", 4300, 260, 300, 0, 1), ("tombstone", 4850, 270, 230, 6, .8),
+                                          ("heart_empty", 5450, 240, 210, 0, .75), ("cartridge", 3750, 250, 170, -14, .45),
+                                          ("heart_empty", 3400, 270, 100, 0, .3)]),
+    "dna": ("#ff2a4d", "#d8f7ff", [("helix", 4500, 250, 420, 0, 1), ("gamepad", 5450, 250, 260, -8, .8),
+                                    ("cpu", 3700, 250, 180, 0, .45), ("helix", 3300, 250, 170, 0, .3)]),
+    "hardware": ("#13bcf5", "#d9f4ff", [("gpu", 4350, 250, 340, -4, 1), ("cpu", 5050, 250, 270, 0, .9),
+                                         ("ram", 5700, 250, 260, -14, .7), ("ram", 3700, 240, 180, 10, .45),
+                                         ("battery_bars", 3330, 260, 100, 0, .3)]),
+    "undo": ("#f2b43a", "#fff0d1", [("rewind", 4300, 250, 290, 0, 1), ("cassette", 4950, 250, 290, -6, .9),
+                                     ("clock", 5600, 250, 230, 0, .7), ("rewind", 3700, 250, 150, 0, .45),
+                                     ("cassette", 3350, 260, 100, 8, .3)]),
+    "settings": ("#7f93ad", "#e1e9f3", [("gear", 4300, 250, 300, 0, 1), ("sliders", 4950, 250, 280, 0, .9),
+                                         ("toggle", 5600, 250, 230, 0, .7), ("gear", 3700, 230, 160, 18, .45),
+                                         ("keycaps", 3350, 260, 110, 0, .3)]),
+    "assistant": ("#30d76b", "#d8ffe6", [("chat", 4300, 250, 300, 0, 1), ("network", 4980, 250, 300, 0, .9),
+                                          ("cpu", 5650, 250, 230, 0, .7), ("chat", 3700, 240, 150, 0, .45),
+                                          ("network", 3350, 260, 110, 0, .3)]),
+    "more_tools": ("#ff2a4d", "#ffe8c4", [("wrench", 4300, 250, 300, -18, 1), ("keycaps", 4980, 250, 300, 0, .9),
+                                           ("screwdriver", 5600, 250, 240, 20, .7), ("mouse", 3700, 250, 160, -8, .45),
+                                           ("headset", 3350, 260, 110, 0, .3)]),
 }
 
 
-def rect(x, y, w, h, fill, op, extra=""):
-    return f'<rect x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{h:.0f}" fill="{fill}" opacity="{op:.2f}" {extra}/>'
+SCALE = 1.32
 
 
-def line(x1, y1, x2, y2, stroke, op, width=3):
-    return (f'<line x1="{x1:.0f}" y1="{y1:.0f}" x2="{x2:.0f}" y2="{y2:.0f}" stroke="{stroke}" '
-            f'stroke-width="{width}" opacity="{op:.2f}"/>')
+def place(name, x, y, size, rot, depth, color, accent):
+    size *= SCALE
+    s = size / 100.0
+    sw = (3.6 + 2.2 * depth) / s
+    body = ICONS[name](color, accent, sw)
+    move = f"translate({x - 50 * s:.1f} {y - 50 * s:.1f}) scale({s:.4f}) rotate({rot} 50 50)"
+    op = .30 + .70 * depth
+    wide = f'<g transform="{move}" filter="url(#haze)" opacity="{op * .8:.2f}">{ICONS[name](accent, accent, sw * 2.2)}</g>'
+    glow = f'<g transform="{move}" filter="url(#bloom)" opacity="{op:.2f}">{body}</g>'
+    crisp = f'<g transform="{move}" opacity="{min(1, op + .1):.2f}">{body}</g>'
+    return wide + glow + crisp
 
 
-def bell(x, centre=CX, spread=1100):
-    return math.exp(-((x - centre) / spread) ** 2)
+def ghost(name, x, y, color):
+    """A huge, faint silhouette of the tab's main object behind the cluster, for depth."""
+    s = 7.4
+    move = f"translate({x - 50 * s:.1f} {y - 50 * s:.1f}) scale({s})"
+    return f'<g transform="{move}" filter="url(#haze)" opacity=".16">{ICONS[name](color, color, 1.4)}</g>'
 
 
-# ---------------------------------------------------------------- motifs drawn in the top half, then mirrored
-def equalizer(a, b, r):
+def grid(a, r):
+    """Retro perspective floor below the middle, mirrored as a ceiling above; vanishing point near the light."""
     out = []
-    for i, x in enumerate(range(2500, W, 46)):
-        height = int(1 + 6.2 * bell(x, CX - 150, 1300) * r.uniform(.45, 1.0) + r.uniform(0, 1.2))
-        for k in range(min(height, 7)):
-            y = MID - 8 - (k + 1) * 33
-            peak = k == height - 1
-            colour = b if i % 7 == 0 else a
-            out.append(rect(x, y, 30, 31, colour, (.9 if peak else .28 + .25 * bell(x)) * (1 - k * .05)))
+    horizon = 34
+    vx = CX - 200
+    for k in range(-40, 41):
+        x_far = vx + k * 40
+        x_near = vx + k * 260
+        for sign in (1, -1):
+            y0 = MID + sign * horizon
+            y1 = MID + sign * (MID + 20)
+            out.append(f'<line x1="{x_far:.0f}" y1="{y0:.0f}" x2="{x_near:.0f}" y2="{y1:.0f}" stroke="{a}" '
+                       f'stroke-width="2.4" opacity=".26"/>')
+    for k in range(1, 14):
+        t = (k / 13) ** 2.1
+        for sign in (1, -1):
+            y = MID + sign * (horizon + t * (MID - horizon + 20))
+            out.append(f'<line x1="0" y1="{y:.1f}" x2="{W}" y2="{y:.1f}" stroke="{a}" stroke-width="{1.2 + 2 * t:.1f}" '
+                       f'opacity="{.10 + .26 * t:.2f}"/>')
     return "".join(out)
 
 
-def diamonds(a, b, r):
+def particles(a, b, r):
     out = []
-    size = 96
-    for row in range(0, 3):
-        for col in range(0, 36):
-            x = 2400 + col * size + (size / 2 if row % 2 else 0)
-            y = MID - 28 - row * size * .5
-            if r.random() < .30:
-                continue  # a missing piece, like a removed mod
-            fill = r.random() < .45
-            colour = b if r.random() < .14 else a
-            op = (.10 + .6 * bell(x, CX, 1200)) * (1 - row * .22)
-            pts = f"{x:.0f},{y - 44:.0f} {x + 44:.0f},{y:.0f} {x:.0f},{y + 44:.0f} {x - 44:.0f},{y:.0f}"
-            style = (f'fill="{colour}" fill-opacity="{op * .9:.2f}"' if fill
-                     else f'fill="none" stroke="{colour}" stroke-width="3" stroke-opacity="{op + .1:.2f}"')
-            out.append(f'<polygon points="{pts}" {style}/>')
+    for _ in range(260):
+        x = r.uniform(2400, W)
+        y = r.uniform(30, H - 30)
+        size = r.choice((4, 6, 6, 8, 10))
+        op = r.uniform(.15, .7) * min(1, (x - 2300) / 1600)
+        col = a if r.random() < .55 else b
+        out.append(f'<rect x="{x:.0f}" y="{y:.0f}" width="{size}" height="{size}" fill="{col}" opacity="{op:.2f}"/>')
+    # a few circuit traces drifting in from the left of the cluster
+    for _ in range(14):
+        y = r.choice(range(60, H - 60, 20))
+        x0 = r.uniform(2600, 3400)
+        x1 = x0 + r.uniform(300, 700)
+        dy = r.choice((-40, -20, 20, 40))
+        out.append(f'<path d="M{x0:.0f} {y} H{x1:.0f} l30 {dy} h{r.uniform(80, 240):.0f}" fill="none" stroke="{b}" '
+                   f'stroke-width="3" opacity=".22"/>')
+        out.append(f'<circle cx="{x0:.0f}" cy="{y}" r="6" fill="none" stroke="{b}" stroke-width="3" opacity=".3"/>')
     return "".join(out)
-
-
-def glitch(a, b, r):
-    out = []
-    for _ in range(20):
-        y = r.uniform(10, MID - 6)
-        x = r.uniform(2400, 5800)
-        w = r.uniform(90, 560)
-        h = r.choice((6, 10, 16, 26))
-        op = .08 + .55 * bell(x + w / 2, CX, 1500)
-        out.append(rect(x, y, w, h, a, op))
-        out.append(rect(x + 14, y + 2, w, h, b, op * .45))
-        if r.random() < .4:
-            out.append(rect(x + w * r.uniform(.2, .8), y - 3, r.uniform(30, 90), h + 6, "#ffffff", op * .35))
-    return "".join(out)
-
-
-def healthbars(a, b, r):
-    out = []
-    for row in range(5):
-        centre = 34 + row * 46
-        start = 2600 + row * 120 + r.uniform(0, 140)
-        segments = int((W - start) // 64)
-        lit = int(segments * r.uniform(.5, .92))
-        for s in range(segments):
-            x = start + s * 64
-            height = r.choice((12, 18, 24, 32, 38))
-            colour = b if row == 2 else a
-            op = (.55 + .35 * bell(x, CX, 1300)) if s < lit else .12
-            out.append(rect(x, centre - height / 2, 52, height, colour, op))
-    return "".join(out)
-
-
-def sparks(a, b, r):
-    out = []
-    for _ in range(46):
-        x, y = r.uniform(2300, 5900), r.uniform(18, MID - 20)
-        s = r.choice((8, 10, 14, 20))
-        op = .12 + .75 * bell(x, CX, 1400) * r.uniform(.5, 1)
-        colour = b if r.random() < .2 else a
-        out += [rect(x - s / 2, y - s / 2, s, s, colour, op), rect(x - s * 1.5, y - s / 2, s, s, colour, op * .6),
-                rect(x + s * .5, y - s / 2, s, s, colour, op * .6), rect(x - s / 2, y - s * 1.5, s, s, colour, op * .6),
-                rect(x - s / 2, y + s * .5, s, s, colour, op * .6)]
-        if r.random() < .35:
-            tail = r.uniform(160, 520)
-            out.append(f'<line x1="{x + s * 2:.0f}" y1="{y:.0f}" x2="{x + s * 2 + tail:.0f}" y2="{y:.0f}" '
-                       f'stroke="{colour}" stroke-width="{max(2, s / 3):.0f}" stroke-dasharray="{s} {s * 1.4:.0f}" opacity="{op * .5:.2f}"/>')
-    return "".join(out)
-
-
-def sliders(a, b, r):
-    out = []
-    for i in range(4):
-        y = 40 + i * 60
-        x0 = 2500 + r.uniform(0, 300)
-        x1 = W - r.uniform(0, 200)
-        knob = x0 + (x1 - x0) * r.uniform(.25, .85)
-        colour = b if i == 1 else a
-        out.append(line(x0, y, x1, y, "#9aa8b6", .14, 4))
-        out.append(line(x0, y, knob, y, colour, .55, 8))
-        for t in range(0, 60):
-            x = x0 + t * (x1 - x0) / 59
-            out.append(line(x, y - 14, x, y - 6, "#9aa8b6", .16, 2))
-        out.append(rect(knob - 16, y - 20, 32, 40, colour, .85))
-        out.append(rect(knob - 16, y - 20, 32, 8, "#ffffff", .25))
-    return "".join(out)
-
-
-def constellation(a, b, r):
-    pts = [(r.uniform(2400, 5950), r.uniform(14, MID - 10)) for _ in range(70)]
-    out = []
-    for i, (x, y) in enumerate(pts):
-        near = sorted(((px - x) ** 2 + (py - y) ** 2, j) for j, (px, py) in enumerate(pts) if j != i)[:2]
-        for dist, j in near:
-            if dist < 330 ** 2 and j > i:
-                out.append(line(x, y, pts[j][0], pts[j][1], a, .10 + .35 * bell(x, CX, 1500), 2))
-    for i, (x, y) in enumerate(pts):
-        op = .2 + .7 * bell(x, CX, 1500)
-        size = r.choice((12, 16, 22))
-        out.append(rect(x - size / 2, y - size / 2, size, size, b if i % 6 == 0 else a, op,
-                        f'transform="rotate(45 {x:.0f} {y:.0f})"'))
-    return "".join(out)
-
-
-def blocks(a, b, r):
-    shapes = [((0, 0), (1, 0), (2, 0), (3, 0)), ((0, 0), (1, 0), (0, 1), (1, 1)), ((0, 0), (1, 0), (2, 0), (1, 1)),
-              ((0, 0), (0, 1), (1, 1), (2, 1)), ((1, 0), (2, 0), (0, 1), (1, 1)), ((0, 0), (1, 0), (1, 1), (2, 1))]
-    cell, gap = 40, 6
-    pitch = cell + gap
-    taken, out = set(), []
-    for _ in range(90):
-        shape = r.choice(shapes)
-        gx = r.randint(0, (W - 2400) // pitch - 5)
-        gy = r.randint(0, 3)
-        cells = {(gx + dx, gy + dy) for dx, dy in shape}
-        halo = {(x + i, y + j) for x, y in cells for i in (-1, 0, 1) for j in (-1, 0, 1)}
-        if halo & taken or any(y > 4 for _, y in cells):
-            continue
-        taken |= cells
-        colour = b if r.random() < .2 else a
-        for x, y in cells:
-            px, py = 2400 + x * pitch, MID - 10 - (y + 1) * pitch
-            out.append(rect(px, py, cell, cell, colour, .12 + .7 * bell(px, CX, 1300)))
-    return "".join(out)
-
-
-# ---------------------------------------------------------------- motifs that are symmetric by construction
-def tunnel(a, b, r):
-    vx = CX + 350
-    out = []
-    for k in range(-16, 17):
-        out.append(line(vx + k * 40, MID, vx + k * 300, -20, a, .06 + .4 * math.exp(-(k / 8) ** 2), 3))
-        out.append(line(vx + k * 40, MID, vx + k * 300, H + 20, a, .06 + .4 * math.exp(-(k / 8) ** 2), 3))
-    for i in range(1, 10):
-        d = MID * (i / 9) ** 1.9
-        o = .12 + .5 * (1 - i / 10)
-        colour = b if i % 4 == 0 else a
-        x = vx - 3000 + r.uniform(0, 200)
-        while x < W:
-            length = r.uniform(140, 520)
-            out.append(line(x, MID - d, x + length, MID - d, colour, o, 3))
-            out.append(line(x, MID + d, x + length, MID + d, colour, o, 3))
-            x += length + r.uniform(160, 520)
-    out.append(f'<ellipse cx="{vx}" cy="{MID}" rx="120" ry="14" fill="{b}" opacity=".55"/>')
-    return "".join(out)
-
-
-def reticle(a, b, r):
-    out = []
-    for cx, scale, o in ((CX, 1.0, 1.0), (CX - 900, .55, .55), (CX + 900, .55, .55)):
-        for radius, width, dash in ((205, 5, ""), (150, 3, 'stroke-dasharray="14 22"'), (78, 4, ""), (16, 0, "fill")):
-            rr = radius * scale
-            if dash == "fill":
-                out.append(f'<circle cx="{cx}" cy="{MID}" r="{10 * scale + 4:.0f}" fill="{b}" opacity="{.9 * o:.2f}"/>')
-            else:
-                out.append(f'<circle cx="{cx}" cy="{MID}" r="{rr:.0f}" fill="none" stroke="{a}" stroke-width="{width}" '
-                           f'opacity="{.7 * o:.2f}" {dash}/>')
-        for ang in range(0, 360, 30):
-            ca, sa = math.cos(math.radians(ang)), math.sin(math.radians(ang))
-            out.append(line(cx + ca * 205 * scale, MID + sa * 205 * scale, cx + ca * 232 * scale, MID + sa * 232 * scale,
-                            b if ang % 90 == 0 else a, .8 * o, 5))
-        for sign in (-1, 1):
-            out.append(line(cx + sign * 100 * scale, MID, cx + sign * 190 * scale, MID, a, .8 * o, 4))
-            out.append(line(cx, MID + sign * 100 * scale, cx, MID + sign * 190 * scale, a, .8 * o, 4))
-    out.append(line(CX - 2400, MID, CX - 260, MID, a, .25, 2))
-    return "".join(out)
-
-
-def chips(a, b, r):
-    """Processor packages seen from above: square die, pin rows on all four sides, a heat spreader. Mirror-symmetric."""
-    out = []
-    for cx, size, o in ((CX, 340, 1.0), (CX - 1000, 210, .55), (CX + 1000, 210, .55)):
-        half = size / 2
-        scale = size / 340
-        pins = 11
-        gap = size / (pins + 1)
-        for i in range(pins):
-            offset = -half + gap * (i + 1)
-            for sign in (-1, 1):
-                out.append(rect(cx + offset - 5 * scale, MID + sign * (half + 17 * scale) - 17 * scale, 10 * scale, 34 * scale, a, .8 * o))
-                out.append(rect(cx + sign * (half + 17 * scale) - 17 * scale, MID + offset - 5 * scale, 34 * scale, 10 * scale, a, .8 * o))
-        out.append(rect(cx - half, MID - half, size, size, "#0a1218", .9 * o, f'stroke="{a}" stroke-width="{6 * scale:.1f}" rx="{14 * scale:.0f}"'))
-        inner = half * .62
-        out.append(rect(cx - inner, MID - inner, inner * 2, inner * 2, "none", .9 * o, f'stroke="{b}" stroke-width="{5 * scale:.1f}" rx="{8 * scale:.0f}"'))
-        core = inner * .52
-        out.append(rect(cx - core, MID - core, core * 2, core * 2, b, .55 * o, f'rx="{5 * scale:.0f}"'))
-        for dx in (-1, 1):
-            for dy in (-1, 1):
-                out.append(rect(cx + dx * inner * .55 - 7 * scale, MID + dy * inner * .55 - 7 * scale, 14 * scale, 14 * scale, a, .9 * o))
-    out.append(line(CX - 2500, MID, CX - 1250, MID, a, .25, 2))
-    out.append(line(CX - 870, MID, CX - 200, MID, a, .35, 3))
-    out.append(line(CX + 200, MID, CX + 870, MID, a, .35, 3))
-    return "".join(out)
-
-
-def viewfinder(a, b, r):
-    out = []
-    for half_w, half_h, o, length in ((1250, 215, .85, 90), (900, 150, .55, 70), (520, 85, .4, 50)):
-        for sx in (-1, 1):
-            for sy in (-1, 1):
-                x, y = CX + sx * half_w, MID + sy * half_h
-                out.append(f'<path d="M{x - sx * length} {y} H{x} V{y - sy * length}" fill="none" stroke="{a}" '
-                           f'stroke-width="7" opacity="{o:.2f}" stroke-linejoin="miter"/>')
-    for t in range(-12, 13):
-        h = 26 if t % 4 == 0 else 14
-        out.append(line(CX + t * 90, MID - 215, CX + t * 90, MID - 215 + h, a, .5, 3))
-        out.append(line(CX + t * 90, MID + 215, CX + t * 90, MID + 215 - h, a, .5, 3))
-    out.append(f'<circle cx="{CX - 1100}" cy="{MID - 150}" r="16" fill="{b}" opacity=".9"/>')
-    out.append(f'<circle cx="{CX - 1100}" cy="{MID + 150}" r="16" fill="{b}" opacity=".9"/>')
-    out.append(line(CX - 60, MID, CX + 60, MID, b, .8, 5))
-    out.append(line(CX, MID - 60, CX, MID + 60, b, .8, 5))
-    return "".join(out)
-
-
-def helix(a, b, r):
-    out = []
-    for x in range(2400, W, 34):
-        phase = x / 118
-        y1, y2 = MID + 150 * math.sin(phase), MID - 150 * math.sin(phase)
-        depth = math.cos(phase)
-        glow = .15 + .75 * bell(x, CX, 1500)
-        size = 22 + 12 * depth
-        if (x // 34) % 4 == 0:
-            out.append(line(x, y1, x, y2, b, glow * .45, 3))
-        out.append(rect(x - size / 2, y1 - size / 2, size, size, a, glow * (.6 + .4 * depth)))
-        out.append(rect(x - size / 2, y2 - size / 2, size, size, b if (x // 34) % 9 == 0 else a, glow * (.6 - .4 * depth + .2)))
-    return "".join(out)
-
-
-def rewind(a, b, r):
-    out = []
-    for row, (height, pitch, o) in enumerate(((420, 190, 1.0), (260, 130, .55))):
-        for i in range(0, 30):
-            x = 2500 + i * pitch + row * 70
-            if x > W:
-                break
-            glow = .08 + .75 * bell(x, CX, 1300)
-            colour = b if (i % 6 == 0 and row == 0) else a
-            out.append(f'<path d="M{x + height * .28:.0f} {MID - height / 2:.0f} L{x:.0f} {MID} L{x + height * .28:.0f} {MID + height / 2:.0f}" '
-                       f'fill="none" stroke="{colour}" stroke-width="{26 - row * 10}" stroke-linejoin="miter" opacity="{glow * o:.2f}"/>')
-    return "".join(out)
-
-
-MIRRORED = {"equalizer": equalizer, "diamonds": diamonds, "glitch": glitch, "healthbars": healthbars, "sparks": sparks,
-            "sliders": sliders, "constellation": constellation, "blocks": blocks}
-CENTRED = {"chips": chips, "tunnel": tunnel, "reticle": reticle, "viewfinder": viewfinder, "helix": helix, "rewind": rewind}
 
 
 def picture(slug, seed):
-    a, b, motif = TABS[slug]
+    a, line_col, cluster = TABS[slug]
     r = random.Random(seed)
-    if motif in MIRRORED:
-        top = MIRRORED[motif](a, b, r)
-        art = f'<g>{top}</g><g transform="matrix(1 0 0 -1 0 {H})">{top}</g>'
-    else:
-        art = CENTRED[motif](a, b, r)
-    scan = "".join(line(0, y, W, y, "#000", .20, 2) for y in range(4, H, 10))
+    hero = max(cluster, key=lambda t: t[5])
+    icons = ghost(hero[0], CX + 250, MID, a) + "".join(
+        place(name, x, y, size, rot, depth, line_col, a) for name, x, y, size, rot, depth in sorted(cluster, key=lambda t: t[5]))
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">
 <defs>
- <linearGradient id="wall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#03070a"/><stop offset=".55" stop-color="#070b10"/><stop offset="1" stop-color="#0b1117"/></linearGradient>
- <radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="{a}" stop-opacity=".30"/><stop offset=".5" stop-color="{a}" stop-opacity=".09"/><stop offset="1" stop-color="{a}" stop-opacity="0"/></radialGradient>
- <radialGradient id="glow2" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="{b}" stop-opacity=".26"/><stop offset="1" stop-color="{b}" stop-opacity="0"/></radialGradient>
- <linearGradient id="reveal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".38" stop-color="#fff" stop-opacity=".25"/><stop offset=".72" stop-color="#fff" stop-opacity="1"/></linearGradient>
+ <linearGradient id="wall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#03060a"/><stop offset=".5" stop-color="#060a10"/><stop offset="1" stop-color="#0a1018"/></linearGradient>
+ <radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="{a}" stop-opacity=".34"/><stop offset=".45" stop-color="{a}" stop-opacity=".10"/><stop offset="1" stop-color="{a}" stop-opacity="0"/></radialGradient>
+ <radialGradient id="core" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff" stop-opacity=".10"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+ <linearGradient id="reveal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".40" stop-color="#fff" stop-opacity=".18"/><stop offset=".62" stop-color="#fff" stop-opacity="1"/></linearGradient>
+ <linearGradient id="vfade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset=".22" stop-color="#000" stop-opacity="0"/><stop offset=".78" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></linearGradient>
  <mask id="fadein" maskUnits="userSpaceOnUse" x="0" y="0" width="{W}" height="{H}"><rect width="{W}" height="{H}" fill="url(#reveal)"/></mask>
+ <filter id="bloom" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>
+ <filter id="haze" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="22"/></filter>
 </defs>
 <rect width="{W}" height="{H}" fill="url(#wall)"/>
-<ellipse cx="{CX}" cy="{MID}" rx="1700" ry="520" fill="url(#glow)"/>
-<ellipse cx="{CX + 800}" cy="{MID}" rx="800" ry="420" fill="url(#glow2)"/>
-<g mask="url(#fadein)">{art}</g>
-<g mask="url(#fadein)">{scan}</g>
+<ellipse cx="{CX}" cy="{MID}" rx="1900" ry="560" fill="url(#glow)"/>
+<ellipse cx="{CX}" cy="{MID}" rx="900" ry="300" fill="url(#core)"/>
+<g mask="url(#fadein)">{grid(a, r)}</g>
+<rect x="2600" y="{MID - 2}" width="{W - 2600}" height="4" fill="{a}" opacity=".35" filter="url(#bloom)"/>
+<g mask="url(#fadein)">{particles(a, line_col, r)}</g>
+<g mask="url(#fadein)">{icons}</g>
+<rect width="{W}" height="{H}" fill="url(#vfade)"/>
 </svg>"""
 
 
@@ -349,5 +454,8 @@ def render(slug, seed):
 
 
 if __name__ == "__main__":
+    import sys
+    only = set(sys.argv[1:])
     for i, name in enumerate(TABS):
-        render(name, 40 + i)
+        if not only or name in only:
+            render(name, 40 + i)

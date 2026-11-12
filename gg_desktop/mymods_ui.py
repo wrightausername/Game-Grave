@@ -28,8 +28,39 @@ from gg_desktop.widgets import button, column, label, row
 TONES = {"good": ("#32d67a", "#0b2215", "#1f6a3f"), "warn": ("#f6be24", "#241c06", "#6d5512"),
          "bad": ("#ff5a6e", "#26080d", "#7a1d2b"), "info": ("#13bcf5", "#071a22", "#1b5f78")}
 TILE_COLORS = ("#7f5af0", "#2cb67d", "#e45858", "#f2b84b", "#3da9fc", "#ef4565", "#00b8a9", "#c084fc")
-CARD_STYLE = ("QFrame#mmCard{background:#0c121a;border:1px solid #1e2b3a;border-radius:10px;}"
-              "QFrame#mmCard:hover{border-color:#3b5470;}")
+CARD_STYLE = ("QFrame#mmCard{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #121c27,stop:1 #0a1017);"
+              "border:1px solid #1c2836;border-radius:14px;}"
+              "QFrame#mmCard:hover{border-color:%s;}")
+LIST_STYLE = ("QListWidget#mmList{background:transparent;border:none;outline:0;}"
+              "QListWidget#mmList::item{background:#0d141c;border:1px solid #17212c;border-radius:12px;margin:3px 2px;}"
+              "QListWidget#mmList::item:hover{background:#111b26;border-color:#26364a;}"
+              "QListWidget#mmList::item:selected{background:#13202e;border-color:#ff2a4d;}")
+INPUT_STYLE = ("QLineEdit{background:#0d141c;border:1px solid #1c2836;border-radius:10px;padding:7px 10px;color:#e8eef5;"
+               "font-size:13px;} QLineEdit:focus{border-color:#ff2a4d;}"
+               "QComboBox{background:#0d141c;border:1px solid #1c2836;border-radius:10px;padding:6px 10px;color:#e8eef5;"
+               "font-size:13px;} QComboBox:hover{border-color:#2f4256;} QComboBox::drop-down{border:none;width:22px;}")
+TONE_HEX = {"good": "#32d67a", "warn": "#f6be24", "bad": "#ff5a6e", "info": "#13bcf5", "muted": "#8b98aa",
+            "accent": "#ff2a4d"}
+
+
+def pill(text, tone="muted"):
+    color = QColor(TONE_HEX[tone])
+    tag = QLabel(text)
+    tag.setStyleSheet(f"color:{TONE_HEX[tone]};background:rgba({color.red()},{color.green()},{color.blue()},38);"
+                      f"border:1px solid rgba({color.red()},{color.green()},{color.blue()},90);border-radius:10px;"
+                      "padding:2px 9px;font-size:11px;font-weight:700;")
+    return tag
+
+
+def glyph(symbol, tone, size=34):
+    from gg_desktop.reference_widgets import icon
+    color = QColor(TONE_HEX[tone])
+    box = QLabel()
+    box.setFixedSize(size, size)
+    box.setAlignment(Qt.AlignCenter)
+    box.setPixmap(icon(symbol, TONE_HEX[tone], int(size * .52)).pixmap(int(size * .52), int(size * .52)))
+    box.setStyleSheet(f"background:rgba({color.red()},{color.green()},{color.blue()},34);border-radius:{size // 2}px;")
+    return box
 
 
 def mode(window):
@@ -69,10 +100,7 @@ def tile(name: str, size=40, picture: QPixmap | None = None) -> QLabel:
 
 
 def note(text, tone="muted"):
-    color = {"muted": "#8b98aa", "good": "#32d67a", "warn": "#f6be24", "bad": "#ff5a6e", "info": "#13bcf5"}[tone]
-    tag = QLabel(text)
-    tag.setStyleSheet(f"color:{color};font-size:12px;")
-    return tag
+    return pill(text, tone)
 
 
 def when(ts):
@@ -85,25 +113,43 @@ def when(ts):
 
 
 class Card(QFrame):
-    def __init__(self, symbol_text, on_click):
+    def __init__(self, symbol_text, on_click, symbol="check", tone="good"):
         super().__init__()
         self.setObjectName("mmCard")
-        self.setStyleSheet(CARD_STYLE)
         self.setCursor(Qt.PointingHandCursor)
         self.on_click = on_click
-        lay = column(spacing=3, margins=(12, 10, 12, 10))
-        self.setLayout(lay)
+        outer = row(spacing=12, margins=(14, 12, 14, 12))
+        self.setLayout(outer)
+        self.badge_holder = column(spacing=0)
+        outer.addLayout(self.badge_holder)
+        lay = column(spacing=2)
+        outer.addLayout(lay, 1)
         self.head = label(symbol_text, "caption")
+        self.head.setStyleSheet("color:#7d8ea3;font-size:10px;font-weight:800;letter-spacing:1.4px;")
         self.big = label("", "readyDetail", wrap=True)
-        self.big.setStyleSheet("color:#f2f5f8;font-size:14px;font-weight:700;")
+        self.big.setStyleSheet("color:#f4f7fb;font-size:15px;font-weight:800;")
         self.small = label("", "caption", wrap=True)
+        self.small.setStyleSheet("color:#93a3b6;font-size:11px;")
         for w in (self.head, self.big, self.small):
             lay.addWidget(w)
-        self.setMinimumHeight(86)
+        self.setMinimumHeight(88)
+        self.symbol, self.tone = symbol, tone
+        self._badge = None
+        self.set_tone(symbol, tone)
 
-    def set(self, big, small):
+    def set_tone(self, symbol, tone):
+        self.symbol, self.tone = symbol, tone
+        if self._badge is not None:
+            self._badge.deleteLater()
+        self._badge = glyph(symbol, tone, 38)
+        self.badge_holder.addWidget(self._badge, 0, Qt.AlignTop)
+        self.setStyleSheet(CARD_STYLE % TONE_HEX[tone])
+
+    def set(self, big, small, tone=None, symbol=None):
         self.big.setText(big)
         self.small.setText(small)
+        if tone is not None and (tone != self.tone or (symbol and symbol != self.symbol)):
+            self.set_tone(symbol or self.symbol, tone)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and self.on_click:
@@ -127,14 +173,16 @@ class MyModsView(QWidget):
         lay = column(spacing=10)
         self.setLayout(lay)
 
-        head = row(spacing=10)
+        self.setStyleSheet(INPUT_STYLE)
+        head = row(spacing=14)
         self.game_tile = QLabel()
-        self.game_tile.setFixedSize(48, 48)
+        self.game_tile.setFixedSize(112, 52)
         head.addWidget(self.game_tile)
         names = column(spacing=2)
         self.title = label("Your mods", "referenceTitle")
-        self.title.setStyleSheet("font-size:22px;font-weight:800;")
+        self.title.setStyleSheet("font-size:24px;font-weight:800;color:#ffffff;")
         self.subtitle = label("", "caption")
+        self.subtitle.setStyleSheet("color:#93a3b6;font-size:12px;")
         names.addWidget(self.title)
         names.addWidget(self.subtitle)
         head.addLayout(names, 1)
@@ -156,8 +204,11 @@ class MyModsView(QWidget):
 
         self.banner = QFrame()
         self.banner.setObjectName("mmBanner")
-        banner_lay = row(spacing=10, margins=(12, 8, 12, 8))
+        banner_lay = row(spacing=12, margins=(14, 10, 14, 10))
         self.banner.setLayout(banner_lay)
+        self.banner_icon = QLabel()
+        self.banner_icon.setFixedSize(22, 22)
+        banner_lay.addWidget(self.banner_icon)
         self.banner_text = label("", "readyDetail", wrap=True)
         banner_lay.addWidget(self.banner_text, 1)
         self.fix_button = button("Show what needs you", self.show_problems, kind="primary")
@@ -165,23 +216,27 @@ class MyModsView(QWidget):
         lay.addWidget(self.banner)
 
         cards = row(spacing=10)
-        self.health = Card("HEALTH", self.show_problems)
-        self.updates = Card("UPDATES", lambda: self.set_filter("update"))
-        self.clashes = Card("CLASHES", lambda: self.set_filter("clash"))
+        self.health = Card("HEALTH", self.show_problems, "shield", "good")
+        self.updates = Card("UPDATES", lambda: self.set_filter("update"), "download", "info")
+        self.clashes = Card("CLASHES", lambda: self.set_filter("clash"), "warning", "muted")
         for c in (self.health, self.updates, self.clashes):
             cards.addWidget(c, 1)
         lay.addLayout(cards)
 
         self.problem_box = QFrame()
         self.problem_box.setObjectName("mmProblems")
-        self.problem_box.setStyleSheet("QFrame#mmProblems{background:#0b1016;border:1px solid #2a3442;border-radius:10px;}")
-        self.problem_lay = column(spacing=6, margins=(12, 10, 12, 10))
+        self.problem_box.setStyleSheet("QFrame#mmProblems{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #1a0c11,"
+                                       "stop:1 #0d1219);border:1px solid #5a1f2c;border-radius:14px;}")
+        self.problem_lay = column(spacing=8, margins=(16, 12, 16, 12))
         self.problem_box.setLayout(self.problem_lay)
         self.problem_box.hide()
         lay.addWidget(self.problem_box)
 
         tools = row(spacing=8)
         self.search = QLineEdit()
+        from gg_desktop.reference_widgets import icon as _icon
+        from PySide6.QtWidgets import QLineEdit as _QLE
+        self.search.addAction(_icon("search", "#7d8ea3", 16), _QLE.LeadingPosition)
         self.search.setPlaceholderText("Search your mods")
         self.search.setAccessibleName("Search your mods")
         self.search.textChanged.connect(lambda *_: self.fill())
@@ -200,16 +255,66 @@ class MyModsView(QWidget):
         self.list = QListWidget()
         self.list.setObjectName("mmList")
         self.list.setAccessibleName("Your mods")
-        self.list.setStyleSheet("QListWidget#mmList{background:#080c11;border:1px solid #1e2b3a;border-radius:10px;}"
-                                "QListWidget#mmList::item{border-bottom:1px solid #141c26;}"
-                                "QListWidget#mmList::item:selected{background:#122030;}")
+        self.list.setStyleSheet(LIST_STYLE)
         self.list.setSpacing(0)
         self.list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.list.model().rowsMoved.connect(self.dropped)
         lay.addWidget(self.list, 1)
         self.hint = label("", "caption", wrap=True)
+        self.hint.setStyleSheet("color:#6f8095;font-size:11px;")
         lay.addWidget(self.hint)
         self.load_sources()
+
+    # -------------------------------------------------------------- game picture
+    def set_game_art(self, name, key=""):
+        """The game's own library artwork when Game Grave has it, else a tile with its initials."""
+        art = getattr(self.window_owner, "artwork", None)
+        picture = None
+        if art is not None and key and not getattr(self.window_owner, "reference_preview", False):
+            try:
+                picture = art.pixmap(key)
+            except Exception:
+                picture = None
+        w, h = self.game_tile.width(), self.game_tile.height()
+        if picture is not None and not picture.isNull():
+            from gg_desktop.reference_widgets import _cover_fit
+            self.game_tile.setPixmap(_cover_fit(picture, w, h, max(1.0, round(self.devicePixelRatioF(), 2))))
+            self.game_tile.setStyleSheet("border:1px solid #2a3a4c;border-radius:10px;")
+            return
+        pix = QPixmap(w, h)
+        pix.fill(Qt.transparent)
+        p = QPainter(pix)
+        p.setRenderHint(QPainter.Antialiasing)
+        base = QColor(TILE_COLORS[int(hashlib.md5(name.encode("utf-8")).hexdigest(), 16) % len(TILE_COLORS)])
+        from PySide6.QtGui import QLinearGradient
+        grad = QLinearGradient(0, 0, w, h)
+        grad.setColorAt(0, base)
+        grad.setColorAt(1, base.darker(260))
+        p.setBrush(grad)
+        p.setPen(Qt.NoPen)
+        p.drawRoundedRect(0, 0, w, h, 10, 10)
+        words = [x for x in name.replace(":", " ").split() if x[:1].isalnum()]
+        p.setPen(QColor("#ffffff"))
+        font = p.font()
+        font.setBold(True)
+        font.setPixelSize(22)
+        p.setFont(font)
+        p.drawText(pix.rect(), Qt.AlignCenter, "".join(x[0] for x in words[:3]).upper())
+        p.end()
+        self.game_tile.setPixmap(pix)
+        self.game_tile.setStyleSheet("")
+
+    def game_key(self, name="", path=None, app_id=""):
+        games = getattr(getattr(self.window_owner, "inventory", None), "games", ()) or ()
+        for g in games:
+            if app_id and str(getattr(g, "app_id", "")) == str(app_id):
+                return g.key
+            if path and getattr(g, "install_path", "") and str(path).casefold().rstrip("\\/") == str(g.install_path).casefold().rstrip("\\/"):
+                return g.key
+        for g in games:
+            if name and g.name.casefold() == name.casefold():
+                return g.key
+        return ""
 
     # -------------------------------------------------------------- sources
     def load_sources(self):
@@ -313,7 +418,7 @@ class MyModsView(QWidget):
         mods = [m for m in prof.mods if m.kind == "mod"]
         on = sum(m.enabled for m in mods)
         self.title.setText(inst.game)
-        self.game_tile.setPixmap(tile(inst.game, 48).pixmap())
+        self.set_game_art(inst.game, self.game_key(inst.game, inst.game_path))
         self.subtitle.setText(f"{len(mods)} mods, {on} turned on · Mod Organizer 2 · profile \"{prof.name}\"")
         sentence, tone = doctor.status_line(rep)
         self.set_banner(sentence, tone)
@@ -321,14 +426,18 @@ class MyModsView(QWidget):
         problems = rep.problems
         self.health.set(("Everything looks good" if not problems else
                          f"{len(problems)} problem{'s' if len(problems) != 1 else ''} to fix"),
-                        problems[0].title if problems else f"Checked {rep.checked_plugins} plugins and every mod folder.")
+                        problems[0].title if problems else f"Checked {rep.checked_plugins} plugins and every mod folder.",
+                        "bad" if problems else "good", "shield")
         ups = rep.updates
         self.updates.set((f"{len(ups)} update{'s' if len(ups) != 1 else ''} ready" if ups else "Nothing to update"),
-                         "Click to see them" if ups else "Mod Organizer 2 checks Nexus for these.")
+                         "Click to see them" if ups else "Mod Organizer 2 checks Nexus for these.",
+                         "warn" if ups else "good", "download")
         cl = rep.clashes
+        self.clashes.head.setText("CLASHES")
         self.clashes.set((f"{len(cl)} pair{'s' if len(cl) != 1 else ''} change the same files" if cl else "No clashes"),
                          (f"{cl[0][0]} wins over {cl[0][1]}" if cl else "No two switched-on mods change the same file.")
-                         + (" (big setup: checked the first 400,000 files)" if rep.clash_limited else ""))
+                         + (" (big setup: checked the first 400,000 files)" if rep.clash_limited else ""),
+                         "warn" if cl else "good", "warning" if cl else "check")
         self.undo_button.setVisible(True)
         self.undo_button.setEnabled(bool(mc.snapshots(prof.folder)))
         self.list.setDragDropMode(QAbstractItemView.InternalMove)
@@ -343,17 +452,18 @@ class MyModsView(QWidget):
     def mo2_row(self, mod):
         rep = self.report
         frame = QWidget()
-        lay = row(spacing=10, margins=(10, 6, 10, 6))
+        frame.setAttribute(Qt.WA_TranslucentBackground)
+        lay = row(spacing=12, margins=(14, 8, 14, 8))
         frame.setLayout(lay)
         if mod.kind == "separator":
             text = label(mod.label.upper(), "caption")
-            text.setStyleSheet("color:#8fa6c0;font-weight:800;letter-spacing:1px;")
+            text.setStyleSheet("color:#8fa6c0;font-size:10px;font-weight:800;letter-spacing:1.6px;")
             lay.addWidget(text, 1)
             return frame
-        lay.addWidget(tile(mod.name, 34), 0, Qt.AlignVCenter)
-        words = column(spacing=1)
+        lay.addWidget(tile(mod.name, 40), 0, Qt.AlignVCenter)
+        words = column(spacing=2)
         name = label(mod.name, "readyDetail")
-        name.setStyleSheet("color:#f2f5f8;font-size:13px;font-weight:700;")
+        name.setStyleSheet("color:#f4f7fb;font-size:14px;font-weight:700;")
         words.addWidget(name)
         bits = []
         if mod.kind == "base":
@@ -365,7 +475,9 @@ class MyModsView(QWidget):
                 bits.append(f"{len(mod.plugins)} plugin{'s' if len(mod.plugins) != 1 else ''}")
             if mod.nexus_id:
                 bits.append("from Nexus")
-        words.addWidget(label(" · ".join(bits), "caption"))
+        sub = label(" · ".join(bits), "caption")
+        sub.setStyleSheet("color:#8394a8;font-size:11px;")
+        words.addWidget(sub)
         lay.addLayout(words, 1)
         problem = next((f for f in rep.problems if mod.name in f.mods), None) if rep else None
         if problem is not None:
@@ -386,7 +498,7 @@ class MyModsView(QWidget):
     def load_workshop(self, app_id, libraries, text):
         game = text.split(" · ")[0]
         self.title.setText(game)
-        self.game_tile.setPixmap(tile(game, 48).pixmap())
+        self.set_game_art(game, self.game_key(game, app_id=app_id))
         self.undo_button.hide()
         self.list.setDragDropMode(QAbstractItemView.NoDragDrop)
         items = ws.local_items(libraries, app_id)
@@ -434,11 +546,14 @@ class MyModsView(QWidget):
             self.set_banner(f"All {len(items)} Workshop items are up to date with Steam.", "good")
         self.fix_button.hide()
         self.health.set(f"{len(removed)} removed from the Workshop" if removed else "All still on the Workshop",
-                        "Steam can't update items that were taken down." if removed else "Every item is still listed.")
+                        "Steam can't update items that were taken down." if removed else "Every item is still listed.",
+                        "bad" if removed else "good", "shield")
         self.updates.set(f"{len(waiting)} newer on Steam" if waiting else "Up to date",
-                         "Click to see them" if waiting else "Steam updates items when it can.")
+                         "Click to see them" if waiting else "Steam updates items when it can.",
+                         "warn" if waiting else "good", "download")
         biggest = max(items, key=lambda i: i.size, default=None)
-        self.clashes.set(f"Biggest: {biggest.name}" if biggest else "No items", human_size(biggest.size) if biggest else "")
+        self.clashes.set(f"Biggest: {biggest.name}" if biggest else "No items", human_size(biggest.size) if biggest else "",
+                         "info", "storage")
         self.clashes.head.setText("SPACE")
         self.hint.setText("Subscribe and unsubscribe on each item's Steam page (Open in Steam). Game Grave doesn't delete "
                           "Workshop folders: Steam would just download them again.")
@@ -446,12 +561,13 @@ class MyModsView(QWidget):
 
     def ws_row(self, item):
         frame = QWidget()
-        lay = row(spacing=10, margins=(10, 6, 10, 6))
+        frame.setAttribute(Qt.WA_TranslucentBackground)
+        lay = row(spacing=12, margins=(14, 8, 14, 8))
         frame.setLayout(lay)
-        lay.addWidget(tile(item.name, 40, self._previews.get(item.item_id)), 0, Qt.AlignVCenter)
-        words = column(spacing=1)
+        lay.addWidget(tile(item.name, 46, self._previews.get(item.item_id)), 0, Qt.AlignVCenter)
+        words = column(spacing=2)
         name = label(item.name, "readyDetail")
-        name.setStyleSheet("color:#f2f5f8;font-size:13px;font-weight:700;")
+        name.setStyleSheet("color:#f4f7fb;font-size:14px;font-weight:700;")
         name.setToolTip(item.description or item.name)
         words.addWidget(name)
         bits = [human_size(item.size) if item.size else ""]
@@ -460,7 +576,9 @@ class MyModsView(QWidget):
         if item.tags:
             bits.append(", ".join(item.tags[:3]))
         bits.append(f"#{item.item_id}")
-        words.addWidget(label(" · ".join(b for b in bits if b), "caption"))
+        sub = label(" · ".join(b for b in bits if b), "caption")
+        sub.setStyleSheet("color:#8394a8;font-size:11px;")
+        words.addWidget(sub)
         lay.addLayout(words, 1)
         if item.removed:
             lay.addWidget(note("No longer on the Workshop", "bad"))
@@ -539,7 +657,7 @@ class MyModsView(QWidget):
         for entry in rows[:3000]:
             item = QListWidgetItem()
             widget = self.mo2_row(entry) if self.instance is not None else self.ws_row(entry)
-            item.setSizeHint(QSize(10, 34 if getattr(entry, "kind", "") == "separator" else 56))
+            item.setSizeHint(QSize(10, 34 if getattr(entry, "kind", "") == "separator" else 64))
             item.setData(Qt.UserRole, getattr(entry, "name", ""))
             self.list.addItem(item)
             self.list.setItemWidget(item, widget)
@@ -661,10 +779,14 @@ class MyModsView(QWidget):
 
     # -------------------------------------------------------------- banner
     def set_banner(self, text, tone):
+        from gg_desktop.reference_widgets import icon
         color, back, edge = TONES[tone]
-        self.banner.setStyleSheet(f"QFrame#mmBanner{{background:{back};border:1px solid {edge};border-radius:8px;}}")
+        self.banner.setStyleSheet(f"QFrame#mmBanner{{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 {back},"
+                                  f"stop:1 #0b1016);border:1px solid {edge};border-radius:14px;}}")
+        symbol = {"good": "check", "warn": "warning", "bad": "warning", "info": "sparkles"}[tone]
+        self.banner_icon.setPixmap(icon(symbol, color, 20).pixmap(20, 20))
         self.banner_text.setText(text)
-        self.banner_text.setStyleSheet(f"color:{color};font-size:13px;font-weight:700;")
+        self.banner_text.setStyleSheet(f"color:{color};font-size:14px;font-weight:800;")
 
 
 def _short(finding):

@@ -545,3 +545,20 @@ shows it); the detailed-view smokes open Advanced.
   marked. Open in Steam goes to the item page (unsubscribe there); Game Grave never deletes Workshop folders.
 - Covered by `tests/test_mymods.py` and `tools/mymods_smoke.py` (fix button, Undo, a switch, reorder, refusal while MO2 runs,
   Workshop names, Advanced and back).
+
+- Look (owner, 2026-11-11: "Make it sleeker looking and more modern and appealing to the eye"): the game's own library artwork
+  (or a gradient tile) in the header, larger type, rounded inputs with a search icon, a status bar with an icon, cards with a
+  coloured icon badge whose colour follows the status, each mod as its own rounded card row with hover, and pill badges. Same
+  facts and controls; nothing new is claimed.
+
+Banner art, third version (owner instruction, 2026-11-11: "the banner art needs changing too. I want it still hd quality abstract
+but keep it computer and video games themed instead of just random shapes"). Every tab's header picture is replaced
+(`tools/make_banner_art.py`, `gg_desktop/assets/brand/banner_*.jpg`, still 6000x500). Each tab gets a cluster of recognisable
+gaming and PC objects as glowing neon line art (Overview: monitor, controller, WASD keys, pixel hearts; Ready Room: arcade joystick,
+controller, crosshair, trophy; Games: cartridges, disc, controller; Mods: puzzle pieces, wrench, cube; Old Files: floppies, folder;
+Other Storage: hard drive, SSDs; Captures: camera, film strip; Graveyard: tombstones, empty pixel hearts; Game DNA: pixel helix,
+chip; Hardware: graphics card, CPU, RAM; Undo Center: rewind, cassette, clock; Settings: gears, sliders, toggle; AI Assistant: chat
+bubbles, neural network, chip; More Tools: wrench, keyboard, screwdriver, mouse, headset) over a retro perspective grid floor
+mirrored into a ceiling, pixel particles and circuit traces. Objects sit in the right two thirds and the middle band, the left stays
+calm behind the title. No characters, logos, brand marks or words (the WASD keycaps are the only letters). Only the picture files
+changed.
