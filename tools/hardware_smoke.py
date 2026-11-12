@@ -312,7 +312,9 @@ def main():
                 assert "1 device with a problem" in tab.driver_banner.text() and not tab.driver_bar.isVisible()
                 assert "newer graphics driver from NVIDIA (566.36)" in tab.driver_banner.text(), tab.driver_banner.text()
                 assert any(t.startswith("Newer: 566.36") for t in texts(window)), "the graphics card row shows the newer driver"
-                assert any(t.startswith("Get it: NVIDIA App") for t in texts(window))
+                from PySide6.QtWidgets import QPushButton
+                assert any(b.text().startswith("Get it: NVIDIA App") for b in tab.findChildren(QPushButton)), \
+                    [b.text() for b in tab.findChildren(QPushButton)]
                 assert any("Unknown USB Device" in t for t in texts(window)) and any("no driver installed" in t for t in texts(window))
                 assert window.grab().save(str(args.output / "hardware-drivers-startup-1366.png"))
                 with patch.object(window, "confirm", return_value=False):

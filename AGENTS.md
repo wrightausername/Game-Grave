@@ -501,8 +501,9 @@ Graphics drivers from the maker, and firmware (owner instruction, 2026-11-11: "Y
 checking NVIDIA's, AMD's and Intel's latest graphics drivers). Hardware's Drivers & Startup tab only (`gg_desktop/upkeep_vendor.py`):
 - On Check (never automatically): NVIDIA's own driver lookup (the card's product IDs from NVIDIA's product list, then the newest
   WHQL Game Ready DCH driver for Windows 10/11 64-bit) compared with the installed driver in NVIDIA's form (32.0.15.6094 = 560.94);
-  AMD's version file that AMD Software: Adrenalin itself reads (drivers.amd.com, https), compared by Windows driver-store version
-  when the file gives it, otherwise shown without a verdict; Intel publishes no readable version, so its installed version and
+  AMD's version file that AMD Software: Adrenalin itself reads (drivers.amd.com, https): its newest WHQL entry gives an internal
+  version and a build date ("26.20.15.07-261015a-..."), which can't be matched to Windows' driver number, so AMD is compared by
+  date (newer when AMD's build is more than 14 days after the installed driver's date; no verdict without a date); Intel publishes no readable version, so its installed version and
   date are shown with Intel's assistant linked. Hosts allowed: gfwsl.geforce.com, nvidia.com, drivers.amd.com. When a maker's
   answer can't be read the row says so; a driver is never called outdated on a guess. Game Grave downloads no graphics driver:
   "Get it" opens the maker's own app page.

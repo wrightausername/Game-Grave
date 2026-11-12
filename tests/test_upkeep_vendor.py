@@ -75,7 +75,24 @@ class Nvidia(unittest.TestCase):
             v._get("https://example.com/x")
 
 
+AMD_REAL = json.dumps({"ADDL_VERSION": "1.0 Consumer_beta_Win10_productionASICs", "DLL_URL": "NA",
+                       "Consumer_Whql_Win10": {"version": "26.20.15.07-261015a-205306C-AMD-Software-Adrenalin-Edition",
+                                               "url": "https://www2.ati.com/x.json"},
+                       "Consumer_Beta_Win10": {"version": "26.20.15.12-261023a1-205499C-AMD-Software-Adrenalin-Edition"}})
+
+
 class Amd(unittest.TestCase):
+    def test_real_file_layout_compares_build_dates(self):
+        self.assertEqual(v.parse_amd_whql(AMD_REAL), ("26.20.15.07", "2026-10-15"))
+        old = v.check_graphics("AMD Radeon RX 7800 XT", "32.0.21045.5002", "2026-05-01", opener({"drivers.amd.com": AMD_REAL}))
+        self.assertTrue(old.outdated)
+        self.assertIn("built 2026-10-15", old.summary)
+        same = v.check_graphics("AMD Radeon RX 7800 XT", "32.0.32015.7001", "2026-10-10", opener({"drivers.amd.com": AMD_REAL}))
+        self.assertFalse(same.outdated)
+        undated = v.check_graphics("AMD Radeon RX 7800 XT", "32.0.32015.7001", "", opener({"drivers.amd.com": AMD_REAL}))
+        self.assertIsNone(undated.outdated)
+        self.assertIn("26.20.15.07", undated.note)
+
     def test_version_file_with_store_version(self):
         text = json.dumps({"releases": [{"version": "24.12.1", "driverStoreVersion": "32.0.12033.1030"},
                                         {"version": "25.1.1", "driverStoreVersion": "32.0.13031.3015"}]})

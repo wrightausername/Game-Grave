@@ -30,6 +30,7 @@ NVIDIA_LOOKUP = ("https://gfwsl.geforce.com/services_toolkit/services/com/nvidia
                  "?func=DriverManualLookup&psid={psid}&pfid={pfid}&osID=57&languageCode=1033&beta=0&isWHQL=1"
                  "&dltype=-1&dch=1&upCRD=0&qnf=0&sort1=0&numberOfResults=1")
 AMD_VERSION = "https://drivers.amd.com/drivers/installer/json/version.json"
+AMD_DATE_SLACK = 14   # days: an installed driver dated within two weeks of AMD's build is the same release
 PAGES = {"NVIDIA": ("NVIDIA App", "https://www.nvidia.com/en-us/software/nvidia-app/"),
          "AMD": ("AMD Software: Adrenalin", "https://www.amd.com/en/support/download/drivers.html"),
          "Intel": ("Intel Driver & Support Assistant", "https://www.intel.com/content/www/us/en/support/detect.html")}
@@ -82,16 +83,30 @@ class GraphicsCheck:
     latest_name: str = ""
     page: str = ""
     note: str = ""
+    by_date: bool = False   # AMD: its numbers don't match Windows', so compare build dates instead
 
     @property
     def outdated(self):
-        return newer(self.latest, self.installed) if self.latest else None
+        if not self.latest:
+            return None
+        if self.by_date:
+            try:
+                gap = (date.fromisoformat(self.latest_date) - date.fromisoformat(self.installed_date)).days
+            except ValueError:
+                return None
+            return gap > AMD_DATE_SLACK
+        return newer(self.latest, self.installed)
 
     @property
     def summary(self):
+        if self.latest and self.outdated and self.by_date:
+            return (f"AMD's newest WHQL driver ({self.latest}) was built {self.latest_date}; yours is dated "
+                    f"{self.installed_date}.")
         if self.latest and self.outdated:
             return (f"{self.maker} has a newer driver: {self.latest}" + (f" ({self.latest_date})" if self.latest_date else "")
                     + f". You have {self.installed}.")
+        if self.latest and self.outdated is False and self.by_date:
+            return f"Up to date: your AMD driver matches AMD's newest WHQL build ({self.latest_date})."
         if self.latest and self.outdated is False:
             return f"Up to date: {self.installed} is {self.maker}'s newest driver."
         return self.note or f"Installed: {self.installed or 'unknown'}" + (f" ({self.installed_date})" if self.installed_date else "")
@@ -175,6 +190,24 @@ def _date(text):
     return ""
 
 
+def parse_amd_whql(text: str):
+    """AMD's newest WHQL (recommended) driver from the version file Adrenalin reads: (internal version, build date).
+    The entry looks like "26.20.15.07-261015a-205306C-AMD-Software-Adrenalin-Edition"; 261015 is the build date."""
+    data = json.loads(text)
+    entry = next((v for k, v in data.items() if isinstance(v, dict) and k.casefold().startswith("consumer_whql")), None)
+    if not entry:
+        raise VendorError("AMD's version file has no WHQL entry")
+    raw = str(entry.get("version") or "")
+    m = re.match(r"(\d+\.\d+\.\d+\.\d+)-(\d{2})(\d{2})(\d{2})", raw)
+    if not m:
+        raise VendorError("AMD's WHQL entry has no version Game Grave recognises")
+    try:
+        built = date(2000 + int(m.group(2)), int(m.group(3)), int(m.group(4))).isoformat()
+    except ValueError:
+        built = ""
+    return m.group(1), built
+
+
 def parse_amd(text: str):
     """The newest Adrenalin release in AMD's version file: (public version, Windows driver store version or '')."""
     data = json.loads(text)
@@ -213,7 +246,22 @@ def check_graphics(card: str, windows_version: str, driver_date: str, opener=Non
                                  note=f"Couldn't read NVIDIA's newest version ({problem}). You have {installed}.")
     if maker == "AMD":
         try:
-            public, store = parse_amd(_get(AMD_VERSION, opener))
+            raw = _get(AMD_VERSION, opener)
+        except VendorError as problem:
+            return GraphicsCheck(card, maker, windows_version, driver_date, page=page,
+                                 note=f"Couldn't read AMD's newest version ({problem}). You have driver {windows_version}.")
+        try:
+            internal, built = parse_amd_whql(raw)
+            if built and driver_date:
+                return GraphicsCheck(card, maker, windows_version, driver_date, internal, built, "AMD WHQL driver", page,
+                                     by_date=True)
+            return GraphicsCheck(card, maker, windows_version, driver_date, page=page,
+                                 note=f"AMD's newest WHQL driver is {internal}" + (f", built {built}" if built else "")
+                                      + f". Your driver ({windows_version}) has no date to compare; AMD Software can check.")
+        except (VendorError, ValueError):
+            pass
+        try:
+            public, store = parse_amd(raw)
         except (VendorError, ValueError) as problem:
             return GraphicsCheck(card, maker, windows_version, driver_date, page=page,
                                  note=f"Couldn't read AMD's newest version ({problem}). You have driver {windows_version}.")
