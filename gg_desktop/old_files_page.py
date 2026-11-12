@@ -272,6 +272,8 @@ def build(window):
     self.old_search.textChanged.connect(self._fill_old_files)
     self.old_table.itemSelectionChanged.connect(self._old_details)
     self.old_table.itemChanged.connect(self._old_selection_count)
+    from gg_desktop import old_files_select
+    old_files_select.install(self)
     control.state.changed.connect(lambda: self._photo_old_changed(page) if isValid(page) and self.page is page else None)
     self._photo_old_changed(page)
     page.photo_inspector = ResponsiveInspector(page, self.old_details.parentWidget().parentWidget())
@@ -511,7 +513,8 @@ def selection_count(window):
     selected = selected_files(window)
     rows = len(_checked(window.old_table))
     size = human_size(sum(f.size for f in selected))
-    window.old_selection.setText(f"{rows} selected ({size})" if window._old_view == "files" or not rows else
+    window.old_selection.setText("0 selected · double-click a file to tick it, Shift+click for a range" if not rows else
+                                 f"{rows} selected ({size})" if window._old_view == "files" else
                                  f"{rows} folders, {len(selected):,} files ({size})")
     with QSignalBlocker(window.old_select_all):
         window.old_select_all.setChecked(bool(window.old_table.rowCount()) and rows == window.old_table.rowCount())

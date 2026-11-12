@@ -513,3 +513,9 @@ checking NVIDIA's, AMD's and Intel's latest graphics drivers). Hardware's Driver
   Windows Update offers are marked "Firmware" in the update list. Game Grave never updates a BIOS.
 - The drivers column now scrolls so the extra sections fit. Covered by `tests/test_upkeep_vendor.py`, the hardware smoke, and
   `tools/upkeep_real_check.py`, which reads the real firmware and asks NVIDIA's and AMD's live services.
+
+Old Files ticking (owner instruction, 2026-11-11: "when double clicking something in old files it should be auto selected...
+along with easy multiple selecting stuff with shift and click"). Old Files is reopened for this only (`gg_desktop/old_files_select.py`):
+double-click a row to tick or untick it, Shift+click ticks every row from the last clicked one, Ctrl+click flips one row. The
+footer says so when nothing is ticked. Ticking only marks rows for the existing buttons; removal is unchanged (Recycle Bin only
+after confirmation and re-checks). Covered by the Old Files smoke.

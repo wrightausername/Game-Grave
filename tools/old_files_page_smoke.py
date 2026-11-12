@@ -212,6 +212,35 @@ def main():
             settle()
             assert window._shown_old_files and not window._shown_old_groups
 
+            # Easy ticking: double-click ticks a file, Shift+click ticks the range, Ctrl+click flips one.
+            from PySide6.QtTest import QTest
+            table = window.old_table
+            assert table.rowCount() >= 3
+            assert "double-click" in window.old_selection.text(), window.old_selection.text()
+
+            def at(row):
+                return table.visualRect(table.model().index(row, 1)).center()
+
+            def ticked():
+                return [r for r in range(table.rowCount()) if table.item(r, 0).checkState() == Qt.Checked]
+            QTest.mouseDClick(table.viewport(), Qt.LeftButton, Qt.NoModifier, at(0))
+            settle()
+            assert ticked() == [0], ticked()
+            QTest.mouseClick(table.viewport(), Qt.LeftButton, Qt.ShiftModifier, at(2))
+            settle()
+            assert ticked() == [0, 1, 2], ticked()
+            assert window.old_selection.text().startswith("3 selected"), window.old_selection.text()
+            QTest.mouseClick(table.viewport(), Qt.LeftButton, Qt.ControlModifier, at(1))
+            settle()
+            assert ticked() == [0, 2], ticked()
+            QTest.mouseDClick(table.viewport(), Qt.LeftButton, Qt.NoModifier, at(0))
+            settle()
+            assert ticked() == [2], ticked()
+            window.old_select_all.setChecked(True)
+            window.old_select_all.setChecked(False)
+            settle()
+            assert not ticked()
+
             # Selection, Graveyard review, Protect: nothing moves.
             window.old_table.item(names(window).index("notes.dat"), 0).setCheckState(Qt.Checked)
             settle()
