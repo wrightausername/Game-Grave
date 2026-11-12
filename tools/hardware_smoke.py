@@ -302,8 +302,10 @@ def main():
                              "the driver install")
                 assert uid in elevated[0] and not window.cleaning
                 assert len(steps_seen) == 2, "install steps reach the screen"
+                wait_for(lambda: tab.check_button.isEnabled() and not tab.driver_bar.isVisible(), "the re-check")
                 settle(60)
                 assert tab.driver_banner.isVisible() and tab.driver_banner.text().startswith("Done:"), tab.driver_banner.text()
+                assert "Checked again:" in tab.driver_banner.text(), tab.driver_banner.text()
                 assert "Restart Windows to finish" in tab.driver_banner.text() and not tab.driver_bar.isVisible()
                 assert tab.restart_button.isVisible(), "a driver that needs a restart offers Restart now"
                 with patch("gg_desktop.upkeep_core.restart_pc") as restart, patch.object(window, "confirm", return_value=True):

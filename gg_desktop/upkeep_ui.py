@@ -53,6 +53,7 @@ class UpkeepTab(QWidget):
         self.window_owner = window
         self.gpu_names = tuple(gpu_names)
         self.updates, self.update_checks, self.problems = [], {}, []
+        self.install_banner = None
         self.last_install = ""
         self.apps, self.loaded = [], False
         outer = row(spacing=10)
@@ -263,6 +264,8 @@ class UpkeepTab(QWidget):
             self.idle()
             self.check_button.setEnabled(True)
             self.updates, problems, problem = result
+            installed = getattr(self, "install_banner", None)
+            self.install_banner = None
             self.show_problems(problems)
             if problem:
                 self.driver_status.setText("Windows Update did not answer: " + problem)
@@ -272,7 +275,12 @@ class UpkeepTab(QWidget):
             found = len(self.updates)
             words = (f"Check complete: {found} driver update{'s' if found != 1 else ''} from Windows Update"
                      + (f", {len(problems)} device{'s' if len(problems) != 1 else ''} with a problem." if problems else "."))
-            self.banner(words, "warn" if (found or problems) else "good")
+            if installed:   # keep the install result on screen; the fresh check goes under it
+                text, tone = installed
+                left = f"{found} driver update{'s' if found != 1 else ''} still offered" if found else "nothing else offered"
+                self.banner(f"{text}\nChecked again: {left}.", tone)
+            else:
+                self.banner(words, "warn" if (found or problems) else "good")
         self.window_owner.job(work, done, error_title="Driver check did not finish")
 
     def show_updates(self):
@@ -356,8 +364,9 @@ class UpkeepTab(QWidget):
             self.driver_status.setText(words)
             failed = any(w in words.casefold() for w in ("failed", "error", "not ", "declined", "did not"))
             tone = "good" if ok and not failed and not reboot else ("warn" if ok else "bad")
-            self.banner(("Done: " if ok else "Not finished: ") + words + (" Restart Windows to finish." if reboot else ""),
-                        tone)
+            text = ("Done: " if ok else "Not finished: ") + words + (" Restart Windows to finish." if reboot else "")
+            self.banner(text, tone)
+            self.install_banner = (text, tone) if ok else None
             self.restart_button.setVisible(bool(reboot))
             log_event("driver_update", f"Driver updates through Windows Update: {words}",
                       result="installed" if ok else "not installed", source="hardware")
