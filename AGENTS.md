@@ -474,3 +474,21 @@ replaced by a "Local AI" panel; the rest of the tab is unchanged.
   now sits at the top of the right column, above Data Used, and an empty chat shows a large "Get smarter answers with Local AI"
   card (pick Small / Medium / Large, Download Local AI, Not now) until a model is downloaded or the owner presses Not now
   (`local_ai_card_hidden`). The card uses the same confirmed, verified download as the panel.
+- Download feedback (owner, 2026-11-11: "the bar just goes to all the way complete then closes then nothing else happens"): a
+  finished download now shows a "Local AI is ready" message; a failed one shows a message with the exact reason, keeps it in the
+  panel and logs it. The first question shows a thinking line while the model loads. The Large size now comes from Qwen's own
+  `Qwen/Qwen3-8B-GGUF` (ggml-org's 8B repo has no single Q4_K_M file); the real CI check resolves all three sizes.
+
+Drivers, wider detection and progress (owner instruction, 2026-11-11: "it only detected one that needs updating yet on the app
+driver easy it says there is 28 ... when something is downloading or updating there needs to be some kind of status bar").
+Hardware's Drivers & Startup tab only:
+- The driver search asks three ways and merges by update ID: the PC's default update source, Windows Update online directly
+  (ServerSelection 2) and the Microsoft Update service (ServerSelection 3, its ServiceID) when it is registered. Nothing is
+  registered or changed to do so.
+- Devices Windows reports a problem with (Device Manager's yellow mark, Win32_PnPEntity ConfigManagerErrorCode, not disabled or
+  disconnected ones) are listed with the code in plain words and an Open Device Manager link. Read only.
+- The tab says why tools with their own driver databases (Driver Easy) list more; Game Grave still installs only what Windows
+  Update offers and links the graphics maker's app.
+- Progress: checking shows a moving bar with elapsed time; installing goes one update at a time in the elevated script, which
+  writes each step to a progress file that the app reads every second ("Downloading 2 of 5: ...", "Installing 2 of 5: ...").
+  A result banner stays on screen afterwards (green done, amber restart needed or something to review, red not finished).

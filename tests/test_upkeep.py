@@ -161,3 +161,33 @@ class StoreAppsAndTasks(unittest.TestCase):
     def test_install_criteria_can_be_chosen(self):
         self.assertIn("Type='Software'", up.install_script([ID], "__RESULT__", criteria="IsInstalled=0 and Type='Software'"))
         self.assertIn("Type='Driver'", up.install_script([ID], "__RESULT__"))
+
+
+class WiderChecksAndProgress(unittest.TestCase):
+    def test_search_asks_three_ways_and_merges(self):
+        from gg_desktop import upkeep_core as up
+        self.assertIn("ServerSelection", up.UPDATES_SCRIPT)
+        self.assertIn(up.MICROSOFT_UPDATE, up.UPDATES_SCRIPT)
+        self.assertIn("$seen[$id]", up.UPDATES_SCRIPT)
+
+    def test_device_problems(self):
+        from gg_desktop import upkeep_core as up
+        found = up.parse_problems('[{"Name":"Unknown USB Device","PNPClass":"USB","ConfigManagerErrorCode":28},'
+                                  '{"Name":"Fine","ConfigManagerErrorCode":0}]')
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].meaning, "no driver installed")
+        self.assertTrue(found[0].missing_driver)
+        self.assertEqual(up.parse_problems('{"Name":"X","ConfigManagerErrorCode":43}')[0].meaning,
+                         "stopped after reporting a problem")
+
+    def test_install_reports_each_step(self):
+        from gg_desktop import upkeep_core as up
+        script = up.install_script(["3f1c9b2e-1111-4a2b-9c3d-123456789abc"], "C:/r.json", progress_path="C:/p.json")
+        self.assertIn("step = 'download'", script)
+        self.assertIn("step = 'install'", script)
+        self.assertIn("$sels", script)
+        self.assertEqual(up.step_text(up.read_step('\ufeff{"step":"download","index":1,"count":3,"title":"Intel - Net"}')),
+                         "Downloading 1 of 3: Intel - Net")
+        self.assertEqual(up.step_text(up.read_step('{"step":"find","index":0,"count":2,"title":""}')),
+                         "Finding the 2 updates in Windows Update…")
+        self.assertIsNone(up.read_step("not json"))

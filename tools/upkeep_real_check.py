@@ -91,6 +91,8 @@ def main():
     store = [a for a in up.read_startup() if a.source == "StoreApp"]
     print(f"PASS real: Store app startup tasks read: {len(store)} ({', '.join(a.title for a in store[:4]) or 'none on this machine'})")
 
+    problems = up.read_problems()
+    print(f"PASS real: Device Manager problems read: {len(problems)} ({'; '.join(p.name + ': ' + p.meaning for p in problems[:3]) or 'none'})")
     updates = up.search_updates()
     print(f"PASS real: Windows Update driver search answered with {len(updates)} update(s): "
           + "; ".join(u.title for u in updates[:5]))
@@ -110,9 +112,13 @@ def main():
             criteria = "IsInstalled=0 and IsHidden=0 and Type='Software'"
             small = sorted([u for u in up.search_any(criteria) if 0 < u.size < 200 * 1024 ** 2], key=lambda u: u.size)
         assert small, "Windows Update offered nothing small enough to prove the install path"
-        text = up.run_elevated(up.install_script([small[0].update_id], "__RESULT__", criteria=criteria))
+        steps = []
+        text = up.run_elevated(up.install_script([small[0].update_id], "__RESULT__", criteria=criteria,
+                                                 progress_path="__PROGRESS__"), on_step=steps.append)
         ok, words, reboot = up.summarize_install(text, 1)
         assert ok, words
+        print("PASS real: live install steps seen: " + " | ".join(up.step_text(s) for s in steps))
+        assert any(s[0] in ("download", "install", "done") for s in steps), "the installer's steps were read live"
         print(f"PASS real: download and install through the same installer code worked ({small[0].title}): {words}")
     print(f"Drivers & Startup real check passed in {time.time() - started:.0f}s")
 

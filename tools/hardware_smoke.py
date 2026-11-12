@@ -241,16 +241,26 @@ def main():
                 calls.append(script[:40])
                 if "Win32_PnPSignedDriver" in script:
                     return installed_json
+                if "Win32_PnPEntity" in script:
+                    return json.dumps([{"Name": "Unknown USB Device", "PNPClass": "USB", "ConfigManagerErrorCode": 28}])
                 if "CreateUpdateSearcher" in script:
                     return update_json
                 return startup_json
-            writes, elevated = [], []
+            writes, elevated, steps_seen = [], [], []
+
+            def fake_elevated(script, **kw):
+                elevated.append(script)
+                if "UpdateInstaller" not in script:
+                    return ""
+                assert "__PROGRESS__" in script, "the installer reports its steps"
+                for step in (("download", 1, 1, "NVIDIA - Display"), ("install", 1, 1, "NVIDIA - Display")):
+                    if kw.get("on_step"):
+                        kw["on_step"](step)
+                        steps_seen.append(step)
+                return json.dumps({"found": 1, "reboot": True, "results": [{"title": "NVIDIA", "code": 2}]})
             with patch("gg_desktop.upkeep_core._powershell", side_effect=fake_ps), \
                  patch("gg_desktop.upkeep_core.set_enabled_user", side_effect=lambda a, on: writes.append((a.name, on))), \
-                 patch("gg_desktop.upkeep_core.run_elevated",
-                       side_effect=lambda script, **kw: elevated.append(script) or
-                       (json.dumps({"found": 1, "reboot": True, "results": [{"title": "NVIDIA", "code": 2}]})
-                        if "UpdateInstaller" in script else "")):
+                 patch("gg_desktop.upkeep_core.run_elevated", side_effect=fake_elevated):
                 pressed(window, "Drivers && Startup").click()
                 tab = body(window).upkeep_tab
                 wait_for(lambda: tab.apps, "the startup list")
@@ -278,6 +288,10 @@ def main():
                 settle(60)
                 assert "Windows Update offers 1 driver update" in tab.driver_status.text(), tab.driver_status.text()
                 assert tab.install_button.isVisible() and tab.install_button.text() == "Update all"
+                assert tab.driver_banner.isVisible() and "Check complete: 1 driver update" in tab.driver_banner.text(), \
+                    tab.driver_banner.text()
+                assert "1 device with a problem" in tab.driver_banner.text() and not tab.driver_bar.isVisible()
+                assert any("Unknown USB Device" in t for t in texts(window)) and any("no driver installed" in t for t in texts(window))
                 assert window.grab().save(str(args.output / "hardware-drivers-startup-1366.png"))
                 with patch.object(window, "confirm", return_value=False):
                     tab.install_button.click()
@@ -287,6 +301,10 @@ def main():
                     wait_for(lambda: "Installed 1 of 1" in tab.driver_status.text() or elevated and not window.cleaning,
                              "the driver install")
                 assert uid in elevated[0] and not window.cleaning
+                assert len(steps_seen) == 2, "install steps reach the screen"
+                settle(60)
+                assert tab.driver_banner.isVisible() and tab.driver_banner.text().startswith("Done:"), tab.driver_banner.text()
+                assert "Restart Windows to finish" in tab.driver_banner.text() and not tab.driver_bar.isVisible()
                 assert tab.restart_button.isVisible(), "a driver that needs a restart offers Restart now"
                 with patch("gg_desktop.upkeep_core.restart_pc") as restart, patch.object(window, "confirm", return_value=True):
                     tab.restart_button.click()

@@ -28,6 +28,8 @@ import json
 import os
 from pathlib import Path
 import re
+import time
+from types import SimpleNamespace
 import subprocess
 import tempfile
 
@@ -354,13 +356,67 @@ INSTALLED_SCRIPT = (
     "ConvertTo-Json -Compress")
 
 SEARCH = "IsInstalled=0 and Type='Driver' and IsHidden=0"
+MICROSOFT_UPDATE = "7971f918-a847-4430-9279-4a52d1efe18d"
+# Ask three ways and merge: this PC's default update source, Windows Update online directly (a PC pointed at a company
+# server otherwise sees only that server), and the Microsoft Update service when it is registered (it carries more
+# optional drivers from hardware makers). Each update is listed once.
+SEARCHERS_PS = (
+    "$sels = @(@(0, '', 'Windows Update'), @(2, '', 'Windows Update'), @(3, '" + MICROSOFT_UPDATE + "', 'Microsoft Update'))\n"
+    "function Searcher($s, $sel) { $q = $s.CreateUpdateSearcher(); $q.Online = $true; $q.ServerSelection = $sel[0];"
+    " if ($sel[1]) { $q.ServiceID = $sel[1] }; $q }\n")
 UPDATES_SCRIPT = (
-    "$s = New-Object -ComObject Microsoft.Update.Session; $s.ClientApplicationID = 'Game Grave'; "
-    f"$r = $s.CreateUpdateSearcher().Search(\"{SEARCH}\"); "
-    "@($r.Updates | ForEach-Object { [pscustomobject]@{ Id = $_.Identity.UpdateID; Title = $_.Title; "
-    "Class = $_.DriverClass; Maker = $_.DriverManufacturer; Model = $_.DriverModel; "
-    "Date = $(if ($_.DriverVerDate) { $_.DriverVerDate.ToString('yyyy-MM-dd') } else { '' }); "
-    "Size = [int64]$_.MaxDownloadSize } }) | ConvertTo-Json -Compress")
+    "$s = New-Object -ComObject Microsoft.Update.Session; $s.ClientApplicationID = 'Game Grave'\n"
+    + SEARCHERS_PS +
+    "$seen = @{}; $out = New-Object System.Collections.ArrayList; $errs = @(); $ok = 0\n"
+    "foreach ($sel in $sels) {\n"
+    f"  try {{ $r = (Searcher $s $sel).Search(\"{SEARCH}\"); $ok++ }} catch {{ $errs += $_.Exception.Message; continue }}\n"
+    "  foreach ($u in $r.Updates) { $id = $u.Identity.UpdateID; if ($seen[$id]) { continue }; $seen[$id] = 1\n"
+    "    [void]$out.Add([pscustomobject]@{ Id = $id; Title = $u.Title; Class = $u.DriverClass; Maker = $u.DriverManufacturer;"
+    " Model = $u.DriverModel; Date = $(if ($u.DriverVerDate) { $u.DriverVerDate.ToString('yyyy-MM-dd') } else { '' });"
+    " Size = [int64]$u.MaxDownloadSize; Source = $sel[2] }) }\n"
+    "}\n"
+    "if ($ok -eq 0) { throw ($errs | Select-Object -First 1) }\n"
+    "@($out) | ConvertTo-Json -Compress")
+
+PROBLEM_SCRIPT = (
+    "Get-CimInstance Win32_PnPEntity | Where-Object { $_.ConfigManagerErrorCode -and $_.ConfigManagerErrorCode -ne 22 "
+    "-and $_.ConfigManagerErrorCode -ne 45 } | "
+    "Select-Object Name, PNPClass, ConfigManagerErrorCode, DeviceID | ConvertTo-Json -Compress")
+
+# What Device Manager's problem codes mean, in plain words (the common ones).
+PROBLEM_CODES = {1: "not set up correctly", 3: "driver may be damaged", 10: "can't start", 12: "not enough resources",
+                 14: "needs a restart", 18: "driver needs reinstalling", 19: "settings damaged", 21: "being removed",
+                 24: "not present or not working", 28: "no driver installed", 31: "driver didn't load",
+                 32: "driver service disabled", 37: "driver failed to start", 39: "driver missing or damaged",
+                 41: "driver loaded but device not found", 43: "stopped after reporting a problem",
+                 48: "driver blocked", 52: "driver not digitally signed"}
+
+
+@dataclass(frozen=True)
+class DeviceProblem:
+    name: str
+    device_class: str
+    code: int
+    device_id: str
+
+    @property
+    def meaning(self):
+        return PROBLEM_CODES.get(self.code, f"Windows problem code {self.code}")
+
+    @property
+    def missing_driver(self):
+        return self.code in (1, 18, 28, 31, 39, 52)
+
+
+def parse_problems(text) -> list[DeviceProblem]:
+    found = []
+    for row in _rows(text):
+        code = _int(row.get("ConfigManagerErrorCode"))
+        name = str(row.get("Name") or row.get("DeviceID") or "Unknown device").strip()
+        if code:
+            found.append(DeviceProblem(name[:160], str(row.get("PNPClass") or ""), code, str(row.get("DeviceID") or "")[:200]))
+    return found
+
 
 STARTUP_SCRIPT = r"""
 $ErrorActionPreference = 'SilentlyContinue'
@@ -466,6 +522,11 @@ def search_updates() -> list[DriverUpdate]:
     return parse_updates(_powershell(UPDATES_SCRIPT, 600))
 
 
+def read_problems() -> list[DeviceProblem]:
+    """Devices Windows itself reports a problem with (Device Manager's yellow mark). Read only."""
+    return parse_problems(_powershell(PROBLEM_SCRIPT, 60))
+
+
 def read_startup() -> list[StartupApp]:
     return parse_startup(_powershell(STARTUP_SCRIPT, 60))
 
@@ -475,46 +536,113 @@ def search_any(criteria: str):
     return parse_updates(_powershell(UPDATES_SCRIPT.replace(SEARCH, criteria), 600))
 
 
-def install_script(update_ids, result_path: str, criteria: str = SEARCH) -> str:
+def install_script(update_ids, result_path: str, criteria: str = SEARCH, progress_path: str = "") -> str:
+    """Elevated script: finds exactly these update IDs (through the same three searches), then downloads and installs
+    them one at a time, writing each step to progress_path so the app can show it, and each result to result_path."""
     ids = ",".join(ps_quote(i) for i in update_ids if re.fullmatch(r"[0-9a-fA-F-]{36}", str(i)))
+    prog = ps_quote(progress_path) if progress_path else "''"
     return ("$ErrorActionPreference='Stop'\n"
-            f"$out = {ps_quote(result_path)}\n"
+            f"$out = {ps_quote(result_path)}; $prog = {prog}\n"
+            "function Step($o) { if ($prog) { ($o | ConvertTo-Json -Compress) | Set-Content -Encoding UTF8 -LiteralPath $prog } }\n"
             "try {\n"
             f"  $ids = @({ids})\n"
             "  $s = New-Object -ComObject Microsoft.Update.Session; $s.ClientApplicationID = 'Game Grave'\n"
-            f"  $r = $s.CreateUpdateSearcher().Search(\"{criteria}\")\n"
-            "  $c = New-Object -ComObject Microsoft.Update.UpdateColl\n"
-            "  foreach ($u in $r.Updates) { if ($ids -contains $u.Identity.UpdateID) { if (-not $u.EulaAccepted) { $u.AcceptEula() }; [void]$c.Add($u) } }\n"
-            "  $res = @{ found = $c.Count; results = @(); reboot = $false }\n"
-            "  if ($c.Count -gt 0) {\n"
-            "    $d = $s.CreateUpdateDownloader(); $d.Updates = $c; [void]$d.Download()\n"
-            "    $i = $s.CreateUpdateInstaller(); $i.Updates = $c; $ir = $i.Install(); $res.reboot = [bool]$ir.RebootRequired\n"
-            "    for ($k = 0; $k -lt $c.Count; $k++) { $res.results += @{ title = $c.Item($k).Title; code = [int]$ir.GetUpdateResult($k).ResultCode } }\n"
+            + "  " + SEARCHERS_PS.replace("\n", "\n  ").rstrip() + "\n"
+            "  Step @{ step = 'find'; index = 0; count = $ids.Count; title = '' }\n"
+            "  $todo = New-Object System.Collections.ArrayList; $got = @{}\n"
+            "  foreach ($sel in $sels) {\n"
+            "    if ($got.Count -ge $ids.Count) { break }\n"
+            f"    try {{ $r = (Searcher $s $sel).Search(\"{criteria}\") }} catch {{ continue }}\n"
+            "    foreach ($u in $r.Updates) { $id = $u.Identity.UpdateID\n"
+            "      if (($ids -contains $id) -and -not $got[$id]) { $got[$id] = 1; if (-not $u.EulaAccepted) { $u.AcceptEula() }; [void]$todo.Add($u) } }\n"
             "  }\n"
+            "  $res = @{ found = $todo.Count; results = @(); reboot = $false }\n"
+            "  for ($k = 0; $k -lt $todo.Count; $k++) {\n"
+            "    $u = $todo[$k]; $c = New-Object -ComObject Microsoft.Update.UpdateColl; [void]$c.Add($u)\n"
+            "    try {\n"
+            "      Step @{ step = 'download'; index = $k + 1; count = $todo.Count; title = $u.Title }\n"
+            "      $d = $s.CreateUpdateDownloader(); $d.Updates = $c; [void]$d.Download()\n"
+            "      Step @{ step = 'install'; index = $k + 1; count = $todo.Count; title = $u.Title }\n"
+            "      $i = $s.CreateUpdateInstaller(); $i.Updates = $c; $ir = $i.Install()\n"
+            "      if ($ir.RebootRequired) { $res.reboot = $true }\n"
+            "      $res.results += @{ title = $u.Title; code = [int]$ir.GetUpdateResult(0).ResultCode }\n"
+            "    } catch { $res.results += @{ title = $u.Title; code = 4; error = $_.Exception.Message } }\n"
+            "  }\n"
+            "  Step @{ step = 'done'; index = $todo.Count; count = $todo.Count; title = '' }\n"
             "} catch { $res = @{ error = $_.Exception.Message } }\n"
             "$res | ConvertTo-Json -Compress -Depth 4 | Set-Content -Encoding UTF8 -LiteralPath $out\n")
 
 
-def run_elevated(script: str, timeout: int = 3600, result_name: str = "") -> str:
+def read_step(text):
+    """The installer's latest step as (step, index, count, title), or None."""
+    try:
+        data = json.loads(text.lstrip("\ufeff"))
+        return (str(data.get("step") or ""), int(data.get("index") or 0), int(data.get("count") or 0),
+                str(data.get("title") or "")[:200])
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def step_text(step):
+    if not step:
+        return ""
+    kind, index, count, title = step
+    if kind == "find":
+        return f"Finding the {count} update{'s' if count != 1 else ''} in Windows Update…"
+    if kind == "download":
+        return f"Downloading {index} of {count}: {title}"
+    if kind == "install":
+        return f"Installing {index} of {count}: {title}"
+    if kind == "done":
+        return "Finishing…"
+    return ""
+
+
+def run_elevated(script: str, timeout: int = 3600, result_name: str = "", on_step=None) -> str:
     """Runs a script in a separate PowerShell that Windows asks you to allow (UAC). Returns what the script wrote to
-    its result file, or '' when it writes none. Refusing the prompt changes nothing."""
+    its result file, or '' when it writes none. Refusing the prompt changes nothing. With on_step, the script's
+    __PROGRESS__ file is read every second and each new step is passed to on_step."""
     if os.name != "nt":
         raise UpkeepError("This works on Windows only.")
     folder = Path(tempfile.mkdtemp(prefix="GameGrave-"))
     script_path, result_path = folder / "task.ps1", folder / (result_name or "result.json")
+    progress_path = folder / "progress.json"
     try:
-        script_path.write_text(script.replace("__RESULT__", str(result_path)), encoding="utf-8-sig")
+        script_path.write_text(script.replace("__RESULT__", str(result_path)).replace("__PROGRESS__", str(progress_path)),
+                               encoding="utf-8-sig")
         launcher = ("$p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -PassThru -WindowStyle Hidden "
                     f"-ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',{ps_quote(str(script_path))}); "
                     "exit $p.ExitCode")
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         try:
-            done = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", launcher], capture_output=True,
-                                  text=True, timeout=timeout, creationflags=flags, errors="replace")
-        except subprocess.TimeoutExpired:
-            raise UpkeepError("Windows did not finish in time. Check Windows Update in Settings for what happened.") from None
+            proc = subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-Command", launcher],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=flags,
+                                    errors="replace")
         except (OSError, subprocess.SubprocessError):
             raise UpkeepError("Windows would not start the task.") from None
+        deadline, last = time.monotonic() + timeout, None
+        while proc.poll() is None:
+            if time.monotonic() > deadline:
+                proc.kill()
+                raise UpkeepError("Windows did not finish in time. Check Windows Update in Settings for what happened.")
+            if on_step is not None and progress_path.exists():
+                try:
+                    step = read_step(progress_path.read_text(encoding="utf-8-sig"))
+                except OSError:
+                    step = None
+                if step and step != last:
+                    last = step
+                    on_step(step)
+            time.sleep(1)
+        if on_step is not None and progress_path.exists():   # a quick task can finish between two looks
+            try:
+                step = read_step(progress_path.read_text(encoding="utf-8-sig"))
+            except OSError:
+                step = None
+            if step and step != last:
+                on_step(step)
+        out, err = proc.communicate()
+        done = SimpleNamespace(returncode=proc.returncode, stdout=out, stderr=err)
         text = (done.stderr or "") + (done.stdout or "")
         if done.returncode != 0 and ("canceled" in text.casefold() or "cancelled" in text.casefold() or "1223" in text):
             raise UpkeepError("Windows did not get permission (the prompt was declined). Nothing was changed.")
@@ -525,7 +653,7 @@ def run_elevated(script: str, timeout: int = 3600, result_name: str = "") -> str
         except OSError:
             return ""
     finally:
-        for item in (script_path, result_path):
+        for item in (script_path, result_path, progress_path):
             try:
                 item.unlink()
             except OSError:
@@ -536,11 +664,11 @@ def run_elevated(script: str, timeout: int = 3600, result_name: str = "") -> str
             pass
 
 
-def install_updates(updates) -> tuple[bool, str, bool]:
+def install_updates(updates, on_step=None) -> tuple[bool, str, bool]:
     ids = [u.update_id for u in updates]
     if not ids:
         raise UpkeepError("Pick at least one driver update.")
-    text = run_elevated(install_script(ids, "__RESULT__"))
+    text = run_elevated(install_script(ids, "__RESULT__", progress_path="__PROGRESS__"), on_step=on_step)
     return summarize_install(text, len(ids))
 
 

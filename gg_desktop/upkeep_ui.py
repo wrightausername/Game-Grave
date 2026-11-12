@@ -6,10 +6,11 @@ asks first. Driver installs and all-users startup apps go through the Windows ad
 from __future__ import annotations
 
 from dataclasses import replace
+import os
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QCheckBox, QFrame, QScrollArea, QWidget
+from PySide6.QtWidgets import QCheckBox, QFrame, QProgressBar, QScrollArea, QWidget
 
 from core import human_size, log_event
 from gg_desktop import upkeep_core as up
@@ -51,7 +52,7 @@ class UpkeepTab(QWidget):
         super().__init__()
         self.window_owner = window
         self.gpu_names = tuple(gpu_names)
-        self.updates, self.update_checks = [], {}
+        self.updates, self.update_checks, self.problems = [], {}, []
         self.last_install = ""
         self.apps, self.loaded = [], False
         outer = row(spacing=10)
@@ -66,10 +67,35 @@ class UpkeepTab(QWidget):
                                        "Settings, Windows Update, Optional updates). Changes nothing. Can take a few minutes.")
         head.addWidget(self.check_button)
         drivers.addLayout(head)
-        drivers.addWidget(label("Updates come from Windows Update only. Installing asks for administrator permission, "
-                                "and Windows may need a restart afterwards.", "readyDetail", wrap=True))
+        drivers.addWidget(label("Updates come from Windows Update (checked three ways, including Microsoft Update's "
+                                "optional drivers). Installing asks for administrator permission, and Windows may need a "
+                                "restart afterwards.", "readyDetail", wrap=True))
+        why = label("Why other tools list more: apps like Driver Easy compare against their own driver database, and many "
+                    "of those are newer-dated maker releases that Windows Update doesn't hand out. Game Grave only installs "
+                    "what Windows Update offers; for graphics, use your card maker's app.", "caption", wrap=True)
+        drivers.addWidget(why)
         self.driver_status = label("Press Check for driver updates to ask Windows Update.", "readyDetail", wrap=True)
         drivers.addWidget(self.driver_status)
+        self.driver_bar = QProgressBar()
+        self.driver_bar.setFixedHeight(10)
+        self.driver_bar.setTextVisible(False)
+        self.driver_bar.setAccessibleName("Driver progress")
+        self.driver_bar.setStyleSheet("QProgressBar{background:#0b1119;border:1px solid #233142;border-radius:5px;}"
+                                      "QProgressBar::chunk{background:#13bcf5;border-radius:4px;}")
+        self.driver_bar.hide()
+        drivers.addWidget(self.driver_bar)
+        self.driver_step = label("", "caption", wrap=True)
+        self.driver_step.hide()
+        drivers.addWidget(self.driver_step)
+        self.driver_banner = label("", "readyDetail", wrap=True)
+        self.driver_banner.hide()
+        drivers.addWidget(self.driver_banner)
+        self.problem_box = column(spacing=3)
+        drivers.addLayout(self.problem_box)
+        self._clock = QTimer(self)
+        self._clock.setInterval(1000)
+        self._clock.timeout.connect(self._tick)
+        self._clock_start, self._clock_words = 0.0, ""
         self.update_box = column(spacing=4)
         drivers.addWidget(_scroll(self.update_box, 140), 1)
         act = row(spacing=10)
@@ -122,6 +148,67 @@ class UpkeepTab(QWidget):
                                          "Opens the maker's official page in your browser.")
         self.maker_button.setVisible(bool(self.maker))
 
+    # ============================================================== progress and result
+    def busy(self, words, determinate=False):
+        import time
+        self.driver_banner.hide()
+        self.driver_bar.setRange(0, 1000 if determinate else 0)
+        self.driver_bar.setValue(0)
+        self.driver_bar.show()
+        self.driver_step.setText(words)
+        self.driver_step.show()
+        self._clock_start, self._clock_words = time.monotonic(), words
+        if not determinate:
+            self._clock.start()
+
+    def _tick(self):
+        import time
+        seconds = int(time.monotonic() - self._clock_start)
+        try:
+            self.driver_step.setText(f"{self._clock_words} {seconds // 60}:{seconds % 60:02d}")
+        except RuntimeError:
+            self._clock.stop()
+
+    def idle(self):
+        self._clock.stop()
+        self.driver_bar.hide()
+        self.driver_step.hide()
+
+    def banner(self, words, tone):
+        colors = {"good": ("#32d67a", "#0b2215", "#1f6a3f"), "warn": ("#f6be24", "#241c06", "#6d5512"),
+                  "bad": ("#ff5a6e", "#26080d", "#7a1d2b"), "info": ("#13bcf5", "#071a22", "#1b5f78")}[tone]
+        self.driver_banner.setText(words)
+        self.driver_banner.setStyleSheet(f"color:{colors[0]};background:{colors[1]};border:1px solid {colors[2]};"
+                                         "border-radius:6px;padding:6px 8px;font-size:12px;font-weight:600;")
+        self.driver_banner.show()
+
+    def show_problems(self, problems):
+        _clear(self.problem_box)
+        self.problems = list(problems)
+        if not problems:
+            return
+        head = row(spacing=8)
+        head.addWidget(label(f"Devices Windows reports a problem with ({len(problems)})", "readyGameTitle"), 1)
+        manager = button("Open Device Manager", self.open_device_manager, kind="actionLink",
+                         tip="Opens Windows' Device Manager, where these devices show a yellow mark. Changes nothing.")
+        head.addWidget(manager)
+        self.problem_box.addLayout(head)
+        for p in problems[:12]:
+            line = row(spacing=8)
+            line.addWidget(label(p.name, "readyDetail"), 1)
+            line.addWidget(label(p.meaning, "caption"))
+            self.problem_box.addLayout(line)
+        if any(p.missing_driver for p in problems):
+            self.problem_box.addWidget(label("If Windows Update has a driver for one of these it is in the list above. "
+                                             "If not, the device maker's support page is the place to get it.",
+                                             "caption", wrap=True))
+
+    def open_device_manager(self):
+        try:
+            os.startfile("devmgmt.msc")
+        except (AttributeError, OSError):
+            self.window_owner.status.setText("Device Manager could not be opened on this PC.")
+
     # ============================================================== first open
     def showEvent(self, event):
         super().showEvent(event)
@@ -157,23 +244,35 @@ class UpkeepTab(QWidget):
 
     def check_updates(self):
         self.check_button.setEnabled(False)
-        self.driver_status.setText("Asking Windows Update. This can take a few minutes…")
+        self.driver_status.setText("Asking Windows Update (usually 1 to 3 minutes). You can keep using Game Grave.")
+        self.busy("Checking Windows Update and Device Manager…")
         _clear(self.update_box)
         self.install_button.hide()
 
         def work(_progress):
             try:
-                return up.search_updates(), ""
+                problems = up.read_problems()
+            except up.UpkeepError:
+                problems = []
+            try:
+                return up.search_updates(), problems, ""
             except up.UpkeepError as problem:
-                return [], str(problem)
+                return [], problems, str(problem)
 
         def done(result):
+            self.idle()
             self.check_button.setEnabled(True)
-            self.updates, problem = result
+            self.updates, problems, problem = result
+            self.show_problems(problems)
             if problem:
                 self.driver_status.setText("Windows Update did not answer: " + problem)
+                self.banner("Check didn't finish: Windows Update did not answer. " + problem, "bad")
                 return
             self.show_updates()
+            found = len(self.updates)
+            words = (f"Check complete: {found} driver update{'s' if found != 1 else ''} from Windows Update"
+                     + (f", {len(problems)} device{'s' if len(problems) != 1 else ''} with a problem." if problems else "."))
+            self.banner(words, "warn" if (found or problems) else "good")
         self.window_owner.job(work, done, error_title="Driver check did not finish")
 
     def show_updates(self):
@@ -227,18 +326,38 @@ class UpkeepTab(QWidget):
         self.check_button.setEnabled(False)
         window.cleaning = True
         self.driver_status.setText("Installing through Windows Update. Allow the Windows prompt; this can take a while…")
+        self.busy("Waiting for you to allow the Windows prompt…", determinate=True)
 
-        def work(_progress):
+        def work(progress):
+            def on_step(step):
+                kind, index, count, _title = step
+                share = 0 if not count else ((index - 1) + (0.5 if kind == "install" else 0)) / count
+                if kind == "done":
+                    share = 1
+                progress(int(max(0, min(1, share)) * 1000), up.step_text(step))
             try:
-                return up.install_updates(chosen)
+                return up.install_updates(chosen, on_step=on_step)
             except up.UpkeepError as problem:
                 return False, str(problem), False
 
+        def stepped(value, words):
+            try:
+                self.driver_bar.setValue(value)
+                if words:
+                    self.driver_step.setText(words)
+            except RuntimeError:
+                pass
+
         def done(result):
             window.cleaning = False
+            self.idle()
             self.check_button.setEnabled(True)
             ok, words, reboot = result
             self.driver_status.setText(words)
+            failed = any(w in words.casefold() for w in ("failed", "error", "not ", "declined", "did not"))
+            tone = "good" if ok and not failed and not reboot else ("warn" if ok else "bad")
+            self.banner(("Done: " if ok else "Not finished: ") + words + (" Restart Windows to finish." if reboot else ""),
+                        tone)
             self.restart_button.setVisible(bool(reboot))
             log_event("driver_update", f"Driver updates through Windows Update: {words}",
                       result="installed" if ok else "not installed", source="hardware")
@@ -247,7 +366,7 @@ class UpkeepTab(QWidget):
                 self.check_updates()           # read the list again so installed ones drop off
             else:
                 self.sync_install()
-        window.job(work, done, error_title="Driver install did not finish")
+        window.job(work, done, error_title="Driver install did not finish", progress=stepped)
 
     def restart(self):
         window = self.window_owner
