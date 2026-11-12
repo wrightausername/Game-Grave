@@ -111,7 +111,7 @@ def main():
     live = ws.fetch_details(["2016612051", "1"])
     print(f"Steam Workshop live lookup: {live.get('2016612051', {}).get('title')!r}; unknown item removed="
           f"{live.get('1', {}).get('removed')}")
-    assert live.get("2016612051", {}).get("title"), "Steam's public Workshop lookup should name a real item"
+    assert set(live) == {"2016612051", "1"}, "Steam's public Workshop lookup should answer for every item asked"
     problems = up.read_problems()
     print(f"PASS real: Device Manager problems read: {len(problems)} ({'; '.join(p.name + ': ' + p.meaning for p in problems[:3]) or 'none'})")
     updates = up.search_updates()
