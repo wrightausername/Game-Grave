@@ -171,7 +171,7 @@ def main():
             assert modlist.read_text(encoding="utf-8") == original, "Undo put the exact list back"
 
             stage("a switch turns one mod on")
-            assert view.filter_kind == "problem" and view.problem_box.isVisible(), "after Undo the problem is back on show"
+            assert view.banner_text.text().startswith("1 thing needs you"), "after Undo the problem is back in the banner"
             view.clear_filter.click()
             settle()
             switches = {s.accessibleName(): s for s in view.findChildren(Switch)}
