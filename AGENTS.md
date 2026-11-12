@@ -492,3 +492,23 @@ Hardware's Drivers & Startup tab only:
 - Progress: checking shows a moving bar with elapsed time; installing goes one update at a time in the elevated script, which
   writes each step to a progress file that the app reads every second ("Downloading 2 of 5: ...", "Installing 2 of 5: ...").
   A result banner stays on screen afterwards (green done, amber restart needed or something to review, red not finished).
+- Feature knowledge (owner, 2026-11-11, after the local model suggested adding performance tracking and pointed at More Tools):
+  the model now also gets Game Grave's own feature list (each feature's title, tab and first sentence from
+  `assistant_features.py`, plus one line per main tab) and a rule never to call a listed feature missing or send the user to
+  another tab for it.
+
+Graphics drivers from the maker, and firmware (owner instruction, 2026-11-11: "Yes and outdated firmwares as well etc...", to
+checking NVIDIA's, AMD's and Intel's latest graphics drivers). Hardware's Drivers & Startup tab only (`gg_desktop/upkeep_vendor.py`):
+- On Check (never automatically): NVIDIA's own driver lookup (the card's product IDs from NVIDIA's product list, then the newest
+  WHQL Game Ready DCH driver for Windows 10/11 64-bit) compared with the installed driver in NVIDIA's form (32.0.15.6094 = 560.94);
+  AMD's version file that AMD Software: Adrenalin itself reads (drivers.amd.com, https), compared by Windows driver-store version
+  when the file gives it, otherwise shown without a verdict; Intel publishes no readable version, so its installed version and
+  date are shown with Intel's assistant linked. Hosts allowed: gfwsl.geforce.com, nvidia.com, drivers.amd.com. When a maker's
+  answer can't be read the row says so; a driver is never called outdated on a guess. Game Grave downloads no graphics driver:
+  "Get it" opens the maker's own app page.
+- Firmware (read from Windows on first open): BIOS/UEFI version and date with the board or PC model and the maker's support page,
+  and each drive's firmware revision with the maker's tool (Samsung Magician, WD Dashboard, ...). There is no shared list of the
+  newest firmware, so firmware is never called outdated; a BIOS 2+ years old is marked as worth checking. Firmware updates that
+  Windows Update offers are marked "Firmware" in the update list. Game Grave never updates a BIOS.
+- The drivers column now scrolls so the extra sections fit. Covered by `tests/test_upkeep_vendor.py`, the hardware smoke, and
+  `tools/upkeep_real_check.py`, which reads the real firmware and asks NVIDIA's and AMD's live services.

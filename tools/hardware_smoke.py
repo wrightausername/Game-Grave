@@ -229,7 +229,8 @@ def main():
             update_json = json.dumps([{"Id": uid, "Title": "NVIDIA - Display - 32.0.15.6094", "Class": "Display",
                                        "Maker": "NVIDIA", "Model": "RTX 3060 Ti", "Date": "2024-09-12", "Size": 700000000}])
             installed_json = json.dumps([{"DeviceName": "Old Sound Card", "DeviceClass": "MEDIA", "Date": "2016-03-01"},
-                                         {"DeviceName": "RTX 3060 Ti", "DeviceClass": "DISPLAY", "Date": "2025-01-01"}])
+                                         {"DeviceName": "NVIDIA GeForce RTX 3060 Ti", "DeviceClass": "DISPLAY", "Date": "2025-01-01",
+                                          "DriverVersion": "32.0.15.6094"}])
             startup_json = json.dumps([
                 {"Name": "Steam", "Command": "\"C:\\Steam\\steam.exe\" -silent", "Scope": "user", "Source": "Run",
                  "Approved": "", "Company": "Valve", "Description": "Steam Client Bootstrapper", "Exists": True},
@@ -241,12 +242,24 @@ def main():
                 calls.append(script[:40])
                 if "Win32_PnPSignedDriver" in script:
                     return installed_json
+                if "Win32_BIOS" in script:
+                    return json.dumps({"BiosVersion": "F12", "BiosDate": "2021-03-04", "BoardMaker": "Gigabyte Technology Co., Ltd.",
+                                       "Board": "B550 AORUS ELITE", "PcMaker": "To Be Filled By O.E.M.",
+                                       "PcModel": "System Product Name",
+                                       "Drives": [{"Model": "Samsung SSD 980 PRO 1TB", "Firmware": "5B2QGXA7"}]})
                 if "Win32_PnPEntity" in script:
                     return json.dumps([{"Name": "Unknown USB Device", "PNPClass": "USB", "ConfigManagerErrorCode": 28}])
                 if "CreateUpdateSearcher" in script:
                     return update_json
                 return startup_json
-            writes, elevated, steps_seen = [], [], []
+            writes, elevated, steps_seen, vendor_calls = [], [], [], []
+
+            def fake_vendor(url, opener=None, timeout=20, limit=0):
+                vendor_calls.append(url)
+                if "lookupValueSearch" in url:
+                    return ('<LookupValueSearch><LookupValues><LookupValue ParentID="120"><Name>GeForce RTX 3060 Ti</Name>'
+                            '<Value>934</Value></LookupValue></LookupValues></LookupValueSearch>')
+                return json.dumps({"IDS": [{"downloadInfo": {"Version": "566.36", "ReleaseDateTime": "Thu Dec 05, 2024"}}]})
 
             def fake_elevated(script, **kw):
                 elevated.append(script)
@@ -260,7 +273,8 @@ def main():
                 return json.dumps({"found": 1, "reboot": True, "results": [{"title": "NVIDIA", "code": 2}]})
             with patch("gg_desktop.upkeep_core._powershell", side_effect=fake_ps), \
                  patch("gg_desktop.upkeep_core.set_enabled_user", side_effect=lambda a, on: writes.append((a.name, on))), \
-                 patch("gg_desktop.upkeep_core.run_elevated", side_effect=fake_elevated):
+                 patch("gg_desktop.upkeep_core.run_elevated", side_effect=fake_elevated), \
+                 patch("gg_desktop.upkeep_vendor._get", side_effect=fake_vendor):
                 pressed(window, "Drivers && Startup").click()
                 tab = body(window).upkeep_tab
                 wait_for(lambda: tab.apps, "the startup list")
@@ -268,6 +282,11 @@ def main():
                 settle(100)
                 assert tab.isVisible() and not body(window).pc_tab.isVisible() and window.hardware_tab == "Drivers & Startup"
                 assert not any("CreateUpdateSearcher" in c for c in calls), "Windows Update is only asked on a press"
+                assert not vendor_calls, "NVIDIA and AMD are only asked on a press"
+                wait_for(lambda: any("B550 AORUS ELITE" in t for t in texts(window)), "the firmware facts")
+                assert any("F12 · 2021-03-04" in t for t in texts(window)), "BIOS version and date"
+                assert any("Samsung Magician" in t for t in texts(window)), "the drive maker's tool"
+                assert any("560.94" in t and "press Check" in t for t in texts(window)), "installed NVIDIA version before a check"
                 assert [a.title for a in tab.apps] == ["Steam Client Bootstrapper", "Vendor Updater"]
                 assert "2 apps can start with Windows; 1 is on." in tab.startup_status.text(), tab.startup_status.text()
                 assert any("Old Sound Card" in t for t in texts(window))
@@ -291,6 +310,9 @@ def main():
                 assert tab.driver_banner.isVisible() and "Check complete: 1 driver update" in tab.driver_banner.text(), \
                     tab.driver_banner.text()
                 assert "1 device with a problem" in tab.driver_banner.text() and not tab.driver_bar.isVisible()
+                assert "newer graphics driver from NVIDIA (566.36)" in tab.driver_banner.text(), tab.driver_banner.text()
+                assert any(t.startswith("Newer: 566.36") for t in texts(window)), "the graphics card row shows the newer driver"
+                assert any(t.startswith("Get it: NVIDIA App") for t in texts(window))
                 assert any("Unknown USB Device" in t for t in texts(window)) and any("no driver installed" in t for t in texts(window))
                 assert window.grab().save(str(args.output / "hardware-drivers-startup-1366.png"))
                 with patch.object(window, "confirm", return_value=False):

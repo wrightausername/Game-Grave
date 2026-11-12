@@ -60,7 +60,17 @@ class UpkeepTab(QWidget):
         self.setLayout(outer)
 
         # ---------------------------------------------------------- drivers
-        self.drivers_panel, drivers = panel(kind="libraryPanel", padding=12, spacing=8)
+        self.drivers_panel, frame_lay = panel(kind="libraryPanel", padding=12, spacing=8)
+        inner = QWidget()
+        drivers = column(spacing=8)
+        inner.setLayout(drivers)
+        holder = QScrollArea()
+        holder.setWidgetResizable(True)
+        holder.setFrameShape(QFrame.NoFrame)
+        holder.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        holder.setStyleSheet("QScrollArea{background:transparent;} QScrollArea > QWidget > QWidget{background:transparent;}")
+        holder.setWidget(inner)
+        frame_lay.addWidget(holder, 1)
         head = row(spacing=8)
         head.addWidget(label("Drivers", "sectionTitle"), 1)
         self.check_button = button("Check for driver updates", self.check_updates, kind="primary",
@@ -75,6 +85,11 @@ class UpkeepTab(QWidget):
                     "of those are newer-dated maker releases that Windows Update doesn't hand out. Game Grave only installs "
                     "what Windows Update offers; for graphics, use your card maker's app.", "caption", wrap=True)
         drivers.addWidget(why)
+        drivers.addWidget(label("Graphics driver", "readyGameTitle"))
+        self.gpu_box = column(spacing=4)
+        self.gpu_box.addWidget(label("Reading your graphics driver…", "caption"))
+        drivers.addLayout(self.gpu_box)
+        self.gpu_drivers, self.gpu_checks = [], []
         self.driver_status = label("Press Check for driver updates to ask Windows Update.", "readyDetail", wrap=True)
         drivers.addWidget(self.driver_status)
         self.driver_bar = QProgressBar()
@@ -113,6 +128,10 @@ class UpkeepTab(QWidget):
         act.addWidget(self.maker_button)
         act.addStretch()
         drivers.addLayout(act)
+        drivers.addWidget(label("Firmware", "readyGameTitle"))
+        self.firmware_box = column(spacing=3)
+        self.firmware_box.addWidget(label("Reading firmware versions…", "caption"))
+        drivers.addLayout(self.firmware_box)
         drivers.addWidget(label("Oldest drivers on this PC", "readyGameTitle"))
         drivers.addWidget(label("An old date is only a hint: many devices never get a newer driver.", "caption", wrap=True))
         self.old_box = column(spacing=3)
@@ -210,6 +229,90 @@ class UpkeepTab(QWidget):
         except (AttributeError, OSError):
             self.window_owner.status.setText("Device Manager could not be opened on this PC.")
 
+    def show_gpu(self):
+        from gg_desktop import upkeep_vendor as vendor
+        _clear(self.gpu_box)
+        checks = {c.card: c for c in self.gpu_checks}
+        if not self.gpu_drivers:
+            self.gpu_box.addWidget(label("No graphics driver was read yet.", "caption", wrap=True))
+            return
+        for card, version, when in self.gpu_drivers:
+            check = checks.get(card)
+            maker = vendor.maker_of(card)
+            shown = vendor.nvidia_version(version) if maker == "NVIDIA" else version
+            line = row(spacing=8)
+            words = label(card, "readyDetail")
+            line.addWidget(words, 1)
+            if check is None:
+                status = f"{shown or 'unknown'}" + (f" · {when}" if when else "") + " · press Check to compare"
+                tone = "caption"
+            elif check.outdated:
+                status, tone = f"Newer: {check.latest}" + (f" ({check.latest_date})" if check.latest_date else ""), "warning"
+            elif check.outdated is False:
+                status, tone = f"Up to date ({check.installed})", "caption"
+            else:
+                status, tone = f"{shown or version} · couldn't compare", "caption"
+            tag = label(status, tone)
+            if check is not None:
+                tag.setToolTip(check.summary)
+                words.setToolTip(check.summary)
+            line.addWidget(tag)
+            name, url = vendor.PAGES.get(maker, ("", ""))
+            if url:
+                get = button(("Get it: " if check is not None and check.outdated else "Open ") + name,
+                             lambda _=False, u=url: QDesktopServices.openUrl(QUrl(u)), kind="actionLink",
+                             tip=f"Opens {name} on the maker's official site in your browser. Game Grave downloads nothing.")
+                line.addWidget(get)
+            self.gpu_box.addLayout(line)
+            if check is not None and check.note:
+                self.gpu_box.addWidget(label(check.note, "caption", wrap=True))
+
+    def load_firmware(self):
+        from gg_desktop import upkeep_vendor as vendor
+
+        def work(_progress):
+            try:
+                return up.read_firmware(), ""
+            except (up.UpkeepError, ValueError) as problem:
+                return None, str(problem)
+
+        def done(result):
+            facts, problem = result
+            try:
+                _clear(self.firmware_box)
+            except RuntimeError:
+                return
+            if facts is None:
+                self.firmware_box.addWidget(label("Firmware versions couldn't be read: " + problem, "caption", wrap=True))
+                return
+            self.firmware = facts
+            age = facts.bios_age()
+            line = row(spacing=8)
+            line.addWidget(label(f"BIOS / UEFI on {facts.model or 'this PC'}", "readyDetail"), 1)
+            when = f" · {facts.bios_date}" if facts.bios_date else ""
+            old = age is not None and age >= vendor.OLD_BIOS_YEARS
+            line.addWidget(label(f"{facts.bios_version or 'unknown'}{when}" + (f" · {age:.0f} years old" if old else ""),
+                                 "warning" if old else "caption"))
+            name, url = facts.support
+            if url:
+                line.addWidget(button("Open " + name, lambda _=False, u=url: QDesktopServices.openUrl(QUrl(u)),
+                                      kind="actionLink", tip=f"Opens {name}. Search for {facts.model} to see its newest "
+                                      "BIOS. Game Grave never updates a BIOS itself."))
+            self.firmware_box.addLayout(line)
+            for model, revision, tool in facts.drives:
+                drive = row(spacing=8)
+                drive.addWidget(label(model, "readyDetail"), 1)
+                drive.addWidget(label(f"firmware {revision or 'unknown'}" + (f" · check with {tool}" if tool else ""),
+                                      "caption"))
+                self.firmware_box.addLayout(drive)
+            self.firmware_box.addWidget(label(
+                "Board and drive makers don't publish a list Game Grave can compare against, so firmware is never called "
+                "outdated here" + (f"; a BIOS from {facts.bios_date[:4]} is worth checking on the maker's page" if old else "")
+                + ". Firmware updates Windows Update offers appear in the list above, marked Firmware. Updating a BIOS "
+                "is done with the maker's own tool; never during a storm or on a laptop without its charger.",
+                "caption", wrap=True))
+        self.window_owner.job(work, done, error_title="Firmware could not be read")
+
     # ============================================================== first open
     def showEvent(self, event):
         super().showEvent(event)
@@ -217,11 +320,14 @@ class UpkeepTab(QWidget):
             self.loaded = True
             self.load_startup()
             self.load_installed()
+            self.load_firmware()
 
     # ============================================================== drivers
     def load_installed(self):
         def done(result):
             installed, problem = result
+            self.gpu_drivers = up.graphics_drivers(installed) if not problem else []
+            self.show_gpu()
             _clear(self.old_box)
             if problem:
                 self.old_box.addWidget(label(problem, "caption", wrap=True))
@@ -249,21 +355,25 @@ class UpkeepTab(QWidget):
         self.busy("Checking Windows Update and Device Manager…")
         _clear(self.update_box)
         self.install_button.hide()
+        gpus = list(self.gpu_drivers)
 
         def work(_progress):
+            from gg_desktop import upkeep_vendor as vendor
             try:
                 problems = up.read_problems()
             except up.UpkeepError:
                 problems = []
+            checks = [vendor.check_graphics(card, version, when) for card, version, when in gpus]
             try:
-                return up.search_updates(), problems, ""
+                return up.search_updates(), problems, checks, ""
             except up.UpkeepError as problem:
-                return [], problems, str(problem)
+                return [], problems, checks, str(problem)
 
         def done(result):
             self.idle()
             self.check_button.setEnabled(True)
-            self.updates, problems, problem = result
+            self.updates, problems, self.gpu_checks, problem = result
+            self.show_gpu()
             installed = getattr(self, "install_banner", None)
             self.install_banner = None
             self.show_problems(problems)
@@ -273,8 +383,11 @@ class UpkeepTab(QWidget):
                 return
             self.show_updates()
             found = len(self.updates)
+            newer = [c for c in self.gpu_checks if c.outdated]
             words = (f"Check complete: {found} driver update{'s' if found != 1 else ''} from Windows Update"
-                     + (f", {len(problems)} device{'s' if len(problems) != 1 else ''} with a problem." if problems else "."))
+                     + (f", {len(problems)} device{'s' if len(problems) != 1 else ''} with a problem" if problems else "")
+                     + (f", a newer graphics driver from {newer[0].maker} ({newer[0].latest})" if newer else "") + ".")
+            problems = problems or newer
             if installed:   # keep the install result on screen; the fresh check goes under it
                 text, tone = installed
                 left = f"{found} driver update{'s' if found != 1 else ''} still offered" if found else "nothing else offered"
@@ -297,7 +410,8 @@ class UpkeepTab(QWidget):
         self.driver_status.setText(before + f"Windows Update offers {len(self.updates)} driver update{'s' if len(self.updates) != 1 else ''}"
                                    + (f", about {human_size(total)} to download." if total else "."))
         for update in self.updates:
-            box = QCheckBox(update.title)
+            firmware = "firmware" in (update.device_class or "").casefold() or "firmware" in update.title.casefold()
+            box = QCheckBox(("Firmware · " if firmware else "") + update.title)
             box.setChecked(True)
             box.setAccessibleName(update.title)
             box.setToolTip(" · ".join(p for p in (update.device_class, update.maker, update.model,

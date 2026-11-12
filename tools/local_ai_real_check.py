@@ -49,7 +49,7 @@ def main():
     good = 0
     try:
         for q in ("how many games do i have?", "which game should i uninstall to free up space?",
-                  "when did i last play cyberpunk?"):
+                  "when did i last play cyberpunk?", "what would you recommend adding to game grave?"):
             base_answer = engine.answer(q, f)
             t = time.monotonic()
             raw = server.chat(prompt.build_messages(q, base_answer, f), max_tokens=300, timeout=600)
@@ -63,7 +63,7 @@ def main():
     removed = ai.remove_all(base)
     assert not base.exists()
     print(f"\nRemoved {removed / ai.GB:.2f} GB.")
-    assert good >= 2, "The local model should answer most questions within the rules"
+    assert good >= 3, "The local model should answer most questions within the rules"
     print("PASS: the local AI model downloads verified, runs on this PC, answers within the rules and removes cleanly.")
     return 0
 

@@ -91,6 +91,22 @@ def main():
     store = [a for a in up.read_startup() if a.source == "StoreApp"]
     print(f"PASS real: Store app startup tasks read: {len(store)} ({', '.join(a.title for a in store[:4]) or 'none on this machine'})")
 
+    from gg_desktop import upkeep_vendor as vendor
+    fw = up.read_firmware()
+    print(f"PASS real: firmware read: BIOS {fw.bios_version} ({fw.bios_date}) on {fw.model}; drives: "
+          + "; ".join(f"{m} fw {r}" for m, r, _t in fw.drives))
+    nv = vendor.check_graphics("NVIDIA GeForce RTX 3060 Ti", "32.0.15.6094", "2024-09-12")
+    print(f"NVIDIA live lookup: latest={nv.latest!r} date={nv.latest_date!r} name={nv.latest_name!r} note={nv.note!r}")
+    assert nv.latest, "NVIDIA's own lookup should give the newest Game Ready driver"
+    nvl = vendor.check_graphics("NVIDIA GeForce RTX 4060 Laptop GPU", "32.0.15.6094", "")
+    print(f"NVIDIA live lookup (laptop): latest={nvl.latest!r} note={nvl.note!r}")
+    try:
+        raw = vendor._get(vendor.AMD_VERSION)
+        print("AMD version file (first 700 chars):", raw[:700].replace("\n", " "))
+    except vendor.VendorError as problem:
+        print("AMD version file not reachable:", problem)
+    amd = vendor.check_graphics("AMD Radeon RX 7800 XT", "32.0.12033.1030", "")
+    print(f"AMD live check: latest={amd.latest!r} name={amd.latest_name!r} note={amd.note!r}")
     problems = up.read_problems()
     print(f"PASS real: Device Manager problems read: {len(problems)} ({'; '.join(p.name + ': ' + p.meaning for p in problems[:3]) or 'none'})")
     updates = up.search_updates()

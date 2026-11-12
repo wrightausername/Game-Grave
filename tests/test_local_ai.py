@@ -244,6 +244,15 @@ class Prompt(unittest.TestCase):
         self.assertEqual(msgs[-1]["content"], "what are my biggest games? /no_think")
         self.assertEqual([m["role"] for m in msgs[1:3]], ["user", "assistant"])
 
+    def test_model_knows_what_game_grave_already_does(self):
+        f = facts()
+        msgs = prompt.build_messages("what features should game grave add?", engine.answer("help", f), f)
+        system = msgs[0]["content"]
+        for name in ("Autopsy (Ready Room)", "Mod Bisect (Mods)", "Resurrection Kit (More Tools)", "Drivers & Startup"):
+            self.assertIn(name, system)
+        self.assertIn("Never say a feature is missing", system)
+        self.assertLess(len(system), 12000, "the prompt stays well inside the model's context")
+
     def test_turned_off_sources_are_left_out(self):
         f = replace(facts(), enabled=frozenset({"history"}))
         digest = prompt.facts_digest(f)

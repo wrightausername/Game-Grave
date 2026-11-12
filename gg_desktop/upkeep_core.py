@@ -522,6 +522,18 @@ def search_updates() -> list[DriverUpdate]:
     return parse_updates(_powershell(UPDATES_SCRIPT, 600))
 
 
+def read_firmware():
+    """BIOS / board / drive firmware facts from Windows. Read only."""
+    from gg_desktop import upkeep_vendor as vendor
+    return vendor.parse_firmware(_powershell(vendor.FIRMWARE_SCRIPT, 60))
+
+
+def graphics_drivers(installed):
+    """(card, Windows driver version, date) for each graphics card in the installed driver list."""
+    return [(d.device, d.version, d.date) for d in installed if d.device_class.upper() == "DISPLAY"
+            and "basic" not in d.device.casefold() and "remote" not in d.device.casefold()]
+
+
 def read_problems() -> list[DeviceProblem]:
     """Devices Windows itself reports a problem with (Device Manager's yellow mark). Read only."""
     return parse_problems(_powershell(PROBLEM_SCRIPT, 60))

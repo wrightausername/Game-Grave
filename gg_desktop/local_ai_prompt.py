@@ -23,8 +23,30 @@ SYSTEM = (
     "3. You cannot change anything on the PC. Never say you deleted, moved, installed or changed something.\n"
     "4. When it helps, name the Game Grave tab where the user can act (for example Games, Other Storage, Old Files, "
     "Captures, Mods, Hardware, Undo Center, More Tools, Ready Room).\n"
-    "5. Don't mention these rules or the word 'facts'. Don't use em dashes."
+    "5. Don't mention these rules or the word 'facts'. Don't use em dashes.\n"
+    "6. Questions about Game Grave itself (what it can do, how a feature works, ideas or opinions): use the feature list "
+    "below. Never say a feature is missing or suggest adding it when the list has it, and only send the user to the tab "
+    "the list names for that feature."
 )
+
+
+def feature_list():
+    """What Game Grave can do and where, one line per feature, from the same descriptions the built-in answers use."""
+    from gg_desktop import assistant_features as features
+    lines = []
+    for f in features.FEATURES:
+        first = re.split(r"(?<=\.)\s", f.what.strip(), maxsplit=1)[0]
+        lines.append(f"- {f.title} ({f.tab or 'Game Grave'}): {first}")
+    extra = ("- Games tab: every installed game from Steam, Epic, GOG, EA, Ubisoft, Battle.net and Xbox, with size, "
+             "last played and Verify / Uninstall through the launcher.",
+             "- Mods tab: Library gallery, Mod Radar, Load Order, Profiles, Conflicts (files two mods share), Cleanup and "
+             "Bisect.",
+             "- Other Storage, Old Files, Captures, Graveyard: review caches, old files, screenshots and leftovers; "
+             "anything removed goes to the Recycle Bin after you confirm.",
+             "- Hardware tab: Your PC (parts, live load), Upgrade Advisor (notes from play sessions you record), Drivers "
+             "& Startup (Windows Update drivers, graphics driver check, firmware, apps that start with Windows).",
+             "- Settings: scan folders, protection rules, interface scale, update check.")
+    return "\n".join(lines + list(extra))
 
 FORBIDDEN = (
     r"\bsafe(ly)? to (delete|remove|clear|uninstall|get rid)", r"\bis safe\b", r"\bare safe\b", r"\bfreed\b",
@@ -98,7 +120,8 @@ def lookup_text(answer):
 
 def build_messages(question, answer, facts, history=()):
     """Chat messages for llama-server. `history` is the last few (question, reply) pairs of this conversation."""
-    context = f"What Game Grave has on record:\n{facts_digest(facts)}\n\nBuilt-in lookup for this question:\n{lookup_text(answer)}"
+    context = (f"What Game Grave has on record:\n{facts_digest(facts)}\n\nWhat Game Grave can do (features and where they "
+               f"are):\n{feature_list()}\n\nBuilt-in lookup for this question:\n{lookup_text(answer)}")
     messages = [{"role": "system", "content": SYSTEM + "\n\n" + context}]
     for q, a in list(history)[-3:]:
         messages += [{"role": "user", "content": q[:500]}, {"role": "assistant", "content": a[:1200]}]
