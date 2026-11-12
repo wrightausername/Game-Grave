@@ -54,7 +54,7 @@ class Hosts(unittest.TestCase):
     def test_models_are_open_licensed_official_repos(self):
         self.assertEqual([m.key for m in ai.MODELS], ["small", "medium", "large"])
         for m in ai.MODELS:
-            self.assertTrue(m.repo.startswith("ggml-org/Qwen3-"), m.repo)
+            self.assertTrue(m.repo.startswith(("ggml-org/Qwen3-", "Qwen/Qwen3-")), m.repo)
 
 
 class Resolve(unittest.TestCase):
@@ -65,6 +65,17 @@ class Resolve(unittest.TestCase):
                    {"type": "file", "path": "Qwen3-4B-Q4_K_M.gguf", "lfs": {"oid": self.SHA, "size": 2500}},
                    {"type": "file", "path": "README.md", "size": 10}]
         self.assertEqual(ai.pick_model_file(listing, "Q4_K_M"), ("Qwen3-4B-Q4_K_M.gguf", 2500, self.SHA))
+
+    def test_plain_name_wins_over_variants(self):
+        listing = [{"type": "file", "path": "Qwen3-8B-UD-Q4_K_M.gguf", "lfs": {"oid": "b" * 64, "size": 9}},
+                   {"type": "file", "path": "Qwen3-8B-Q4_K_M.gguf", "lfs": {"oid": self.SHA, "size": 5}},
+                   {"type": "file", "path": "Qwen3-8B-Q4_K_M-00001-of-00002.gguf", "lfs": {"oid": "c" * 64, "size": 1}}]
+        self.assertEqual(ai.pick_model_file(listing, "Q4_K_M")[0], "Qwen3-8B-Q4_K_M.gguf")
+
+    def test_missing_quant_names_what_is_there(self):
+        with self.assertRaises(ai.LocalAIError) as caught:
+            ai.pick_model_file([{"type": "file", "path": "Qwen3-8B-Q8_0.gguf", "lfs": {"oid": self.SHA}}], "Q4_K_M")
+        self.assertIn("Qwen3-8B-Q8_0.gguf", str(caught.exception))
 
     def test_model_without_sha_is_refused(self):
         with self.assertRaises(ai.LocalAIError):

@@ -1,6 +1,6 @@
 """Optional local AI model for the AI Assistant: download, verify, run and remove. No Qt here.
 
-What it is: a small open language model (Qwen3, Apache 2.0, published by ggml-org, the llama.cpp team) run on this PC by
+What it is: a small open language model (Qwen3, Apache 2.0, published by ggml-org, the llama.cpp team, or by Qwen) run on this PC by
 llama.cpp's own `llama-server.exe`. Nothing is sent anywhere: the server listens on 127.0.0.1 only, and the model only
 sees the facts Game Grave already holds plus the question.
 
@@ -53,7 +53,7 @@ MODELS = (
                 "Fastest and lightest. Fine for short answers; weaker on long questions."),
     ModelChoice("medium", "Medium", "ggml-org/Qwen3-4B-GGUF", "Q4_K_M", int(2.5 * GB), 8,
                 "The best balance. Runs on most gaming PCs and answers in a few seconds."),
-    ModelChoice("large", "Large", "ggml-org/Qwen3-8B-GGUF", "Q4_K_M", int(5.03 * GB), 16,
+    ModelChoice("large", "Large", "Qwen/Qwen3-8B-GGUF", "Q4_K_M", int(5.03 * GB), 16,
                 "Best answers. Needs 16 GB of memory and is slower without a strong graphics card."),
 )
 BY_KEY = {m.key: m for m in MODELS}
@@ -157,10 +157,12 @@ class Remote:
 def pick_model_file(listing, quant):
     """The single .gguf in a Hugging Face tree listing whose name ends with the quant, with its recorded SHA-256."""
     hits = [f for f in listing if isinstance(f, dict) and f.get("type") == "file"
-            and str(f.get("path", "")).lower().endswith(f"-{quant.lower()}.gguf") and "/" not in str(f.get("path", ""))]
-    if len(hits) != 1:
-        raise LocalAIError(f"Hugging Face did not list exactly one {quant} model file.")
-    item = hits[0]
+            and str(f.get("path", "")).lower().endswith(f"{quant.lower()}.gguf") and "/" not in str(f.get("path", ""))
+            and "-of-" not in str(f.get("path", "")).lower()]  # split files are not supported
+    if not hits:
+        names = ", ".join(str(f.get("path")) for f in listing if isinstance(f, dict))[:300]
+        raise LocalAIError(f"Hugging Face lists no single {quant} model file (it has: {names}).")
+    item = min(hits, key=lambda f: len(str(f["path"])))  # the plain name, not a variant like ...-UD-Q4_K_M
     lfs = item.get("lfs") or {}
     sha = str(lfs.get("oid") or lfs.get("sha256") or "").lower()
     size = int(lfs.get("size") or item.get("size") or 0)
