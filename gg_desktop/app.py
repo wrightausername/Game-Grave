@@ -26,7 +26,9 @@ from gg_desktop.reference_widgets import Brand, NavRail, ROUTE_SYMBOLS, TitleBar
 from gg_desktop.scan_progress import ScanProgress
 from gg_desktop.ready_room import ReadyRoomMethods
 
-ROUTES = tuple(ROUTE_SYMBOLS.items())
+from gg_desktop import nav_groups as _nav_groups
+
+ROUTES = tuple((route, ROUTE_SYMBOLS[route]) for route in _nav_groups.routes())
 
 ROUTE_ALIASES = {
     "Steam Games": "Games", "Other Launchers": "Games",
@@ -34,6 +36,7 @@ ROUTE_ALIASES = {
     "Save Vault": "More Tools", "Resurrection Lab": "More Tools",
     "Cleanup History": "More Tools", "Automation": "More Tools",
     "Make Room": "More Tools", "Storage History": "More Tools",
+    "Toolbox": "More Tools",
 }
 
 
@@ -116,22 +119,10 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         rail.setLayout(r)
         self.brand = Brand()
         r.addWidget(self.brand)
-        r.addSpacing(15)
-        self.nav_buttons = {}
-        for route, symbol in ROUTES:
-            control = button("   " + route,
-                             lambda _checked=False, route=route: self.navigate(route),
-                             kind="navButton")
-            control.setIcon(icon(symbol, size=23))
-            control.setIconSize(QSize(23, 23))
-            control.setFixedHeight(35)
-            control.setProperty("active", route == self.current_route)
-            control.setAccessibleName(route + " page")
-            control.setFocusPolicy(Qt.StrongFocus)
-            r.addWidget(control)
-            self.nav_buttons[route] = control
+        r.addSpacing(8)
+        from gg_desktop import nav_rail
+        self.nav_buttons = nav_rail.build(self, r)
         self._sync_assistant_nav()
-        r.addStretch()
         outer.addWidget(rail)
 
         main = QWidget()
@@ -179,11 +170,10 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.scan_button.hide()
         topbox.addWidget(tool("", "bell", lambda: self.info("Scan Status", self.status.text() +
             ("\n\n" + "\n".join(self.inventory.warnings) if self.inventory.warnings else "")), kind="chromeButton", tip="Scan status and warnings"))
-        topbox.addWidget(tool("", "help", lambda: self.info("Game Grave Help", "Scan PC (F5) discovers your local library.\n"
-            "Use Ctrl+K to search the current page.\n\n"
-            "Select a game, mod location or file for details. Check individual old files before requesting a Recycle Bin review.\n"
-            "Managed mods, saves and installed games remain protected.\n\n"
-            "This is the optional Crimson Command desktop preview."), kind="chromeButton", tip="Help"))
+        help_button = tool("", "help", self.open_welcome_tour, kind="chromeButton",
+                           tip="Help: watch the welcome tour of Game Grave")
+        help_button.setAccessibleName("Help: watch the welcome tour")
+        topbox.addWidget(help_button)
         for symbol, action, tip in (("minus", self.showMinimized, "Minimize"),
                                     ("maximize", self._toggle_maximize, "Maximize or restore"),
                                     ("close", self.close, "Close")):
@@ -210,6 +200,17 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
 
 
 
+    def open_welcome_tour(self):
+        from gg_desktop import welcome_ui
+        return welcome_ui.open_tour(self)
+
+    def _welcome_setting_changed(self):
+        """The tour changed the startup choice; a Settings page on screen shows it straight away."""
+        if self.current_route == "Settings":
+            from gg_desktop import settings_page
+            settings_page.state_of(self).pending = None
+            self.navigate("Settings")
+
     def _toggle_maximize(self):
         self.showNormal() if self.isMaximized() else self.showMaximized()
 
@@ -220,12 +221,6 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.nav_rail.setFixedWidth(296 if wide_overview else 219)
         self.top_bar.setFixedHeight(56 if wide_overview else 46)
         self.brand.setFixedHeight(80 if wide_overview else 65)
-        for control in self.nav_buttons.values():
-            control.setFixedHeight(40 if wide_overview and self.height() >= 740 else 35)
-            if control.property("overview") != wide_overview:
-                control.setProperty("overview", wide_overview)
-                control.style().unpolish(control)
-                control.style().polish(control)
 
     def _search_current_page(self, text):
         attr = {"Games": "game_search", "Mods": "mod_search", "Old Files": "old_search",
@@ -269,9 +264,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.global_search.blockSignals(False)
         self.search_shell.setMaximumWidth({"Games":452, "Ready Room":452, "Old Files":475}.get(title, 550))
         for route, control in self.nav_buttons.items():
-            control.setProperty("active", route == title)
-            control.style().unpolish(control)
-            control.style().polish(control)
+            control.set_active(route == title)
         return self.page
 
     def assistant_enabled(self) -> bool:
@@ -282,6 +275,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         control = self.nav_buttons.get("AI Assistant")
         if control is not None:
             control.setVisible(self.assistant_enabled())
+        from gg_desktop import nav_rail
+        nav_rail.sync_groups(self)
 
     def navigate(self, route: str):
         route = ROUTE_ALIASES.get(route, route)
@@ -305,6 +300,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             "Undo Center": self.undo_page,
             "Settings": self.settings_page,
             "More Tools": self.tools_page,
+            "Fix Kit": self.fix_kit_page,
         }
         methods[route]()
         self._name_controls()

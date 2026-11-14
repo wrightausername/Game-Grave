@@ -19,7 +19,7 @@ ROUTE_ART = {
     "Mods": "banner_mods.jpg", "Old Files": "banner_old_files.jpg", "Other Storage": "banner_other_storage.jpg",
     "Captures": "banner_captures.jpg", "Graveyard": "banner_graveyard.jpg", "Game DNA": "banner_dna.jpg", "Hardware": "banner_hardware.jpg",
     "Undo Center": "banner_undo.jpg", "Settings": "banner_settings.jpg", "AI Assistant": "banner_assistant.jpg",
-    "More Tools": "banner_more_tools.jpg",
+    "More Tools": "banner_more_tools.jpg", "Fix Kit": "banner_fix_kit.jpg",
 }
 
 

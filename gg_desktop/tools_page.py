@@ -22,7 +22,7 @@ from gg_desktop.header_banner import HeaderBannerArtwork
 from gg_desktop.reference_widgets import icon, tool
 from gg_desktop.widgets import button, column, label, panel, row
 
-SUBTITLE = "Back up, report on and manage your games."
+SUBTITLE = "Windows, backup, report and file tools, each listed once."
 TONES = {"red": "255,37,74", "cyan": "19,188,245", "purple": "180,85,255", "magenta": "223,80,200",
          "blue": "40,140,255", "yellow": "246,190,36", "green": "50,214,122"}
 HEX = {"red": "#ff3b57", "cyan": "#13bcf5", "purple": "#b455ff", "magenta": "#df50c8", "blue": "#288cff",
@@ -206,8 +206,8 @@ def heading(symbol, text, tone):
 def category_panel(window, category):
     frame, stack = panel(kind="fileFilterPanel", padding=9, spacing=6)
     accent(frame, "tools_" + category.key, category.tone)
-    symbol = {"maintenance": "trash", "optimization": "sparkles", "backup": "archive", "analysis": "list",
-              "utilities": "box", "advanced": "settings"}[category.key]
+    symbol = {"windows": "settings", "backup": "archive", "reports": "list", "files": "box",
+              "elsewhere": "grid"}.get(category.key, "box")
     frame.setAccessibleName(category.title)
     top = column(spacing=0)
     top.addLayout(heading(symbol, category.title, category.tone))
@@ -238,6 +238,7 @@ def build(window):
     try:  # the TOOLKIT chip sits beside the title, as in the photo
         text_column = banner.layout().itemAt(1).layout()
         title = text_column.takeAt(0).widget()
+        title.setText("Toolbox")   # shown name; the route key stays "More Tools"
         line = row(spacing=10)
         line.addWidget(title)
         line.addWidget(chip("TOOLKIT", "red"), 0, Qt.AlignVCenter)
@@ -258,6 +259,7 @@ def build(window):
         self.tools_tabs[key] = control
         strip_lay.addWidget(control, 1)
     page.content.addWidget(strip)
+    strip.setVisible(len(data.TABS) > 1)   # one page now: no tab row
 
     self.tools_holder = QWidget()
     holder_lay = column(spacing=8)

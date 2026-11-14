@@ -110,24 +110,12 @@ def main():
             state = tools_page.state_of(window)
             assert window.current_route == "More Tools" and hasattr(window.page, "tools_ready")
 
-            # The photo's structure: six tabs, six categories, twenty-four tiles.
-            assert list(window.tools_tabs) == [t[0] for t in data.TABS] and window.tools_tabs["hub"].isChecked()
-            assert len(window.tools_panels) == 6 and len(window.tools_tiles) == 24
+            # One Toolbox page: five groups, every tool listed once, no inner tab row.
+            assert list(window.tools_tabs) == ["hub"] and not window.tools_tabs["hub"].isVisible()
+            assert len(window.tools_panels) == 5 and len(window.tools_tiles) == 21
             assert all(window.tools_panels[c.key].isVisible() for c in data.CATEGORIES)
             assert [b.accessibleName() for b in window.tools_quick_buttons.values()] == [q[1] for q in data.QUICK_ACTIONS]
             assert window.grab().save(str(args.output / "tools-hub-1280.png"))
-
-            # Top tabs show only their categories, then the hub shows all again.
-            for key, _title, _cap, _symbol, cats in data.TABS:
-                window.tools_tabs[key].click()
-                settle()
-                visible = {c for c, f in window.tools_panels.items() if f.isVisible()}
-                assert visible == set(cats), (key, visible)
-            window.tools_tabs["advanced"].click()
-            settle()
-            assert window.grab().save(str(args.output / "tools-advanced-1280.png"))
-            window.tools_tabs["hub"].click()
-            settle()
 
             # Tiles that belong to another tab open it.
             for tile in [t for t in data.all_tiles() if t.kind == data.GO]:
@@ -386,7 +374,7 @@ def main():
             settle()
         assert tree_bytes(root / "Untouched") == before, "Nothing outside the chosen report files may change"
         assert small.read_bytes() == small_before and hashlib.sha256(big.read_bytes()).hexdigest() == big_before, "Hashing never edits a file"
-    print("PASS: More Tools page: six tabs and twenty-four tiles, hand-offs to the owning tabs, the seven Windows tools wired to their own screens, "
+    print("PASS: Toolbox page: five groups and twenty-one tiles, hand-offs to the owning tabs, the seven Windows tools wired to their own screens, "
           "reports, a real hash checker, live health readings, real Active Tasks, the Tool Log and no sideways scrolling.")
     return 0
 

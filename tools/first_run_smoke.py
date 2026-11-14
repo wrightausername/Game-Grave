@@ -51,7 +51,7 @@ def main():
             assert any(b.isVisible() and "scan" in b.text().casefold() for b in window.findChildren(QAbstractButton)), \
                 "The first screen offers a scan"
             for route in ("Overview", "Ready Room", "Games", "Mods", "Old Files", "Other Storage", "Captures", "Graveyard",
-                          "Game DNA", "Hardware", "Undo Center", "More Tools", "Settings"):
+                          "Fix Kit", "Game DNA", "Hardware", "Undo Center", "More Tools", "Settings"):
                 window.navigate(route)
                 settle(500)
                 assert window.grab().save(str(args.output / f"first-run-{route.lower().replace(' ', '-')}.png")), route

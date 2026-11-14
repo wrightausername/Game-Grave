@@ -367,6 +367,8 @@ def startup_panel(window):
                                "Asks GitHub once when Game Grave starts. Nothing is downloaded or installed."))
     body.addWidget(bool_switch(window, "soulbind_new_games", "Soulbind new games",
                                "Applies your Soulbind preferences to newly installed games after a scan. Backup first."))
+    body.addWidget(bool_switch(window, "welcome_at_startup", "Welcome tour at startup",
+                               "Shows the short tour of Game Grave each time it opens. Watch it now from Appearance."))
     body.addStretch()
     return box
 
@@ -617,16 +619,29 @@ def remove_rule(window):
     sync(window)
 
 
+def _open_tour(window):
+    from gg_desktop import welcome_ui
+    welcome_ui.open_tour(window)
+
+
 def appearance_panel(window):
     box, body = frame("settingsAppearance", "red", "Appearance", "sparkles")
     body.addWidget(line("Theme", "", pill("Crimson Command")))
     body.addWidget(line("Interface scale", "", scale_combo(window)))
     body.addWidget(label("The theme is fixed so every tab keeps its approved layout. A larger scale enlarges the whole "
                          "window evenly and is used the next time Game Grave starts.", "caption", wrap=True))
-    classic = tool("Open More Tools…", "more", lambda: window.navigate("More Tools"),
-                   tip="Backups, Resurrection Kits, Windows tools and utilities live in More Tools")
+    classic = tool("Open Toolbox…", "more", lambda: window.navigate("More Tools"),
+                   tip="Windows tools, backups, reports and file utilities live in Toolbox")
     classic.setFixedHeight(28)
-    body.addWidget(classic)
+    tour = tool("Watch the welcome tour", "help", lambda: _open_tour(window),
+                tip="A short tour of every part of Game Grave. Skip it or close it any time.")
+    tour.setFixedHeight(28)
+    tour.setAccessibleName("Watch the welcome tour")
+    buttons = row(spacing=6)
+    buttons.addWidget(classic)
+    buttons.addWidget(tour)
+    buttons.addStretch()
+    body.addLayout(buttons)
     body.addStretch()
     return box
 

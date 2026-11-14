@@ -22,7 +22,7 @@ SYSTEM = (
     "2. Sizes are what launchers and scans reported, not measured disk use. Never say space was or will be freed.\n"
     "3. You cannot change anything on the PC. Never say you deleted, moved, installed or changed something.\n"
     "4. When it helps, name the Game Grave tab where the user can act (for example Games, Other Storage, Old Files, "
-    "Captures, Mods, Hardware, Undo Center, More Tools, Ready Room).\n"
+    "Captures, Mods, Hardware, Undo Center, Fix Kit, Toolbox, Ready Room).\n"
     "5. Don't mention these rules or the word 'facts'. Don't use em dashes.\n"
     "6. Questions about Game Grave itself (what it can do, how a feature works, ideas or opinions): use the feature list "
     "below. Never say a feature is missing or suggest adding it when the list has it, and only send the user to the tab "

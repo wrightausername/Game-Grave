@@ -1,4 +1,4 @@
-"""More Tools: the tile registry and the report, CSV and hash helpers. No Qt in this module.
+"""Toolbox (route key "More Tools"): the tile registry and the report, CSV and hash helpers. No Qt in this module.
 
 Honesty rules for this tab:
 * A tile is "go" (opens the tab that owns the work), "run" (a real action implemented in this tab) or "unavailable".
@@ -44,47 +44,40 @@ def _off(key, title, symbol, why=OFF_REASON):
     return Tile(key, title, symbol, OFF, note=why)
 
 
+# Toolbox (owner instruction, 2026-11-14: "these need to be more organized"; picked "One page, real tools"). One page, each
+# tool listed once. Tiles that only open another tab sit together under "Also in Game Grave". Resurrection Kit also has a
+# home in Fix Kit; the tile here opens the same kit menu.
 CATEGORIES = (
-    Category("maintenance", "Maintenance", "Keep your PC clean and running smoothly.", "red", (
-        Tile("disk_cleanup", "Disk Cleanup", "trash", GO, "Other Storage", "Opens Other Storage, where caches, logs and temp files the scan found are listed. You review items one at a time; nothing is removed from here."),
-        Tile("temp_files", "Temp Files", "file", GO, "Other Storage", "Opens Other Storage filtered to the temporary files the scan found. Nothing is removed until you review and confirm there."),
-        Tile("clear_caches", "Clear Caches", "refresh", GO, "Other Storage", "Opens Other Storage to the cache folders the scan found. Each is reviewed and confirmed there; driver and Steam library caches are review only."),
-        Tile("windows_cleanup", "Windows Cleanup", "settings", RUN, "windows_cleanup", "Delete temporary files older than 2 days from your Windows temp folders after you confirm."))),
-    Category("optimization", "Optimization", "Reduce clutter that may slow down games.", "cyan", (
+    Category("windows", "Windows", "Tune and tidy Windows for gaming. Each change is shown and confirmed first.", "red", (
+        Tile("windows_cleanup", "Windows Cleanup", "settings", RUN, "windows_cleanup", "Delete temporary files older than 2 days from your Windows temp folders after you confirm."),
         Tile("game_optimizer", "Game Optimizer", "play", RUN, "game_optimizer", "Turn on Game Mode, turn off background recording or switch the power plan. Undo restores your values."),
-        Tile("shader_cache", "Shader Cache", "dna", GO, "Game DNA", "Opens Game DNA, which lists the shader caches Game Grave can prove belong to a game (by Steam app ID). Display only."),
         Tile("memory_optimizer", "Memory Optimizer", "storage", RUN, "memory_optimizer", "Choose open apps to close politely, largest memory first. Windows itself is never listed."),
         Tile("startup_manager", "Startup Manager", "clock", RUN, "startup_manager", "Opens Hardware, Drivers & Startup: every app that starts with Windows, with Task Manager's own on/off switch."))),
-    Category("backup", "Backup and Recovery", "Back up and restore what matters most.", "purple", (
+    Category("backup", "Backups", "Copies of your saves, mods and whole games, checked after they are written.", "purple", (
         Tile("game_backup", "Game Backup", "archive", RUN, "save_vault", "Back up a folder you choose into a verified Save Vault ZIP."),
         Tile("save_backup", "Save Backup", "shield", RUN, "save_vault", "Back up a save folder you choose into a verified Save Vault ZIP."),
         Tile("mod_backup", "Mod Backup", "mods", RUN, "save_vault", "Back up a mod folder you choose into a verified Save Vault ZIP."),
         Tile("resurrection_kit", "Resurrection Kit", "grave", RUN, "kit_menu", "Saves a game's whole install, saves, load order and mods into one verified ZIP you can restore later. Opens a menu: set up a kit, restore a game, inspect, rehearse, compare or transfer. Nothing changes until you confirm."))),
-    Category("analysis", "Analysis and Reporting", "Understand what uses your space.", "magenta", (
-        Tile("storage_analyzer", "Storage Analyzer", "storage", GO, "Overview", "Opens Overview, which shows the sizes your last scan reported, grouped by type. They are reported sizes, not measured disk use."),
+    Category("reports", "Reports", "Save what the last scan found as a file you can keep or share.", "magenta", (
         Tile("game_size_report", "Game Size Report", "game", RUN, "game_report", "Save a CSV of installed games and their reported sizes."),
         Tile("mod_report", "Mod Report", "mods", RUN, "mod_report", "Save a CSV of the mod and game folders the scan found."),
         Tile("system_report", "System Report", "list", RUN, "system_report", "Save a text summary of the last scan and this PC."))),
-    Category("utilities", "Utilities", "Handy tools for everyday tasks.", "blue", (
-        Tile("screenshot_tools", "Screenshot Tools", "camera", GO, "Captures", "Opens Captures, where screenshots are grouped by game only when the file path proves the game. Each is previewed before any Recycle Bin move."),
-        Tile("recording_tools", "Recording Tools", "radio", GO, "Captures", "Opens Captures, where recordings are listed with their size and game when proven. Removal is Recycle Bin only, after you confirm."),
-        Tile("bulk_files", "Bulk File Manager", "folder", GO, "Old Files", "Opens Old Files, which lists older ordinary files in the folder you pick. Age does not prove a file is unused; you choose what to review."),
-        Tile("hash_checker", "Hash Checker", "check", RUN, "hash", "Compute a SHA-256 checksum of any file you choose."))),
-    Category("advanced", "Advanced Tools", "Powerful tools for experienced users.", "yellow", (
-        Tile("command_runner", "Command Runner", "list", RUN, "command_runner", "Run one command line you type or pick, after you see it and confirm."),
+    Category("files", "Files", "Small utilities for files and folders.", "blue", (
+        Tile("hash_checker", "Hash Checker", "check", RUN, "hash", "Compute a SHA-256 checksum of any file you choose."),
         Tile("file_associations", "File Associations", "file", RUN, "file_associations", "Look up which app opens a file type and jump to Windows Default apps."),
         Tile("junction_manager", "Junction Manager", "folder", RUN, "junction_manager", "List, create or remove folder junctions. Removing deletes only the link."),
-        Tile("advanced_cleanup", "Advanced Cleanup", "grave", GO, "Graveyard", "Opens the Graveyard, where apparent storage and protected folders are explained and individual Recycle Bin moves are approved one at a time."))),
+        Tile("command_runner", "Command Runner", "list", RUN, "command_runner", "Run one command line you type or pick, after you see it and confirm."))),
+    Category("elsewhere", "Also in Game Grave", "These jobs have their own tab. Click to go there.", "cyan", (
+        Tile("disk_cleanup", "Caches and Temp", "trash", GO, "Other Storage", "Opens Other Storage, where caches, logs and temp files the scan found are listed. You review items one at a time; nothing is removed from here."),
+        Tile("bulk_files", "Old Files", "folder", GO, "Old Files", "Opens Old Files, which lists older ordinary files in the folder you pick. Age does not prove a file is unused; you choose what to review."),
+        Tile("screenshot_tools", "Screenshots and Clips", "camera", GO, "Captures", "Opens Captures, where screenshots and recordings are grouped by game only when the file path proves the game. Each is previewed before any Recycle Bin move."),
+        Tile("advanced_cleanup", "Game Leftovers", "grave", GO, "Graveyard", "Opens the Graveyard, where leftovers from removed games are explained and individual Recycle Bin moves are approved one at a time."),
+        Tile("shader_cache", "Shader Caches", "dna", GO, "Game DNA", "Opens Game DNA, which lists the shader caches Game Grave can prove belong to a game (by Steam app ID). Display only."),
+        Tile("storage_analyzer", "Storage Overview", "storage", GO, "Overview", "Opens Overview, which shows the sizes your last scan reported, grouped by type. They are reported sizes, not measured disk use."))),
 )
 
 TABS = (
-    ("hub", "Toolbox Hub", "All tools and utilities", "grid",
-     ("maintenance", "optimization", "backup", "analysis", "utilities", "advanced")),
-    ("system", "System Tools", "PC maintenance and health", "settings", ("maintenance", "optimization", "analysis")),
-    ("game", "Game Tools", "Game-specific utilities", "game", ("backup", "analysis", "utilities")),
-    ("file", "File Tools", "Manage and work with files", "folder", ("maintenance", "utilities")),
-    ("repair", "Repair and Fix", "Backups and recovery", "shield", ("backup", "maintenance")),
-    ("advanced", "Advanced", "Power user tools", "star", ("advanced", "utilities")),
+    ("hub", "Toolbox", "Every tool, listed once", "grid", tuple(c.key for c in CATEGORIES)),
 )
 
 _by_tab = {key: cats for key, _t, _s, _i, cats in TABS}

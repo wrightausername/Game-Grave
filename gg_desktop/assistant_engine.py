@@ -64,6 +64,12 @@ class Answer:
                 "handoffs": [list(h) for h in self.handoffs]}
 
 
+def _shown(tab):
+    """The tab's name as the sidebar shows it (More Tools is shown as Toolbox)."""
+    from gg_desktop.nav_groups import display_name
+    return display_name(tab)
+
+
 def answer_from_dict(value):
     """Rebuild a saved answer; anything malformed becomes None so a damaged settings file cannot break the page."""
     try:
@@ -260,7 +266,7 @@ def _feature(question, game_name=""):
     text = features.explain(feature)
     asked_safe = any(w in question.casefold() for w in ("safe", "safely", "delete", "remove"))
     note = SAFETY_TEXT if asked_safe else ""
-    handoffs = ((f"Open {feature.tab}", feature.tab),) if feature.tab else ()
+    handoffs = (("Open " + _shown(feature.tab), feature.tab),) if feature.tab else ()
     return Answer("feature", text, note=note, handoffs=handoffs)
 
 
@@ -325,7 +331,7 @@ def _summary(facts, game, question):
     for row in rows:
         if row.tab not in seen and len(handoffs) < 3:
             seen.add(row.tab)
-            handoffs.append((f"Open {row.tab}", row.tab))
+            handoffs.append(("Open " + _shown(row.tab), row.tab))
     return Answer("summary", text, rows, note, _source_names(*used), tuple(handoffs))
 
 
@@ -546,7 +552,7 @@ def _thanks():
 def _feature_key(key, note=""):
     feature = features.BY_KEY[key]
     return Answer("feature", features.explain(feature), note=note,
-                  handoffs=((f"Open {feature.tab}", feature.tab),) if feature.tab else ())
+                  handoffs=(("Open " + _shown(feature.tab), feature.tab),) if feature.tab else ())
 
 
 def _squad():
@@ -705,7 +711,7 @@ def _count(facts, game, question):
         return _unknown()
     tab = {"games": "Games", "mods": "Mods", "captures": "Captures", "saves": "Game DNA", "history": "Undo Center"}[asks[0]]
     return Answer("count", " ".join(parts), tuple(rows[:TOP + 2]), "", _source_names(*dict.fromkeys(used)),
-                  ((f"Open {tab}", tab),))
+                  (("Open " + _shown(tab), tab),))
 
 
 def _candidates(facts, game, question):
@@ -754,7 +760,7 @@ def _candidates(facts, game, question):
     for r in shown:
         if r.tab not in seen and len(handoffs) < 3:
             seen.add(r.tab)
-            handoffs.append((f"Open {r.tab}", r.tab))
+            handoffs.append(("Open " + _shown(r.tab), r.tab))
     return Answer("candidates", "These are where the most space sits that you might not need, biggest first. Each one "
                   "opens in the tab that can act on it, after you review it:", shown,
                   "Sizes are reported, not measured, and nothing is removed from here. Games go through their launcher; "
@@ -862,16 +868,16 @@ def _backup():
 def _performance(facts, game, question):
     who = game.name if game else "a game"
     return Answer("performance", f"Game Grave can't make {who} faster by itself, but it can show you what's slowing it:\n"
-                  "• Autopsy (Ready Room) reads frame-time captures from PresentMon or CapFrameX and shows stutters and "
+                  "• Autopsy (Fix Kit) reads frame-time captures from PresentMon or CapFrameX and shows stutters and "
                   "your 1% lows.\n"
                   "• Hardware's live monitor shows whether the processor, graphics card or memory is maxed out while "
                   "you play, and Upgrade Advisor turns recorded sessions into notes on what held you back.\n"
                   "• Drivers & Startup (Hardware) checks Windows Update for driver updates and lets you switch off apps "
                   "that start with Windows and run in the background.\n"
-                  "• If it started after a driver update, Exhume (Ready Room) helps roll the graphics driver back.\n"
+                  "• If it started after a driver update, Exhume (Fix Kit) helps roll the graphics driver back.\n"
                   "• If it started after adding mods, Mod Bisect finds which mod does it.",
                   note="Nothing here changes a setting by itself; each tool asks first.",
-                  handoffs=(("Open Hardware", "Hardware"), ("Open Ready Room", "Ready Room")))
+                  handoffs=(("Open Hardware", "Hardware"), ("Open Fix Kit", "Fix Kit")))
 
 
 def _verify(facts, game, question):

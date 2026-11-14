@@ -43,18 +43,18 @@ FEATURES = (
         "action asks first. Launcher accounts and licences are not part of a kit, so a launcher may sign in or "
         "re-verify the files the first time you start the restored game. Saves are only included when the save "
         "scanner labeled the folder with that exact game or you linked it in Game DNA.",
-        "More Tools, then Backup and Recovery, then Resurrection Kit.", "More Tools",
+        "Fix Kit, then Resurrection Kit (also in Toolbox, Backups).", "Fix Kit",
         "Saves a game's whole install, saves, load order and mods into one verified ZIP you can restore later. Opens "
         "a menu to set up, restore, inspect, rehearse, compare or transfer kits. Nothing changes until you confirm."),
     Feature(
         "save_vault", "Save Vault",
         ("save vault", "savevault", "game backup", "save backup", "mod backup", "back up my saves", "backup my saves"),
         "Save Vault copies one folder you choose, such as a save or profile folder, into a new ZIP and verifies the "
-        "ZIP afterwards. Game Backup, Save Backup and Mod Backup in More Tools all use it.",
+        "ZIP afterwards. Game Backup, Save Backup and Mod Backup in Toolbox all use it.",
         ("Choose the folder, choose a new ZIP name, confirm, and it runs in the background.",),
         "It never deletes or overwrites your source files and refuses to write over an existing ZIP. Close the game "
         "first so the files are consistent.",
-        "More Tools, then Backup and Recovery.", "More Tools",
+        "Toolbox, then Backups.", "More Tools",
         "Copies the one folder you pick into a new, verified ZIP. The original files are never touched."),
     Feature(
         "black_box", "Black Box",
@@ -64,7 +64,7 @@ FEATURES = (
         ("It reads the Windows Application log for crashes of that game.",
          "It lists crash logs and dump files found in the game folder and recently changed files there."),
         "It does not say why the game crashed, does not go online and changes nothing on your PC.",
-        "Ready Room, then Black Box. Open the panel with the Open button.", "Ready Room",
+        "Fix Kit, then Black Box. Click the panel to open it.", "Fix Kit",
         "Builds a crash report for one game from the Windows Application log and the game folder. Read-only."),
     Feature(
         "exhume", "Exhume",
@@ -72,13 +72,13 @@ FEATURES = (
         "Exhume looks for older graphics drivers that Windows still has stored and lets you bring one back.",
         ("Checking only reads the driver list.", "Rolling back asks first and may need administrator rights."),
         "Checking changes nothing.",
-        "Ready Room, then Exhume.", "Ready Room",
+        "Fix Kit, then Exhume.", "Fix Kit",
         "Lists older graphics drivers Windows still has stored. Checking changes nothing; a rollback asks first."),
     Feature(
         "autopsy", "Autopsy",
         ("autopsy", "frame time", "frametime", "frame-time"),
         "Autopsy runs by itself and compares your newest frame-time captures, keeping ten.",
-        (), "It does not capture frames itself.", "Ready Room, then Autopsy.", "Ready Room",
+        (), "It does not capture frames itself.", "Fix Kit, then Autopsy.", "Fix Kit",
         "Compares your newest frame-time captures. Runs automatically and keeps ten."),
     Feature(
         "soulbind", "Soulbind",
@@ -206,7 +206,7 @@ FEATURES = (
         "hash_checker", "Hash Checker",
         ("hash checker", "checksum", "sha-256", "sha256"),
         "Hash Checker computes the SHA-256 checksum of any file you choose and compares it with one you paste.",
-        (), "A match proves the bytes are identical, not that the file is good.", "More Tools, then Utilities.",
+        (), "A match proves the bytes are identical, not that the file is good.", "Toolbox, then Files.",
         "More Tools",
         "Computes a SHA-256 checksum of a file you choose. Read-only."),
     Feature(

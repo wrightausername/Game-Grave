@@ -6,6 +6,8 @@ every row that names files hands the owner to the tab that owns them. Conversati
 """
 from __future__ import annotations
 
+from gg_desktop.nav_groups import display_name
+
 from types import SimpleNamespace
 import time
 
@@ -86,8 +88,8 @@ class AnswerRow(QFrame):
             words.addWidget(Bar(item.share, color))
         line.addLayout(words, 1)
         if item.tab:
-            go = tool("Open", "chevron", lambda _=False, tab=item.tab: window.navigate(tab), tip=f"Open {item.tab}")
-            go.setText("Open " + item.tab)
+            go = tool("Open", "chevron", lambda _=False, tab=item.tab: window.navigate(tab), tip="Open " + display_name(item.tab))
+            go.setText("Open " + display_name(item.tab))
             go.setIcon(icon("chevron", "#e8eef5", 12))
             go.setFixedHeight(26)
             go.setStyleSheet("font-size:11px;padding:0 9px;")

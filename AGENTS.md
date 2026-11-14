@@ -596,3 +596,25 @@ screens (what Game Grave is; Mod Bisect, Undo Center, Black Box; Soulbind, Hardw
 the photo-reference preview or when starting minimized. No tab, the shell, navigation or shared styles changed. Covered by
 `tools/welcome_smoke.py`. The grouped sidebar with subtitles and an Overview "Start here" card were proposed but need the owner to
 reopen the shell and Overview.
+
+Organization pass (owner instruction, 2026-11-14: "lets focus on organizing these tools and tabs... if i click on a tool tab it
+should just open... the tutorial needs to be a little more extensive along with an option to turn off on startup permanently, or
+skip, or look at it again in the settings"; answers: "Grouped sidebar" with a new Fix Kit tab, and "One page, real tools" for More
+Tools). This reopens the shared sidebar, Ready Room (its Black Box, Autopsy and Exhume strips move out), More Tools (hub layout),
+Settings (one switch and one button) and the top bar's ? button. Everything else stays as locked.
+- Sidebar (`gg_desktop/nav_groups.py` pure, `gg_desktop/nav_rail.py` Qt): five headings (Home; Library; Clean Up; Fix and Protect;
+  PC and Help), each tab with one plain line under it, in a scroll area so it fits short windows. Route keys are unchanged; More
+  Tools is shown as "Toolbox" (`nav_groups.display_name`, also used by AI Assistant hand-off buttons).
+- Fix Kit (`gg_desktop/fix_kit_page.py`, banner `banner_fix_kit.jpg` from `tools/make_banner_art.py fix_kit`): cards for Mod Bisect
+  (opens Mods > Bisect for this visit without changing the saved My Mods / Advanced choice) and Resurrection Kit (Set up a kit,
+  Restore a game, More kit tools: the existing windows), then the Black Box, Autopsy and Exhume strips, unchanged, moved from
+  Ready Room. Soulbind and Squad Sync stay in Ready Room.
+- Strips (`feature_strip.collapsible`): a click anywhere on the header line opens or hides the strip; the Open / Hide button stays.
+- Toolbox (`tools_data.CATEGORIES`): one page, no inner tab row, every tool once: Windows, Backups, Reports, Files, and "Also in
+  Game Grave" (the tiles that only open another tab). The duplicate Temp Files, Clear Caches and Recording Tools tiles are gone.
+- Welcome tour (`welcome_data.py`, `welcome_ui.py`): eight screens covering every sidebar group, a step count, arrow keys, Skip intro
+  (shows again next start), "Don't show this at startup" (off for good) and finishing (turns startup off). Setting
+  `welcome_at_startup` (default on) is a Settings switch in Startup & Behavior; "Watch the welcome tour" in Appearance and the ?
+  button in the top bar open it any time without changing the startup choice. The old `welcome_seen` key is no longer read.
+- Covered by `tests/test_nav_groups.py`, `tests/test_welcome.py`, `tests/test_tools.py`, `tools/welcome_smoke.py`, and the updated
+  tools page, shell, hardware, first run, Black Box, Autopsy and Exhume smokes.

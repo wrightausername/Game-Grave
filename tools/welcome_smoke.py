@@ -1,4 +1,5 @@
-"""First-launch welcome: shows once, steps through three screens, Scan my games starts the scan, then never again."""
+"""Welcome tour: shows at startup, steps through every screen, Skip keeps it for next time, "Don't show this at startup"
+and finishing turn it off, Scan my games starts the scan, and Settings and the ? button open it again."""
 from __future__ import annotations
 
 import argparse
@@ -18,16 +19,17 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     if sys.platform.startswith("linux"):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    faulthandler.dump_traceback_later(120, exit=True)
+    faulthandler.dump_traceback_later(160, exit=True)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from PySide6.QtCore import QCoreApplication, QEvent
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QPushButton
     from core import default_settings
     from gg_desktop.app import CrimsonWindow
     from gg_desktop import welcome_ui, welcome_data
     from gg_desktop.settings_store import load_settings
 
     app = QApplication.instance() or QApplication([])
+    key = welcome_data.STARTUP_KEY
 
     def settle(ms=0):
         end = datetime.now() + timedelta(milliseconds=ms)
@@ -51,43 +53,75 @@ def main():
             window.resize(1280, 790)
             window.show()
             settle(300)
+
+            # 1. Startup: it shows. Walk every screen, then back, then Skip: it shows again next time.
             dialog = welcome_ui.show_if_needed(window)
-            assert dialog is not None and dialog.isVisible(), "A first launch shows the welcome"
+            assert dialog is not None and dialog.isVisible(), "The tour shows at startup by default"
             settle(200)
             for step in range(len(welcome_data.STEPS)):
                 assert dialog.title.text() == welcome_data.STEPS[step]["title"], step
                 assert dialog.back_button.isVisible() == (step > 0), step
                 assert dialog.next_button.text() == welcome_data.next_label(step), step
+                assert dialog.skip_button.text() == welcome_data.close_label(step), step
+                shown = sum(1 for frame, _n, _t in dialog.point_rows if frame.isVisible())
+                assert shown == len(welcome_data.STEPS[step]["points"]), (step, shown)
                 assert dialog.grab().save(str(args.output / f"welcome-{step + 1}.png")), step
-                assert window.grab().save(str(args.output / f"welcome-window-{step + 1}.png")), step
                 if step < welcome_data.LAST:
                     dialog.next_button.click()
-                    settle(100)
-            dialog.back_button.click()
-            settle(50)
-            assert dialog.index == welcome_data.LAST - 1, "Back goes one screen back"
-            dialog.next_button.click()
-            dialog.next_button.click()
-            settle(200)
-            assert not dialog.isVisible(), "Scan my games closes the welcome"
-            scan.assert_called_once()
-            assert load_settings().get("welcome_seen") is True, "Seen is saved"
-            assert window.settings.get("welcome_seen") is True
-            assert welcome_ui.show_if_needed(window) is None, "The welcome never shows twice"
+                    settle(80)
+            assert window.grab().save(str(args.output / "welcome-window.png"))
+            for _ in range(welcome_data.LAST):
+                dialog.back_button.click()
+                settle(30)
+            assert dialog.index == 0
+            dialog.skip_button.click()
+            settle(150)
+            assert not dialog.isVisible() and scan.call_count == 0, "Skip closes without scanning"
+            assert window.settings.get(key, True) is not False, "Skip keeps the tour for the next start"
+            assert welcome_data.should_show(window.settings)
 
-            fresh = dict(window.settings)
-            fresh.pop("welcome_seen", None)
-            window.settings = fresh
-            skipped = welcome_ui.show_if_needed(window)
-            assert skipped is not None
+            # 2. "Don't show this at startup" turns it off for good; it is saved.
+            dialog = welcome_ui.show_if_needed(window)
+            assert dialog is not None
             settle(100)
-            skipped.skip_button.click()
+            dialog.never.setChecked(True)
+            dialog.skip_button.click()
+            settle(150)
+            assert window.settings.get(key) is False and load_settings().get(key) is False, "The choice is saved"
+            assert welcome_ui.show_if_needed(window) is None, "Off means it no longer opens at startup"
+
+            # 3. The ? button opens it again any time, and Settings shows the switch and a Watch button.
+            help_button = next(b for b in window.top_bar.findChildren(QPushButton)
+                               if b.accessibleName() == "Help: watch the welcome tour")
+            help_button.click()
+            settle(150)
+            replay = window._welcome_dialog
+            assert replay.isVisible() and replay.index == 0, "The ? button opens the tour"
+            replay.reject()
             settle(100)
-            assert not skipped.isVisible(), "Skip intro closes it"
-            assert scan.call_count == 1, "Skip does not scan"
-            assert window.settings.get("welcome_seen") is True, "Skip also counts as seen"
+            assert window.settings.get(key) is False, "Watching it again does not switch startup back on"
+            window.navigate("Settings")
+            settle(300)
+            assert key in window.settings_controls, "Settings has the startup switch"
+            watch = next(b for b in window.page.findChildren(QPushButton) if b.accessibleName() == "Watch the welcome tour")
+            assert window.grab().save(str(args.output / "welcome-settings.png"))
+            watch.click()
+            settle(150)
+            assert window._welcome_dialog.isVisible(), "Settings opens the tour"
+
+            # 4. Finishing with Scan my games starts the scan and turns the startup tour off.
+            window.settings[key] = True
+            last = window._welcome_dialog
+            for _ in range(welcome_data.LAST):
+                last.next_button.click()
+                settle(30)
+            last.next_button.click()
+            settle(200)
+            assert not last.isVisible()
+            scan.assert_called_once()
+            assert window.settings.get(key) is False, "Finishing the tour turns it off at startup"
             error.assert_not_called()
-    print("Welcome smoke passed")
+    print("Welcome tour smoke passed")
 
 
 if __name__ == "__main__":

@@ -149,7 +149,7 @@ def main():
             assert "Cyberpunk 2077" in transcript(window) and "never remove anything" in transcript(window)
             ask(window, "help me with the resurrection kit")
             text = transcript(window)
-            assert "Resurrection Kit:" in text and "single ZIP file" in text and "Open More Tools" in buttons(window), text
+            assert "Resurrection Kit:" in text and "single ZIP file" in text and "Open Fix Kit" in buttons(window), text
             assert text.count("I answer from what Game Grave has already scanned") == 0, "A feature question is answered, not deflected"
             ask(window, "tell me a joke")
             assert "don't have an answer for that one yet" in transcript(window)

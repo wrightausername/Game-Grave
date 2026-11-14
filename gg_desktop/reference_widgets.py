@@ -25,6 +25,7 @@ RED = "#ff183b"
 
 # Consistent 24px outline icons; no platform-dependent chess/emoji glyphs.
 PATHS = {
+    "wrench": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
     "home": '<path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z"/>',
     "game": '<path d="M7 7h10a4 4 0 0 1 3.95 3.4l.9 5.4a2.4 2.4 0 0 1-4.1 2.1L15.6 16H8.4l-2.15 1.9A2.4 2.4 0 0 1 2.15 15.8l.9-5.4A4 4 0 0 1 7 7z"/><path d="M8 10v3M6.5 11.5h3M15.5 10.8h.01M17.8 12.8h.01"/>',
     "mods": '<path d="M6 5h4a2 2 0 0 1 4 0h4a1 1 0 0 1 1 1v4a2 2 0 0 1 0 4v5a1 1 0 0 1-1 1h-4a2 2 0 0 0-4 0H6a1 1 0 0 1-1-1v-4a2 2 0 0 0 0-4V6a1 1 0 0 1 1-1z"/>',
@@ -316,6 +317,7 @@ ROUTE_SYMBOLS = {
     "Overview": "home", "Ready Room": "radio", "Games": "game", "Mods": "mods", "Old Files": "archive",
     "Other Storage": "storage", "Captures": "camera", "Graveyard": "grave", "Game DNA": "dna",
     "Hardware": "chip", "Undo Center": "undo", "AI Assistant": "sparkles", "More Tools": "grid", "Settings": "settings",
+    "Fix Kit": "wrench",
 }
 
 

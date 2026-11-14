@@ -101,7 +101,7 @@ def main():
             settle(100)
             assert "Hardware" in window.nav_buttons, "Hardware is missing from the sidebar"
             names = list(window.nav_buttons)
-            assert names.index("Game DNA") + 1 == names.index("Hardware") and names.index("Hardware") + 1 == names.index("Undo Center")
+            assert names.index("Undo Center") + 1 == names.index("Hardware") and names.index("Hardware") + 1 == names.index("More Tools")
 
             window.navigate("Hardware")
             wait_for(lambda: window.page.isVisible(), "the Hardware page")

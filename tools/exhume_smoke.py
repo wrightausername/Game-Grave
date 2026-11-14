@@ -67,9 +67,9 @@ def main():
             window = CrimsonWindow()
             window.resize(1280, 790)
             window.show()
-            window.navigate("Ready Room")
+            window.navigate("Fix Kit")
             settle(300)
-            assert window.page.exhume is not None, "Exhume panel is missing from Ready Room"
+            assert window.page.exhume is not None, "Exhume panel is missing from Fix Kit"
             strip = window.page.exhume
             assert not strip.strip_open and strip.maximumHeight() <= 50, "Exhume starts as one slim line"
             strip.strip_toggle.click()
@@ -124,7 +124,7 @@ def main():
             settle(300)
 
             # A page rebuild keeps what was found.
-            window.navigate("Ready Room")
+            window.navigate("Fix Kit")
             settle(300)
             assert live(window).cards, "The driver list survives a page rebuild"
 

@@ -137,6 +137,7 @@ class ReadyPanel(QFrame):
         if trailing:
             heading.addWidget(trailing)
         self.stack.addWidget(header)
+        self.header = header
         self.body = QWidget()
         self.body_layout = column(spacing=0, margins=(12, 3, 11, 7))
         self.body.setLayout(self.body_layout)
@@ -534,18 +535,7 @@ class ReadyRoomContent(ScrollPage):
             self.soulbind = build_panel(ReadyPanel, window)
             self.content.addSpacing(14)
             self.content.addWidget(self.soulbind)
-            from gg_desktop.blackbox_ui import build_panel as build_blackbox
-            self.blackbox = build_blackbox(ReadyPanel, window)
-            self.content.addSpacing(14)
-            self.content.addWidget(self.blackbox)
-            from gg_desktop.autopsy_ui import build_panel as build_autopsy
-            self.autopsy = build_autopsy(ReadyPanel, window)
-            self.content.addSpacing(14)
-            self.content.addWidget(self.autopsy)
-            from gg_desktop.exhume_ui import build_panel as build_exhume
-            self.exhume = build_exhume(ReadyPanel, window)
-            self.content.addSpacing(14)
-            self.content.addWidget(self.exhume)
+            # Black Box, Autopsy and Exhume moved to the Fix Kit tab (owner instruction, 2026-11-14).
             from gg_desktop.squad_ui import build_panel as build_squad
             self.squad = build_squad(ReadyPanel, window)
             self.content.addSpacing(14)

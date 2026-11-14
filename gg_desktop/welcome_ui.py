@@ -1,12 +1,13 @@
-"""First-launch welcome window (Qt). Facts and wording live in welcome_data.py.
+"""Welcome tour window (Qt). Wording and the startup rules live in welcome_data.py.
 
-A new window over the app, shown once from main(); it changes no tab, the shell or navigation. Closing it in any way
-(Skip, Esc, the last button) saves `welcome_seen`. "Scan my games" starts the same read-only scan as Scan PC.
+A window over the app. Shown at startup from main() while the setting is on, and on demand from Settings or the ? button.
+Skip closes it for now; "Don't show this at startup" or finishing turns the startup tour off. "Scan my games" on the last
+screen starts the same read-only scan as Scan PC.
 """
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (QCheckBox, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout)
 
 from gg_desktop import welcome_data
 
@@ -14,17 +15,19 @@ STYLE = """
 QDialog#welcome { background: #080C13; }
 QFrame#welcomeCard { background: #111922; border: 1px solid #2A3541; border-radius: 16px; }
 QLabel#welcomeBrand { font-size: 17px; font-weight: 900; letter-spacing: 1px; color: #F6FAFF; }
+QLabel#welcomeCount { color: #8C9AA9; font-size: 12px; }
 QLabel#welcomeKicker { color: #42D4F2; font-size: 11px; font-weight: 700; letter-spacing: 2px; }
-QLabel#welcomeTitle { font-size: 30px; font-weight: 900; color: #F6FAFF; }
-QLabel#welcomeBody { font-size: 14px; color: #D7E1ED; }
+QLabel#welcomeTitle { font-size: 28px; font-weight: 900; color: #F6FAFF; }
+QLabel#welcomeBody { font-size: 13.5px; color: #D7E1ED; }
 QFrame#welcomePoint { background: #0C151C; border: 1px solid #2A3541; border-radius: 10px; }
-QLabel#welcomePointName { font-size: 14px; font-weight: 700; color: #F4F7FC; }
-QLabel#welcomePointText { font-size: 13px; color: #A3B4C5; }
-QLabel#welcomeTick { color: #69DEA7; font-size: 16px; font-weight: 900; }
+QLabel#welcomePointName { font-size: 13.5px; font-weight: 700; color: #F4F7FC; }
+QLabel#welcomePointText { font-size: 12.5px; color: #A3B4C5; }
+QLabel#welcomeTick { color: #69DEA7; font-size: 15px; font-weight: 900; }
 QFrame#welcomeBar { background: #25303C; border-radius: 2px; }
 QFrame#welcomeBar[on="true"] { background: #FF4357; }
 QPushButton#welcomeSkip { background: transparent; border: none; color: #A3B4C5; padding: 8px 4px; }
 QPushButton#welcomeSkip:hover { color: #FFFFFF; }
+QCheckBox#welcomeNever { color: #A3B4C5; font-size: 12px; spacing: 8px; }
 """
 
 
@@ -48,7 +51,7 @@ class WelcomeDialog(QDialog):
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setModal(True)
         self.setStyleSheet(STYLE)
-        self.setFixedSize(680, 600)
+        self.setFixedSize(700, 660)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(14, 14, 14, 14)
@@ -56,21 +59,23 @@ class WelcomeDialog(QDialog):
         card.setObjectName("welcomeCard")
         outer.addWidget(card)
         box = QVBoxLayout(card)
-        box.setContentsMargins(36, 30, 36, 30)
-        box.setSpacing(18)
+        box.setContentsMargins(34, 26, 34, 22)
+        box.setSpacing(14)
 
         top = QHBoxLayout()
         top.addWidget(_label("GAME GRAVE", "welcomeBrand"))
+        top.addSpacing(12)
+        self.count = _label("", "welcomeCount")
+        top.addWidget(self.count)
         top.addStretch(1)
         self.skip_button = QPushButton("Skip intro")
         self.skip_button.setObjectName("welcomeSkip")
-        self.skip_button.setAccessibleName("Skip the welcome intro")
         self.skip_button.clicked.connect(self.reject)
         top.addWidget(self.skip_button)
         box.addLayout(top)
 
         bars = QHBoxLayout()
-        bars.setSpacing(8)
+        bars.setSpacing(6)
         self.bars = []
         for _ in welcome_data.STEPS:
             bar = QFrame()
@@ -87,27 +92,31 @@ class WelcomeDialog(QDialog):
             box.addWidget(widget)
 
         self.point_rows = []
-        for _ in range(3):
+        for _ in range(welcome_data.MAX_POINTS):
             frame = QFrame()
             frame.setObjectName("welcomePoint")
             line = QHBoxLayout(frame)
-            line.setContentsMargins(16, 12, 16, 12)
-            line.setSpacing(14)
+            line.setContentsMargins(14, 9, 14, 9)
+            line.setSpacing(12)
             line.addWidget(_label("✓", "welcomeTick"), 0, Qt.AlignTop)
             texts = QVBoxLayout()
-            texts.setSpacing(3)
+            texts.setSpacing(2)
             name = _label("", "welcomePointName")
             text = _label("", "welcomePointText", wrap=True)
             texts.addWidget(name)
             texts.addWidget(text)
             line.addLayout(texts, 1)
             box.addWidget(frame)
-            self.point_rows.append((name, text))
+            self.point_rows.append((frame, name, text))
 
         box.addStretch(1)
+        self.never = QCheckBox("Don't show this at startup")
+        self.never.setObjectName("welcomeNever")
+        self.never.setAccessibleName("Don't show the welcome tour at startup")
+        box.addWidget(self.never)
         actions = QHBoxLayout()
         self.back_button = QPushButton("Back")
-        self.back_button.setAccessibleName("Previous welcome screen")
+        self.back_button.setAccessibleName("Previous screen")
         self.back_button.clicked.connect(self.back)
         self.next_button = QPushButton("Next")
         self.next_button.setObjectName("primary")
@@ -126,12 +135,17 @@ class WelcomeDialog(QDialog):
 
     def render(self):
         step = welcome_data.STEPS[self.index]
+        self.count.setText(welcome_data.step_caption(self.index))
         self.kicker.setText(step["kicker"])
         self.title.setText(step["title"])
         self.body.setText(step["body"])
-        for (name, text), (point_name, point_text) in zip(self.point_rows, step["points"]):
-            name.setText(point_name)
-            text.setText(point_text)
+        points = step["points"]
+        for position, (frame, name, text) in enumerate(self.point_rows):
+            shown = position < len(points)
+            frame.setVisible(shown)
+            if shown:
+                name.setText(points[position][0])
+                text.setText(points[position][1])
         for position, bar in enumerate(self.bars):
             on = position <= self.index
             if bar.property("on") != on:
@@ -139,8 +153,12 @@ class WelcomeDialog(QDialog):
                 bar.style().unpolish(bar)
                 bar.style().polish(bar)
         self.back_button.setVisible(self.index > 0)
-        self.next_button.setText(welcome_data.next_label(self.index))
-        self.next_button.setAccessibleName(welcome_data.next_label(self.index))
+        caption = welcome_data.next_label(self.index)
+        self.next_button.setText(caption)
+        self.next_button.setAccessibleName(caption)
+        close = welcome_data.close_label(self.index)
+        self.skip_button.setText(close)
+        self.skip_button.setAccessibleName(close + " the welcome tour")
 
     def advance(self):
         if self.index >= welcome_data.LAST:
@@ -154,33 +172,61 @@ class WelcomeDialog(QDialog):
         self.index = welcome_data.clamp(self.index - 1)
         self.render()
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Right:
+            self.advance() if self.index < welcome_data.LAST else None
+            return
+        if event.key() == Qt.Key_Left:
+            self.back()
+            return
+        super().keyPressEvent(event)
+
     def _on_finished(self, _result):
-        self._save_seen()
+        self._save_choice()
         if self.scan_requested:
             start = getattr(self.window_ref, "start_scan", None)
             if callable(start):
                 start()
 
-    def _save_seen(self):
+    def _save_choice(self):
         if self._saved:
             return
         self._saved = True
+        current = getattr(self.window_ref, "settings", None)
+        before = (current or {}).get(welcome_data.STARTUP_KEY, True) is not False
+        on = welcome_data.startup_after(finished=self.index == welcome_data.LAST, dont_show=self.never.isChecked(), current=before)
+        if on == before:
+            return
         try:
             from gg_desktop.settings_store import load_settings
             from core import save_settings
-            save_settings(welcome_data.mark_seen(load_settings()))
-            current = getattr(self.window_ref, "settings", None)
+            save_settings(welcome_data.with_startup(load_settings(), on))
             if isinstance(current, dict):
-                current[welcome_data.SEEN_KEY] = True
+                current[welcome_data.STARTUP_KEY] = on
         except Exception:
-            pass  # a settings write that fails only means the welcome shows once more next time
+            pass  # a settings write that fails only means the tour shows once more next time
+        refresh = getattr(self.window_ref, "_welcome_setting_changed", None)
+        if callable(refresh):
+            refresh()
+
+
+def open_tour(window) -> WelcomeDialog:
+    """Show the tour now (Settings, the ? button). The startup choice is kept unless the owner ticks the box or finishes."""
+    old = getattr(window, "_welcome_dialog", None)
+    try:
+        if old is not None and old.isVisible():
+            old.raise_()
+            return old
+    except RuntimeError:
+        pass
+    dialog = WelcomeDialog(window)
+    window._welcome_dialog = dialog
+    dialog.open()
+    return dialog
 
 
 def show_if_needed(window) -> WelcomeDialog | None:
     if not welcome_data.should_show(getattr(window, "settings", {}),
                                     reference_preview=bool(getattr(window, "reference_preview", False))):
         return None
-    dialog = WelcomeDialog(window)
-    window._welcome_dialog = dialog
-    dialog.open()
-    return dialog
+    return open_tour(window)

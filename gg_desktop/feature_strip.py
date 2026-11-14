@@ -1,10 +1,11 @@
-"""Slim, collapsible panels for the optional Ready Room features (Soulbind, Autopsy, Exhume, Squad Sync).
+"""Slim, collapsible panels: Soulbind and Squad Sync in Ready Room; Black Box, Autopsy and Exhume in Fix Kit.
 
 Each one used to be a tall panel that pushed Ready Room's own content down. Now it is one quiet line (title, one
 status sentence and an Open button) until the owner opens it. Display only; the features' own rules live elsewhere.
 """
 from __future__ import annotations
 
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtWidgets import QSizePolicy
 
 from gg_desktop.widgets import button
@@ -14,6 +15,22 @@ BIG = 16777215
 # Ready Room rebuilds itself when live news arrives. Without this a panel you had open would snap shut mid-use.
 # Kept for this run of the app only; every panel starts closed the next time Game Grave starts.
 _REMEMBERED = {}
+
+
+class _HeaderClick(QObject):
+    """A click anywhere on a strip's header line opens or hides it (owner, 2026-11-14: "if i click on a tool tab it should
+    just open not me having to find the open button"). The Open / Hide button keeps working for the keyboard."""
+
+    def __init__(self, panel):
+        super().__init__(panel)
+        self.panel = panel
+
+    def eventFilter(self, target, event):
+        if event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton:
+            if target.rect().contains(event.position().toPoint()):
+                self.panel.set_open(not self.panel.strip_open)
+                return True
+        return False
 
 
 def collapsible(panel_cls, title, subtitle, glyph, *, open_height, open_text="Open", close_text="Hide",
@@ -42,5 +59,11 @@ def collapsible(panel_cls, title, subtitle, glyph, *, open_height, open_text="Op
 
     toggle.clicked.connect(lambda _=False: set_open(not panel.strip_open))
     panel.set_open = set_open
+    header = getattr(panel, "header", None)
+    if header is not None:
+        header.setCursor(Qt.PointingHandCursor)
+        header.setToolTip("Click to open or hide " + title)
+        panel._header_click = _HeaderClick(panel)
+        header.installEventFilter(panel._header_click)
     set_open(_REMEMBERED.get(title, expanded))
     return panel

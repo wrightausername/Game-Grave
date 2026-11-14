@@ -89,10 +89,10 @@ def main():
             window = CrimsonWindow()
             window.resize(1280, 790)
             window.show()
-            window.navigate("Ready Room")
+            window.navigate("Fix Kit")
             settle()
             panel = window.page.blackbox
-            assert panel is not None, "Black Box panel is missing from Ready Room"
+            assert panel is not None, "Black Box panel is missing from Fix Kit"
             assert not panel.strip_open and panel.maximumHeight() <= 50, "Black Box starts as one slim line"
             assert panel.strip_toggle.text() == "Open"
             panel.strip_toggle.click()
@@ -101,7 +101,7 @@ def main():
             panel.strip_toggle.click()
             settle(60)
             assert not panel.strip_open and not panel.body.isVisible() and panel.maximumHeight() <= 50, \
-                "Black Box minimizes again like the other Ready Room panels"
+                "Black Box minimizes again like the other strips"
             panel.strip_toggle.click()
             settle(60)
             body = panel.blackbox
@@ -112,7 +112,7 @@ def main():
             window.inventory.steam = [game, other]
             window.inventory.games = merge_games([game, other], [])
             window.inventory.scanned_at = "Disposable Black Box QA"
-            window.navigate("Ready Room")
+            window.navigate("Fix Kit")
             settle()
             window.page.blackbox.set_open(True)
             settle(60)
@@ -153,10 +153,10 @@ def main():
             assert "None found in the Windows Application log for this game." in text
             assert body.summary.text().startswith("0 crashes recorded by Windows, 0 log or dump files")
             # A rebuilt page still shows the newest report.
-            window.navigate("Ready Room")
+            window.navigate("Fix Kit")
             settle()
             assert live(window).report is not None and live(window).report.game == "Cyberpunk 2077"
-            assert window.page.blackbox.strip_open, "A panel that was open stays open when Ready Room rebuilds itself"
+            assert window.page.blackbox.strip_open, "A panel that was open stays open when Fix Kit rebuilds itself"
             assert live(window).games.currentText() == "Cyberpunk 2077", "The dropdown follows the shown report"
             error.assert_not_called()
     print("Black Box smoke passed")

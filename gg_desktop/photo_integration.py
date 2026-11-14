@@ -420,6 +420,10 @@ class PhotoIntegration:
         from gg_desktop import tools_page
         tools_page.build(self)
 
+    def fix_kit_page(self):
+        from gg_desktop import fix_kit_page
+        fix_kit_page.build(self)
+
     def graveyard_page(self):
         from gg_desktop import grave_page
         self._merge_manual_reviews()

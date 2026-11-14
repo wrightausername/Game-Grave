@@ -31,6 +31,7 @@ OWNED = {
     "check_updates_on_launch": False,   # one question to GitHub when the app starts; off until the owner turns it on
     "soulbind_new_games": False,        # apply the Soulbind profile to newly installed games; off until switched on
     "interface_scale": 100,             # whole-window size in percent; used the next time the app starts
+    "welcome_at_startup": True,         # the welcome tour opens when Game Grave starts until the owner turns it off
 }
 LIBRARY_KEYS = ("steam_extra_roots", "other_library_roots", "mod_extra_roots", "screenshot_roots", "recording_roots")
 LIBRARY_NAMES = {"steam_extra_roots": "Steam libraries", "other_library_roots": "Other / Xbox libraries",
@@ -75,6 +76,7 @@ def current(settings):
         "check_updates_on_launch": settings.get("check_updates_on_launch") is True,
         "soulbind_new_games": settings.get("soulbind_new_games") is True,
         "interface_scale": pick_days(settings.get("interface_scale"), SCALES, 100),
+        "welcome_at_startup": settings.get("welcome_at_startup", True) is not False,
     }
 
 

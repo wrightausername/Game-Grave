@@ -76,10 +76,10 @@ def main():
             window = CrimsonWindow()
             window.resize(1280, 790)
             window.show()
-            window.navigate("Ready Room")
+            window.navigate("Fix Kit")
             settle(300)
             panel = window.page.autopsy
-            assert panel is not None, "Autopsy panel is missing from Ready Room"
+            assert panel is not None, "Autopsy panel is missing from Fix Kit"
             assert not panel.strip_open and panel.maximumHeight() <= 50, "Autopsy starts as one slim line"
 
             # The automatic pass finds both captures on its own, with no click and no dialog.
@@ -128,7 +128,7 @@ def main():
             assert window.grab().save(str(args.output / "ready-room-autopsy-1280.png"))
 
             # A page rebuild keeps the choice and the note without reading any capture again.
-            window.navigate("Ready Room")
+            window.navigate("Fix Kit")
             settle(300)
             body = live(window)
             assert body.result is not None and body.note.text() == "Updated the graphics driver" and body.graph.after

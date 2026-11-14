@@ -248,7 +248,7 @@ class Prompt(unittest.TestCase):
         f = facts()
         msgs = prompt.build_messages("what features should game grave add?", engine.answer("help", f), f)
         system = msgs[0]["content"]
-        for name in ("Autopsy (Ready Room)", "Mod Bisect (Mods)", "Resurrection Kit (More Tools)", "Drivers & Startup"):
+        for name in ("Autopsy (Fix Kit)", "Mod Bisect (Mods)", "Resurrection Kit (Fix Kit)", "Drivers & Startup"):
             self.assertIn(name, system)
         self.assertIn("Never say a feature is missing", system)
         self.assertLess(len(system), 12000, "the prompt stays well inside the model's context")

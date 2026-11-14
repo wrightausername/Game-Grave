@@ -58,9 +58,9 @@ def main():
             window.navigate("Overview")
             settle()
 
-            # More Tools sits above Settings and Settings is the last panel.
+            # Grouped sidebar: Toolbox (More Tools), then the optional AI Assistant, then Settings last.
             order = [route for route, _ in ROUTES]
-            assert order[-2:] == ["More Tools", "Settings"], order
+            assert order[-3:] == ["More Tools", "AI Assistant", "Settings"], order
             visible = [route for route, control in window.nav_buttons.items() if not control.isHidden()]
             assert visible[-2:] == ["More Tools", "Settings"], visible
             tops = {route: window.nav_buttons[route].geometry().top() for route in visible}

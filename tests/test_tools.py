@@ -22,12 +22,18 @@ def mod(name, size, files=1, truncated=False):
 
 
 class Registry(unittest.TestCase):
-    def test_every_photo_tile_exists_once_in_six_categories(self):
-        self.assertEqual(len(data.CATEGORIES), 6)
+    def test_toolbox_lists_every_tool_once_in_five_groups(self):
+        self.assertEqual([c.key for c in data.CATEGORIES], ["windows", "backup", "reports", "files", "elsewhere"])
         keys = [t.key for t in data.all_tiles()]
-        self.assertEqual(len(keys), 24)
-        self.assertEqual(len(set(keys)), 24)
-        self.assertTrue(all(len(c.tiles) == 4 for c in data.CATEGORIES))
+        self.assertEqual(len(keys), 21)
+        self.assertEqual(len(set(keys)), 21)
+        titles = [t.title for t in data.all_tiles()]
+        self.assertEqual(len(titles), len(set(titles)), "no tool is listed twice")
+
+    def test_only_also_in_game_grave_tiles_open_another_tab(self):
+        for c in data.CATEGORIES:
+            for t in c.tiles:
+                self.assertEqual(t.kind == data.GO, c.key == "elsewhere", t.key)
 
     def test_tiles_are_go_run_or_unavailable_and_each_has_a_target_or_reason(self):
         tabs = {"Other Storage", "Game DNA", "Overview", "Captures", "Old Files", "Graveyard"}
@@ -57,9 +63,9 @@ class Registry(unittest.TestCase):
             self.assertNotIn("&", t.title)
 
     def test_tabs_filter_categories_and_unknown_falls_back_to_all(self):
-        self.assertEqual(len(data.categories_for("hub")), 6)
-        self.assertEqual([c.key for c in data.categories_for("advanced")], ["utilities", "advanced"])
-        self.assertEqual(len(data.categories_for("nonsense")), 6)
+        self.assertEqual(len(data.TABS), 1)
+        self.assertEqual(len(data.categories_for("hub")), 5)
+        self.assertEqual(len(data.categories_for("nonsense")), 5)
         for key, *_rest in data.TABS:
             self.assertTrue(data.categories_for(key))
 

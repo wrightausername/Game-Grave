@@ -252,9 +252,9 @@ class FeatureQuestions(unittest.TestCase):
             a = engine.answer(q, facts())
             self.assertEqual(a.intent, "feature", q)
             self.assertIn("ZIP", a.text)
-            self.assertIn("More Tools", a.text)
+            self.assertIn("Fix Kit", a.text)
             self.assertNotIn("I answer from what Game Grave has already scanned", a.text)
-            self.assertEqual(a.handoffs, (("Open More Tools", "More Tools"),))
+            self.assertEqual(a.handoffs, (("Open Fix Kit", "Fix Kit"),))
 
     def test_other_features(self):
         for q, title in (("how does save vault work", "Save Vault"), ("what does black box do", "Black Box"),
