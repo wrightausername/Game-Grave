@@ -21,7 +21,7 @@ def main():
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     faulthandler.dump_traceback_later(160, exit=True)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from PySide6.QtCore import QCoreApplication, QEvent
+    from PySide6.QtCore import QCoreApplication, QEvent, QTimer
     from PySide6.QtWidgets import QApplication, QPushButton
     from core import default_settings
     from gg_desktop.app import CrimsonWindow
@@ -90,34 +90,47 @@ def main():
             assert window.settings.get(key) is False and load_settings().get(key) is False, "The choice is saved"
             assert welcome_ui.show_if_needed(window) is None, "Off means it no longer opens at startup"
 
-            # 3. The ? button opens it again any time, and Settings shows the switch and a Watch button.
+            # 3. The ? button opens it again any time (a normal modal window), and Settings has the switch and a Watch button.
+            seen = {}
+
+            def look_and_close():
+                tour = window._welcome_dialog
+                seen.update(visible=tour.isVisible(), index=tour.index)
+                tour.reject()
+
             help_button = next(b for b in window.top_bar.findChildren(QPushButton)
                                if b.accessibleName() == "Help: watch the welcome tour")
+            QTimer.singleShot(250, look_and_close)
             help_button.click()
-            settle(150)
-            replay = window._welcome_dialog
-            assert replay.isVisible() and replay.index == 0, "The ? button opens the tour"
-            replay.reject()
             settle(100)
+            assert seen == {"visible": True, "index": 0}, seen
             assert window.settings.get(key) is False, "Watching it again does not switch startup back on"
             window.navigate("Settings")
             settle(300)
             assert key in window.settings_controls, "Settings has the startup switch"
             watch = next(b for b in window.page.findChildren(QPushButton) if b.accessibleName() == "Watch the welcome tour")
             assert window.grab().save(str(args.output / "welcome-settings.png"))
+            seen.clear()
+            QTimer.singleShot(250, look_and_close)
             watch.click()
-            settle(150)
-            assert window._welcome_dialog.isVisible(), "Settings opens the tour"
+            settle(100)
+            assert seen.get("visible") is True, "Settings opens the tour"
 
             # 4. Finishing with Scan my games starts the scan and turns the startup tour off.
-            window.settings[key] = True
-            last = window._welcome_dialog
-            for _ in range(welcome_data.LAST):
-                last.next_button.click()
-                settle(30)
-            last.next_button.click()
+            window.navigate("Overview")
             settle(200)
-            assert not last.isVisible()
+            window.settings[key] = True
+
+            def finish():
+                tour = window._welcome_dialog
+                for _ in range(welcome_data.LAST):
+                    tour.next_button.click()
+                tour.next_button.click()
+
+            QTimer.singleShot(250, finish)
+            help_button.click()
+            settle(200)
+            assert not window._welcome_dialog.isVisible()
             scan.assert_called_once()
             assert window.settings.get(key) is False, "Finishing the tour turns it off at startup"
             error.assert_not_called()

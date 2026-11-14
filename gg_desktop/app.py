@@ -170,7 +170,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.scan_button.hide()
         topbox.addWidget(tool("", "bell", lambda: self.info("Scan Status", self.status.text() +
             ("\n\n" + "\n".join(self.inventory.warnings) if self.inventory.warnings else "")), kind="chromeButton", tip="Scan status and warnings"))
-        help_button = tool("", "help", self.open_welcome_tour, kind="chromeButton",
+        help_button = tool("", "help", lambda: self.open_welcome_tour(), kind="chromeButton",
                            tip="Help: watch the welcome tour of Game Grave")
         help_button.setAccessibleName("Help: watch the welcome tour")
         topbox.addWidget(help_button)

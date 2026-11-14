@@ -79,14 +79,18 @@ def check_controls(*, window, inventory, storage, root, app, home, drive, clicke
             window.page.ensureWidgetVisible(widget)
             drive(lambda widget=widget: QTest.mouseClick(widget, Qt.LeftButton), category_dialog)
             completed("Mouse: " + category + " legend " + part, "Open the same category from every part of the legend.")
-    for tip, title in (("Help", "Game Grave Help"), ("Scan status and warnings", "Scan Status")):
+    for tip, title in (("Help: watch the welcome tour of Game Grave", "Welcome to Game Grave"),
+                       ("Scan status and warnings", "Scan Status")):
         def message(dialog, title=title):
             assert dialog.windowTitle() == title
             readable(dialog)
-            assert dialog.grab().save(str(output/("overview-triple-help.png" if title == "Game Grave Help" else "overview-triple-status.png")))
-            dismiss_message(dialog)
+            assert dialog.grab().save(str(output/("overview-triple-help.png" if title.startswith("Welcome") else "overview-triple-status.png")))
+            if title.startswith("Welcome"):
+                dialog.reject()   # the ? button opens the welcome tour; Skip closes it
+            else:
+                dismiss_message(dialog)
         drive(lambda tip=tip: QTest.mouseClick(header(tip), Qt.LeftButton), message)
-        completed("Mouse: " + tip, "Open a readable message and close it normally.")
+        completed("Mouse: " + tip.split(":")[0], "Open a readable message and close it normally.")
     def activity_history(dialog):
         clicked(dialog, "View History")
     drive(lambda: QTest.mouseClick(window.overview_activity[0][0], Qt.LeftButton), activity_history)
@@ -364,6 +368,6 @@ def check_controls(*, window, inventory, storage, root, app, home, drive, clicke
     def other_tab_message(dialog):
         assert not dialog.property("overviewReadable")
         QTest.mouseClick(dialog.button(QMessageBox.Ok), Qt.LeftButton)
-    drive(lambda: QTest.mouseClick(header("Help"), Qt.LeftButton), other_tab_message)
+    drive(lambda: QTest.mouseClick(header("Scan status and warnings"), Qt.LeftButton), other_tab_message)
     completed("Isolation: leave Overview and use shared Help", "Preserve the other tab's existing message behavior.")
     home()

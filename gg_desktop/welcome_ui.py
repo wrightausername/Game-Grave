@@ -210,8 +210,9 @@ class WelcomeDialog(QDialog):
             refresh()
 
 
-def open_tour(window) -> WelcomeDialog:
-    """Show the tour now (Settings, the ? button). The startup choice is kept unless the owner ticks the box or finishes."""
+def open_tour(window, *, blocking: bool = True) -> WelcomeDialog:
+    """Show the tour now. From Settings or the ? button it is a normal modal window like Help used to be; at startup it
+    opens without blocking. The startup choice is kept unless the owner ticks the box or finishes the tour."""
     old = getattr(window, "_welcome_dialog", None)
     try:
         if old is not None and old.isVisible():
@@ -221,7 +222,10 @@ def open_tour(window) -> WelcomeDialog:
         pass
     dialog = WelcomeDialog(window)
     window._welcome_dialog = dialog
-    dialog.open()
+    if blocking:
+        dialog.exec()
+    else:
+        dialog.open()
     return dialog
 
 
@@ -229,4 +233,4 @@ def show_if_needed(window) -> WelcomeDialog | None:
     if not welcome_data.should_show(getattr(window, "settings", {}),
                                     reference_preview=bool(getattr(window, "reference_preview", False))):
         return None
-    return open_tour(window)
+    return open_tour(window, blocking=False)
