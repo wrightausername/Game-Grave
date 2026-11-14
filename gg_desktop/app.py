@@ -265,6 +265,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.search_shell.setMaximumWidth({"Games":452, "Ready Room":452, "Old Files":475}.get(title, 550))
         for route, control in self.nav_buttons.items():
             control.set_active(route == title)
+        from gg_desktop import nav_rail
+        nav_rail.follow(self, title)
         return self.page
 
     def assistant_enabled(self) -> bool:

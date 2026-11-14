@@ -30,7 +30,8 @@ STEPS = (
     {
         "kicker": "FINDING YOUR WAY",
         "title": "Five groups in the sidebar.",
-        "body": "The sidebar on the left is sorted by what you want to do. Each tab has one line under it saying what it is for.",
+        "body": ("The sidebar on the left is sorted by what you want to do. Click a heading to open its tabs; click it again to "
+                 "fold them away. Each tab has one line under it saying what it is for."),
         "points": (
             ("Home and Library", "Overview and Ready Room, then your Games, Mods and Captures."),
             ("Clean Up", "Old Files, Other Storage and Graveyard: find what is taking up space."),

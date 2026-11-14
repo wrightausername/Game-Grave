@@ -27,6 +27,13 @@ class NavGroupTests(unittest.TestCase):
         self.assertEqual(nav_groups.group_of("Fix Kit"), "Fix and Protect")
         self.assertEqual(nav_groups.group_of("Nope"), "")
 
+    def test_dropdown_accordion(self):
+        self.assertEqual(nav_groups.toggled("Home", "Library"), "Library")
+        self.assertEqual(nav_groups.toggled("Library", "Library"), "")
+        self.assertEqual(nav_groups.toggled("", "Clean Up"), "Clean Up")
+        self.assertEqual(nav_groups.open_for("Hardware", "Home"), "PC and Help")
+        self.assertEqual(nav_groups.open_for("Nope", "Home"), "Home")
+
     def test_every_route_has_a_symbol_and_banner(self):
         import re
         from pathlib import Path

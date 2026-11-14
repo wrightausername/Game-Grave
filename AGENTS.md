@@ -618,3 +618,8 @@ Settings (one switch and one button) and the top bar's ? button. Everything else
   button in the top bar open it any time without changing the startup choice. The old `welcome_seen` key is no longer read.
 - Covered by `tests/test_nav_groups.py`, `tests/test_welcome.py`, `tests/test_tools.py`, `tools/welcome_smoke.py`, and the updated
   tools page, shell, hardware, first run, Black Box, Autopsy and Exhume smokes.
+- Dropdown sidebar (owner, 2026-11-14: "make it sleeker and less cluttered on the left with panels.... maybe click it once and it
+  drops down and minimizes"): each heading is a button with a chevron (`nav_rail.GroupHead`). One group is open at a time
+  (`nav_groups.toggled`); a second click folds it away; going to a tab opens its group (`nav_rail.follow`, called from
+  `page_for`). Opening slides down in 160 ms; folding is instant. Rows have one fixed width so nothing shifts when the scroll bar
+  appears. Covered by `tests/test_nav_groups.py` and `tools/shell_polish_smoke.py`.

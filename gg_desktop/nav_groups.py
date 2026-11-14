@@ -58,3 +58,13 @@ def group_of(route: str) -> str:
         if any(name == route for name, _sub in items):
             return heading
     return ""
+
+
+def toggled(open_group: str, clicked: str) -> str:
+    """Accordion: clicking the open heading folds it away; clicking another opens it and folds the rest."""
+    return "" if clicked == open_group else clicked
+
+
+def open_for(route: str, open_group: str) -> str:
+    """Going to a tab opens its group so the highlighted tab is always on screen."""
+    return group_of(route) or open_group

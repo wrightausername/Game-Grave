@@ -21,6 +21,7 @@ def main():
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from PySide6.QtCore import QCoreApplication, QEvent
     from PySide6.QtWidgets import QApplication
+    from PySide6.QtTest import QTest
     import core
     from gg_desktop import reference_widgets as rw
     from gg_desktop.app import CrimsonWindow, ROUTES
@@ -63,12 +64,36 @@ def main():
             assert order[-3:] == ["More Tools", "AI Assistant", "Settings"], order
             visible = [route for route, control in window.nav_buttons.items() if not control.isHidden()]
             assert visible[-2:] == ["More Tools", "Settings"], visible
-            tops = {route: window.nav_buttons[route].geometry().top() for route in visible}
-            heights = {route: window.nav_buttons[route].height() for route in visible}
+            # Dropdown groups: one open at a time, the current tab's group opens by itself, one click folds it.
+            from PySide6.QtCore import QPoint
+            from gg_desktop import nav_rail
+            assert window.nav_open_group == "Home" and window.nav_bodies["Home"].isVisible()
+            assert all(not window.nav_bodies[g].isVisible() for g in window.nav_bodies if g != "Home"), "Only one group is open"
+            window.nav_heads["Library"].click()
+            settle()
+            assert window.nav_open_group == "Library" and not window.nav_bodies["Home"].isVisible()
+            window.nav_heads["Library"].click()
+            settle()
+            assert window.nav_open_group == "" and not window.nav_bodies["Library"].isVisible(), "A second click folds it away"
+            window.navigate("Hardware")
+            settle()
+            assert window.nav_open_group == "PC and Help" and window.nav_buttons["Hardware"].isVisibleTo(window)
+            QTest.qWait(250)
+            settle()
+            holder = window.nav_scroll.widget()
+            shown = [route for route in visible if window.nav_buttons[route].isVisibleTo(window)]
+            assert shown == ["Hardware", "More Tools", "Settings"], shown
+            tops = {route: window.nav_buttons[route].mapTo(holder, QPoint(0, 0)).y() for route in shown}
+            heights = {route: window.nav_buttons[route].height() for route in shown}
             assert min(heights.values()) >= 38, ("Sidebar rows are squeezed", heights)
             ordered = sorted(tops.values())
             assert all(b - a >= 38 for a, b in zip(ordered, ordered[1:])), ("Sidebar rows overlap", tops)
             assert tops["More Tools"] < tops["Settings"] and max(tops.values()) == tops["Settings"], tops
+            widths = {window.nav_buttons[route].width() for route in window.nav_buttons}
+            assert len(widths) == 1, ("Every sidebar row keeps one width", widths)
+            assert window.grab().save(str(args.output / "shell-sidebar-dropdown.png"))
+            window.navigate("Overview")
+            settle()
 
             # The AI Assistant is optional and starts off: hidden, and unreachable until it is switched on.
             assert window.settings.get("assistant_enabled") is not True
