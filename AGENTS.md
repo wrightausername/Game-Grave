@@ -651,3 +651,19 @@ Local AI and Data Used. `app.py` only starts the routine timer. Everything else 
 - Covered by `tests/test_autopilot.py`, `tools/autopilot_smoke.py` (off preview, turn on, checks, Run all with the confirmation,
   ready to play, game-running stop, Cancel, Save as routine, the timer, the notice, routine Run all, pause and delete) and the AI
   Assistant smoke. The feature list (`assistant_features.py`) has an Automation answer.
+
+Scan results stay, with their time (owner instruction, 2026-11-14: "after scanning things the results should stay there unless i
+hit rescan or scan again.... also with a timestamp of when the scan was"). This reopens the top bar (one caption) and adds one save
+line after each scan in Old Files, Other Storage, Captures and Graveyard's leftover scan; their layouts, controls and rules are
+unchanged.
+- `gg_desktop/scan_cache.py`: after the PC scan and each tab's own scan, the results are written in the background to
+  `<config>/last_scan.json` (slots: inventory, old_files, storage, captures, grave; 60 MB cap; written atomically). When Game Grave
+  starts they are read back into the tabs, so nothing says "No scan yet" after a restart. Only a new scan replaces a slot.
+  Files that are gone since the scan are dropped from the restored Old Files, recordings, screenshots and Captures lists; every
+  action still re-checks a file before changing it. Only an allowlist of Game Grave's own result dataclasses is read back; a
+  damaged slot is skipped. `GAME_GRAVE_SCAN_CACHE=0` turns it off (set for CI so one check never sees another's results).
+- The top bar shows when the page's results were taken: "Last scan Today 5:40 PM" (PC scan), "Scanned ..." on Other Storage,
+  Captures and Old Files (their own scans), "Leftovers scanned ..." on Graveyard, or "Not scanned yet". Updated on every page
+  change and after every scan.
+- Covered by `tests/test_scan_cache.py` and `tools/scan_cache_smoke.py` (scan, restart, results and time back, gone file
+  dropped, Other Storage keeps its own time, a new scan replaces the results).

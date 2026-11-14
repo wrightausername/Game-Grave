@@ -181,6 +181,7 @@ def main():
             playing.return_value = False
             press(window, "Cancel")
             assert plan.steps[1].status == "skipped" and plan.steps[1].result == "Cancelled by you."
+            assert "Cancelled. Nothing was changed." in transcript(window)
 
             # A schedule becomes a routine. Its checks run on time; its change waits for an OK.
             ask(window, "every sunday at 9pm clean temp files and check drivers")

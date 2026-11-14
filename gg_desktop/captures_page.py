@@ -1325,6 +1325,9 @@ def scan(window, automatic=False):
             window.status.setText("Capture scan canceled. Earlier results are unchanged.")
         else:
             state.report = report
+            from gg_desktop import scan_cache
+            scan_cache.keep_async("captures", report)
+            window._sync_scan_time()
             state.duplicates = state.similar = None
             state.thumbs.clear()
             invalidate(window)

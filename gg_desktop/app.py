@@ -97,6 +97,14 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         QFontDatabase.addApplicationFont(str(Path(__file__).parent / "assets/ready_room/RobotoCondensed.ttf"))
         self.artwork = SteamArtwork(self)
         self._create_shell()
+        if not reference_preview:
+            from gg_desktop import scan_cache    # the last results stay until the owner scans again
+            try:
+                if scan_cache.restore(self):
+                    self.status.setText(f"Showing results from {scan_cache.when_text(self.inventory.scanned_at) or 'the last scan'}. "
+                                        "Scan again to refresh them.")
+            except Exception:
+                pass                              # an unreadable results file only means starting empty
         self.navigate("Ready Room" if reference_preview else "Overview")
         if self.settings.get("scan_on_launch", False) and not reference_preview:
             QTimer.singleShot(0, self.start_scan)
@@ -157,6 +165,12 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         searchbox.addWidget(shortcut_hint)
         topbox.addWidget(self.search_shell, 1)
         topbox.addStretch(0)
+        self.scan_time = label("", "caption")
+        self.scan_time.setObjectName("scanTime")
+        self.scan_time.setStyleSheet("QLabel#scanTime{color:#9fb0c2;font-size:12px;padding:0 6px;}")
+        self.scan_time.setToolTip("When the results on this page were scanned. They stay until you scan again.")
+        self.scan_time.setAccessibleName("Scan time")
+        topbox.addWidget(self.scan_time)
         self.status = label("No scan yet. Scan PC (F5) to begin.", "caption", wrap=True)
         self.status.setMaximumWidth(195)
         self.status.setMaximumHeight(44)
@@ -309,6 +323,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         }
         methods[route]()
         self._name_controls()
+        self._sync_scan_time()
         QTimer.singleShot(400, self._name_controls)   # tables and panels that fill in a moment later
 
     def _name_controls(self):
@@ -347,6 +362,15 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             job.signals.progress.connect(progress)
         self.pool.start(job)
 
+    def _sync_scan_time(self):
+        if not hasattr(self, "scan_time"):
+            return
+        from gg_desktop import scan_cache
+        if self.reference_preview:
+            self.scan_time.setText("")
+            return
+        self.scan_time.setText(scan_cache.label_for(self.current_route, self.inventory.scanned_at, scan_cache.times_of(self)))
+
     def start_scan(self):
         if self.scanning or self.cleaning:
             return
@@ -376,6 +400,9 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
                 return
             self._last_scan_seconds = seconds
             self.inventory = inventory
+            from gg_desktop import scan_cache
+            scan_cache.keep_async("inventory", inventory)
+            self._sync_scan_time()
             self.status.setText(
                 f"Scanned {inventory.scanned_at}  •  {len(inventory.games)} game installs, "
                 f"{len(inventory.mods)} mod locations, {len(inventory.graveyard)} Graveyard findings."

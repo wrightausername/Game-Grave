@@ -96,6 +96,9 @@ class OldFilesSession(QObject):
             else:
                 self.result = result
                 self.message = result.summary()
+                from gg_desktop import scan_cache
+                scan_cache.keep_async("old_files", result)
+                window._sync_scan_time()
             window.status.setText(message_text("Old Files: " + self.message))
             self.changed.emit()
         def work(emit):

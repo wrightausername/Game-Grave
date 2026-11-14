@@ -35,6 +35,7 @@ STYLE = (
     "QCheckBox::indicator,QListView::indicator{width:18px;height:18px;border:1px solid #6b7788;background:#0a1118;border-radius:4px;}"
     "QCheckBox::indicator:checked,QListView::indicator:checked{background:#ff284a;border-color:#ff284a;}"
     "QCheckBox::indicator:disabled{background:#14202b;border-color:#2c3a48;}"
+    "QCheckBox::indicator:checked:disabled{background:#6b2232;border-color:#8c2b3e;}"
     "QListWidget,QPlainTextEdit,QComboBox,QLineEdit{background:#0a1118;color:#e8eef5;border:1px solid #243242;"
     "border-radius:8px;padding:6px 8px;font-size:13px;}"
     "QComboBox{min-height:22px;} QLineEdit{min-height:22px;}"

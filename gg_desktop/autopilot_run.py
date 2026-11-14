@@ -205,6 +205,9 @@ def run_change(step, env, on_step=None):
 def outcome(plan):
     """One closing sentence for the plan, and its colour."""
     ran = [s for s in plan.steps if s.ticked]
+    if any(s.result == "Cancelled by you." for s in ran) and not any(s.status == "done" and s.kind == core.CHANGE
+                                                                     for s in ran):
+        return "Cancelled. Nothing was changed.", "warn"
     done = sum(1 for s in ran if s.status == "done")
     problems = sum(1 for s in ran if s.status == "problem")
     waiting = sum(1 for s in ran if s.status == "waiting")

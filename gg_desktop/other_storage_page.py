@@ -541,6 +541,9 @@ def scan(window):
         else:
             state.report, state.message = report, ""
             window._storage_key = None
+            from gg_desktop import scan_cache
+            scan_cache.keep_async("storage", report)
+            window._sync_scan_time()
             window.status.setText(report.summary() + ". Nothing was changed.")
         if live(window):
             window.storage_scan.setText("Scan Other Storage")

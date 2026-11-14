@@ -938,6 +938,9 @@ def scan(window, automatic=False):
             window.status.setText("Leftover scan canceled. Earlier results are unchanged.")
         else:
             state.report, state.scanned = report, True
+            from gg_desktop import scan_cache
+            scan_cache.keep_async("grave", report)
+            window._sync_scan_time()
             invalidate(window)
             window.status.setText(report.summary() + ". Nothing was changed.")
         if live(window):

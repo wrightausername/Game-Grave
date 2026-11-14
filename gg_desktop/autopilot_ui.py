@@ -113,7 +113,7 @@ class PlanCard(QFrame):
         shell.set_pill(self.count, core.summary(plan), shell.words.INFO)
         waiting_changes = [s for s in plan.steps if s.ticked and s.kind == core.CHANGE and s.status == "waiting"]
         preparing = any(s.status == "running" for s in plan.steps) and not running
-        self.run_button.setVisible(self.live)
+        self.run_button.setVisible(self.live and any(s.ticked and s.status == "waiting" for s in plan.steps))
         self.run_button.setEnabled(self.live and not running and not preparing and
                                    any(s.ticked and s.status == "waiting" for s in plan.steps))
         self.run_button.setText(("Run all (" + str(len(waiting_changes)) + (" change)" if len(waiting_changes) == 1
