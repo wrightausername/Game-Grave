@@ -31,6 +31,8 @@ class AutopilotTest(unittest.TestCase):
         assert keys("how much space do my temp files use?") == []
         assert keys("which drivers are old") == []
         assert keys("hello there") == []
+        assert keys("Explain my last cleanup") == [] and keys("Cleanup history") == []
+        assert keys("Drivers & Startup") == [] and keys("tell me about my drivers") == []
         # A polite question that asks Game Grave to do it is a request.
         assert keys("can you clean up my temp files?") == ["check_temp", "clear_temp"]
 

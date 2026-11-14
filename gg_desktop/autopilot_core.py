@@ -125,7 +125,11 @@ class Plan:
 
 
 # ------------------------------------------------------------------ reading a request
-_QUESTION = re.compile(r"^(what|where|which|why|how much|how many|how do|how does|is|are|does|do i|did|when|who|should)\b")
+_QUESTION = re.compile(r"^(what|where|which|why|how much|how many|how do|how does|how is|is|are|does|do i|did|when|who|"
+                       r"should|explain|tell me|show me|describe|summari[sz]e|list|give me|help me understand)\b")
+_VERB = re.compile(r"\b(clean|clear|delete|remove|close|kill|quit|exit|end|turn|switch|stop|disable|block|prevent|scan|"
+                   r"re-?scan|check|update|install|download|get|make|run|boost|optimi[sz]e|speed|prep|prepare|undo|revert|"
+                   r"put|restore|free|tidy|do|find|look|automate|schedule)\b")
 _POLITE = re.compile(r"\b(can you|could you|would you|please|for me|go ahead|do it|run|automate|every|each|daily|nightly|"
                      r"weekly)\b")
 
@@ -133,8 +137,8 @@ _POLITE = re.compile(r"\b(can you|could you|would you|please|for me|go ahead|do 
 def is_request(text):
     """A request to do something, not a question about the data. "What can I delete?" stays a question."""
     t = " ".join(text.casefold().split())
-    if not t:
-        return False
+    if not t or not _VERB.search(t):
+        return False  # a name on its own ("Cleanup history", "Drivers & Startup") is a question about that thing
     return not _QUESTION.search(t) or bool(_POLITE.search(t))
 
 
