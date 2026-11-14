@@ -362,13 +362,13 @@ def startup_panel(window):
     body.addWidget(bool_switch(window, "scan_on_launch", "Scan when Game Grave starts",
                                "Runs a read-only scan each time the app opens."))
     body.addWidget(bool_switch(window, "assistant_enabled", "AI Assistant tab",
-                               "Adds the AI Assistant to the sidebar. It is local, read only and off until you turn it on."))
+                               "Adds the local, read-only AI tab."))
     body.addWidget(bool_switch(window, "check_updates_on_launch", "Check for updates on launch",
-                               "Asks GitHub once when Game Grave starts. Nothing is downloaded or installed."))
+                               "Asks GitHub once at start. Installs nothing."))
     body.addWidget(bool_switch(window, "soulbind_new_games", "Soulbind new games",
-                               "Applies your Soulbind preferences to newly installed games after a scan. Backup first."))
+                               "Applies Soulbind to new games, backup first."))
     body.addWidget(bool_switch(window, "welcome_at_startup", "Welcome tour at startup",
-                               "Shows the short tour of Game Grave each time it opens. Watch it now from Appearance."))
+                               "Shows the short tour when Game Grave opens."))
     body.addStretch()
     return box
 

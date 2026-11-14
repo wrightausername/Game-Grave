@@ -13,7 +13,7 @@ GROUPS = (
     )),
     ("Library", (
         ("Games", "Everything installed, in one place"),
-        ("Mods", "Turn mods on and off, fix problems"),
+        ("Mods", "Switch, sort and fix your mods"),
         ("Captures", "Screenshots and recordings"),
     )),
     ("Clean Up", (
