@@ -110,7 +110,7 @@ def main():
             idle(window)
             assert window.windowFlags() & Qt.FramelessWindowHint
             assert window.nav_rail.width() == 219 and window.top_bar.height() == 46
-            assert len(ROUTES) == 14 and isinstance(window.game_grid, CoverGrid)
+            assert len(ROUTES) == 15 and isinstance(window.game_grid, CoverGrid)
             assert window.game_grid.count() == 10
             first = window.game_grid.visualItemRect(window.game_grid.item(0))
             point = window.game_grid.viewport().mapTo(window, first.topLeft())
