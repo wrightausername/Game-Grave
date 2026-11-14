@@ -233,6 +233,20 @@ FEATURES = FEATURES + (
         "Nothing you ask leaves this PC, and a reply that breaks Game Grave's rules is never shown; the built-in "
         "answer is shown instead.", "AI Assistant, Local AI panel on the right.", "AI Assistant",
         "Optional AI model that runs on this PC only."),
+    Feature(
+        "automation", "Automation",
+        ("automation", "automate", "routine", "routines", "run tools", "run the tools", "do it for me", "autopilot",
+         "schedule", "scheduled"),
+        "Automation lets the assistant run Game Grave's own tools when you ask, like \"get my PC ready to play\", "
+        "\"clean up temp files\" or \"update my drivers\". It is off until you switch on \"Let the assistant run tools\".",
+        ("Ask for something and I show a plan: checks (they only read) run straight away, and every change is listed.",
+         "Untick anything you don't want, then press Run all. One confirmation names every change.",
+         "Add a schedule (\"every Sunday at 9pm clean temp files\") and press Save as routine. Its checks run on time; "
+         "its changes wait for your OK in a notice.",
+         "Nothing runs while a game is open, and every change is written to the activity log."),
+        "It only uses tools from Game Grave's fixed list and never types a command of its own. Closing apps and "
+        "switching off startup apps always need you there.", "AI Assistant, Automation panel on the right.",
+        "AI Assistant", "Let the assistant run Game Grave's own tools when you ask."),
 )
 BY_KEY = {f.key: f for f in FEATURES}
 

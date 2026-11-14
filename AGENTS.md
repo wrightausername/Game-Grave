@@ -623,3 +623,31 @@ Settings (one switch and one button) and the top bar's ? button. Everything else
   (`nav_groups.toggled`); a second click folds it away; going to a tab opens its group (`nav_rail.follow`, called from
   `page_for`). Opening slides down in 160 ms; folding is instant. Rows have one fixed width so nothing shifts when the scroll bar
   appears. Covered by `tests/test_nav_groups.py` and `tools/shell_polish_smoke.py`.
+
+AI Assistant automation (owner instruction, 2026-11-14: "for the AI assistant if the user so chooses it should be able to automate
+processes if possible. Like run these tools and programs for me"; answers: "One OK per plan" and routines "Yes, changes wait for OK").
+AI Assistant is reopened for this: a request in the chat can become a plan, and the right column gains an Automation panel between
+Local AI and Data Used. `app.py` only starts the routine timer. Everything else stays as locked.
+- Off until the owner switches on "Let the assistant run tools" (`autopilot_on`, default off). Off, a request shows the plan as a
+  preview with "Turn on and plan it"; nothing runs. On, the welcome line and the Assistant Mode metric say so ("Runs Tools").
+- `gg_desktop/autopilot_core.py` (pure, `tests/test_autopilot.py`): a fixed ACTIONS list, nothing else is ever run and no typed
+  command is ever run. Checks (read only): scan games, old temp files, memory use, driver updates (Windows Update), startup apps,
+  newer Game Grave. Changes: delete old temp files, Game Mode on, background recording off, High performance power, put those back,
+  close an app (asked normally), switch a startup app off, install the driver updates Windows offers (Windows asks to allow it).
+  Questions ("what can I delete?") stay with the built-in answers; only requests become plans. Launchers are never suggested for
+  closing; apps and startup apps are ticked only when the request names them.
+- `gg_desktop/autopilot_run.py` (no Qt, every call injectable): `prepare` runs the checks straight away and fills in each change
+  ("About 340 files, 1.2 GB", "Already set" skips); `run_change` reads the PC again before each change, uses the same `winpc` and
+  `upkeep_core` functions as the Toolbox and Hardware screens, and writes one activity-log line per change ("AI Assistant").
+- `gg_desktop/autopilot_ui.py`: the plan card in the chat (each step with Reads only / Change, its result and a status pill; changes
+  can be unticked; Run all (N changes) shows ONE confirmation listing every change with its exact technical line; checks first, then
+  changes, one at a time; a game starting stops the rest; Cancel). The plan and its results are saved with the chat; after a restart
+  the card is shown read only ("Ask again to run it").
+- Routines: a request with a schedule ("every Sunday at 9pm ...") offers Save as routine (up to 12, `autopilot_routines`; closing
+  apps and startup switches are left out because they need the owner there). The timer wakes every 5 minutes (first look 90 s after
+  start) and does nothing unless a routine is due, automation is on, and no game, scan or clean-up is running. A due routine runs
+  its checks, then any change waits: a notice (Review and OK / Skip) and the plan in the "Routines" chat, run only by Run all. A
+  routine missed while the PC was off runs once at the next start if within a day. Pause, Resume, Run now and Delete in the panel.
+- Covered by `tests/test_autopilot.py`, `tools/autopilot_smoke.py` (off preview, turn on, checks, Run all with the confirmation,
+  ready to play, game-running stop, Cancel, Save as routine, the timer, the notice, routine Run all, pause and delete) and the AI
+  Assistant smoke. The feature list (`assistant_features.py`) has an Automation answer.

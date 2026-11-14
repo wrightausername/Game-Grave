@@ -34,6 +34,10 @@ SUBTITLE = "Ask about your games, mods and storage. Answers come from data scann
 ROW_COLORS = ("#30d76b", "#13bcf5", "#f2a5b2", "#f6be24", "#b455ff", "#ff254a")
 WELCOME = ("Ask me about your games, storage, mods, captures or cleanup history. I answer only from what Game Grave "
            "has already scanned on this PC, I show where each answer came from, and I never change any file.")
+WELCOME_TOOLS = ("Ask me about your games, storage, mods, captures or cleanup history, or ask me to do something, like "
+                 "\"get my PC ready to play\" or \"every Sunday at 9pm clean temp files\". Answers only use what Game Grave "
+                 "has scanned. To do something I show a plan of Game Grave's own tools, and nothing changes until you "
+                 "press Run all.")
 ACCENTS = {"red": "255,37,74", "yellow": "246,190,36", "cyan": "19,188,245", "green": "50,214,122"}
 
 
@@ -337,10 +341,13 @@ def build(window):
     used_lay.addStretch()
 
     can = local_ai_ui.build_panel(self, accent)
+    from gg_desktop import autopilot_ui
+    auto = autopilot_ui.build_panel(self, accent)
     right = QWidget()
     right_lay = column(spacing=8)
     right.setLayout(right_lay)
     right_lay.addWidget(can, 4)
+    right_lay.addWidget(auto, 3)
     right_lay.addWidget(used, 4)
 
     page.content.addWidget(_split(_split(left, chat, [222, 580]), _detail_scroll(right), [802, 232]), 1)
@@ -366,6 +373,8 @@ def refresh(window):
     strip.set_value(1, f"{metrics['games']:,}")
     strip.set_value(2, f"{metrics['items']:,}")
     strip.set_value(3, metrics["scan"])
+    from gg_desktop import autopilot_ui
+    strip.set_value(4, "Runs Tools" if autopilot_ui.enabled(window) else "Read Only")
     strip.set_value(5, f"{metrics['sources_on']} of {metrics['sources_total']}")
     for source in data.source_states(facts):
         check, detail = window.assistant_source_rows[source.key]
@@ -422,7 +431,8 @@ def render_chat(window):
     chat = current_chat(window)
     window.assistant_title.setText(chat["title"] if chat and chat["messages"] else "New chat")
     if not chat or not chat["messages"]:
-        add_assistant_text(window, WELCOME)
+        from gg_desktop import autopilot_ui
+        add_assistant_text(window, WELCOME_TOOLS if autopilot_ui.enabled(window) else WELCOME)
         if local_ai_ui.show_card(window):
             window.assistant_messages.addSpacing(6)
             window.assistant_messages.addWidget(local_ai_ui.setup_card(window))
@@ -433,7 +443,7 @@ def render_chat(window):
                 question = message["text"]
                 window.assistant_messages.addWidget(bubble(message["text"]))
             else:
-                add_answer(window, question, engine.answer_from_dict(message.get("answer") or {}))
+                add_answer(window, question, engine.answer_from_dict(message.get("answer") or {}), message.get("plan"))
     window.assistant_messages.addStretch()
     scroll_down(window)
 
@@ -451,7 +461,7 @@ def add_assistant_text(window, text):
     window.assistant_messages.addWidget(holder)
 
 
-def add_answer(window, question, answer):
+def add_answer(window, question, answer, plan=None):
     if answer is None:
         return
     line = row(spacing=10)
@@ -484,8 +494,42 @@ def add_answer(window, question, answer):
             sources.addWidget(chip(name, "blue"))
         sources.addStretch()
         stack.addLayout(sources)
+    if plan:
+        from gg_desktop import autopilot_ui
+        off = answer.intent == "autopilot_off"
+        widget = autopilot_ui.card(window, plan, off=off)
+        if widget is not None:
+            stack.insertWidget(1, widget)
+            if off and not autopilot_ui.enabled(window):
+                stack.insertWidget(2, _widget(_turn_on_row(window, question)))
     line.addLayout(stack, 1)
     window.assistant_messages.addWidget(holder)
+
+
+def _turn_on_row(window, question):
+    flow = ActionFlow(spacing=6)
+
+    def turn_on():
+        from gg_desktop import autopilot_core, autopilot_ui
+        if not save(window, dict(window.settings, **{autopilot_core.SETTING: True})):
+            return
+        if _alive_switch(window):
+            window.autopilot_switch.blockSignals(True)
+            window.autopilot_switch.setChecked(True)
+            window.autopilot_switch.blockSignals(False)
+        autopilot_ui.sync_panel(window)
+        send(window, question)
+    control = tool("Turn on and plan it", "play", turn_on, kind="primary",
+                   tip="Let the assistant run Game Grave's own tools, then plan this request. Checks run straight away; "
+                       "changes wait for Run all.")
+    control.setAccessibleName("Let the assistant run tools")
+    flow.addWidget(control)
+    return flow
+
+
+def _alive_switch(window):
+    switch = getattr(window, "autopilot_switch", None)
+    return switch is not None and isValid(switch)
 
 
 def scroll_down(window):
@@ -504,6 +548,10 @@ def send(window, question=None):
     state = state_of(window)
     text = " ".join((question if question is not None else window.assistant_input.text()).split())[:actions.MAX_QUESTION]
     if not text:
+        return
+    from gg_desktop import autopilot_ui
+    if autopilot_ui.handle(window, text):  # a request to run Game Grave's own tools becomes a plan
+        window.status.setText("Planned with Game Grave's own tools. Nothing changes until you press Run all.")
         return
     facts = make_facts(window)
     result = engine.answer(text, facts)

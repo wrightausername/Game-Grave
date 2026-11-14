@@ -33,6 +33,11 @@ def _clean_message(raw):
         if answer is None:
             return None
         message["answer"] = answer.to_dict()
+        if raw.get("plan"):
+            from gg_desktop import autopilot_core
+            plan = autopilot_core.plan_from_dict(raw["plan"])
+            if plan is not None:
+                message["plan"] = autopilot_core.plan_to_dict(plan)
     return message
 
 
@@ -55,11 +60,14 @@ def title_for(question):
     return line if len(line) <= 42 else line[:41].rstrip() + "…"
 
 
-def add_exchange(chat, question, answer, now):
-    """Append one question and its answer to a chat (in place) and return it."""
+def add_exchange(chat, question, answer, now, plan=None):
+    """Append one question and its answer (and an automation plan, when there is one) to a chat, in place."""
     question = " ".join(question.split())[:MAX_QUESTION]
     chat["messages"].append({"role": "user", "text": question, "at": float(now)})
-    chat["messages"].append({"role": "assistant", "text": answer.text, "at": float(now), "answer": answer.to_dict()})
+    reply = {"role": "assistant", "text": answer.text, "at": float(now), "answer": answer.to_dict()}
+    if plan:
+        reply["plan"] = plan
+    chat["messages"].append(reply)
     del chat["messages"][:-MAX_MESSAGES]
     if chat["title"] == NEW_TITLE:
         chat["title"] = title_for(question)

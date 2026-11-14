@@ -100,6 +100,9 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.navigate("Ready Room" if reference_preview else "Overview")
         if self.settings.get("scan_on_launch", False) and not reference_preview:
             QTimer.singleShot(0, self.start_scan)
+        if not reference_preview:
+            from gg_desktop import autopilot_ui   # routines: wakes every 5 minutes, does nothing unless one is due
+            autopilot_ui.install(self)
         if self.settings.get("check_updates_on_launch") is True and not reference_preview:
             def ask():
                 from gg_desktop import settings_page
