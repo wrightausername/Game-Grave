@@ -587,3 +587,12 @@ for its tool windows only; the hub, tiles, tabs and side panels are unchanged. O
 - Unchanged: every confirmation still names the exact change (the folded technical lines are repeated there), every action
   is logged, nothing new is changed on the PC, and nothing is called safe. Covered by `tools/tools_windows_smoke.py`,
   `tools/tools_page_smoke.py` and `tools/kit_easy_smoke.py`.
+
+First-launch welcome (owner instruction, 2026-11-14: a beta tester "is confused on the purpose of said app ... the app should be
+able to speak for itself", then "its supposed to be an exe"). New window only: `gg_desktop/welcome_data.py` (pure wording and the
+once-only rule, `tests/test_welcome.py`) and `gg_desktop/welcome_ui.py` (Qt), opened from `app.main()` after the window shows. Three
+screens (what Game Grave is; Mod Bisect, Undo Center, Black Box; Soulbind, Hardware, AI Assistant), Skip intro, Back / Next, and
+"Scan my games" on the last one, which calls the existing `start_scan`. Closing it any way saves `welcome_seen`; it never shows in
+the photo-reference preview or when starting minimized. No tab, the shell, navigation or shared styles changed. Covered by
+`tools/welcome_smoke.py`. The grouped sidebar with subtitles and an Overview "Start here" card were proposed but need the owner to
+reopen the shell and Overview.

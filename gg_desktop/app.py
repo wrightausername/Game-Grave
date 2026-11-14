@@ -450,4 +450,6 @@ def main() -> int:
         win.showMinimized()
     else:
         win.show()
+        from gg_desktop import welcome_ui      # first launch only: what Game Grave is, then the first scan
+        QTimer.singleShot(350, lambda: welcome_ui.show_if_needed(win))
     return app.exec()
