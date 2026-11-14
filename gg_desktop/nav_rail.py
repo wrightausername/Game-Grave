@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QScrollA
 from gg_desktop import nav_groups
 from gg_desktop.reference_widgets import ROUTE_SYMBOLS, icon
 
-ITEM_HEIGHT = 40
+ITEM_HEIGHT = 40   # the QSS above repeats it: the app's global QPushButton min-height would otherwise win
 
 STYLE = """
 QScrollArea#navScroll, QWidget#navList { background: transparent; border: none; }
@@ -19,7 +19,8 @@ QScrollArea#navScroll QScrollBar:vertical { width: 6px; background: transparent;
 QScrollArea#navScroll QScrollBar::handle:vertical { background: #2A3541; border-radius: 3px; min-height: 30px; }
 QScrollArea#navScroll QScrollBar::add-line:vertical, QScrollArea#navScroll QScrollBar::sub-line:vertical { height: 0; }
 QLabel#navGroup { color: #7E8C9B; font-size: 10px; font-weight: 800; letter-spacing: 1.6px; padding: 0 0 0 16px; }
-QPushButton#navItem { border: none; background: transparent; border-radius: 9px; padding: 0; text-align: left; }
+QPushButton#navItem { border: none; background: transparent; border-radius: 9px; padding: 0; text-align: left;
+                      min-height: 40px; max-height: 40px; }
 QPushButton#navItem:hover { background: #162230; }
 QPushButton#navItem[active="true"] { background: #2A171F; border-left: 3px solid #FF4357; }
 QPushButton#navItem:focus { border: 1px solid #42D4F2; }

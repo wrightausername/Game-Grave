@@ -64,6 +64,10 @@ def main():
             visible = [route for route, control in window.nav_buttons.items() if not control.isHidden()]
             assert visible[-2:] == ["More Tools", "Settings"], visible
             tops = {route: window.nav_buttons[route].geometry().top() for route in visible}
+            heights = {route: window.nav_buttons[route].height() for route in visible}
+            assert min(heights.values()) >= 38, ("Sidebar rows are squeezed", heights)
+            ordered = sorted(tops.values())
+            assert all(b - a >= 38 for a, b in zip(ordered, ordered[1:])), ("Sidebar rows overlap", tops)
             assert tops["More Tools"] < tops["Settings"] and max(tops.values()) == tops["Settings"], tops
 
             # The AI Assistant is optional and starts off: hidden, and unreachable until it is switched on.

@@ -618,7 +618,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $shots = @('hardware-*.png','tools-*.png','photo-more-tools-*.png','shell-*.png','scan-bar-*.png','banner-*.png','ready-room-*.png','kit-easy-*.png','first-run-*.png','overview-ring-*.png','other-dial-*.png','assistant-*.png','games-*.png','mods-*.png','old-files-*.png','crimson-*-1440.png' | ForEach-Object { Get-ChildItem _ci_temp -Filter $_ })
+          $shots = @('hardware-*.png','tools-*.png','photo-more-tools-*.png','shell-*.png','scan-bar-*.png','banner-*.png','ready-room-*.png','kit-easy-*.png','first-run-*.png','overview-ring-*.png','other-dial-*.png','assistant-*.png','games-*.png','mods-*.png','old-files-*.png','crimson-*-1440.png','welcome-*.png' | ForEach-Object { Get-ChildItem _ci_temp -Filter $_ })
           if (-not $shots) { Write-Host 'No More Tools screenshots to publish.'; exit 0 }
           $dir = Join-Path $env:RUNNER_TEMP 'tools-shots'
           New-Item -ItemType Directory -Force $dir | Out-Null
