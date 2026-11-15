@@ -55,6 +55,19 @@ ACTIONS = {a.key: a for a in (
            "Reads your capture folders only. Nothing is changed."),
     Action("check_mods", "Find the mods you named", CHECK, "Looks up the mods in your Mod Organizer 2 profiles.",
            "Reads modlist.txt in each Mod Organizer 2 profile. Nothing is changed.", routine=False),
+    Action("check_game_fix", "Check why the game won't run", CHECK, "Looks for the usual causes that are not mods: crashes "
+           "Windows recorded, overlays that hook into games, and missing Microsoft runtimes.",
+           "Reads Black Box's crash records (Windows Application log), the open apps (tasklist), the Visual C++ runtime "
+           "registry keys and System32 / SysWOW64 for d3dx9_43.dll. Nothing is changed.", routine=False),
+    Action("verify_game", "Ask the launcher to check the game's files", CHANGE,
+           "Steam compares every game file with the real one and downloads any that are missing or damaged. Your saves "
+           "and settings are not part of it.", "Opens steam://validate/<app id>; Steam does the check.", routine=False,
+           undo="Nothing to undo: Steam only replaces damaged or missing game files."),
+    Action("install_vcredist", "Install Microsoft's Visual C++ runtime", CHANGE,
+           "Downloads Microsoft's Visual C++ 2015-2022 runtime from Microsoft and installs it. Windows asks you to allow it.",
+           "https://aka.ms/vs/17/release/vc_redist.x64.exe (Microsoft hosts only, signature checked as Microsoft), "
+           "then vc_redist.x64.exe /install /passive /norestart.", routine=False,
+           undo="Remove it in Windows Settings > Apps if you ever need to."),
     Action("clear_temp", "Delete old temporary files", CHANGE,
            "Deletes temporary files that have not changed for 2 days. Files in use are skipped.",
            "Permanently deletes (no Recycle Bin) files 2+ days old in Windows' temp folders, each checked again first.",
@@ -117,6 +130,10 @@ class Step:
             return "Close " + name
         if self.key == "startup_off" and name:
             return f"Stop {name} starting with Windows"
+        if self.key == "verify_game" and name:
+            return f"Ask Steam to check {name}'s files"
+        if self.key == "check_game_fix" and name:
+            return f"Check why {name} won't run"
         if self.key in ("mod_off", "mod_on") and name:
             return ("Turn off " if self.key == "mod_off" else "Turn on ") + name
         return self.action.title
@@ -147,7 +164,7 @@ _QUESTION = re.compile(r"^(what|where|which|why|how much|how many|how do|how doe
 _VERB = re.compile(r"\b(clean|clear|delete|remove|close|kill|quit|exit|end|turn|switch|stop|disable|block|prevent|scan|"
                    r"re-?scan|check|update|install|download|get|make|run|boost|optimi[sz]e|speed|prep|prepare|undo|revert|"
                    r"put|restore|free|tidy|do|find|look|automate|schedule|enable|activate|deactivate|toggle|open|launch|start|"
-                   r"show|take|go|set|use|bring|pull|help|back)\b")
+                   r"show|take|go|set|use|bring|pull|help|back|fix|repair|crash|crashes|crashing)\b")
 _POLITE = re.compile(r"\b(can you|could you|would you|please|for me|go ahead|do it|run|automate|every|each|daily|nightly|"
                      r"weekly)\b")
 
@@ -196,6 +213,11 @@ def wants(text):
     if _UNDO.search(t) and (_GAME_MODE.search(t) or _RECORDING.search(t) or _POWER.search(t) or
                             re.search(r"optimi[sz]|windows settings|my settings", t)):
         add("undo_optimizer")
+        return found
+    from gg_desktop import fixgame_core
+    if fixgame_core.wants_fix(t):        # "my game won't start", "Elden Ring keeps crashing": the non-mod causes first
+        add("check_game_fix", mentioned=t)
+        add("check_drivers")
         return found
     looks = bool(_SCAN.search(t) or re.search(r"\b(find|look for|check)\b", t))
     specific = False

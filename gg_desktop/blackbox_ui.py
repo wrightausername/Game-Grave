@@ -54,6 +54,10 @@ class BlackBoxBody(QWidget):
         self.build_button = button("Build report", self.build, kind="primary",
                                    tip="Reads the Windows Application log and the game folder. Changes nothing.")
         top.addWidget(self.build_button)
+        self.fix_button = button("Check the usual fixes", self.ask_fix, kind="actionLink",
+                                 tip="Asks the AI Assistant to check overlays, Microsoft runtimes, drivers and the game's "
+                                     "files for this game, and offer fixes. Nothing changes until you press Run all.")
+        top.addWidget(self.fix_button)
         top.addStretch()
         layout.addLayout(top)
         self.summary = label("", "readyDetail", wrap=True)
@@ -110,6 +114,17 @@ class BlackBoxBody(QWidget):
     def _sync(self):
         for control in (self.copy_button, self.save_button):
             control.setEnabled(bool(self.text))
+
+    def ask_fix(self):
+        """Fix my game for the chosen game, in the AI Assistant's pop-out chat (the same plan as asking there)."""
+        game = self.games.currentData()
+        window = self.window_owner
+        if game is None:
+            return
+        from gg_desktop import assistant_page, assistant_popout
+        pop = assistant_popout.open_popout(window)     # says how to turn the assistant on when it is off
+        if pop is not None:
+            assistant_page.send(window, f"Fix {game.name}, it keeps crashing", source=pop.input)
 
     def build(self):
         game = self.games.currentData()

@@ -29,7 +29,72 @@ def default_env(never_touch=()):
         has_backup=winpc.has_backup, search_updates=upkeep_core.search_updates, install_updates=upkeep_core.install_updates,
         read_startup=upkeep_core.read_startup, set_startup=upkeep_core.set_enabled, check_update=update_check.check,
         log=lambda details, result: log_event("AI Assistant", details, result=result),
-        mo2_profiles=lambda: [], set_mod=_set_mod, cache={})
+        mo2_profiles=lambda: [], set_mod=_set_mod, cache={},
+        games=lambda: [], game_crashes=_game_crashes, read_runtimes=_read_runtimes, open_url=_open_url,
+        install_vcredist=_install_vcredist)
+
+
+def _game_crashes(game):
+    """Black Box's crash records for this game (Windows Application log, program inside the game folder)."""
+    from gg_desktop import blackbox_core as bb
+    return bb.crashes_for(bb.parse_events(bb.query_events()), Path(game.install_path))
+
+
+def _read_runtimes():
+    """(Visual C++ 2015-2022 x64 installed, x86 installed, d3dx9_43.dll present). Reads only."""
+    import os
+    import winreg
+    def installed(view):
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\" + view,
+                                0, winreg.KEY_READ | winreg.KEY_WOW64_32KEY) as key:
+                return winreg.QueryValueEx(key, "Installed")[0] == 1
+        except OSError:
+            return False
+    windir = os.environ.get("WINDIR", r"C:\Windows")
+    d3dx = os.path.exists(os.path.join(windir, "System32", "d3dx9_43.dll")) or \
+        os.path.exists(os.path.join(windir, "SysWOW64", "d3dx9_43.dll"))
+    return installed("x64"), installed("x86"), d3dx
+
+
+def _open_url(url):
+    import os
+    os.startfile(url)        # steam:// links go to Steam itself
+
+
+def _install_vcredist():
+    """Download Microsoft's installer from Microsoft only, check it is signed by Microsoft, run it (Windows asks)."""
+    import subprocess
+    import tempfile
+    import urllib.request
+    from gg_desktop import fixgame_core as fx
+
+    class Guard(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            if not fx.safe_download(newurl):
+                raise OSError("Download moved to a host that is not Microsoft's, so it was stopped.")
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+    folder = Path(tempfile.mkdtemp(prefix="gg-vcredist-"))
+    target = folder / "vc_redist.x64.exe"
+    opener = urllib.request.build_opener(Guard)
+    with opener.open(urllib.request.Request(fx.VC_DOWNLOAD, headers={"User-Agent": "GameGrave/1"}), timeout=60) as response:
+        if not fx.safe_download(response.geturl()):
+            raise OSError("The download did not come from Microsoft, so it was stopped.")
+        target.write_bytes(response.read(80 * 1024 * 1024))
+    check = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                            "$s = Get-AuthenticodeSignature -LiteralPath $args[0]; \"$($s.Status)|$($s.SignerCertificate.Subject)\"",
+                            str(target)], capture_output=True, text=True, timeout=60,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    status, _, subject = (check.stdout or "").strip().partition("|")
+    if status != "Valid" or "Microsoft Corporation" not in subject:
+        target.unlink(missing_ok=True)
+        raise OSError("The installer's signature is not a valid Microsoft signature, so it was not run.")
+    run = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                          "$p = Start-Process -FilePath $args[0] -ArgumentList '/install','/passive','/norestart' -Verb RunAs "
+                          "-Wait -PassThru; exit $p.ExitCode", str(target)], capture_output=True, text=True, timeout=900,
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    target.unlink(missing_ok=True)
+    return run.returncode
 
 
 def _set_mod(folder, name, on):
@@ -127,6 +192,9 @@ def _check(step, env, plan):
         _kind, sentence = env.check_update()
         _mark(step, "done", sentence)
         return
+    if step.key == "check_game_fix":
+        _fix_check(step, env, plan)
+        return
     if step.key == "check_mods":
         profiles = env.mo2_profiles()
         on = bool(step.args.get("on"))
@@ -145,6 +213,55 @@ def _check(step, env, plan):
         plan.steps[at:at] = new
         return
     raise ValueError("Not a check: " + step.key)
+
+
+def _fix_check(step, env, plan):
+    from gg_desktop import fixgame_core as fx
+    request = step.args.get("mentioned", plan.request)
+    game = fx.game_named(env.games(), request)
+    lines, new = [], []
+    if game is None:
+        lines.append("Name the game for a closer look (for example \"fix Elden Ring\"). These checks cover every game.")
+    else:
+        step.args["name"] = game.name
+        try:
+            lines.append(fx.crash_summary(env.game_crashes(game)))
+        except Exception:
+            lines.append("Windows' crash records could not be read.")
+        link = fx.verify_link(game)
+        if link:
+            new.append(core.Step("verify_game", {"name": game.name, "url": link},
+                                 detail="Steam re-downloads only damaged or missing files."))
+        else:
+            lines.append(fx.verify_words(game))
+    try:
+        overlays = fx.overlay_findings(p.name for p in env.list_processes(env.runner))
+    except Exception:
+        overlays = []
+    if overlays:
+        lines.append("Open overlays that hook into games: " + ", ".join(overlays) + ". Close them and try again.")
+        procs = {p.name.casefold(): p for p in env.list_processes(env.runner)}
+        for exe, label in fx.OVERLAYS.items():
+            if label in overlays and exe in procs:
+                new.append(core.Step("close_app", {"name": procs[exe].name, "pid": int(procs[exe].pid)},
+                                     detail=label + " (overlay)", ticked=False))
+    else:
+        lines.append("No overlays known to cause trouble are open.")
+    try:
+        x64, x86, d3dx = env.read_runtimes()
+        for finding in fx.runtime_findings(x64, x86, d3dx):
+            lines.append(finding.detail)
+        if not x64 or not x86:
+            new.append(core.Step("install_vcredist", {}, detail="From Microsoft, signature checked. Windows asks to allow it."))
+        if not d3dx:
+            lines.append("DirectX End-User Runtime: " + fx.DIRECTX_PAGE)
+        if x64 and x86:
+            lines.append("Microsoft's Visual C++ runtime is installed.")
+    except Exception:
+        lines.append("The Microsoft runtimes could not be checked.")
+    _mark(step, "done", " ".join(lines))
+    at = plan.steps.index(step) + 1
+    plan.steps[at:at] = new
 
 
 def prepare(plan, env, game_running=lambda: False):
@@ -235,6 +352,21 @@ def run_change(step, env, on_step=None):
                     f" (profile {step.args.get('profile', '')}). Undo in Mods > My Mods.")
             env.log(text, "Mod switched " + ("on" if on else "off"))
             return _mark(step, "done", text)
+        if key == "verify_game":
+            url = str(step.args.get("url", ""))
+            if not url.startswith("steam://validate/"):
+                return _mark(step, "problem", "Only Steam's own verify can be opened from here.")
+            env.open_url(url)
+            text = f"Steam is checking {step.args.get('name', 'the game')}'s files. Watch Steam for the result."
+            env.log(text, "Verify started")
+            return _mark(step, "done", text)
+        if key == "install_vcredist":
+            code = env.install_vcredist()
+            ok = code in (0, 1638, 3010)     # 1638: a newer one is already installed; 3010: restart to finish
+            text = ("Microsoft's Visual C++ runtime is installed." + (" Restart the PC to finish." if code == 3010 else "")
+                    if ok else f"The installer stopped with code {code}. Nothing else was changed.")
+            env.log("Visual C++ runtime: " + text, "Installed" if ok else "Not finished")
+            return _mark(step, "done" if ok else "problem", text)
         if key == "install_drivers":
             ids = list(step.args.get("ids") or [])
             updates = [u for u in env.cache.get("drivers") or env.search_updates() if not ids or u.update_id in ids]

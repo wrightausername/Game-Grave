@@ -64,6 +64,8 @@ def main():
     procs = [SimpleNamespace(name="chrome.exe", pid=10, kb=900_000), SimpleNamespace(name="Discord.exe", pid=12, kb=400_000),
              SimpleNamespace(name="steam.exe", pid=14, kb=700_000)]
 
+    opened_urls, vc_runs = [], []
+
     def make_env(never_touch=()):
         return SimpleNamespace(
             reg=object(), runner=object(), backup="backup.json", never_touch=list(never_touch), size=lambda n: f"{n} B",
@@ -83,7 +85,11 @@ def main():
             read_startup=lambda: [], set_startup=lambda app, on: None,
             check_update=lambda: ("current", "You have the newest build."),
             log=lambda details, result: log.append((details, result)), mo2_profiles=lambda: [],
-            set_mod=lambda folder, name, on: switched.append((folder, name, on)), cache={})
+            set_mod=lambda folder, name, on: switched.append((folder, name, on)), cache={},
+            games=lambda: [SimpleNamespace(name="Elden Ring", launcher="Steam", app_id="1245620",
+                                           install_path="C:\\Steam\\common\\ELDEN RING")],
+            game_crashes=lambda game: [], read_runtimes=lambda: (True, False, True),
+            open_url=lambda url: opened_urls.append(url), install_vcredist=lambda: vc_runs.append(1) or 0)
 
     with tempfile.TemporaryDirectory(prefix="GG-autopilot-") as temp:
         root = Path(temp)
@@ -253,6 +259,20 @@ def main():
             wait_for(lambda: plan.steps[1].status == "done", "the mod switch")
             assert switched == [("C:\\MO2\\profiles\\Default", "SkyUI_5_2", False)], switched
             assert window.grab().save(str(args.output / "assistant-autopilot-mod.png"))
+
+            # Fix my game: the usual non-mod causes, then Steam's verify and Microsoft's runtime after Run all.
+            ask(window, "Elden Ring keeps crashing, fix it")
+            plan = list(ui.state_of(window).plans.values())[-1]
+            wait_for(lambda: plan.steps[0].status == "done", "the game checks")
+            keys = [s.key for s in plan.steps]
+            assert keys[0] == "check_game_fix" and "verify_game" in keys and "install_vcredist" in keys, keys
+            assert "32-bit" in plan.steps[0].result, plan.steps[0].result
+            assert window.grab().save(str(args.output / "assistant-autopilot-fixgame.png"))
+            confirm.reset_mock()
+            press(window, "Run all")
+            assert "steam://validate/1245620" in confirm.call_args[0][1]
+            wait_for(lambda: all(s.status in ("done", "skipped", "problem") for s in plan.steps if s.ticked), "the fixes")
+            assert opened_urls == ["steam://validate/1245620"] and vc_runs == [1], (opened_urls, vc_runs)
 
             # The tabs' own scans run from a plan too.
             ask(window, "scan for leftovers")

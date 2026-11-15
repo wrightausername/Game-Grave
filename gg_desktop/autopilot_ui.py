@@ -320,6 +320,8 @@ def env_for(window, plan):
     if plan.id not in st.envs:
         env = run.default_env(window.settings.get("never_touch", []))
         env.mo2_profiles = lambda: run.mo2_profiles(getattr(window.inventory, "mods", []))
+        fallback = getattr(env, "games", lambda: [])
+        env.games = lambda: list(getattr(window.inventory, "games", []) or []) or fallback()
         st.envs[plan.id] = env
     return st.envs[plan.id]
 

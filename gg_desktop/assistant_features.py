@@ -395,6 +395,19 @@ FEATURES = FEATURES + (
         ("Press the ? at the top right, or Watch the welcome tour in Settings.",
          "Use Next and Back (or the arrow keys); Skip intro closes it."),
         "", "The ? button at the top right.", "Settings", "A short tour of Game Grave."),
+    Feature(
+        "fix_game", "Fix my game",
+        ("fix my game", "won't start", "wont start", "won't launch", "wont launch", "keeps crashing", "game crashes",
+         "game won't open", "black screen", "game freezes", "crashes on startup", "crashes to desktop"),
+        "Fix my game checks the usual reasons a game won't start or keeps crashing that are not mods, then offers the "
+        "fixes. Ask \"fix\" and the game's name, for example \"fix Elden Ring\".",
+        ("It reads the crashes Windows recorded for the game (Black Box) and names the file they happened in.",
+         "It lists overlays that hook into games (RivaTuner, Overwolf, Discord's overlay and others) and offers to close them.",
+         "It checks Microsoft's Visual C++ runtime and the older DirectX files, and checks Windows Update for drivers.",
+         "Fixes it can do after Run all and one OK: Steam's own file check, closing overlays, installing Microsoft's "
+         "runtime (from Microsoft, signature checked)."),
+        "It never says a cause is certain and never deletes a game file. For mod crashes, Mod Bisect finds the mod.",
+        "Ask the AI Assistant, or Fix Kit.", "Fix Kit", "Checks why a game won't run and offers the usual fixes."),
 )
 
 _GUIDES = {
@@ -413,7 +426,7 @@ _GUIDES = {
     "junction_manager": ("tool:junction_manager", ""), "reports": ("tool:game_report", ""),
     "other_storage": ("tab:Other Storage", "scan other storage"), "captures": ("tab:Captures", "scan my captures"),
     "games_tab": ("tab:Games", ""), "my_mods": ("tab:Mods", ""), "scan_pc": ("", "scan my games"),
-    "never_touch": ("tab:Settings", ""), "welcome_tour": ("tour", ""),
+    "never_touch": ("tab:Settings", ""), "welcome_tour": ("tour", ""), "fix_game": ("tab:Fix Kit", "fix my game"),
 }
 # Tabs that also hold scan data: "what is in other storage" is a question about the data, so their guide only answers a
 # how-to question ("how do I use other storage").
