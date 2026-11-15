@@ -175,6 +175,16 @@ def main():
             window.game_sort.setCurrentText("Recently played")
             settle()
 
+            # Empty screens offer the next step.
+            window.navigate("Other Storage")
+            settle()
+            step = window.storage_notice.property("gg_next_step")
+            if not window._shown_storage:
+                assert step is not None and step.isVisible() and step.text() == "Scan Other Storage", step
+                assert window.grab().save(str(args.output / "shell-next-step.png"))
+            window.navigate("Games")
+            settle()
+
             # Right-click "Ask the assistant about this": answered in the pop-out from the row itself.
             from gg_desktop import ask_about, assistant_page, assistant_popout
             from PySide6.QtWidgets import QMenu

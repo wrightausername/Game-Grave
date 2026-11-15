@@ -181,6 +181,11 @@ class GamesScreens:
                    "Your library starts here. Scan PC (F5), or use the … menu to connect your game libraries.")
         self.game_empty.setText(message if not rows else "")
         self.game_empty.setVisible(not rows)
+        from gg_desktop import next_step
+        first = (not rows and not self.inventory.scanned_at and not self.page.games.records
+                 and "Not Installed" not in active and "Updates" not in active)
+        next_step.show(self.game_empty, "Scan PC (F5)" if first and not self.scanning else "", self.start_scan,
+                       "Finds installed games, mods, saves and captures. Reads only; nothing is changed.")
         self.game_count.setText(f"{len(rows):,} games shown · Local library" if self.inventory.scanned_at else "No scan yet · Nothing has been changed")
         self._game_details()
         self.game_grid.doItemsLayout()

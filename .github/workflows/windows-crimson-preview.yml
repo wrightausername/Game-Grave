@@ -152,6 +152,7 @@ on:
       - 'gg_desktop/ask_about.py'
       - 'gg_desktop/ask_about_core.py'
       - 'tests/test_ask_about.py'
+      - 'gg_desktop/next_step.py'
       - 'gg_desktop/assistant_popout.py'
       - 'tools/scan_cache_smoke.py'
       - 'tools/autopilot_smoke.py'

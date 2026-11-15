@@ -220,7 +220,9 @@ def build(window):
     from gg_desktop import ask_about
 
     def old_row(r, window=self):
-        shown = getattr(getattr(window.page, "old_files", None), "shown", [])
+        if getattr(window, "_shown_old_groups", None):
+            return None                     # folder groups: ask about a file in the file view
+        shown = getattr(window, "_shown_old_files", [])
         return shown[r] if 0 <= r < len(shown) else None
     ask_about.install_table(self, self.old_table, "old_file", old_row)
     self.old_table.setIconSize(self.old_table.iconSize().__class__(28, 28))
@@ -456,6 +458,9 @@ def fill(window, *args, requested_page=0, **kwargs):
         notice = "\n".join(part for part in (notice, state.message) if part)
     window.old_notice.setText(notice)
     window.old_notice.setVisible(bool(notice))
+    from gg_desktop import next_step
+    next_step.show(window.old_notice, "Scan Now" if not items and not result and not state.busy else "",
+                   window._old_scan, "Reads file names, sizes and dates in the chosen folder. Nothing is changed.")
     window._old_selection_count()
     window._old_details()
 

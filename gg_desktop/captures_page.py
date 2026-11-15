@@ -729,6 +729,14 @@ def update_notice(window, rows):
     window.capture_notice.setVisible(bool(notice))
     window.capture_action.setText(action)
     window.capture_action.setVisible(bool(action))
+    from gg_desktop import next_step
+    step = ("", None)
+    if not rows and not action and state.tab not in ("Settings",) and not state.busy:
+        if notice.startswith("No captures were found"):
+            step = ("Add a capture folder", lambda: set_tab(window, "Settings"))
+        elif notice.startswith("No captures match"):
+            step = ("Clear filters", lambda: clear_filters(window))
+    next_step.show(window.capture_notice, *step)
 
 
 def contextual_action(window):

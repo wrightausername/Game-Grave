@@ -423,6 +423,14 @@ def fill(window, *args, requested_page=0, **kwargs):
         notice = "Showing items from the last PC scan. Use Scan Other Storage for caches, logs and settings folders."
     window.storage_notice.setText(notice)
     window.storage_notice.setVisible(bool(notice))
+    from gg_desktop import next_step
+    if not rows and not state.busy and state.report is None:
+        next_step.show(window.storage_notice, "Scan Other Storage", window._scan_other_storage,
+                       "Reads sizes and dates of known game-related folders. Nothing is changed.")
+    elif not rows and not state.busy and window.storage_search.text():
+        next_step.show(window.storage_notice, "Clear search", window.storage_search.clear)
+    else:
+        next_step.hide(window.storage_notice)
     selection_count(window)
     details(window)
 

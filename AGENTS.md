@@ -732,3 +732,25 @@ Shell only; no tab layout changes. `gg_desktop/comfort_core.py` (pure, `tests/te
   in the owner's own HKCU Run key, removed when switched off, logged), Quit. `--minimized` starts hidden in the tray.
   `GAME_GRAVE_TRAY=0` turns the tray off (set in CI so other checks close normally).
 - Covered by `tests/test_comfort.py`, `tools/comfort_smoke.py` and the updated Overview check (the bell opens Notifications).
+
+Quality-of-life pass, batch B (same owner instruction). This reopens, for these additions only, Other Storage and Captures
+(ticking), Games, Mods, Old Files, Other Storage, Captures and Graveyard (one right-click entry and an empty-screen button);
+their layouts, rules and removal paths are unchanged.
+- Undo right after a removal: `CrimsonWindow.cleaning` is a property; when a clean-up starts, the ids of the recovery records are
+  noted, and when it ends any NEW Recycle Bin record pops up "Moved to the Recycle Bin" with Undo and Open (Undo Center). Undo asks
+  first, naming each path, then uses the same calls as Undo Center (`undo_actions.restore`: check each record, restore only
+  AVAILABLE, at most 20, never overwrite). `recovery.py` is not edited. A job that recycles nothing shows no Undo.
+- Other Storage gets a Select all / Clear selection button and the Old Files ticking (double-click, Shift+click, Ctrl+click);
+  Captures gets Shift+click and Ctrl+click in the grid and the list (double-click still opens a capture).
+- Sort and filter lists (accessible name starting with "Sort" or "Filter") are put back to the last choice per tab
+  (`view_memory`) when the tab opens, only to a choice the list still offers. Search text and ticks are never kept.
+- Right-click "Ask the assistant about this" on games, mods (one at a time), Old Files, Other Storage, Captures and Graveyard rows
+  (`ask_about.py`, pure answers in `ask_about_core.py`). It opens the pop-out chat; a game is asked like a typed question, other
+  rows are answered from the row (type, related game, size, date, where, why listed, Never Touch) with what each tab button would
+  do. It never says an item is safe to remove and never switches the tab. Off, the entry says to turn the assistant on.
+- Empty screens: Other Storage before its scan shows "Scan Other Storage" (or "Clear search"), Old Files before a scan "Scan Now",
+  Captures "Add a capture folder" or "Clear filters", Games before the first scan "Scan PC (F5)" (`next_step.py`). Each button
+  only starts the tab's existing action.
+- Diagnostics now also take any other `C:\Users\<name>` out of paths. The notifications list is dark behind its rows.
+- Covered by `tests/test_comfort.py`, `tests/test_ask_about.py`, `tools/comfort_smoke.py` (Undo with faked recovery calls, sort
+  remembered, ask-about, next step).
