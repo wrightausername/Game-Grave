@@ -6,7 +6,7 @@ writes, and what it never does.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import re
 
 
@@ -21,6 +21,8 @@ class Feature:
     where: str = ""          # how to open it
     tab: str = ""            # a tab name for the hand-off button
     hover: str = ""          # a short, specific tooltip for the feature's own button or tile
+    opens: str = ""          # what "Open it" opens: tool:<key>, kit:easy, tab:<Tab>[/<inner tab>], bisect, tour
+    do: str = ""             # the request "Do it for me" sends to the assistant's automation, when it can run it
 
 
 FEATURES = (
@@ -93,7 +95,8 @@ FEATURES = (
         "Set your game preferences once and apply them to every game Game Grave can verify."),
     Feature(
         "squad_sync", "Squad Sync",
-        ("squad sync", "squadsync", "squad code", "co-op mods", "coop mods", "match mods with a friend"),
+        ("squad sync", "squadsync", "squad code", "co-op mods", "coop mods", "match mods with a friend", "share my mods",
+         "share mods", "my mods with a friend", "same mods as my friend", "mods with friends"),
         "Squad Sync gets a co-op group onto the same mods. One person hosts and shares a code; everyone else pastes "
         "it and Game Grave shows what they are missing and helps get it.",
         ("Hosting: pick the game, press Copy squad code, and paste it to your friends in Discord or a text. For a "
@@ -112,7 +115,8 @@ FEATURES = (
         "Reads your mod setup so you can compare it with a friend's."),
     Feature(
         "undo_center", "Undo Center",
-        ("undo center", "undo centre"),
+        ("undo center", "undo centre", "restore something", "get back a file", "get my file back", "undo a delete",
+         "recover a file", "restore a file", "restore what"),
         "Undo Center checks whether Windows still holds a file Game Grave recycled, and lets you approve a restore.",
         (), "A recorded recycle is not a promise Windows can restore it; it checks again before any restore.",
         "Undo Center in the sidebar.", "Undo Center",
@@ -248,6 +252,209 @@ FEATURES = FEATURES + (
         "switching off startup apps always need you there.", "AI Assistant, Automation panel on the right.",
         "AI Assistant", "Let the assistant run Game Grave's own tools when you ask."),
 )
+
+# Every tool in the app, so "how do I ..." always has a walkthrough (owner, 2026-11-14: "if somebody doesn't know how to
+# do any of these tools or use them it should be easy enough for them to ask and it implement what ever they want").
+FEATURES = FEATURES + (
+    Feature(
+        "windows_cleanup", "Windows Cleanup",
+        ("windows cleanup", "temp files", "temporary files", "temp folder", "clear temp", "clean temp", "junk files",
+         "delete temp"),
+        "Windows Cleanup deletes temporary files that Windows and your apps left behind and that have not changed for "
+        "2 days.",
+        ("Open it: Game Grave looks through Windows' temp folders first and shows how many old files it found and their "
+         "size. Nothing is deleted yet.",
+         "Check the list, then press Delete. One confirmation names the folders.",
+         "Files in use are skipped and every file is checked again just before it is deleted.",
+         "Or just ask me \"clean up temp files\" and I'll do the same with one OK."),
+        "These files are deleted for good, not sent to the Recycle Bin.", "Toolbox, Windows section.", "More Tools",
+        "Deletes old temporary files after you confirm."),
+    Feature(
+        "game_optimizer", "Game Optimizer",
+        ("game optimizer", "game mode", "background recording", "game bar recording", "game dvr", "power plan",
+         "high performance", "optimize windows for gaming", "windows settings for games"),
+        "Game Optimizer switches three Windows settings that can help games: Game Mode on, background recording off, "
+        "and the High performance power plan. It saves your current values first, so Undo puts them back exactly.",
+        ("Open it: each setting shows how it is set now (On, Off, or \"Windows decides\").",
+         "Tick the ones you want and press Apply. One confirmation shows the exact change.",
+         "Undo my changes puts every setting back the way it was.",
+         "Or ask me \"turn on game mode and turn off background recording\"."),
+        "It does not promise more frames; it only changes those three settings.", "Toolbox, Windows section.",
+        "More Tools", "Three Windows settings for games, with Undo."),
+    Feature(
+        "memory_optimizer", "Memory Optimizer",
+        ("memory optimizer", "free up memory", "free memory", "free up ram", "close apps", "close programs",
+         "using memory", "using ram", "memory hog", "too much memory", "too much ram"),
+        "Memory Optimizer lists the apps open right now, biggest memory use first, so you can close the ones you are not "
+        "using before you play.",
+        ("Open it: the list shows each app and how much memory it uses, and a badge shows total memory use.",
+         "Tick the apps to close and press Close. Each one is asked to close normally, like pressing its X, so "
+         "anything unsaved can still ask you first.",
+         "Or ask me \"close discord and chrome\", or \"get my PC ready to play\"."),
+        "Windows itself and Game Grave are never listed, and nothing is forced closed.", "Toolbox, Windows section.",
+        "More Tools", "Close apps you're not using, biggest first."),
+    Feature(
+        "command_runner", "Command Runner",
+        ("command runner", "run a command", "run command", "cmd", "command prompt", "ipconfig", "flush dns"),
+        "Command Runner runs one Windows command and shows what it prints.",
+        ("Pick a ready-made command (network details, flush DNS and others) or type your own.",
+         "Press Run. You see the exact line and confirm before it runs.",
+         "Exit code 0 usually means it worked; any other code means read the output."),
+        "It stops after 2 minutes. I never run commands for you; you type or pick them here.", "Toolbox, Files section.",
+        "More Tools", "Run one Windows command after you confirm it."),
+    Feature(
+        "file_associations", "File Associations",
+        ("file associations", "file association", "default app", "default apps", "opens with", "open with",
+         "which app opens"),
+        "File Associations shows which app opens a type of file, such as .zip or .pak.",
+        ("Pick or type a file type and press Look up.",
+         "To change it, press Change it in Windows: Windows only lets you change this yourself, so Game Grave opens the "
+         "right Windows page."),
+        "Nothing is changed here.", "Toolbox, Files section.", "More Tools", "See which app opens a file type."),
+    Feature(
+        "junction_manager", "Junction Manager",
+        ("junction manager", "junction", "junctions", "symlink", "symbolic link", "folder link", "folder links"),
+        "Junction Manager shows folder links (junctions), such as a game folder that really lives on another drive, and "
+        "can add or remove them.",
+        ("Press Choose folder and pick where to look. Each link shows where it points; broken ones are called out.",
+         "Remove link deletes only the link, never the folder it points to.",
+         "Create junction asks for a name and the folder to point to, then confirms."),
+        "Real folders and your Never Touch places are refused.", "Toolbox, Files section.", "More Tools",
+        "See, add or remove folder links."),
+    Feature(
+        "reports", "Reports",
+        ("report", "reports", "export", "export my games", "list of my games", "game list", "mod list",
+         "system report", "csv"),
+        "Reports save a list of your games, your mods or your PC's details as a file you can keep or share.",
+        ("Press Games report, Mods report or System report.",
+         "Choose where to save it. The file opens in Excel or any text editor."),
+        "Reports only read what Game Grave already scanned.", "Toolbox, Reports section.", "More Tools",
+        "Save a list of games, mods or PC details."),
+    Feature(
+        "other_storage", "Other Storage",
+        ("other storage", "shader cache", "shader caches", "launcher cache", "launcher caches", "caches", "cache folders"),
+        "Other Storage finds game-related folders outside your games: shader caches, launcher caches and logs, crash "
+        "dumps and settings folders, with their size.",
+        ("Press Scan Other Storage. It only reads known locations.",
+         "Each folder says what it is and whether it is Review only, Reviewable or Protected.",
+         "Small launcher cache and log folders can go to the Recycle Bin after a confirmation and a file-by-file check.",
+         "Or ask me \"scan other storage\"."),
+        "Settings and saves are never removable, and driver and Steam caches are review only.", "Clean Up, Other Storage.",
+        "Other Storage", "Find caches, logs and other game data."),
+    Feature(
+        "captures", "Captures",
+        ("captures tab", "my captures", "screenshots tab", "recordings tab", "find my screenshots", "find my recordings"),
+        "Captures finds your game screenshots and recordings, groups them by game when it can prove which game, and finds "
+        "duplicates.",
+        ("Press Scan Captures. It reads your capture folders.",
+         "Filter by game or type, open a picture, or find duplicates and look-alikes.",
+         "Removal sends files to the Recycle Bin after a confirmation and a check.",
+         "Or ask me \"scan my captures\"."),
+        "A game is named only when Game Grave can prove it.", "Library, Captures.", "Captures",
+        "Your screenshots and recordings, by game."),
+    Feature(
+        "games_tab", "Games",
+        ("games tab", "my library", "game library", "launch a game", "uninstall a game", "favorite"),
+        "Games shows every installed game from every launcher in one place, with size, last played and launcher.",
+        ("Search, sort and filter by launcher, Installed, Favorites or Recently played.",
+         "Pick a game for Play, Verify, DLC, Uninstall and Open folder. Those go through the game's own launcher."),
+        "Game Grave never uninstalls a game itself; the launcher does it.", "Library, Games.", "Games",
+        "All your games from every launcher."),
+    Feature(
+        "my_mods", "My Mods",
+        ("my mods", "turn off a mod", "turn on a mod", "disable a mod", "enable a mod", "load order", "reorder mods",
+         "mod order", "workshop", "steam workshop", "workshop items"),
+        "My Mods is the simple Mods screen: one game at a time, each mod by its real name with an on/off switch, a list of "
+        "what needs you with fix buttons, and Steam Workshop items with their real titles.",
+        ("Pick the game (and the Mod Organizer 2 profile if you have several).",
+         "Flip a mod's switch, or drag it to change the order. Each change saves a snapshot first, and Undo puts it back.",
+         "What needs you lists missing masters, updates and clashes, with a button to fix what can be fixed.",
+         "Or ask me \"turn off <mod name>\" or \"turn on <mod name>\"."),
+        "Changes are refused while Mod Organizer 2 is open, and mod folders are never deleted.", "Library, Mods.",
+        "Mods", "Switch mods on and off, reorder, fix problems."),
+    Feature(
+        "scan_pc", "Scan PC",
+        ("scan pc", "scan my pc", "scan my games", "rescan", "full scan", "first scan"),
+        "Scan PC reads your drives for games, mods, old files, captures and saves. It only reads.",
+        ("Press Scan PC (or F5) on any tab, or ask me \"scan my games\".",
+         "The bar at the bottom shows the step, percent and time left. Cancel stops it and keeps your earlier results.",
+         "Results stay until you scan again, and the top bar shows when they were taken."),
+        "Nothing is changed by scanning.", "Any tab.", "Overview", "Read your drives for games, mods and files."),
+    Feature(
+        "never_touch", "Never Touch rules",
+        ("never touch", "protect a folder", "exclude a folder", "excluded folders", "ignore a folder"),
+        "Never Touch rules are folders Game Grave will never remove anything from, whatever a tab finds there. Excluded "
+        "folders are left out of scans entirely.",
+        ("Open Settings, then Protection.", "Add a folder; each rule is added or removed one at a time with a confirmation."),
+        "Import and Reset never remove a rule.", "PC and Help, Settings.", "Settings", "Folders Game Grave never touches."),
+    Feature(
+        "welcome_tour", "Welcome tour",
+        ("welcome tour", "tutorial", "tour", "walkthrough of the app", "show me around", "how does game grave work",
+         "what does game grave do"),
+        "The welcome tour is a short walk through every part of Game Grave.",
+        ("Press the ? at the top right, or Watch the welcome tour in Settings.",
+         "Use Next and Back (or the arrow keys); Skip intro closes it."),
+        "", "The ? button at the top right.", "Settings", "A short tour of Game Grave."),
+)
+
+_GUIDES = {
+    # key: (what Open it opens, what Do it for me asks the automation)
+    "resurrection_kit": ("kit:easy", ""), "save_vault": ("tool:save_vault", ""), "black_box": ("tab:Fix Kit", ""),
+    "exhume": ("tab:Fix Kit", ""), "autopsy": ("tab:Fix Kit", ""), "soulbind": ("tab:Ready Room", ""),
+    "squad_sync": ("tab:Ready Room", ""), "undo_center": ("tab:Undo Center", ""),
+    "graveyard": ("tab:Graveyard", "scan for leftovers"), "old_files": ("tab:Old Files", ""),
+    "game_dna": ("tab:Game DNA", ""), "mods_library": ("tab:Mods", ""), "mod_bisect": ("bisect", ""),
+    "hardware": ("tab:Hardware", ""), "drivers_startup": ("tab:Hardware/Drivers & Startup", "check my drivers"),
+    "updates": ("tab:Settings", "check for updates to game grave"), "hash_checker": ("tool:hash", ""),
+    "windows_cleanup": ("tool:windows_cleanup", "clean up temp files"),
+    "game_optimizer": ("tool:game_optimizer", "turn on game mode and turn off background recording"),
+    "memory_optimizer": ("tool:memory_optimizer", "close the apps using the most memory"),
+    "command_runner": ("tool:command_runner", ""), "file_associations": ("tool:file_associations", ""),
+    "junction_manager": ("tool:junction_manager", ""), "reports": ("tool:game_report", ""),
+    "other_storage": ("tab:Other Storage", "scan other storage"), "captures": ("tab:Captures", "scan my captures"),
+    "games_tab": ("tab:Games", ""), "my_mods": ("tab:Mods", ""), "scan_pc": ("", "scan my games"),
+    "never_touch": ("tab:Settings", ""), "welcome_tour": ("tour", ""),
+}
+# Tabs that also hold scan data: "what is in other storage" is a question about the data, so their guide only answers a
+# how-to question ("how do I use other storage").
+DATA_TABS = frozenset({"other_storage", "captures", "games_tab", "my_mods", "scan_pc", "memory_optimizer"})
+_HOW = re.compile(r"\b(how (do|can|would|should) (i|you|we)|how to|how does|how do|teach me|show me how|walk me through|"
+                  r"help me (use|with|to)|i don'?t (know|understand) how|what'?s the (best )?way to|guide me|explain how|"
+                  r"what does .+ do|what is the .+ for|where (do|can) i (find|get|start))\b")
+
+
+def is_how_to(question):
+    return bool(_HOW.search(" ".join(question.casefold().replace("’", "'").split())))
+
+
+_STEPS = {
+    "autopsy": ("Record a play session with a frame-time tool such as CapFrameX or PresentMon and save the CSV.",
+                "Game Grave picks up the newest captures by itself and keeps a short summary of each.",
+                "Pick two captures to compare: it shows the frame-time graph, average and lows side by side."),
+    "undo_center": ("Every removal Game Grave made is listed with its time, size and where it went.",
+                    "Pick items still in the Recycle Bin and press Restore. Each is checked first and goes back only to its "
+                    "original place, never over a file that is there now.",
+                    "Hide from History only hides a row; it never changes the Recycle Bin."),
+    "graveyard": ("Press Scan Leftovers to look in known game-related places for leftovers of games you removed.",
+                  "Each item shows its Evidence (Direct, Location, Name hint, Age only, Yours) instead of a guess.",
+                  "Tick items (double-click, Shift+click or Select all) and use the delete menu: archives and recordings "
+                  "go to the Recycle Bin after a confirmation; games go through Steam, mods through Mods.",
+                  "Or ask me \"scan for leftovers\"."),
+    "old_files": ("Pick a folder or a drive (Downloads is the default) and press Rescan.",
+                  "Old installers, archives and files you haven't opened in a long time are listed with their size.",
+                  "Tick files (double-click, Shift+click) and Move to Recycle Bin. Each file is checked again first."),
+    "game_dna": ("Pick a game. Game DNA shows everything proven to belong to it: install folder, mods, shader cache, "
+                 "screenshots and folders you linked.",
+                 "Press Analyze for sizes. Link a save or settings folder yourself if Game Grave can't prove it.",
+                 "Cleanup Suggestions send you to the tab that can act on each item."),
+    "mods_library": ("Open Mods. The simple My Mods screen shows one game at a time with an on/off switch per mod.",
+                     "Advanced shows the detailed view: the library gallery, load order, profiles, conflicts and Bisect."),
+    "hash_checker": ("Press Hash Checker and pick a file. Game Grave reads it and shows its SHA-256 fingerprint.",
+                     "Paste the checksum from the download page. Green means it matches byte for byte; red means it is "
+                     "different."),
+}
+FEATURES = tuple(replace(f, steps=f.steps or _STEPS.get(f.key, ()), opens=_GUIDES.get(f.key, ("", ""))[0],
+                         do=_GUIDES.get(f.key, ("", ""))[1]) for f in FEATURES)
 BY_KEY = {f.key: f for f in FEATURES}
 
 

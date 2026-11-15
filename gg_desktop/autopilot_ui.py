@@ -7,6 +7,7 @@ Nothing starts while a game runs, a scan runs or a clean-up runs; the timer wake
 """
 from __future__ import annotations
 
+import re
 import time
 from datetime import datetime
 from types import SimpleNamespace
@@ -198,12 +199,73 @@ def remember(window, plan):
                 return
 
 
+# ------------------------------------------------------------------ opening a tool for the owner
+def open_target(window, target):
+    """Open exactly the tool an answer's button names: a Toolbox window, the kit setup, Mod Bisect, the tour, a tab (with
+    its inner tab), or send a request to the assistant ("ask:..."). Opening changes nothing; the tool asks before it does."""
+    target = str(target or "")
+    if target.startswith("ask:"):
+        from gg_desktop import assistant_page
+        if not assistant_page.live(window):
+            window.navigate("AI Assistant")
+        QTimer.singleShot(0, lambda: assistant_page.send(window, target[4:]))
+        return True
+    if target.startswith("tool:"):
+        from gg_desktop import tools_actions
+        QTimer.singleShot(0, lambda: tools_actions.run_action(window, target[5:]))
+        return True
+    if target in ("kit:easy", "kit:restore"):
+        from gg_desktop import kit_easy_ui
+        opener = kit_easy_ui.open_easy_setup if target == "kit:easy" else kit_easy_ui.open_easy_restore
+        QTimer.singleShot(0, lambda: opener(window))
+        return True
+    if target == "bisect":
+        from gg_desktop import fix_kit_page
+        fix_kit_page.open_bisect(window)
+        return True
+    if target == "tour":
+        QTimer.singleShot(0, window.open_welcome_tour)
+        return True
+    tab = target[4:] if target.startswith("tab:") else target
+    route, _, inner = tab.partition("/")
+    if route == "Hardware" and inner:
+        window.hardware_tab = inner
+    window.navigate(route)
+    return True
+
+
+_OPEN_WORDS = re.compile(r"\b(open|launch|start|bring up|pull up|show me|take me to|go to|use|set up|setup|make a|"
+                         r"run the|get to)\b")
+
+
+def opens_for(text):
+    """The feature a request asks to open ("open the hash checker", "take me to drivers"), or None."""
+    from gg_desktop import assistant_features as features
+    t = " ".join(text.casefold().split())
+    if not _OPEN_WORDS.search(t) or features.is_how_to(t) and not t.startswith(("open", "take me", "go to")):
+        return None
+    feature = features.find_feature(t)
+    return feature if feature is not None and (feature.opens or feature.tab) else None
+
+
 # ------------------------------------------------------------------ chat requests
 def handle(window, text):
-    """Called by the AI Assistant before its built-in answers. True when the request became a plan."""
-    plan = core.plan_for(text)
+    """Called by the AI Assistant before its built-in answers. True when the request became a plan or opened a tool."""
+    feature = opens_for(text)
+    leads = re.match(r"^(please |can you |could you )?(open|take me|go to|launch|show me|bring up|pull up|start)\b",
+                     " ".join(text.casefold().split()))
+    plan = None if feature is not None and leads else core.plan_for(text)
     if plan is None:
-        return False
+        if feature is None:
+            return False
+        from gg_desktop import assistant_engine as engine, assistant_features as features
+        buttons = tuple(b for b in engine.guide_buttons(feature) if not b[0].startswith("Open "))
+        answer = engine.Answer("feature", f"Opening {feature.title} for you. Here's how it works.\n\n" +
+                               features.explain(feature), handoffs=buttons + (("Open it again", feature.opens or
+                                                                               feature.tab),))
+        _post(window, text, answer, None)
+        open_target(window, feature.opens or feature.tab)
+        return True
     from gg_desktop import assistant_engine as engine
     on = enabled(window)
     tabs = []
@@ -256,13 +318,15 @@ def _post(window, question, answer, plan, off_plan=None, chat_title=None, prepar
 def env_for(window, plan):
     st = state_of(window)
     if plan.id not in st.envs:
-        st.envs[plan.id] = run.default_env(window.settings.get("never_touch", []))
+        env = run.default_env(window.settings.get("never_touch", []))
+        env.mo2_profiles = lambda: run.mo2_profiles(getattr(window.inventory, "mods", []))
+        st.envs[plan.id] = env
     return st.envs[plan.id]
 
 
 def prepare(window, plan, after=None):
     for step in plan.steps:
-        if step.kind == core.CHECK and step.key != "scan_library" and step.status == "waiting":
+        if step.kind == core.CHECK and step.key not in core.UI_CHECKS and step.status == "waiting":
             step.status = "running"
     redraw(window, plan)
     try:
@@ -284,12 +348,40 @@ def prepare(window, plan, after=None):
     def done(_plan):
         remember(window, plan)
         redraw(window, plan)
-        scan = next((s for s in plan.steps if s.key == "scan_library" and s.status == "waiting"), None)
-        if scan is not None:
-            run_scan(window, plan, scan, lambda: (remember(window, plan), redraw(window, plan), after and after(plan)))
-        elif after:
-            after(plan)
+        screen_checks = [s for s in plan.steps if s.key in core.UI_CHECKS and s.status == "waiting"]
+
+        def next_check():
+            if not screen_checks:
+                remember(window, plan)
+                redraw(window, plan)
+                if after:
+                    after(plan)
+                return
+            run_scan(window, plan, screen_checks.pop(0), lambda: (redraw(window, plan), next_check()))
+        next_check()
     window.job(work, done, error_title="The plan's checks stopped")
+
+
+def _screen_scan(window, key):
+    """(start, still running, result sentence) for the scans that the tabs run themselves."""
+    if key == "scan_leftovers":
+        from gg_desktop import grave_page as page
+        state = page.state_of(window)
+        return (lambda: page.scan(window, automatic=True), lambda: state.busy,
+                lambda: (state.report.summary() + ". See Graveyard.") if state.report else "No leftovers found.")
+    if key == "scan_storage":
+        from gg_desktop import other_storage_page as page
+        state = page.state_of(window)
+        return (lambda: page.scan(window), lambda: state.busy,
+                lambda: (state.report.summary() + ". See Other Storage.") if state.report else "Nothing found.")
+    if key == "scan_captures":
+        from gg_desktop import captures_page as page
+        state = page.state_of(window)
+        return (lambda: page.scan(window, automatic=True), lambda: bool(state.busy),
+                lambda: (state.report.summary() + ". See Captures.") if state.report else "No captures found.")
+    return (window.start_scan, lambda: window.scanning,
+            lambda: f"Scan finished: {len(window.inventory.games):,} games, {len(window.inventory.mods):,} mod "
+                    "locations.")
 
 
 def run_scan(window, plan, step, then):
@@ -299,21 +391,26 @@ def run_scan(window, plan, step, then):
         return
     step.status = "running"
     redraw(window, plan)
-    if not window.scanning:
-        window.start_scan()
-    if not window.scanning:
-        step.status, step.result = "problem", "The scan could not start because Game Grave is busy."
+    start, busy, result = _screen_scan(window, step.key)
+    if window.scanning or window.cleaning:
+        step.status, step.result = "problem", "Another scan or clean-up is running. Ask again when it finishes."
+        then()
+        return
+    try:
+        start()
+    except Exception as exc:
+        step.status, step.result = "problem", "The scan could not start: " + str(exc)[:160]
         then()
         return
     timer = QTimer(window)
-    timer.setInterval(1000)
+    timer.setInterval(500)
 
     def poll():
-        if window.scanning:
+        if busy():
             return
         timer.stop()
         timer.deleteLater()
-        step.status, step.result = "done", "Scan finished."
+        step.status, step.result = "done", result()
         then()
     timer.timeout.connect(poll)
     timer.start()
@@ -370,7 +467,7 @@ def run_all(window, plan_id):
             finish()
             return
         step = order.pop(0)
-        if step.key == "scan_library":
+        if step.key in core.UI_CHECKS:
             run_scan(window, plan, step, lambda: (redraw(window, plan), next_step()))
             return
         step.status = "running"

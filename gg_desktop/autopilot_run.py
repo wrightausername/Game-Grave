@@ -29,7 +29,31 @@ def default_env(never_touch=()):
         has_backup=winpc.has_backup, search_updates=upkeep_core.search_updates, install_updates=upkeep_core.install_updates,
         read_startup=upkeep_core.read_startup, set_startup=upkeep_core.set_enabled, check_update=update_check.check,
         log=lambda details, result: log_event("AI Assistant", details, result=result),
-        cache={})
+        mo2_profiles=lambda: [], set_mod=_set_mod, cache={})
+
+
+def _set_mod(folder, name, on):
+    from gg_desktop import mymods_core
+    from gg_desktop.bisect_apply import mo2_running
+    return mymods_core.set_enabled(Path(folder), [name], on, running=mo2_running)
+
+
+def mo2_profiles(inventory_mods):
+    """(game, profile name, profile folder, [(mod folder name, on, readable name)]) for the profile each Mod Organizer 2
+    setup has selected. Reads only."""
+    from manager_profiles import _mo2_roots
+    from gg_desktop import mymods_core
+    out = []
+    for ini in _mo2_roots(inventory_mods or []):
+        try:
+            inst = mymods_core.read_instance(ini)
+            names = [inst.selected] + [p for p in inst.profiles if p != inst.selected]
+            profile = mymods_core.read_profile(inst, names[0])
+        except Exception:
+            continue
+        mods = [(m.name, m.enabled, m.label) for m in profile.mods if m.kind == "mod"]
+        out.append((inst.game, profile.name, profile.folder, mods))
+    return out
 
 
 def _plural(n, noun):
@@ -103,6 +127,23 @@ def _check(step, env, plan):
         _kind, sentence = env.check_update()
         _mark(step, "done", sentence)
         return
+    if step.key == "check_mods":
+        profiles = env.mo2_profiles()
+        on = bool(step.args.get("on"))
+        new, already = core.mod_steps(profiles, step.args.get("mentioned", plan.request), on)
+        if not profiles:
+            _mark(step, "problem", "No Mod Organizer 2 setup was found. Run Scan PC first, or switch mods in your mod "
+                                   "manager. Steam Workshop items are changed in Steam.")
+            return
+        found = ", ".join(s.args["name"] for s in new)
+        text = (f"Found {found}." if new else "No switched-" + ("off" if on else "on") + " mod with that name in your "
+                "Mod Organizer 2 profiles.")
+        if already:
+            text += " Already " + ("on" if on else "off") + ": " + ", ".join(already[:5]) + "."
+        _mark(step, "done", text)
+        at = plan.steps.index(step) + 1
+        plan.steps[at:at] = new
+        return
     raise ValueError("Not a check: " + step.key)
 
 
@@ -112,7 +153,7 @@ def prepare(plan, env, game_running=lambda: False):
     for step in list(plan.steps):
         if step.status != "waiting":
             continue
-        if step.kind == core.CHECK and step.key != "scan_library":
+        if step.kind == core.CHECK and step.key not in core.UI_CHECKS:
             if game_running():
                 _mark(step, "skipped", "A game is running, so this waits.")
                 continue
@@ -186,6 +227,13 @@ def run_change(step, env, on_step=None):
             env.set_startup(app, False)
             text = f"{app.title} will no longer start with Windows. Turn it back on in Hardware > Drivers & Startup."
             env.log(text, "Startup off")
+            return _mark(step, "done", text)
+        if key in ("mod_off", "mod_on"):
+            on = key == "mod_on"
+            env.set_mod(step.args["folder"], step.args.get("key") or step.args["name"], on)
+            text = (f"{step.args['name']} is now " + ("on" if on else "off") + f" in {step.args.get('game', 'Mod Organizer 2')}"
+                    f" (profile {step.args.get('profile', '')}). Undo in Mods > My Mods.")
+            env.log(text, "Mod switched " + ("on" if on else "off"))
             return _mark(step, "done", text)
         if key == "install_drivers":
             ids = list(step.args.get("ids") or [])

@@ -89,5 +89,46 @@ class EverydayQuestions(unittest.TestCase):
         self.assertNotEqual(engine.classify("hello how many games do i have", self.facts)[0], "greet")
 
 
+
+
+class HowToEveryTool(unittest.TestCase):
+    def test_every_tool_has_a_walkthrough_and_buttons(self):
+        from gg_desktop import assistant_engine as engine, assistant_features as features
+        from tests.test_assistant import facts
+        for feature in features.FEATURES:
+            if feature.key in ("data_used",):
+                continue
+            self.assertTrue(feature.steps, feature.key)
+            question = "how do I use " + feature.keywords[0]
+            answer = engine.answer(question, facts())
+            self.assertEqual(answer.intent, "feature", question)
+            self.assertIn(feature.title, answer.text, question)
+            if feature.do:
+                self.assertIn(("Do it for me", "ask:" + feature.do), answer.handoffs, question)
+            if feature.opens:
+                self.assertTrue(any(target == feature.opens for _c, target in answer.handoffs), (question, answer.handoffs))
+            blob = (answer.text + answer.note).casefold()
+            self.assertNotIn("safe to remove", blob)
+            self.assertNotIn("—", answer.text)
+
+    def test_task_questions_find_the_right_tool(self):
+        from gg_desktop import assistant_engine as engine
+        from tests.test_assistant import facts
+        cases = {"how do I free up memory": "Memory Optimizer", "how do I clean temp files": "Windows Cleanup",
+                 "how do I find which mod crashes my game": "Mod Bisect", "how do I turn off a mod": "My Mods",
+                 "I don't know how to use game optimizer": "Game Optimizer", "how do I check my drivers": "Drivers",
+                 "how do I share my mods with a friend": "Squad Sync", "how do I scan my pc": "Scan PC",
+                 "how do I protect a folder": "Never Touch", "walk me through mod bisect": "Mod Bisect",
+                 "how do i see which app opens zip files": "File Associations", "how do I make a kit": "Resurrection Kit"}
+        for question, title in cases.items():
+            self.assertIn(title, engine.answer(question, facts()).text, question)
+
+    def test_do_requests_and_plans_line_up(self):
+        from gg_desktop import assistant_features as features, autopilot_core as core
+        for feature in features.FEATURES:
+            if feature.do:
+                self.assertTrue(core.wants(feature.do), feature.do)
+
+
 if __name__ == "__main__":
     unittest.main()

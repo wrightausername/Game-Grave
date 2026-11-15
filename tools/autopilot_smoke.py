@@ -60,7 +60,7 @@ def main():
         QTest.keyClick(window.assistant_input, Qt.Key_Return)
         settle()
 
-    log, closed, cleaned, applied = [], set(), [], []
+    log, closed, cleaned, applied, switched, opened = [], set(), [], [], [], []
     procs = [SimpleNamespace(name="chrome.exe", pid=10, kb=900_000), SimpleNamespace(name="Discord.exe", pid=12, kb=400_000),
              SimpleNamespace(name="steam.exe", pid=14, kb=700_000)]
 
@@ -82,7 +82,8 @@ def main():
             install_updates=lambda updates, on_step=None: (True, "1 of 1 installed.", False),
             read_startup=lambda: [], set_startup=lambda app, on: None,
             check_update=lambda: ("current", "You have the newest build."),
-            log=lambda details, result: log.append((details, result)), cache={})
+            log=lambda details, result: log.append((details, result)), mo2_profiles=lambda: [],
+            set_mod=lambda folder, name, on: switched.append((folder, name, on)), cache={})
 
     with tempfile.TemporaryDirectory(prefix="GG-autopilot-") as temp:
         root = Path(temp)
@@ -107,6 +108,12 @@ def main():
             ("gg_desktop.game_artwork._request", dict(side_effect=AssertionError("No automatic network"))),
             ("gg_desktop.local_ai_core.ai_dir", dict(side_effect=lambda base=None: Path(base) if base else root / "AI")),
             ("gg_desktop.autopilot_run.default_env", dict(side_effect=make_env)),
+            ("gg_desktop.autopilot_run.mo2_profiles", dict(return_value=[
+                ("Skyrim Special Edition", "Default", "C:\\MO2\\profiles\\Default",
+                 [("SkyUI_5_2", True, "SkyUI"), ("USSEP", True, "Unofficial Skyrim Special Edition Patch")])])),
+            ("gg_desktop.tools_actions.run_action", dict(side_effect=lambda window, key: opened.append(key))),
+            ("gg_desktop.autopilot_ui._screen_scan", dict(side_effect=lambda window, key: (
+                lambda: opened.append(key), lambda: False, lambda: "12 leftover items found. See Graveyard."))),
         ):
             stack.enter_context(patch(target, **options))
         errors = stack.enter_context(patch.object(CrimsonWindow, "error"))
@@ -214,6 +221,45 @@ def main():
             assert len(cleaned) == before + 1
             assert "change waiting" in core.load_routines(saved[-1])[0]["last_note"] or \
                 "Deleted" in routine_plan.steps[1].result
+            # Ask how to use a tool: a walkthrough with Do it for me and Open buttons.
+            window.navigate("AI Assistant")
+            settle()
+            ask(window, "how do I clean temp files")
+            assert "Windows Cleanup" in transcript(window) and "Check the list, then press Delete" in transcript(window)
+            labels = [b.text() for b in window.assistant_scroll.widget().findChildren(QPushButton) if b.isVisible()]
+            assert "Do it for me" in labels and "Open Windows Cleanup" in labels, labels
+            press(window, "Open Windows Cleanup")
+            wait_for(lambda: opened and opened[-1] == "windows_cleanup", "the tool to open")
+            before = len(ui.state_of(window).plans)
+            press(window, "Do it for me")
+            wait_for(lambda: len(ui.state_of(window).plans) > before, "the plan from Do it for me")
+            plan = list(ui.state_of(window).plans.values())[-1]
+            assert [s.key for s in plan.steps] == ["check_temp", "clear_temp"]
+            assert window.grab().save(str(args.output / "assistant-autopilot-howto.png"))
+
+            # "Open the hash checker" opens the tool itself.
+            ask(window, "open the hash checker")
+            wait_for(lambda: opened[-1] == "hash", "the hash checker to open")
+            assert "Opening Hash Checker for you" in transcript(window)
+
+            # Turn a mod off by name: found in the Mod Organizer 2 profile, switched after Run all, never the wrong mod.
+            ask(window, "turn off skyui")
+            plan = list(ui.state_of(window).plans.values())[-1]
+            wait_for(lambda: plan.steps[0].status == "done", "the mod lookup")
+            assert [s.title for s in plan.steps] == ["Find the mods you named", "Turn off SkyUI"], [s.title for s in plan.steps]
+            confirm.reset_mock()
+            press(window, "Run all")
+            assert "modlist.txt" in confirm.call_args[0][1]
+            wait_for(lambda: plan.steps[1].status == "done", "the mod switch")
+            assert switched == [("C:\\MO2\\profiles\\Default", "SkyUI_5_2", False)], switched
+            assert window.grab().save(str(args.output / "assistant-autopilot-mod.png"))
+
+            # The tabs' own scans run from a plan too.
+            ask(window, "scan for leftovers")
+            plan = list(ui.state_of(window).plans.values())[-1]
+            wait_for(lambda: plan.steps[0].status == "done", "the leftover scan")
+            assert "scan_leftovers" in opened and plan.steps[0].result.startswith("12 leftover items")
+
             # Pause and delete only change the saved routine.
             ui.pause_routine(window, routines[0]["id"])
             assert core.load_routines(saved[-1])[0]["on"] is False

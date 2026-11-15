@@ -133,10 +133,36 @@ def fake_env(**over):
         search_updates=lambda: [SimpleNamespace(update_id="u1", title="NVIDIA Display")],
         install_updates=lambda updates, on_step=None: (True, "1 of 1 installed.", False),
         read_startup=lambda: [], set_startup=lambda app, on: None, check_update=lambda: ("current", "You have the newest build."),
-        log=lambda details, result: log.append((details, result)), cache={})
+        log=lambda details, result: log.append((details, result)), mo2_profiles=lambda: [],
+        set_mod=lambda folder, name, on: None, cache={})
     for k, v in over.items():
         setattr(env, k, v)
     return env, log
+
+
+class MoreActionsTest(unittest.TestCase):
+    def test_scans_and_mod_switches(self):
+        self.assertEqual(keys("scan for leftovers"), ["scan_leftovers"])
+        self.assertEqual(keys("scan other storage"), ["scan_storage"])
+        self.assertEqual(keys("clean up the shader cache"), ["scan_storage"])  # caches are reviewed in Other Storage
+        self.assertEqual(keys("find my screenshots"), ["scan_captures"])
+        self.assertEqual(keys("scan my games"), ["scan_library"])
+        self.assertEqual([(s.key, s.args["on"]) for s in core.wants("turn off skyui")], [("check_mods", False)])
+        self.assertEqual([(s.key, s.args["on"]) for s in core.wants("enable the mod skyui")], [("check_mods", True)])
+        self.assertEqual(keys("turn off background recording"), ["recording_off"])  # Windows settings win
+        self.assertTrue(core.UI_CHECKS >= {"scan_library", "scan_leftovers", "scan_storage", "scan_captures"})
+
+    def test_mod_names(self):
+        self.assertTrue(core.mod_named("SkyUI", "turn off skyui in skyrim"))
+        self.assertTrue(core.mod_named("Immersive Armors", "turn immersive armors off"))
+        self.assertFalse(core.mod_named("Unofficial Skyrim Special Edition Patch", "turn off skyui in skyrim"))
+        profiles = [("Skyrim", "Default", "C:/MO2/profiles/Default",
+                     [("SkyUI_5_2", True, "SkyUI"), ("Immersive Armors", False, "Immersive Armors"),
+                      ("USSEP", True, "Unofficial Skyrim Special Edition Patch")])]
+        steps, already = core.mod_steps(profiles, "turn off skyui and immersive armors", False)
+        self.assertEqual([(s.key, s.args["name"], s.args["key"]) for s in steps], [("mod_off", "SkyUI", "SkyUI_5_2")])
+        self.assertEqual(already, ["Immersive Armors"])
+        self.assertEqual(steps[0].title, "Turn off SkyUI")
 
 
 class AutopilotRunTest(unittest.TestCase):
@@ -177,6 +203,27 @@ class AutopilotRunTest(unittest.TestCase):
         broken, _ = fake_env(run_cleanup=lambda items, roots: (_ for _ in ()).throw(OSError("disk busy")))
         assert run.run_change(core.Step("clear_temp"), broken).result == "Stopped: disk busy"
 
+
+    def test_mods_are_found_and_switched(self):
+        switched = []
+        env, log = fake_env(mo2_profiles=lambda: [("Skyrim", "Default", "C:/p", [("SkyUI_5_2", True, "SkyUI")])],
+                            set_mod=lambda folder, name, on: switched.append((folder, name, on)))
+        plan = run.prepare(core.plan_for("turn off skyui"), env)
+        self.assertEqual([s.key for s in plan.steps], ["check_mods", "mod_off"])
+        self.assertEqual(plan.steps[0].result, "Found SkyUI.")
+        step = run.run_change(plan.steps[1], env)
+        self.assertEqual(step.status, "done")
+        self.assertEqual(switched, [("C:/p", "SkyUI_5_2", False)])
+        self.assertIn("Undo in Mods > My Mods", step.result)
+        nothing, _ = fake_env(mo2_profiles=lambda: [])
+        plan = run.prepare(core.plan_for("turn off skyui"), nothing)
+        self.assertEqual(plan.steps[0].status, "problem")
+        self.assertIn("No Mod Organizer 2 setup", plan.steps[0].result)
+
+    def test_screen_scans_wait_for_the_screen(self):
+        env, _ = fake_env()
+        plan = run.prepare(core.plan_for("scan for leftovers"), env)
+        self.assertEqual(plan.steps[0].status, "waiting")
 
     def test_outcome(self):
         plan = core.plan_for("clean up temp files")

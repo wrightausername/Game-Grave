@@ -36,7 +36,9 @@ HELP_TEXT = ("I answer from what Game Grave has already scanned on this PC. Try:
              "what's in Other Storage, screenshots and recordings by game, my mods, games I haven't played lately, what "
              "Game Grave removed, or my graphics card, memory and free space on each drive. You can also ask how a "
              "feature works, for example: what is the Resurrection Kit, how do I share my mods with a friend, which mod "
-             "is crashing my game, how do I stop apps starting with Windows.")
+             "is crashing my game, how do I stop apps starting with Windows. Ask how to use any tool and I'll walk you "
+             "through it and open it for you, or ask me to do it (\"get my PC ready to play\", \"clean up temp files\", "
+             "\"turn off <mod>\", \"scan for leftovers\") and I'll plan it with Game Grave's own tools.")
 UNKNOWN_TEXT = ("I don't have an answer for that one yet. " + HELP_TEXT)
 
 
@@ -77,7 +79,7 @@ def answer_from_dict(value):
                          None if r[3] is None else str(r[3]), str(r[4])[:300]) for r in value.get("rows", [])[:12])
         return Answer(str(value["intent"])[:30], str(value["text"])[:2000], rows, str(value.get("note", ""))[:600],
                       tuple(str(s)[:40] for s in value.get("sources", [])[:6]),
-                      tuple((str(h[0])[:40], str(h[1])[:30]) for h in value.get("handoffs", [])[:5]))
+                      tuple((str(h[0])[:40], str(h[1])[:90]) for h in value.get("handoffs", [])[:5]))
     except (AttributeError, IndexError, KeyError, TypeError, ValueError):
         return None
 
@@ -144,6 +146,10 @@ def classify(question, facts):
     small = more.is_small_talk(text.split())
     if small:
         return small, None
+    if features.is_how_to(question):    # "how do I ..." about one of Game Grave's tools: the walkthrough comes first
+        guide = features.find_feature(question, getattr(find_entity(facts, question), "name", "") or "")
+        if guide is not None:
+            return "feature", None
     if "game grave" in text and _has(words, text, "safe", "trust", "delete", "deletes", "change", "changes",
                                      "touch", "harm", "virus", "dangerous"):
         return "trust", None
@@ -169,6 +175,8 @@ def classify(question, facts):
         if not _has(words, text, "mod", "mods", "screenshot", "screenshots", "recording", "recordings"):
             return "hardware", game
     feature = features.find_feature(question, named.name if named else "")
+    if feature and feature.key in features.DATA_TABS and not features.is_how_to(question):
+        feature = None   # "what is in other storage" asks about the data; "how do I use it" gets the guide
     conflict_words = _has(words, text, "conflict", "conflicts", "conflicting", "overwrite each other", "clash")
     if feature and not (feature.key == "mods_library" and (_has(words, text, "how many") or conflict_words)):
         return "feature", None
@@ -260,14 +268,29 @@ def _unknown():
     return Answer("unknown", UNKNOWN_TEXT)
 
 
+def guide_buttons(feature):
+    """Open it (the tool itself, not just its tab), Do it for me (when the assistant can run it), and the tab."""
+    buttons = []
+    if feature.do:
+        buttons.append(("Do it for me", "ask:" + feature.do))
+    if feature.opens and not feature.opens.startswith("tab:"):
+        buttons.append(("Open " + feature.title, feature.opens))
+    elif feature.opens:
+        target = feature.opens[4:]
+        buttons.append(("Open " + (_shown(target.split("/")[0]) if "/" not in target else target.split("/")[1]),
+                        feature.opens))
+    if feature.tab and not any(feature.tab in b[1] for b in buttons) and feature.tab != "AI Assistant":
+        buttons.append(("Open " + _shown(feature.tab), feature.tab))
+    return tuple(buttons[:3])
+
+
 def _feature(question, game_name=""):
     """How one of Game Grave's own features works. Described from the code, not from scan data, so no source is used."""
     feature = features.find_feature(question, game_name)
     text = features.explain(feature)
     asked_safe = any(w in question.casefold() for w in ("safe", "safely", "delete", "remove"))
     note = SAFETY_TEXT if asked_safe else ""
-    handoffs = (("Open " + _shown(feature.tab), feature.tab),) if feature.tab else ()
-    return Answer("feature", text, note=note, handoffs=handoffs)
+    return Answer("feature", text, note=note, handoffs=guide_buttons(feature))
 
 
 def _safety():
@@ -551,8 +574,7 @@ def _thanks():
 
 def _feature_key(key, note=""):
     feature = features.BY_KEY[key]
-    return Answer("feature", features.explain(feature), note=note,
-                  handoffs=(("Open " + _shown(feature.tab), feature.tab),) if feature.tab else ())
+    return Answer("feature", features.explain(feature), note=note, handoffs=guide_buttons(feature))
 
 
 def _squad():
@@ -875,9 +897,13 @@ def _performance(facts, game, question):
                   "• Drivers & Startup (Hardware) checks Windows Update for driver updates and lets you switch off apps "
                   "that start with Windows and run in the background.\n"
                   "• If it started after a driver update, Exhume (Fix Kit) helps roll the graphics driver back.\n"
-                  "• If it started after adding mods, Mod Bisect finds which mod does it.",
+                  "• If it started after adding mods, Mod Bisect finds which mod does it.\n"
+                  "• Game Optimizer turns on Game Mode, turns off background recording and can switch to High "
+                  "performance power, and Memory Optimizer closes apps you aren't using. Press Get my PC ready to play "
+                  "and I'll plan those for you.",
                   note="Nothing here changes a setting by itself; each tool asks first.",
-                  handoffs=(("Open Hardware", "Hardware"), ("Open Fix Kit", "Fix Kit")))
+                  handoffs=(("Get my PC ready to play", "ask:get my pc ready to play"), ("Open Hardware", "Hardware"),
+                            ("Open Fix Kit", "Fix Kit")))
 
 
 def _verify(facts, game, question):

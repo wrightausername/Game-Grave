@@ -20,6 +20,7 @@ MAX_STEPS = 16
 CATCH_UP = timedelta(hours=24)  # a routine missed while the PC was off runs once at the next start, if within a day
 
 CHECK, CHANGE = "check", "change"
+UI_CHECKS = frozenset({"scan_library", "scan_leftovers", "scan_storage", "scan_captures"})  # run by the screen itself
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,14 @@ ACTIONS = {a.key: a for a in (
            "Reads the Run keys, Startup folders, Store app startup tasks and sign-in tasks."),
     Action("check_app_update", "Check for a newer Game Grave", CHECK, "Asks GitHub for the newest Game Grave build.",
            "One request to the GitHub releases list. Nothing is downloaded."),
+    Action("scan_leftovers", "Scan for leftovers", CHECK, "Looks in known game-related places for leftovers of removed "
+           "games (Graveyard).", "Reads folders only. Nothing is changed."),
+    Action("scan_storage", "Scan Other Storage", CHECK, "Finds shader caches, launcher caches, logs and other game data.",
+           "Reads known locations only. Nothing is changed."),
+    Action("scan_captures", "Scan captures", CHECK, "Finds your screenshots and recordings and groups them by game.",
+           "Reads your capture folders only. Nothing is changed."),
+    Action("check_mods", "Find the mods you named", CHECK, "Looks up the mods in your Mod Organizer 2 profiles.",
+           "Reads modlist.txt in each Mod Organizer 2 profile. Nothing is changed.", routine=False),
     Action("clear_temp", "Delete old temporary files", CHANGE,
            "Deletes temporary files that have not changed for 2 days. Files in use are skipped.",
            "Permanently deletes (no Recycle Bin) files 2+ days old in Windows' temp folders, each checked again first.",
@@ -67,6 +76,12 @@ ACTIONS = {a.key: a for a in (
            "Turns the app's startup switch off, the same switch as Task Manager. The app is not removed.",
            "StartupApproved value set to off (or the Store task or scheduled task disabled).", routine=False,
            undo="Turn it back on in Hardware > Drivers & Startup."),
+    Action("mod_off", "Turn off a mod", CHANGE, "Switches the mod off in its Mod Organizer 2 profile. The mod folder "
+           "stays where it is.", "modlist.txt: the mod's line changes from + to -, after a snapshot of the profile's files.",
+           routine=False, undo="Undo in Mods > My Mods."),
+    Action("mod_on", "Turn on a mod", CHANGE, "Switches the mod on in its Mod Organizer 2 profile.",
+           "modlist.txt: the mod's line changes from - to +, after a snapshot of the profile's files.", routine=False,
+           undo="Undo in Mods > My Mods."),
     Action("install_drivers", "Install the driver updates Windows offers", CHANGE,
            "Installs the driver updates Windows Update found. Windows asks you to allow it.",
            "Windows Update Agent download and install of the listed update IDs, in a PowerShell that Windows asks to allow.",
@@ -102,6 +117,8 @@ class Step:
             return "Close " + name
         if self.key == "startup_off" and name:
             return f"Stop {name} starting with Windows"
+        if self.key in ("mod_off", "mod_on") and name:
+            return ("Turn off " if self.key == "mod_off" else "Turn on ") + name
         return self.action.title
 
     @property
@@ -129,7 +146,8 @@ _QUESTION = re.compile(r"^(what|where|which|why|how much|how many|how do|how doe
                        r"should|explain|tell me|show me|describe|summari[sz]e|list|give me|help me understand)\b")
 _VERB = re.compile(r"\b(clean|clear|delete|remove|close|kill|quit|exit|end|turn|switch|stop|disable|block|prevent|scan|"
                    r"re-?scan|check|update|install|download|get|make|run|boost|optimi[sz]e|speed|prep|prepare|undo|revert|"
-                   r"put|restore|free|tidy|do|find|look|automate|schedule)\b")
+                   r"put|restore|free|tidy|do|find|look|automate|schedule|enable|activate|deactivate|toggle|open|launch|start|"
+                   r"show|take|go|set|use|bring|pull|help|back)\b")
 _POLITE = re.compile(r"\b(can you|could you|would you|please|for me|go ahead|do it|run|automate|every|each|daily|nightly|"
                      r"weekly)\b")
 
@@ -152,6 +170,11 @@ _STARTUP = re.compile(r"start(s|ing)? (up )?with windows|startup|start-up|start 
 _OFF = re.compile(r"\b(turn off|switch off|stop|disable|don'?t|prevent|remove|block|no longer)\b")
 _CLOSE = re.compile(r"\b(close|kill|quit|exit|shut down|end)\b(?! game grave)")
 _SCAN = re.compile(r"\b(re-?scan|scan)\b|look for (my )?games|find (my )?games")
+_LEFTOVERS = re.compile(r"\bleftovers?\b|\bgraveyard\b|left ?behind by (old|removed|uninstalled) games")
+_STORAGE_SCAN = re.compile(r"other storage|\bcaches?\b|shader cache")
+_CAPTURES_SCAN = re.compile(r"\bcaptures?\b|\bscreenshots?\b|\brecordings?\b|\bclips\b")
+_MOD_SWITCH = re.compile(r"\b(turn|switch|toggle) (it |them |that |those )?(off|on)\b|\b(disable|enable|deactivate|activate)\b|"
+                         r"\b(turn|switch) .{1,60}? (off|on)\b")
 _GAME_MODE = re.compile(r"game ?mode")
 _RECORDING = re.compile(r"recording|game ?bar|game ?dvr|captures? in the background")
 _POWER = re.compile(r"power plan|high performance|full power|max(imum)? performance|full speed")
@@ -174,8 +197,24 @@ def wants(text):
                             re.search(r"optimi[sz]|windows settings|my settings", t)):
         add("undo_optimizer")
         return found
-    if _SCAN.search(t):
+    looks = bool(_SCAN.search(t) or re.search(r"\b(find|look for|check)\b", t))
+    specific = False
+    if looks and _LEFTOVERS.search(t):
+        add("scan_leftovers")
+        specific = True
+    caches_only = bool(_STORAGE_SCAN.search(t)) and not re.search(r"\btemp|temporary|junk", t)
+    if (looks or (_CLEAN.search(t) and caches_only)) and _STORAGE_SCAN.search(t):
+        add("scan_storage")
+        specific = True
+    if looks and _CAPTURES_SCAN.search(t):
+        add("scan_captures")
+        specific = True
+    if _SCAN.search(t) and not specific:
         add("scan_library")
+    if re.search(r"\bmods?\b", t) and _MOD_SWITCH.search(t) and not _STARTUP.search(t):
+        on = bool(re.search(r"\b(turn|switch|toggle)\b.*\bon\b|\b(enable|activate)\b", t)) and not \
+            re.search(r"\b(off|disable|deactivate)\b", t)
+        add("check_mods", mentioned=t, on=on)
     if _APP_UPDATE.search(t):
         add("check_app_update")
     if _READY.search(t):
@@ -183,7 +222,7 @@ def wants(text):
         add("game_mode_on")
         add("recording_off")
         add("power_high", ticked=False)
-    if _CLOSE.search(t) and not _STARTUP.search(t):
+    if _CLOSE.search(t) and not _STARTUP.search(t) and not re.search(r"\bmods?\b", t):
         add("check_memory", mentioned=t)
     if _GAME_MODE.search(t) and not _OFF.search(t):
         add("game_mode_on")
@@ -191,7 +230,7 @@ def wants(text):
         add("recording_off")
     if _POWER.search(t):
         add("power_high")
-    if _CLEAN.search(t):
+    if _CLEAN.search(t) and not caches_only:
         add("check_temp")
         add("clear_temp")
     if _DRIVERS.search(t):
@@ -200,6 +239,10 @@ def wants(text):
             add("install_drivers")
     if _STARTUP.search(t):
         add("check_startup", mentioned=t, off=bool(_OFF.search(t)))
+    if not found and _MOD_SWITCH.search(t) and not _STARTUP.search(t):
+        # "turn off skyui": not one of Windows' settings above, so it names mods
+        on = bool(re.search(r"\bon\b|\b(enable|activate)\b", t)) and not re.search(r"\b(off|disable|deactivate)\b", t)
+        add("check_mods", mentioned=t, on=on)
     for step in found:  # the "ticked" hint above is a plan default, not an argument
         if "ticked" in step.args:
             step.ticked = bool(step.args.pop("ticked"))
@@ -221,6 +264,37 @@ def mentioned(name, text):
     words = set(re.sub(r"[^a-z0-9]+", " ", (text or "").casefold()).split())
     parts = [p for p in stem.split() if len(p) >= 3]
     return bool(parts) and (stem.replace(" ", "") in words or any(p in words for p in parts))
+
+
+_MOD_STOP = frozenset("the and for with mod mods turn switch off on my in of a an to please disable enable it them".split())
+
+
+def mod_named(name, request):
+    """True when the request names this mod: its whole name, or every real word of it ("turn off skyui" names SkyUI, but
+    "skyrim" alone does not name "Unofficial Skyrim Special Edition Patch")."""
+    squash = lambda text: re.sub(r"[^a-z0-9]+", "", text.casefold())
+    full = squash(name)
+    if len(full) >= 3 and full in squash(request):
+        return True
+    words = set(re.sub(r"[^a-z0-9]+", " ", (request or "").casefold()).split())
+    parts = [p for p in re.sub(r"[^a-z0-9]+", " ", name.casefold()).split() if p not in _MOD_STOP and len(p) >= 2]
+    return bool(parts) and all(p in words for p in parts)
+
+
+def mod_steps(profiles, request, on):
+    """One step per named mod in each Mod Organizer 2 profile. Mods already in the asked state are reported, not listed."""
+    steps, already = [], []
+    key = "mod_on" if on else "mod_off"
+    for game, profile, folder, mods in profiles:
+        for name, enabled, label in mods:
+            if not mod_named(label, request):
+                continue
+            if enabled == on:
+                already.append(label)
+                continue
+            steps.append(Step(key, {"name": label, "key": name, "folder": str(folder), "profile": profile, "game": game},
+                              detail=f"{game}, profile {profile}"))
+    return steps[:12], already
 
 
 def close_steps(procs, request):
@@ -442,7 +516,7 @@ def plan_to_dict(plan):
     data["schedule"] = asdict(plan.schedule) if plan.schedule else None
     for step in data["steps"]:
         step["args"] = {k: v for k, v in step["args"].items() if k in ("name", "pid", "key", "mentioned", "off", "ids",
-                                                                         "titles")}
+                                                                         "titles", "on", "folder", "profile", "game")}
     return data
 
 

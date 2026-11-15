@@ -482,7 +482,16 @@ def add_answer(window, question, answer, plan=None):
         note.setTextInteractionFlags(Qt.TextSelectableByMouse)
         stack.addWidget(note)
     actions_row = ActionFlow(spacing=6)
+    from gg_desktop import autopilot_ui
     for caption, tab in answer.handoffs:
+        if ":" in tab or tab in ("bisect", "tour") or "/" in tab:
+            asks = tab.startswith("ask:")
+            special = tool(caption, "play" if asks else "chevron", lambda _=False, t=tab: autopilot_ui.open_target(window, t),
+                           kind="primary" if asks else "",
+                           tip=("Plan it with Game Grave's own tools; nothing changes until you press Run all" if asks
+                                else "Open it now. It asks before it changes anything."))
+            actions_row.addWidget(special)
+            continue
         actions_row.addWidget(tool(caption, "chevron", lambda _=False, t=tab: window.navigate(t), tip=f"Open the {tab} tab"))
     actions_row.addWidget(tool("Copy", "file", lambda _=False, q=question, a=answer: copy_answer(window, q, a),
                                tip="Copy this question and answer"))

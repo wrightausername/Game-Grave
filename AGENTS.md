@@ -667,3 +667,28 @@ unchanged.
   change and after every scan.
 - Covered by `tests/test_scan_cache.py` and `tools/scan_cache_smoke.py` (scan, restart, results and time back, gone file
   dropped, Other Storage keeps its own time, a new scan replaces the results).
+
+AI Assistant, every tool by asking (owner instruction, 2026-11-14: "Ai assistant needs to be comprehensive and helpful, if somebody
+doesn't know how to do any of these tools or use them it should be easy enough for them to ask and it implement what ever they
+want"). AI Assistant is reopened for its answers and automation; layout unchanged.
+- Walkthroughs: `assistant_features.py` now covers every tool (34 entries: the Toolbox's Windows Cleanup, Game Optimizer, Memory
+  Optimizer, Command Runner, File Associations, Junction Manager, Reports, Hash Checker, Save Vault, kits; Other Storage, Captures,
+  Games, My Mods / Workshop, Scan PC, Never Touch, the welcome tour, plus the earlier ones), each with numbered steps from what the
+  code does. Each feature has `opens` (the tool itself: a Toolbox window, kit setup, Mod Bisect, the tour, or a tab with its inner
+  tab) and, when the automation can do it, `do` (the request that plans it). Answers show "Do it for me" (sends that request:
+  a plan, nothing changes until Run all) and "Open <tool>".
+- Routing: any how-to question ("how do I ...", "I don't know how to ...", "walk me through ...") that names a tool or a task
+  ("free up memory", "clean temp files", "turn off a mod", "share my mods with a friend") gets that tool's walkthrough first. Tabs
+  that also hold data (Other Storage, Captures, Games, My Mods, Scan PC, Memory Optimizer) answer data questions with data and
+  only how-to questions with the guide. The performance answer offers "Get my PC ready to play".
+- "Open X" / "take me to X" / "launch X" opens the tool straight away (no switch needed: opening changes nothing) and shows its
+  walkthrough (`autopilot_ui.open_target`, `opens_for`).
+- New automation: scan for leftovers (Graveyard), scan Other Storage, scan captures (run by the tabs' own scan functions, read only),
+  and turn mods on or off by name in Mod Organizer 2 ("turn off skyui"): `check_mods` reads the selected profile of each MO2 setup
+  and lists only mods the request names in full (`mod_named`: all real words of the mod's name, so "skyrim" never names a
+  patch); `mod_off` / `mod_on` use the approved My Mods write (`mymods_core.set_enabled`: snapshot first, refused while MO2 runs,
+  Undo in Mods > My Mods), one confirmation via Run all, logged. Caches go to Other Storage's review, never to the temp-file
+  delete.
+- Covered by `tests/test_assistant_answers.py` (every feature has steps and buttons; task questions find the right tool; every
+  "do" request makes a plan), `tests/test_autopilot.py` (scans, mod names, mod switch) and `tools/autopilot_smoke.py` (walkthrough
+  buttons, Open, Do it for me, "open the hash checker", "turn off skyui" with Run all, "scan for leftovers").
