@@ -295,6 +295,27 @@ def main():
                 window.cleaning = False
                 assert comfort.state_of(window).toast is None
 
+            # Faster rescans: F5 on Games scans only games and keeps the rest of the last scan.
+            window.navigate("Games")
+            settle()
+            kept_files, kept_saves = list(window.inventory.files), list(window.inventory.saves)
+            from gg_desktop import backend as scan_backend
+            seen = []
+            real_scan = scan_backend.scan_inventory
+            with patch("gg_desktop.app.scan_inventory", lambda *a, **k: seen.append(k.get("parts")) or real_scan(*a, **k)):
+                QTest.keyClick(window, Qt.Key_F5)
+                for _ in range(400):
+                    settle()
+                    time.sleep(0.05)
+                    if not window.scanning:
+                        break
+            assert seen == [("games",)], seen
+            assert window.inventory.files == kept_files and window.inventory.saves == kept_saves
+            assert comfort.state_of(window).notices[0].title == "Quick scan finished"
+            menu = window._scan_menu()
+            assert [a.text() for a in menu.actions()][:2] == ["Everything", "Games only"]
+            menu.close()
+
             # Tray: closing hides the window and keeps it running; Quit closes it for real.
             tray = comfort.state_of(window).tray
             if tray is not None:

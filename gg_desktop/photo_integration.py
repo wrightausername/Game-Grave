@@ -447,7 +447,8 @@ class PhotoIntegration:
         if self.current_route == "Old Files" and hasattr(self.page, "old_files"):
             self._old_scan()
         else:
-            self.start_scan()
+            from gg_desktop import scan_parts
+            self.start_scan(scan_parts.for_route(self.current_route, bool(self.inventory.scanned_at)))
 
     def _escape_current_route(self):
         if self.scanning:

@@ -202,6 +202,9 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.scan_button = tool("Scan PC", "search", self.start_scan, kind="primary", tip="Scan PC (F5)")
         self.scan_button.setAccessibleName("Scan PC")
         self.scan_button.setFixedSize(105, 30)
+        self.scan_button.setToolTip("Scan PC (F5). Right-click for a quicker scan of one part.")
+        self.scan_button.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.scan_button.customContextMenuRequested.connect(self._scan_menu)
         topbox.addWidget(self.scan_button)
         self.scan_button.hide()
         from gg_desktop import comfort
@@ -412,9 +415,24 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             return
         self.scan_time.setText(scan_cache.label_for(self.current_route, self.inventory.scanned_at, scan_cache.times_of(self)))
 
-    def start_scan(self):
+    def _scan_menu(self, pos=None):
+        from PySide6.QtWidgets import QMenu
+        from gg_desktop import scan_parts
+        menu = QMenu(self.scan_button)
+        for caption, parts in scan_parts.MENU:
+            action = menu.addAction(caption, lambda p=parts: self.start_scan(p))
+            action.setEnabled(not self.scanning and (parts is None or bool(self.inventory.scanned_at)))
+        self.scan_menu = menu
+        menu.popup(self.scan_button.mapToGlobal(pos if pos is not None else self.scan_button.rect().bottomLeft()))
+        return menu
+
+    def start_scan(self, parts=None):
+        """Scan PC. `parts` (games, mods, files, captures, saves) rescans only those and keeps the rest of the last scan."""
         if self.scanning or self.cleaning:
             return
+        if not isinstance(parts, (set, frozenset, tuple, list)) or not self.inventory.scanned_at:
+            parts = None                     # a button's checked flag, or no earlier scan to keep from
+        base = self.inventory if parts else None
         self.scanning = True
         self.cancel.clear()
         self.scan_button.setEnabled(False)
@@ -445,7 +463,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             scan_cache.keep_async("inventory", inventory)
             self._sync_scan_time()
             from gg_desktop import comfort
-            comfort.notify(self, "Scan finished", f"{len(inventory.games)} games, {len(inventory.mods)} mod locations, "
+            comfort.notify(self, "Quick scan finished" if parts else "Scan finished", f"{len(inventory.games)} games, {len(inventory.mods)} mod locations, "
                            f"{len(inventory.graveyard)} Graveyard findings." + (" Some sources weren't available."
                                                                                if inventory.warnings else ""),
                            "warn" if inventory.warnings else "good", "Overview")
@@ -456,7 +474,10 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             self.navigate(self.current_route)
             from gg_desktop import soulbind_auto
             soulbind_auto.after_scan(self)      # only acts when the owner switched it on in Settings
-        self.job(lambda emitter: scan_inventory(settings, self.cancel.is_set, emitter),
+        if parts:
+            from gg_desktop import scan_parts
+            self.status.setText("Quick scan: " + scan_parts.describe(parts) + ". The rest of the last scan is kept.")
+        self.job(lambda emitter: scan_inventory(settings, self.cancel.is_set, emitter, parts=parts, base=base),
                  finish, error_title="Local scan incomplete", progress=progress)
 
     def cancel_scan(self):

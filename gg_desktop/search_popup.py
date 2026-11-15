@@ -67,8 +67,9 @@ class SearchPopup(QObject):
     def place(self):
         top_left = self.box.mapTo(self.window, QPoint(0, self.box.height() + 4))
         width = max(self.box.width(), 420)
-        rows = self.list.count()
-        self.list.setGeometry(top_left.x(), top_left.y(), width, min(26 * rows + 12, 420))
+        height = sum(max(22, self.list.sizeHintForRow(i)) for i in range(self.list.count())) + 14
+        bottom_room = self.window.height() - top_left.y() - 12
+        self.list.setGeometry(top_left.x(), top_left.y(), width, max(60, min(height, 440, bottom_room)))
 
     def move(self, step):
         row = self.list.currentRow()

@@ -45,54 +45,85 @@ class ScanCanceled(InterruptedError):
     pass
 
 
+PARTS = ("games", "mods", "files", "captures", "saves")
+
+
 def scan_inventory(settings: dict, canceled: Callable[[], bool],
-                   progress: Callable[[int, str], None] | None = None) -> Inventory:
-    """Read-only scan, built off-thread; partial noncritical failures are explicit."""
+                   progress: Callable[[int, str], None] | None = None,
+                   parts=None, base: Inventory | None = None) -> Inventory:
+    """Read-only scan, built off-thread; partial noncritical failures are explicit.
+
+    `parts` (a subset of PARTS) rescans only those; everything else is carried over from `base`, the last accepted
+    scan, unchanged. The Graveyard is always rebuilt from the result. None, or no base, scans everything."""
+    wanted = set(PARTS) if parts is None or base is None else set(parts) & set(PARTS)
+    order = [i for i, part in enumerate(PARTS) if part in wanted]
+
     def stage(i, name):
         if canceled():
             raise ScanCanceled("Scan canceled. The earlier accepted inventory is unchanged.")
-        if progress:
-            progress(int(i * 100 / len(STAGES)), name)
+        if progress and i in order:
+            progress(int(order.index(i) * 100 / max(1, len(order))), name)
     staged = Inventory()
-    stage(0, STAGES[0])
-    staged.steam = find_games(list(settings.get("steam_extra_roots", [])), cancel=canceled)
-    staged.other = find_launcher_games(list(settings.get("other_library_roots", [])), cancel=canceled)
-    staged.games = merge_games(staged.steam, staged.other)
-    stage(1, STAGES[1])
-    staged.mods = find_all_mod_storage(
-        list(settings.get("steam_extra_roots", [])),
-        list(settings.get("mod_extra_roots", [])),
-        games=staged.steam, cancel=canceled,
-    )
-    stage(2, STAGES[2])
-    try:
-        staged.files = scan_old_files(Path(settings.get("scan_folder", str(Path.home() / "Downloads"))),
-                                     int(settings.get("files_stale_days", 180)), cancel=canceled)
-    except (ValueError, OSError) as exc:
-        staged.warnings.append("Old Files folder unavailable (" + type(exc).__name__ + ").")
-    stage(3, STAGES[3])
-    days = min(int(settings.get("files_stale_days", 180)),
-               int(settings.get("graveyard_days", 365)))
-    try:
-        staged.recordings = find_old_recordings(
-            days, list(settings.get("recording_roots", [])), cancel=canceled)
-    except (OSError, ValueError) as exc:
-        staged.warnings.append("Recordings partially unavailable (" + type(exc).__name__ + ").")
-    if canceled():
-        raise ScanCanceled("Scan canceled.")
-    try:
-        staged.screenshots = find_old_screenshots(
-            days, list(settings.get("screenshot_roots", [])),
-            extra_steam_roots=list(settings.get("steam_extra_roots", [])), cancel=canceled)
-    except (OSError, ValueError) as exc:
-        staged.warnings.append("Screenshots partially unavailable (" + type(exc).__name__ + ").")
+    if base is not None and wanted != set(PARTS):
+        staged.warnings = [w for w in base.warnings]
+    if "games" in wanted:
+        stage(0, STAGES[0])
+        staged.steam = find_games(list(settings.get("steam_extra_roots", [])), cancel=canceled)
+        staged.other = find_launcher_games(list(settings.get("other_library_roots", [])), cancel=canceled)
+        staged.games = merge_games(staged.steam, staged.other)
+    else:
+        staged.steam, staged.other, staged.games = list(base.steam), list(base.other), list(base.games)
+    if "mods" in wanted:
+        stage(1, STAGES[1])
+        staged.mods = find_all_mod_storage(
+            list(settings.get("steam_extra_roots", [])),
+            list(settings.get("mod_extra_roots", [])),
+            games=staged.steam, cancel=canceled,
+        )
+    else:
+        staged.mods = list(base.mods)
+    if "files" in wanted:
+        stage(2, STAGES[2])
+        staged.warnings = [w for w in staged.warnings if not w.startswith("Old Files folder")]
+        try:
+            staged.files = scan_old_files(Path(settings.get("scan_folder", str(Path.home() / "Downloads"))),
+                                         int(settings.get("files_stale_days", 180)), cancel=canceled)
+        except (ValueError, OSError) as exc:
+            staged.warnings.append("Old Files folder unavailable (" + type(exc).__name__ + ").")
+    else:
+        staged.files = list(base.files)
+        staged.file_scan_root, staged.file_scan_days = base.file_scan_root, base.file_scan_days
+    if "captures" in wanted:
+        stage(3, STAGES[3])
+        staged.warnings = [w for w in staged.warnings if not w.startswith(("Recordings", "Screenshots"))]
+        days = min(int(settings.get("files_stale_days", 180)),
+                   int(settings.get("graveyard_days", 365)))
+        try:
+            staged.recordings = find_old_recordings(
+                days, list(settings.get("recording_roots", [])), cancel=canceled)
+        except (OSError, ValueError) as exc:
+            staged.warnings.append("Recordings partially unavailable (" + type(exc).__name__ + ").")
+        if canceled():
+            raise ScanCanceled("Scan canceled.")
+        try:
+            staged.screenshots = find_old_screenshots(
+                days, list(settings.get("screenshot_roots", [])),
+                extra_steam_roots=list(settings.get("steam_extra_roots", [])), cancel=canceled)
+        except (OSError, ValueError) as exc:
+            staged.warnings.append("Screenshots partially unavailable (" + type(exc).__name__ + ").")
+    else:
+        staged.recordings, staged.screenshots = list(base.recordings), list(base.screenshots)
     excluded = settings.get("excluded_folders", [])
     if excluded:
         from gg_desktop.settings_rules import filter_inventory
         filter_inventory(staged, list(excluded))
-    stage(4, STAGES[4])
-    from save_discovery import discover_saves
-    staged.saves = discover_saves()
+    if "saves" in wanted:
+        stage(4, STAGES[4])
+        from save_discovery import discover_saves
+        staged.saves = discover_saves()
+    else:
+        staged.saves = list(base.saves)
+    staged.source_reports = list(getattr(base, "source_reports", []) or []) if base is not None and wanted != set(PARTS) else staged.source_reports
     if canceled():
         raise ScanCanceled("Scan canceled.")
     staged.graveyard = build_graveyard(
