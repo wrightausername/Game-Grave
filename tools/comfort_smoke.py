@@ -226,7 +226,10 @@ def main():
             with patch.object(gn, "fetch_modes", lambda ids, cache, **k: dict(cache, **{i: ("Online co-op",) for i in ids})), \
                     patch.object(gn, "save_modes", lambda cache, path=None: store.update(cache)), \
                     patch.object(gn, "load_modes", lambda path=None: dict(store)):
-                assert night.paste_code("lets play tonight " + friend_code)
+                for _ in range(20):          # let Ready Room finish any rebuild from its live news first
+                    settle()
+                    time.sleep(0.05)
+                assert window.page.squad.game_night.paste_code("lets play tonight " + friend_code)
                 for _ in range(80):
                     settle()
                     time.sleep(0.05)
