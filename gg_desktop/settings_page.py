@@ -719,6 +719,7 @@ def check_updates(window):
         window.settings_update.setEnabled(True)
         window.settings_update_note.setText(sentence)
         window.settings_update_open.setVisible(kind in {"available", "unknown", "error"})
+        window.settings_update_get.setVisible(kind in {"available", "unknown"})
 
     window.job(work, finish, error_title="Update check failed")
 
@@ -739,6 +740,9 @@ def check_updates_on_launch(window):
         kind, sentence = result
         if kind == "available" and isValid(window.status):
             window.status.setText(sentence + " Open Settings to update.")
+            from gg_desktop import comfort, update_install
+            comfort.notify(window, "Update available", sentence, "info", "Settings",
+                           action=("Download", lambda: update_install.start(window)))
 
     window.job(work, finish, error_title="Update check failed")
 
@@ -976,10 +980,16 @@ def build(window):
                                 tip="Ask GitHub whether a newer preview build exists. Nothing is downloaded or installed.")
     self.settings_update_open = tool("Open Updater", "download", lambda: open_updater(self),
                                      tip="Open the Game Grave Updater, or the releases page if it is not installed")
-    for control in (self.settings_update, self.settings_update_open):
+    from gg_desktop import update_install
+    self.settings_update_get = tool("Install now" if getattr(self, "_update_ready", None) else "Download and install",
+                                    "download", lambda: update_install.primary(self), kind="primary",
+                                    tip="Downloads the newest build, checks its published SHA-256, and installs it after "
+                                        "you say OK. Asks before each step.")
+    for control in (self.settings_update, self.settings_update_get, self.settings_update_open):
         control.setFixedHeight(28)
         update_buttons.addWidget(control)
     self.settings_update_open.hide()
+    self.settings_update_get.setVisible(bool(getattr(self, "_update_ready", None)) or bool(found and found[0] == "available"))
     version.addLayout(update_buttons)
     data_row.addLayout(version)
     strip_body.addLayout(data_row)

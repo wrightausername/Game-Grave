@@ -153,6 +153,12 @@ on:
       - 'gg_desktop/ask_about_core.py'
       - 'tests/test_ask_about.py'
       - 'gg_desktop/next_step.py'
+      - 'gg_desktop/update_install.py'
+      - 'gg_desktop/update_install_core.py'
+      - 'tests/test_update_install.py'
+      - 'gg_desktop/search_core.py'
+      - 'gg_desktop/search_popup.py'
+      - 'tests/test_search_core.py'
       - 'gg_desktop/assistant_popout.py'
       - 'tools/scan_cache_smoke.py'
       - 'tools/autopilot_smoke.py'
@@ -372,7 +378,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_assistant_answers tests.test_local_ai tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_mods_gallery_data tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad tests.test_nexus tests.test_autopsy_library tests.test_theme_prompts tests.test_updater tests.test_update_check tests.test_bisect tests.test_bisect_clues tests.test_bisect_apply tests.test_bisect_units tests.test_bisect_flow tests.test_bisect_store tests.test_bisect_model tests.test_hardware tests.test_kit_install tests.test_kit_easy tests.test_a11y_and_tracking tests.test_squad_install tests.test_squad_flow tests.test_soulbind_auto tests.test_upkeep tests.test_upkeep_vendor tests.test_tools_words tests.test_autopilot tests.test_scan_cache tests.test_games_places tests.test_comfort tests.test_ask_about tests.test_mymods tests.test_resurrection_v2 tests.test_resurrection_lab tests.test_kit_discovery_and_mo2 tests.test_kit_watch tests.test_welcome tests.test_nav_groups -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_assistant_answers tests.test_local_ai tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_mods_gallery_data tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad tests.test_nexus tests.test_autopsy_library tests.test_theme_prompts tests.test_updater tests.test_update_check tests.test_bisect tests.test_bisect_clues tests.test_bisect_apply tests.test_bisect_units tests.test_bisect_flow tests.test_bisect_store tests.test_bisect_model tests.test_hardware tests.test_kit_install tests.test_kit_easy tests.test_a11y_and_tracking tests.test_squad_install tests.test_squad_flow tests.test_soulbind_auto tests.test_upkeep tests.test_upkeep_vendor tests.test_tools_words tests.test_autopilot tests.test_scan_cache tests.test_games_places tests.test_comfort tests.test_ask_about tests.test_update_install tests.test_search_core tests.test_mymods tests.test_resurrection_v2 tests.test_resurrection_lab tests.test_kit_discovery_and_mo2 tests.test_kit_watch tests.test_welcome tests.test_nav_groups -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -706,7 +712,7 @@ jobs:
       - name: Build standalone unsigned Qt EXE
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name GameGrave-Crimson-Preview --collect-all PySide6 --add-data "gg_desktop/assets;gg_desktop/assets" gg_desktop/__main__.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name GameGrave-Crimson-Preview --hidden-import updater.gg_updater --collect-all PySide6 --add-data "gg_desktop/assets;gg_desktop/assets" gg_desktop/__main__.py
           if ($LASTEXITCODE -ne 0) { throw 'Qt PyInstaller failed.' }
           if (-not (Test-Path 'dist/GameGrave-Crimson-Preview.exe')) { throw 'Missing Qt EXE' }
       - name: Build and smoke-test GameGrave-Updater.exe

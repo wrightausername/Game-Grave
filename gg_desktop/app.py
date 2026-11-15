@@ -114,6 +114,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         from gg_desktop import comfort          # Back, shortcuts, notifications, paused note, tray
         comfort.install(self, self._top_box, self.bell_button)
         self._comfort_ready = True
+        from gg_desktop import search_popup     # results from everything under the top search box
+        search_popup.install(self)
         if not reference_preview:
             from gg_desktop import scan_cache    # the last results stay until the owner scans again
             try:

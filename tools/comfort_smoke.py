@@ -175,6 +175,26 @@ def main():
             window.game_sort.setCurrentText("Recently played")
             settle()
 
+            # One search for everything: results under the box, arrow + Enter opens the game in Games.
+            window.navigate("Overview")
+            settle()
+            window.activateWindow()
+            QTest.mouseClick(window.global_search, Qt.LeftButton)
+            QTest.keyClicks(window.global_search, "elden")
+            QTest.qWait(300)
+            popup = window.search_popup
+            assert popup.list.isVisible(), "results show under the search box"
+            texts = [popup.list.item(i).text() for i in range(popup.list.count())]
+            assert "GAMES" in texts and any(t.startswith("Elden Ring") for t in texts), texts
+            assert window.grab().save(str(args.output / "shell-search.png"))
+            QTest.keyClick(window.global_search, Qt.Key_Down)
+            QTest.keyClick(window.global_search, Qt.Key_Return)
+            settle()
+            assert window.current_route == "Games" and window.game_search.text() == "Elden Ring", (
+                window.current_route, window.game_search.text())
+            window.global_search.clear()
+            settle()
+
             # Empty screens offer the next step.
             window.navigate("Other Storage")
             settle()
@@ -206,6 +226,42 @@ def main():
             pop.close()
             settle()
             window.settings = dict(window.settings, assistant_enabled=False)
+
+            # Update from inside the app: ask, download with the Updater's checks, pop-up, ask, start installer, quit.
+            from updater import gg_updater as up
+            from gg_desktop import update_install
+            release = {"tag": "preview-run-99", "setup": {"url": "u", "size": 2 * 1048576}, "sum": {"url": "s", "size": 80}}
+            setup_file = Path(tempfile.mkdtemp()) / "GameGrave-Crimson-Preview-Setup.exe"
+            setup_file.write_bytes(b"x")
+            questions, started, quits = [], [], []
+
+            def fake_download(rel, token, folder, expected, progress=None, opener=None):
+                progress(1048576, 2 * 1048576)
+                return setup_file
+            with patch.object(up, "find_token", lambda: ""), patch.object(up, "list_releases", lambda t, opener=None: [1]), \
+                    patch.object(up, "pick_release", lambda r: release), \
+                    patch.object(up, "fetch_checksum", lambda r, t, opener=None: "ab" * 32), \
+                    patch.object(up, "download_setup", fake_download), \
+                    patch.object(type(window), "confirm", lambda self, t, text, **_: questions.append(text) or True), \
+                    patch("subprocess.Popen", lambda *a, **k: started.append(a[0])), \
+                    patch.object(comfort, "quit_app", lambda w: quits.append(1)):
+                update_install.start(window)
+                for _ in range(100):
+                    settle()
+                    time.sleep(0.05)
+                    if getattr(window, "_update_ready", None):
+                        break
+                assert window._update_ready == (str(setup_file), "preview-run-99"), getattr(window, "_update_ready", None)
+                assert "SHA-256" in questions[0] and "preview-run-99" in questions[0]
+                toast = comfort.state_of(window).toast
+                assert toast.action_button.text() == "Install now"
+                assert window.grab().save(str(args.output / "shell-update-ready.png"))
+                toast.action_button.click()
+                settle()
+                assert "Game Grave closes" in questions[-1]
+                assert started and started[0][0] == "powershell.exe" and "-EncodedCommand" in started[0], started
+                assert quits == [1]
+            window._update_ready = None
 
             # Undo right after a removal: a new Recycle Bin record pops up with Undo, which asks first and then
             # checks and restores through the recovery engine (both faked here; nothing on disk moves).
