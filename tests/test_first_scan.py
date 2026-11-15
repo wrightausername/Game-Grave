@@ -13,7 +13,7 @@ def inv(**kw):
 class FirstScan(unittest.TestCase):
     def test_headline_and_steps(self):
         i = inv(games=[1, 2], mods=[1], files=[NS(size=2048)])
-        self.assertEqual(core.headline(i), "Found 2 games, 1 mod locations, 1 old files.")
+        self.assertEqual(core.headline(i), "Found 2 games, 1 mod location, 1 old file.")
         steps = core.next_steps(i)
         self.assertEqual([s[3] for s in steps], ["tab:Mods", "kit:easy", "tab:Old Files"])
         self.assertTrue(all("safe" not in s[1].lower() for s in steps))

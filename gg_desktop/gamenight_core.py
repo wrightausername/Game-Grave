@@ -181,7 +181,7 @@ def summary(rows, friends):
     if everyone:
         return f"You and {who} can all play {len(everyone)} game{'s' if len(everyone) != 1 else ''} right now."
     if almost:
-        return f"Nothing everyone has installed yet. {len(almost)} game{'s' if len(almost) != 1 else ''} need just one download."
+        return f"Nothing everyone has installed yet. {len(almost)} game{'s need' if len(almost) != 1 else ' needs'} just one download."
     return "No game in common yet. Compare again after someone installs one."
 
 

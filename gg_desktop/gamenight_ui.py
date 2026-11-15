@@ -171,7 +171,7 @@ class GameNightBody(QWidget):
     def refresh(self, fetch=False):
         me = str(self.window_owner.settings.get(gn.NAME_KEY) or "You")
         self.rows = gn.with_modes(gn.overlap(me, self._my_games(), self.friends), self.modes) if self.friends else []
-        names = ", ".join(f"{f.name} ({len(f.games)} games)" for f in self.friends)
+        names = ", ".join(f"{f.name} ({len(f.games)} game{'' if len(f.games) == 1 else 's'})" for f in self.friends)
         self.who.setText(("Friends: " + names) if names else "No friends' codes yet.")
         self.headline.setText(gn.summary(self.rows, self.friends))
         self.clear_button.setVisible(bool(self.friends))

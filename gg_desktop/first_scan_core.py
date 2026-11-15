@@ -7,12 +7,12 @@ SEEN_KEY = "first_scan_summary_seen"
 
 def counts(inventory):
     captures = len(getattr(inventory, "screenshots", []) or []) + len(getattr(inventory, "recordings", []) or [])
-    return [("games", len(inventory.games)), ("mod locations", len(inventory.mods)), ("old files", len(inventory.files)),
-            ("captures", captures), ("save folders", len(inventory.saves)), ("Graveyard findings", len(inventory.graveyard))]
+    return [("game", len(inventory.games)), ("mod location", len(inventory.mods)), ("old file", len(inventory.files)),
+            ("capture", captures), ("save folder", len(inventory.saves)), ("Graveyard finding", len(inventory.graveyard))]
 
 
 def headline(inventory):
-    shown = [f"{n:,} {name}" for name, n in counts(inventory) if n]
+    shown = [f"{n:,} {name}" + ("" if n == 1 else "s") for name, n in counts(inventory) if n]
     return ("Found " + ", ".join(shown) + ".") if shown else "The scan finished but found nothing it recognises yet."
 
 
@@ -26,16 +26,17 @@ def next_steps(inventory, limit=3):
     """[(title, why, button words, target)], most useful first."""
     steps = []
     if inventory.mods:
-        steps.append(("Check your mods", f"{len(inventory.mods):,} mod locations were found. My Mods shows problems, "
+        steps.append(("Check your mods", f"{len(inventory.mods):,} mod location{'' if len(inventory.mods) == 1 else 's'} found. My Mods shows problems, "
                       "updates and clashes in plain words.", "Open Mods", "tab:Mods"))
     if inventory.games:
         steps.append(("Back up a game you care about", "A Resurrection Kit keeps the whole install, saves and load order, "
                       "so a broken game can be put back.", "Set up a kit", "kit:easy"))
     if inventory.files:
-        steps.append(("Review old files", f"{len(inventory.files):,} older files ({_size(inventory.files)}) in your scan "
+        steps.append(("Review old files", f"{len(inventory.files):,} older file{'' if len(inventory.files) == 1 else 's'} "
+                      f"({_size(inventory.files)}) in your scan "
                       "folder. Nothing is removed unless you choose it.", "Open Old Files", "tab:Old Files"))
     if inventory.graveyard:
-        steps.append(("Look at leftovers", f"{len(inventory.graveyard):,} things that may belong to removed games. Review "
+        steps.append(("Look at leftovers", f"{len(inventory.graveyard):,} item{'' if len(inventory.graveyard) == 1 else 's'} that may belong to removed games. Review "
                       "only; each one says why it is listed.", "Open Graveyard", "tab:Graveyard"))
     steps.append(("Measure caches and logs", "Other Storage finds shader caches, logs and temp folders that games leave "
                   "behind.", "Open Other Storage", "tab:Other Storage"))
