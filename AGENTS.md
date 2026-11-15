@@ -804,3 +804,34 @@ small additions only; each names what it reopens.
 - Covered by `tests/test_first_scan.py`, `tests/test_overview_reason.py`, `tests/test_scan_parts.py` and `tools/comfort_smoke.py`.
 - Owner rule (2026-11-14): new ideas must extend existing tools rather than add near-duplicates (for example, snapshot history
   belongs in the Resurrection Kit and an unattended crash hunt belongs in Mod Bisect).
+
+Everyday features, added to existing tools (owner instruction, 2026-11-14: "I like it all. Continue to polish while adding those",
+to four ideas for everyday players; owner rule: extend existing tools, no near-duplicates).
+- Fix my game (AI Assistant automation and Black Box; `fixgame_core.py`, `autopilot_run._fix_check`): "my game won't start" /
+  "fix Elden Ring" makes a plan. The check reads Black Box's crash records for the named game and names the file most crashes were
+  in (graphics driver, DirectX, an overlay), lists open overlays known to hook games, checks Microsoft's Visual C++ 2015-2022
+  runtime (registry) and d3dx9_43.dll, and Windows Update's drivers. Fixes, only after Run all and the one OK: Steam's own verify
+  (steam://validate/<app id>, the real link named in the confirmation), closing an overlay (offered unticked), and installing
+  Microsoft's runtime (downloaded from Microsoft hosts only, Authenticode signer must be Microsoft Corporation, then
+  /install /passive /norestart through the Windows prompt). Other launchers get their own Verify steps in words. It never says a
+  cause is certain. Black Box has "Check the usual fixes", which asks the same in the pop-out chat.
+- Game Night (Squad Sync; `gamenight_core.py`, `gamenight_ui.py`): Squad Sync has two views, Match mods (unchanged) and Game night.
+  A game night code holds the name you pick and your installed games (title, launcher, Steam app id, size); friends' codes are
+  pasted from chat (found inside a message), kept in `game_night_friends` (8 at most). The list shows games everyone has first,
+  then games one person still needs (with size). Matching is by Steam app id, else the exact cleaned title. Co-op / multiplayer
+  tags come from Steam's public store (store.steampowered.com appdetails, categories only), asked for at most 25 matched games per
+  compare, spaced out, cached in `steam_modes.json`, skipped while a game runs; unknown tags never hide a game.
+- Never run out of space (Graveyard; `space_core.py`, `space_ui.py`): when a drive that holds games has under 40 GB or 10% free,
+  the Graveyard shows a card and a scan raises one notice a day. It suggests only games with a real last-played time 90+ days ago,
+  biggest first, until the drive is out of the low zone. Put to rest = the usual Resurrection Kit window (game picked, saved on the
+  other drive with the most room, "Game Grave Kits"), then, once the kit is saved and checked, Steam's own uninstall
+  (steam://uninstall/<app id>) after asking; other launchers are told in words. Bringing one back is Fix Kit > Restore a game.
+  `GAME_GRAVE_SPACE_CARD=0` turns it off in CI. Kit window: `open_easy_setup(window, game, folder, after)`.
+- Make it run better (Soulbind button and Games right-click; `tune_core.py`, `tune_ui.py`): a measured before/after test. Intel
+  PresentMon 2.4.1 (MIT) is an optional one-time download from GitHub, pinned to the SHA-256 in winget's manifest
+  (d74183e7...), kept in `<config>/tools`. Record runs PresentMon for 120 s on the game's biggest program inside its install folder
+  (Windows prompt, since frame timing needs administrator rights). Try the changes applies the Game Optimizer settings with its
+  backup (asked, logged); Record after; Autopsy compares; the verdict suggests keeping only a measured gain in average or 1% low
+  FPS ("within noise" says so). Put back restores the backup. `tools/presentmon_real_check.py` downloads and runs it for real on CI.
+- Covered by `tests/test_fixgame.py`, `tests/test_gamenight.py`, `tests/test_space.py`, `tests/test_tune.py`,
+  `tools/autopilot_smoke.py` (Fix my game) and `tools/comfort_smoke.py` (Game Night, space card and Put to rest, Make it run better).

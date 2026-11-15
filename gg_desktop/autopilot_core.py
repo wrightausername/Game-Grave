@@ -372,7 +372,10 @@ def confirmation(plan):
     lines = []
     for n, step in enumerate([s for s in plan.steps if s.ticked and s.kind == CHANGE and s.status == "waiting"], 1):
         lines.append(f"{n}. {step.title}" + (f" ({step.detail})" if step.detail else ""))
-        lines.append("   " + step.action.technical)
+        technical = step.action.technical
+        if step.key == "verify_game" and step.args.get("url"):
+            technical = "Opens " + str(step.args["url"]) + "; Steam does the check."
+        lines.append("   " + technical)
         if step.action.undo:
             lines.append("   " + step.action.undo)
     return "\n".join(lines)
