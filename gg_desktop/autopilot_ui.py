@@ -226,6 +226,10 @@ def open_target(window, target):
         from gg_desktop import fix_kit_page
         fix_kit_page.open_bisect(window)
         return True
+    if target == "tune":
+        from gg_desktop import tune_ui
+        QTimer.singleShot(0, lambda: tune_ui.open_tune(window))
+        return True
     if target == "tour":
         QTimer.singleShot(0, window.open_welcome_tour)
         return True

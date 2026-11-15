@@ -445,8 +445,9 @@ class GamesController(QObject):
         choose.setEnabled("open_folder" in game.capabilities)
         menu.addAction("Use default launcher", lambda: self.clear_executable(game))
         menu.addAction("Copy installation path", lambda: self.copy_path(game))
-        from gg_desktop import ask_about
+        from gg_desktop import ask_about, tune_ui
         ask_about.add_to_menu(menu, self.window, "game", game)
+        menu.addAction("Make it run better…", lambda: tune_ui.open_tune(self.window, game))
         menu.exec(position or self.window.game_table.mapToGlobal(self.window.game_table.rect().center()))
 
     def copy_path(self, game):

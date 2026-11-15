@@ -271,6 +271,51 @@ def main():
             window.inventory.games = real_games
             window.space_card = None
 
+            # Make it run better: record before, try the changes, record after, keep only a measured gain.
+            from gg_desktop import tune_core as tc, tune_ui, winpc
+            fake_pm = Path(tempfile.mkdtemp()) / tc.PRESENTMON_NAME
+            fake_pm.write_bytes(b"pm")
+            runs, tweaks = [], []
+
+            def fake_run(cmd, **kwargs):
+                import base64 as b64
+                script = b64.b64decode(cmd[-1]).decode("utf-16le")
+                out = script.split("$out = '")[1].split("'")[0]
+                ms = 16.7 if not runs else 12.5        # 60 FPS before, 80 FPS after
+                Path(out).write_text("Application,MsBetweenPresents\n" + "".join(f"game.exe,{ms}\n" for _ in range(1500)))
+                runs.append(out)
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            with patch.object(tc, "presentmon_path", lambda base=None: fake_pm), \
+                    patch.object(tc, "captures_dir", lambda base=None: fake_pm.parent), \
+                    patch("subprocess.run", fake_run), \
+                    patch.object(winpc, "apply_optimizer", lambda reg, runner, keys, backup: tweaks.append(sorted(keys)) or ["done."]), \
+                    patch.object(winpc, "undo_optimizer", lambda reg, runner, backup: tweaks.append("undo") or ["Restored."]), \
+                    patch.object(type(window), "confirm", lambda self, t, text, **_: True):
+                tune = tune_ui.open_tune(window, window.inventory.games[0])
+                settle()
+                assert tune.record_button.isVisible() and tune.record_button.text() == "Record before"
+                tune.record_button.click()
+                for _ in range(100):
+                    settle()
+                    time.sleep(0.05)
+                    if tune.before is not None:
+                        break
+                assert tune.try_button.isVisible()
+                tune.try_button.click()
+                settle()
+                assert tweaks == [["background_recording", "game_mode", "power_plan"]], tweaks
+                tune.record_button.click()
+                for _ in range(100):
+                    settle()
+                    time.sleep(0.05)
+                    if tune.after is not None:
+                        break
+                assert "It runs better" in tune.result_line.text(), tune.result_line.text()
+                assert tune.grab().save(str(args.output / "soulbind-tune.png"))
+                tune.back_button.click()
+                assert tweaks[-1] == "undo"
+                tune.close()
+
             # Empty screens offer the next step.
             window.navigate("Other Storage")
             settle()

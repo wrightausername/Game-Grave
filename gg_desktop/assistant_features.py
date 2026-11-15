@@ -396,6 +396,18 @@ FEATURES = FEATURES + (
          "Use Next and Back (or the arrow keys); Skip intro closes it."),
         "", "The ? button at the top right.", "Settings", "A short tour of Game Grave."),
     Feature(
+        "tune", "Make it run better",
+        ("make it run better", "make my game run better", "run better", "more fps", "better fps", "improve fps",
+         "smoother", "less stutter", "tune my game", "best settings"),
+        "Make it run better (in Soulbind) tests changes on your own PC: you play two minutes, Game Grave tries the Game "
+        "Optimizer changes, you play two minutes again, and it keeps them only if the measured frame rate improved.",
+        ("Open Ready Room, then Soulbind, and press Make a game run better (or right-click a game in Games).",
+         "The first time, get Intel's free PresentMon (checked download); it measures frame times.",
+         "Start the game, press Record before and keep playing the same kind of scene for two minutes.",
+         "Press Try the changes, then Record after. Keep or Put back, as the measurement suggests."),
+        "It never claims a gain it didn't measure, and Put back restores your previous Windows settings.",
+        "Ready Room, Soulbind.", "Ready Room", "A measured before/after test of performance changes."),
+    Feature(
         "game_night", "Game Night",
         ("game night", "what can we play", "what should we play together", "play together", "games in common",
          "games we both have", "games my friends have", "co-op games we own"),
@@ -439,7 +451,7 @@ _GUIDES = {
     "other_storage": ("tab:Other Storage", "scan other storage"), "captures": ("tab:Captures", "scan my captures"),
     "games_tab": ("tab:Games", ""), "my_mods": ("tab:Mods", ""), "scan_pc": ("", "scan my games"),
     "never_touch": ("tab:Settings", ""), "welcome_tour": ("tour", ""), "fix_game": ("tab:Fix Kit", "fix my game"),
-    "game_night": ("tab:Ready Room", ""),
+    "game_night": ("tab:Ready Room", ""), "tune": ("tune", ""),
 }
 # Tabs that also hold scan data: "what is in other storage" is a question about the data, so their guide only answers a
 # how-to question ("how do I use other storage").

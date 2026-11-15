@@ -99,8 +99,16 @@ class SoulbindBody(QWidget):
         tools.addWidget(self.copy_button)
         tools.addWidget(self.import_button)
         tools.addStretch()
+        self.tune_button = button("Make a game run better…", self.open_tune, kind="primary",
+                                  tip="Play two minutes, try changes, play two minutes again. Game Grave measures both runs "
+                                      "and keeps the changes only if they helped.")
+        tools.addWidget(self.tune_button)
         box.addLayout(tools)
         return box
+
+    def open_tune(self):
+        from gg_desktop import tune_ui
+        tune_ui.open_tune(self.window_owner)
 
     @staticmethod
     def _control(pref):
