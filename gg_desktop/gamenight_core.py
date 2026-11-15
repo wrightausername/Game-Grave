@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 CODE_PREFIX = "GGGN1-"
 MAX_GAMES = 600
 MAX_FRIENDS = 8
+CHAT_LIMIT = 1900          # a Discord message holds 2,000 characters
 FRIENDS_KEY = "game_night_friends"
 NAME_KEY = "game_night_name"
 # Steam store category ids

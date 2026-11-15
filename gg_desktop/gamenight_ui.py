@@ -43,7 +43,10 @@ class GameNightBody(QWidget):
         self.paste_button = button("Paste a friend's code", self.paste_code,
                                    tip="Reads a Game Night code from the clipboard, even inside a whole chat message.")
         self.clear_button = button("Remove friends", self.clear_friends, kind="actionLink")
-        for control in (self.copy_button, self.paste_button):
+        self.save_button = button("Save as file", self.save_file, kind="actionLink",
+                                  tip="For a big library: a small text file to send instead of a long chat message.")
+        self.open_button = button("Open a code file", self.open_file, kind="actionLink")
+        for control in (self.copy_button, self.paste_button, self.save_button, self.open_button):
             actions.addWidget(control)
         actions.addStretch()
         actions.addWidget(self.clear_button)
@@ -91,7 +94,44 @@ class GameNightBody(QWidget):
         QGuiApplication.clipboard().setText(code)
         self.steps.set(max(self.steps.current, 1))
         self.window_owner.status.setText(f"Game night code copied ({len(games)} games). Paste it in your group chat.")
-        self.who.setText("Copied. Paste it in your group chat; each friend presses Paste a friend's code with it.")
+        long = len(code) > gn.CHAT_LIMIT
+        self.who.setText(("Copied, but it is " + f"{len(code):,} characters, longer than one Discord message. Use Save as "
+                          "file and send the file instead." if long else
+                          "Copied. Paste it in your group chat; each friend presses Paste a friend's code with it."))
+
+    def save_file(self):
+        from PySide6.QtWidgets import QFileDialog
+        name = self._my_name()
+        games = list(getattr(self.window_owner.inventory, "games", []) or [])
+        if not name or not games:
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Save game night code", f"{name} game night.txt", "Text (*.txt)")
+        if not path:
+            return
+        try:
+            with open(path, "x", encoding="utf-8") as handle:     # never over an existing file
+                handle.write(gn.make_code(name, games) + "\n")
+        except FileExistsError:
+            self.window_owner.info("Not saved", "A file with that name already exists. Pick another name.")
+            return
+        except OSError as problem:
+            self.window_owner.error("Not saved", str(problem))
+            return
+        self.steps.set(max(self.steps.current, 1))
+        self.who.setText("Saved. Send the file in your group chat; friends press Open a code file.")
+
+    def open_file(self):
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(self, "Open a game night code", "", "Text (*.txt);;All files (*)")
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                text = handle.read(2_000_000)
+        except OSError as problem:
+            self.window_owner.error("Could not open it", str(problem))
+            return
+        self.paste_code(text)
 
     def paste_code(self, text=None):
         text = text if isinstance(text, str) else QGuiApplication.clipboard().text()
