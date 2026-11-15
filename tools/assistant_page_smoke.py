@@ -191,6 +191,9 @@ def main():
             # Local AI panel: nothing downloaded, so the switch is off and disabled and Download is offered.
             from gg_desktop import local_ai_core as ai
             from gg_desktop import local_ai_ui
+            from gg_desktop import assistant_page
+            assistant_page.show_side(window, True)    # Local AI, Automation and Data Used sit behind the Settings button
+            settle()
             w = local_ai_ui.state_of(window).widgets
             assert w is not None and w.get.isVisible() and not w.switch.isEnabled(), "Local AI panel"
             assert "Not downloaded" in w.status.text() and w.combo.count() == 3, w.status.text()

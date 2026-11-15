@@ -388,6 +388,8 @@ class Model:
                           tip="For frameworks other mods need. They stay on in every test."),
                    Button("clear_clues", "Clear Picks", "close", enabled=bool(self.hints or self.always_on)),
                    Button("read_reports", "Read Crash Reports", "scan", enabled=self.reports_state != "reading"),
+                   Button("doctor", "Let Crash Doctor Run The Tests", "play",
+                          tip="Game Grave switches the mods, starts the game and judges each test itself."),
                    Button("start", "Start Finding", "wand", enabled=self.can_start() and not problem, primary=True))
         return Panel("setup", "Find what is crashing", tuple(lines), fields, toggles, buttons)
 

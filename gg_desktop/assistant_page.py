@@ -33,12 +33,9 @@ from gg_desktop.widgets import button, column, label, panel, row
 
 SUBTITLE = "Ask about your games, mods and storage. Answers come from data scanned on this PC."
 ROW_COLORS = ("#30d76b", "#13bcf5", "#f2a5b2", "#f6be24", "#b455ff", "#ff254a")
-WELCOME = ("Ask me about your games, storage, mods, captures or cleanup history. I answer only from what Game Grave "
-           "has already scanned on this PC, I show where each answer came from, and I never change any file.")
-WELCOME_TOOLS = ("Ask me about your games, storage, mods, captures or cleanup history, or ask me to do something, like "
-                 "\"get my PC ready to play\" or \"every Sunday at 9pm clean temp files\". Answers only use what Game Grave "
-                 "has scanned. To do something I show a plan of Game Grave's own tools, and nothing changes until you "
-                 "press Run all.")
+WELCOME = ("Ask about your games, storage, mods or captures. I answer from what Game Grave scanned on this PC, and I "
+           "never change any file.")
+WELCOME_TOOLS = ("Ask a question, or tell me what to do. I show a plan first, and nothing changes until you press Run all.")
 PROMPT_CHIP = ("QPushButton{background:#0f161e;border:1px solid #243243;border-radius:13px;color:#c9d4df;font-size:11px;"
                "padding:0 10px;text-align:left;} QPushButton:hover{border-color:#e5243b;color:#ffffff;}")
 PILL = ("QLabel{{color:{0};background:{1};border:1px solid {0};border-radius:10px;padding:2px 9px;font-size:11px;"
@@ -281,7 +278,14 @@ def build(window):
                                 tip="Limit answers to one game, or all games")
     self.assistant_scope.setFixedHeight(28)
     top.addWidget(self.assistant_scope)
-    top.addWidget(tool("Clear Chat", "refresh", lambda: clear(self), tip="Remove this conversation's saved messages"))
+    clear_button = tool("", "refresh", lambda: clear(self), tip="Clear this chat (removes its saved messages)")
+    clear_button.setAccessibleName("Clear Chat")
+    clear_button.setFixedSize(30, 28)
+    top.addWidget(clear_button)
+    self.assistant_side_button = tool("Settings", "settings", lambda: toggle_side(self),
+                                      tip="Show or hide Local AI, Automation and the data the answers use")
+    self.assistant_side_button.setCheckable(True)
+    top.addWidget(self.assistant_side_button)
     body.addLayout(top)
     self.assistant_scroll = QScrollArea()
     self.assistant_scroll.setWidgetResizable(True)
@@ -306,6 +310,7 @@ def build(window):
         chip_button.setStyleSheet(PROMPT_CHIP)
         prompt_row.addWidget(chip_button)
     body.addWidget(prompt_box)
+    self.assistant_prompts = prompt_box
     compose_box = QFrame()
     compose_box.setObjectName("assistantCompose")
     compose_box.setStyleSheet("QFrame#assistantCompose{background:#0d141c;border:1px solid #263445;border-radius:22px;}"
@@ -338,6 +343,7 @@ def build(window):
     using.addLayout(self.assistant_using)
     using.addStretch()
     body.addWidget(using_box)
+    using_box.hide()      # the sources are listed in Settings > Data Used; one less line under the box
 
     # --- right: data used and what it can do
     used, used_lay = panel(kind="fileFilterPanel", padding=9, spacing=4)
@@ -374,10 +380,28 @@ def build(window):
     right_lay.addWidget(auto, 3)
     right_lay.addWidget(used, 4)
 
-    page.content.addWidget(_split(_split(left, chat, [222, 580]), _detail_scroll(right), [802, 232]), 1)
+    side = _detail_scroll(right)
+    self.assistant_side = side
+    page.content.addWidget(_split(_split(left, chat, [222, 580]), side, [802, 232]), 1)
+    show_side(self, bool(self.settings.get(SIDE_KEY, False)))
     page.assistant_ready = True
     refresh(self)
     self.assistant_input.setFocus()
+
+
+SIDE_KEY = "assistant_side_open"
+
+
+def show_side(window, on):
+    window.assistant_side.setVisible(on)
+    window.assistant_side_button.setChecked(on)
+    window.assistant_side_button.setText("Hide settings" if on else "Settings")
+
+
+def toggle_side(window):
+    on = not window.assistant_side.isVisible()
+    show_side(window, on)
+    save(window, dict(window.settings, **{SIDE_KEY: on}))
 
 
 def engine_limit():
@@ -462,6 +486,9 @@ def render_chat(window, layout=None, title=None, scroll=None, compact=False):
     clear_messages(window, layout)
     chat = current_chat(window)
     title.setText(chat["title"] if chat and chat["messages"] else "New chat")
+    prompts = getattr(window, "assistant_prompts", None)
+    if layout is window.__dict__.get("assistant_messages") and prompts is not None and isValid(prompts):
+        prompts.setVisible(bool(chat and chat["messages"]))    # an empty chat already shows the suggestion cards
     if not chat or not chat["messages"]:
         from gg_desktop import autopilot_ui
         layout.addWidget(welcome_hero(window, WELCOME_TOOLS if autopilot_ui.enabled(window) else WELCOME, compact))
@@ -502,19 +529,20 @@ def welcome_hero(window, text, compact=False):
     words.setTextFormat(Qt.PlainText)
     words.setAlignment(Qt.AlignCenter)
     words.setStyleSheet("color:#aab6c3;font-size:12px;")
-    words.setMaximumWidth(560)
-    box.addWidget(words, 0, Qt.AlignHCenter)
+    words.setMinimumWidth(0)
+    box.addWidget(words)
     grid = QGridLayout()
     grid.setHorizontalSpacing(8)
     grid.setVerticalSpacing(8)
-    columns = 1 if compact else 3
+    columns = 1 if compact else 2
     for n, (symbol, name, question) in enumerate(SUGGESTIONS):
         card = QPushButton()
         card.setObjectName("assistantSuggestion")
         card.setCursor(Qt.PointingHandCursor)
         card.setAccessibleName(name)
         card.setToolTip(question)
-        card.setMinimumHeight(58)
+        card.setMinimumHeight(64)
+        card.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Minimum)
         card.setStyleSheet("QPushButton#assistantSuggestion{background:#0d141c;border:1px solid #213040;border-radius:12px;"
                            "text-align:left;padding:8px 12px;} QPushButton#assistantSuggestion:hover{border-color:#e5243b;"
                            "background:#13101a;}")
@@ -525,7 +553,7 @@ def welcome_hero(window, text, compact=False):
         glyph.setAttribute(Qt.WA_TransparentForMouseEvents)
         inner.addWidget(glyph, 0, Qt.AlignTop)
         texts = column(spacing=1)
-        head = label(name, "detailValue")
+        head = label(name, "detailValue", wrap=True)
         head.setStyleSheet("font-weight:700;color:#f2f5f8;font-size:12px;")
         example = label("\u201c" + question + "\u201d", "caption", wrap=True)
         example.setStyleSheet("color:#8d9aa8;font-size:11px;")

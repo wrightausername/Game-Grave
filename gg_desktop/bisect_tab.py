@@ -200,6 +200,10 @@ def act(window, control, key):
     elif key == "clear_clues":
         model.clear_hints()
         model.clear_always_on()
+    elif key == "doctor":
+        from gg_desktop import crashdoctor_ui
+        game = next((g for g in window.inventory.games if model.profile and g.name == model.profile.game_name), None)
+        crashdoctor_ui.open_doctor(window, game)
     elif key == "read_reports":
         start_reports(window, control, model)
     elif key == "build":

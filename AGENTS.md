@@ -859,3 +859,37 @@ automation rules and every confirmation are unchanged.
   ("ask again"). "No / cancel" changes nothing and says so. With nothing offered, it says what it can do instead of guessing.
 - Covered by `tests/test_followup.py`, `tools/autopilot_smoke.py` ("proceed" turns on and plans, "yes go ahead" runs with the
   confirmation) and `tools/assistant_page_smoke.py`.
+- Simpler again (owner, 2026-11-15: "the AI chat box needs to be easy to follow and read on the eyes and simple"): a short
+  welcome, the right-hand column (conversations, Local AI, automation) hidden behind a "Settings" toggle in the chat header
+  (remembered as `assistant_side_open`), the "Answers use" row hidden, prompt chips only once a chat has messages, suggestion
+  cards in two wrapping columns, and an icon-only Clear Chat, so the page has no sideways scroll at 960 pixels.
+
+Crash Doctor (owner instructions, 2026-11-15: "implement crash doctor not just with organizer 2 but with vortex... and a way to
+not have to use either"):
+- Lives inside Mod Bisect, not as a new tool: the Fix Kit's Mod Bisect card has a "Crash Doctor" button, Mods > Bisect setup has
+  "Let Crash Doctor Run The Tests", and the assistant knows it ("which mod is crashing my game"). It runs the same Bisect
+  engine (`bisect_flow.Flow`) the owner answers by hand; it only answers for them.
+- `crashdoctor_core.py` (pure, tested) and `crashdoctor_ui.py` (window and timer loop). Three ways to switch mods, picked per
+  game, only those that exist are offered:
+  - Mod Organizer 2: units are the profile's enabled mods; each test writes only the Bisect test copy of the profile
+    (`bisect_apply.make_copy` / `write_test`), never the real profile. MO2 is started with `-p <copy> moshortcut://:<title>`
+    using its own executable list (script-extender loaders first). Refused while MO2 is open.
+  - Vortex: units are mods from `vortex.deployment*.json` (game folder or Data); for a test, files of mods that are off are moved
+    into `_GameGrave_Crash_Doctor_Off` next to them. Paths that leave the game folder are ignored.
+    Vortex's own database is still never edited (the earlier "not done" note stands); only deployed files move, and they are
+    back before Vortex is used again, so it sees no change.
+  - A folder of mods, no manager (Stardew Mods, BepInEx plugins, a Mods folder): each top-level file or folder is one mod; off
+    mods move into `_GameGrave_Crash_Doctor_Off` inside it.
+- New writes the owner asked for: moving mod files into and back out of that holding folder. The confirmation names the game,
+  the method, the mod count, the folder and how the game is started, before anything moves. Every move is written to
+  `crash-doctor.json` first; moving back never overwrites (a clash stays in the holding folder and is named). Nothing is
+  deleted. Stop, closing the window, and the end of the search put everything back. Folders in use are remembered
+  (`crash_doctor_active`); if Game Grave closed mid-test, the next start offers "Put back".
+- Each test: switch, start the game (loader, game exe, Steam link or MO2), wait up to 2 minutes for it to appear, then watch.
+  Closed early, or a Windows crash record for that game since the start, is "crash"; still running after the chosen time (1, 2
+  or 5 minutes) is "fine" and Game Grave closes only the game's own programs (then MO2 it started); never appearing is "not
+  sure". "It only crashes sometimes" repeats a fine test up to the engine's run count. At most 40 launches. Logged as
+  `crash_doctor_start` / `crash_doctor_end`. Best for crashes at start-up or loading; it says so.
+- Covered by `tests/test_crashdoctor.py` (judging, loaders, MO2 executables, folder and Vortex moves on temp folders, never
+  overwriting, confirmation words) and `tools/crashdoctor_smoke.py` (Vortex offered, folder run with a fake game that crashes
+  only with one mod, the report names it, everything back, "Put back" after a closed run).

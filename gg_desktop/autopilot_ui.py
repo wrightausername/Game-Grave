@@ -226,6 +226,10 @@ def open_target(window, target):
         from gg_desktop import fix_kit_page
         fix_kit_page.open_bisect(window)
         return True
+    if target == "doctor":
+        from gg_desktop import crashdoctor_ui
+        QTimer.singleShot(0, lambda: crashdoctor_ui.open_doctor(window))
+        return True
     if target == "tune":
         from gg_desktop import tune_ui
         QTimer.singleShot(0, lambda: tune_ui.open_tune(window))

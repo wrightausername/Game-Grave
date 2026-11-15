@@ -114,6 +114,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         from gg_desktop import comfort          # Back, shortcuts, notifications, paused note, tray
         comfort.install(self, self._top_box, self.bell_button)
         self._comfort_ready = True
+        from gg_desktop import crashdoctor_ui   # mods a closed Crash Doctor run left aside are offered back
+        QTimer.singleShot(1500, lambda: crashdoctor_ui.check_leftovers(self))
         from gg_desktop import search_popup     # results from everything under the top search box
         search_popup.install(self)
         if not reference_preview:

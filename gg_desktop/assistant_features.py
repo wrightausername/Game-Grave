@@ -396,6 +396,18 @@ FEATURES = FEATURES + (
          "Use Next and Back (or the arrow keys); Skip intro closes it."),
         "", "The ? button at the top right.", "Settings", "A short tour of Game Grave."),
     Feature(
+        "crash_doctor", "Crash Doctor",
+        ("crash doctor", "find the mod that crashes", "which mod is crashing", "mod crashing my game", "run the tests for me",
+         "find it while i sleep", "automatic bisect"),
+        "Crash Doctor runs Mod Bisect's tests for you: it switches mods, starts the game, watches whether it crashes, and "
+        "names the mod or pair causing it. Works with Mod Organizer 2, Vortex or a plain folder of mods.",
+        ("Open Fix Kit and press Crash Doctor (or Mods > Bisect > Let Crash Doctor Run The Tests).",
+         "Pick the game, how its mods are switched, how to start it, and how long it must run to count as fine.",
+         "Press Start and leave the PC; each test starts and closes the game by itself.",
+         "At the end it shows which mods cause the crash, and every mod is put back."),
+        "It only moves or switches mods for the test and puts everything back. Best for crashes on start-up or loading.",
+        "Fix Kit, Crash Doctor.", "Fix Kit", "Runs the mod crash tests for you."),
+    Feature(
         "tune", "Make it run better",
         ("make it run better", "make my game run better", "run better", "more fps", "better fps", "improve fps",
          "smoother", "less stutter", "tune my game", "best settings"),
@@ -451,7 +463,7 @@ _GUIDES = {
     "other_storage": ("tab:Other Storage", "scan other storage"), "captures": ("tab:Captures", "scan my captures"),
     "games_tab": ("tab:Games", ""), "my_mods": ("tab:Mods", ""), "scan_pc": ("", "scan my games"),
     "never_touch": ("tab:Settings", ""), "welcome_tour": ("tour", ""), "fix_game": ("tab:Fix Kit", "fix my game"),
-    "game_night": ("tab:Ready Room", ""), "tune": ("tune", ""),
+    "game_night": ("tab:Ready Room", ""), "tune": ("tune", ""), "crash_doctor": ("doctor", ""),
 }
 # Tabs that also hold scan data: "what is in other storage" is a question about the data, so their guide only answers a
 # how-to question ("how do I use other storage").

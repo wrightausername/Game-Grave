@@ -26,8 +26,9 @@ QLabel#fixSection { color: #8C9AA9; font-size: 11px; font-weight: 800; letter-sp
 
 CARDS = (
     ("bisect", "Mod Bisect", "mods",
-     "A game crashes with mods on? Mod Bisect finds the mod causing it, one test launch at a time.",
-     (("Open Mod Bisect", "bisect", True),)),
+     "A game crashes with mods on? Mod Bisect finds the mod causing it. Crash Doctor runs the tests for you, with Mod "
+     "Organizer 2, Vortex or a plain mod folder.",
+     (("Crash Doctor", "doctor", True), ("Open Mod Bisect", "bisect", False))),
     ("kit", "Resurrection Kit", "grave",
      "Back up a whole game: the install, your saves and the load order, so you can bring it back later.",
      (("Set up a kit", "kit_setup", True), ("Restore a game", "kit_restore", False), ("More kit tools", "kit_menu", False))),
@@ -51,6 +52,10 @@ def open_bisect(window):
 
 
 def run(window, key):
+    if key == "doctor":
+        from gg_desktop import crashdoctor_ui
+        crashdoctor_ui.open_doctor(window)
+        return
     if key == "bisect":
         open_bisect(window)
     elif key == "kit_setup":
