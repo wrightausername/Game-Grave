@@ -31,7 +31,7 @@ def main():
         route=getattr(widget,'route',None)
         if route:   # sidebar groups are dropdowns: open the tab's group first, as a person would
             from gg_desktop import nav_rail, nav_groups
-            nav_rail.show_group(widget.window(),nav_groups.group_of(route),animate=False)
+            w=widget.window(); nav_rail.show_groups(w,nav_groups.open_for(route,w.nav_open_groups),animate=False)
             settle()
         QTest.mouseClick(widget,Qt.LeftButton)
         settle()
