@@ -301,6 +301,31 @@ def walkthrough(output):
                 click(button(window, "Open Folder"))
                 assert open_folder.call_args.args[0] == ea.install_path
             passed("Open Folder targets the selected installation")
+            # Where the game's files are: an Open button on the Install Location line, a Saves line when the save
+            # scanner labeled a folder with this exact game, and the right-click menu.
+            from save_discovery import SaveLocation
+            save_dir = root/"Saves"/"Dragon Age"
+            save_dir.mkdir(parents=True)
+            window.inventory.saves = [SaveLocation(ea.name, str(save_dir), "Documents", "Labeled by the save scanner"),
+                                      SaveLocation("Dragon Age Origins", str(root/"other"), "Documents", "Another game")]
+            select(window, ea.key)
+            settle()
+            with patch.object(window, "_open_folder") as open_folder:
+                click(window.game_open_install)
+                assert open_folder.call_args.args[0] == ea.install_path
+                click(window.game_open_saves)
+                assert open_folder.call_args.args[0] == str(save_dir), "Only the folder labeled with this exact game"
+                menu_action(window, "Open install folder  (Ctrl+O)")
+                assert open_folder.call_args.args[0] == ea.install_path
+                menu_action(window, "Open save folder")
+                assert open_folder.call_args.args[0] == str(save_dir)
+                menu_action(window, "Open library folder")
+                assert open_folder.call_args.args[0] == str(Path(ea.install_path).parent)
+                window.game_grid.setFocus()
+                QTest.keyClick(window.game_grid, Qt.Key_O, Qt.ControlModifier)
+                assert open_folder.call_args.args[0] == ea.install_path
+            window.grab().save(str(output/"games-open-places.png"))
+            passed("Install, save and library folders open from the details panel, the right-click menu and Ctrl+O")
             with patch("gg_desktop.reference_screens.QFileDialog.getExistingDirectory", return_value="") as backup:
                 # The existing Save Vault entry opens a chooser; no save is assumed or deleted.
                 click(button(window, "Save Vault"))

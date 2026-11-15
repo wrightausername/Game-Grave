@@ -422,6 +422,28 @@ class GamesActions(LiveGames, GamesController):
             return
         menu = QMenu(self.page)
         menu.setStyleSheet("QMenu {background:#0b1118;color:#e5e8ee;border:1px solid #49535e;} QMenu::item:selected {background:#7d1529;}")
+        from gg_desktop import games_places as places
+        found = places.places(game, getattr(self.window.inventory, "saves", []))
+        install = next((p for p in found if p.label == "Install folder"), None)
+        opener = menu.addAction("Open install folder  (Ctrl+O)",
+                                lambda: install and self.window._open_folder(install.path))
+        opener.setEnabled(install is not None)
+        saves = [p for p in found if p.label == "Save folder"]
+        if len(saves) == 1:
+            menu.addAction("Open save folder", lambda p=saves[0].path: self.window._open_folder(p))
+        elif saves:
+            sub = menu.addMenu("Open save folder")
+            sub.setStyleSheet(menu.styleSheet())
+            for place in saves:
+                sub.addAction(places.short(place.path, 70), lambda p=place.path: self.window._open_folder(p))
+        else:
+            none = menu.addAction("Open save folder (none found yet)")
+            none.setEnabled(False)
+            none.setToolTip("Saves show here once the save scanner labels a folder with this game, or link one in Game DNA.")
+        library = next((p for p in found if p.label == "Library folder"), None)
+        if library is not None:
+            menu.addAction("Open library folder", lambda p=library.path: self.window._open_folder(p))
+        menu.addSeparator()
         menu.addAction("View source evidence", lambda: self.window.info("Game Source Evidence",
             game.install_evidence + "\n\nLauncher: " + game.launcher + "\nSize source: " + game.size_source + "\n" + self.source_text(game, "status") + "\nPlaytime: " + self.source_text(game, "playtime")))
         menu.addAction("Connect game libraries…", self.connections)

@@ -115,6 +115,7 @@ class GamesScreens:
         QShortcut(QKeySequence("Shift+F10"), page, activated=page.games.keyboard_options)
         QShortcut(QKeySequence("Return"), self.game_grid, activated=self._launch_selected_game).setContext(Qt.WidgetShortcut)
         QShortcut(QKeySequence("Enter"), self.game_grid, activated=self._launch_selected_game).setContext(Qt.WidgetShortcut)
+        QShortcut(QKeySequence("Ctrl+O"), self.game_grid, activated=self._open_selected_install).setContext(Qt.WidgetShortcut)
         page.photo_inspector = ResponsiveInspector(page, self.game_details.parentWidget().parentWidget())
         QTimer.singleShot(0, page.games.refresh_sources)
 
@@ -250,6 +251,7 @@ class GamesScreens:
         for item in self.game_details.findChildren(QLabel):
             if item.objectName() == "detailKey":
                 item.setFixedWidth(104)        # "Tracked Playtime" and "Install Location" in full
+        self._add_place_buttons(contents, game)
         actions = row(spacing=5)
         actions.addWidget(tile_action("Game DNA", "dna", lambda: self.page.games.show_dna(game)))
         actions.addWidget(tile_action("Mods", "mods", lambda: self.navigate("Mods")))
@@ -279,6 +281,74 @@ class GamesScreens:
         actions.addWidget(uninstall)
         contents.addWidget(_widget(actions))
         contents.addStretch()
+
+    def _add_place_buttons(self, contents, game):
+        """Open buttons right where the paths are: on the Install Location line, and a Saves line when the save scanner
+        labeled folders with this game."""
+        from PySide6.QtWidgets import QPushButton
+        from gg_desktop import games_places as places
+        install = places.install_place(game)
+        for n in range(contents.count()):
+            row_widget = contents.itemAt(n).widget()
+            keys = [l.text() for l in row_widget.findChildren(QLabel) if l.objectName() == "detailKey"] if row_widget else []
+            if keys == ["Install Location"] and install is not None:
+                opener = QPushButton("Open")
+                opener.setObjectName("placeOpen")
+                opener.setIcon(icon("folder", "#e8eef5", 14))
+                opener.setFixedHeight(24)
+                opener.setCursor(Qt.PointingHandCursor)
+                opener.setToolTip("Open the install folder in File Explorer:\n" + install.path)
+                opener.setAccessibleName("Open install folder")
+                opener.setStyleSheet("QPushButton#placeOpen{padding:0 8px;font-size:11px;border-radius:6px;"
+                                     "background:#1a2633;border:1px solid #2e4154;color:#e8eef5;}"
+                                     "QPushButton#placeOpen:hover{border-color:#ff3b57;}")
+                opener.clicked.connect(lambda _=False, p=install.path: self._open_folder(p))
+                row_widget.layout().addWidget(opener)
+                self.game_open_install = opener
+                at = n + 1
+                saves = places.save_places(game, getattr(self.inventory, "saves", []))
+                if saves:
+                    detail_line_at = contents.count()
+                    detail_line(contents, "storage", "Saves", ("1 folder" if len(saves) == 1 else f"{len(saves)} folders"))
+                    line = contents.takeAt(detail_line_at).widget()
+                    contents.insertWidget(at, line)
+                    save_open = QPushButton("Open")
+                    save_open.setObjectName("placeOpen")
+                    save_open.setIcon(icon("folder", "#e8eef5", 14))
+                    save_open.setFixedHeight(24)
+                    save_open.setCursor(Qt.PointingHandCursor)
+                    save_open.setStyleSheet(opener.styleSheet())
+                    save_open.setAccessibleName("Open save folder")
+                    save_open.setToolTip("Open " + ("the save folder" if len(saves) == 1 else "a save folder") +
+                                         " the save scanner labeled with this game:\n" + "\n".join(p.path for p in saves))
+                    save_open.clicked.connect(lambda _=False, g=game: self._open_saves(g, save_open))
+                    for key in line.findChildren(QLabel):
+                        if key.objectName() == "detailKey":
+                            key.setFixedWidth(104)
+                    line.layout().addWidget(save_open)
+                    self.game_open_saves = save_open
+                break
+
+    def _open_saves(self, game, anchor=None):
+        from PySide6.QtWidgets import QMenu
+        from gg_desktop import games_places as places
+        saves = places.save_places(game, getattr(self.inventory, "saves", []))
+        if len(saves) == 1:
+            self._open_folder(saves[0].path)
+            return
+        menu = QMenu(self)
+        menu.setStyleSheet("QMenu {background:#0b1118;color:#e5e8ee;border:1px solid #49535e;} QMenu::item:selected {background:#7d1529;}")
+        for place in saves:
+            menu.addAction(places.short(place.path, 70), lambda p=place.path: self._open_folder(p))
+        menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()) if anchor is not None else self.cursor().pos())
+        menu.deleteLater()
+
+    def _open_selected_install(self):
+        game = self._current_game()
+        from gg_desktop import games_places as places
+        place = places.install_place(game) if game is not None else None
+        if place is not None:
+            self._open_folder(place.path)
 
     def _toggle_favorite(self, game):
         values = set(self.settings.get("desktop_favorites", []))

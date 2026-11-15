@@ -704,3 +704,13 @@ is on) and the Ctrl+Shift+A shortcut. No tab layout changes (a header button did
   stay in step (`autopilot_ui.cards_of`). Asking from the pop-out never switches the main window's tab.
 - Covered by the pop-out part of `tools/autopilot_smoke.py` (open from the top bar, follows the tab, this-tab question, a plan run
   from the pop-out, pin saved, position saved, Ctrl+Shift+A toggle).
+
+Games, go straight to the files (owner instruction, 2026-11-14: "in the games tab there needs to be an option to go straight to
+where the games / files are stored"). Games is reopened for this only.
+- `gg_desktop/games_places.py` (pure, `tests/test_games_places.py`): only proven places: the install folder the launcher reported
+  (when the record allows opening it), the library folder holding it, and save folders the save scanner labeled with this exact
+  game name (never a similar name).
+- The details panel's Install Location line has an Open button; a Saves line with its own Open button (a menu when there are
+  several) appears when such save folders exist. The right-click menu starts with Open install folder (Ctrl+O), Open save folder
+  (disabled with a hint when none is known) and Open library folder. The bottom Open Folder action stays. Opening changes nothing.
+- Covered by `tools/games_triple_check.py` (Open buttons, menu entries, Ctrl+O, the exact-name save rule).
