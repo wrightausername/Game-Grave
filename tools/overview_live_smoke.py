@@ -288,7 +288,8 @@ def main():
             wait_for(lambda:not window.workers)
             assert scanner.call_count==scans and len(saved)==saves,"Save with nothing changed must not rescan"
             def add_and_save(dialog):
-                with patch("gg_desktop.reference_overview.QFileDialog.getExistingDirectory",return_value=str(steam_root)):
+                (root/"Steam2"/"steamapps").mkdir(parents=True,exist_ok=True)
+                with patch("gg_desktop.reference_overview.QFileDialog.getExistingDirectory",return_value=str(root/"Steam2")):
                     click(dialog,"Add Folder…")
                 dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.Save).click()
             drive_dialog(window.open_scan_locations,add_and_save)
