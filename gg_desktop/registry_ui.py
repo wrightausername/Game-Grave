@@ -119,6 +119,8 @@ class RegistryTab(QWidget):
             fixable = cat != "review"
             if fixable:
                 top.setFlags(top.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsAutoTristate)
+            else:                                  # review only: no tick box at all
+                top.setFlags(top.flags() & ~Qt.ItemIsUserCheckable)
             self.tree.addTopLevelItem(top)
             for f in items:
                 where = f.full_key + ("" if f.value is None else f"  [{f.value or '(Default)'}]")
@@ -130,6 +132,7 @@ class RegistryTab(QWidget):
                     child.setFlags(child.flags() | Qt.ItemIsUserCheckable)
                     child.setCheckState(0, Qt.Checked if f.ident in ticked else Qt.Unchecked)
                 else:
+                    child.setFlags(child.flags() & ~Qt.ItemIsUserCheckable)
                     child.setForeground(0, Qt.gray)
                     child.setText(1, f"{f.target}  ({f.note})" if f.note else f.target)
                 top.addChild(child)
