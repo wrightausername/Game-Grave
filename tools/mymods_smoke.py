@@ -150,7 +150,7 @@ def main():
 
             stage("opens on My Mods, not the number strip")
             assert view.isVisible() and not any(w.isVisible() for w in window.mymods_advanced), "My Mods is the default"
-            assert view.game_pick.count() == 2, [view.game_pick.itemText(i) for i in range(view.game_pick.count())]
+            assert view.game_pick.count() == 4, [view.game_pick.itemText(i) for i in range(view.game_pick.count())]
             assert "Mod Organizer 2" in view.game_pick.currentText()
             wait_for(lambda: view.report is not None and not window.workers, "the profile was read")
             assert view.title.text() == "Skyrim Special Edition"
