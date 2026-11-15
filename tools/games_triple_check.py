@@ -158,6 +158,10 @@ def walkthrough(output):
             records = list(window.page.games.records)
             for index, handler in enumerate(window.page.games.metric_filters):
                 cell = window.game_metrics.values[index].parentWidget()
+                if not window.game_metrics.cells[index].isVisible():
+                    assert int(window.game_metrics.values[index].text()) == 0, "a launcher with games was hidden"
+                    passed("Launcher with no games is hidden: " + str(handler.bucket))
+                    continue
                 # Click the number label itself: all parts of each card must respond.
                 click(window.game_metrics.values[index])
                 expected = [game for game in records if handler.bucket is None or launcher_bucket(game.launcher) == handler.bucket]
@@ -188,12 +192,19 @@ def walkthrough(output):
                 else:
                     assert window._shown_games
                 passed("Library tab: " + name)
-            for name, control in window.game_chips.buttons.items():
-                click(control)
-                if name.startswith(("Updates", "Not Installed")):
-                    assert not window._shown_games and window.game_empty.isVisible()
-                passed("Library chip: " + name)
-            click(next(control for name, control in window.game_chips.buttons.items() if name.startswith("All Games")))
+            assert not window.game_chips.isVisible(), "one row of tabs, no second chip row"
+            installed = window.game_tabs.buttons["Installed"]
+            assert installed.text().startswith("Installed (") or installed.text() == "Installed", installed.text()
+            assert "(" in window.game_tabs.buttons["Library"].text() or window.game_tabs.buttons["Library"].width() < 90
+            click(next(b for b in window.page.findChildren(QPushButton) if b.text() == "Filters"))
+            assert window.game_filter_box.isVisible() and window.game_filter.isVisible()
+            window.game_large.setChecked(True)
+            assert all(g.size_bytes is not None and g.size_bytes >= 100 * 1024 ** 3 for g in window._shown_games)
+            passed("Filters: only large games")
+            window.game_large.setChecked(False)
+            assert len(window._shown_games) == 13
+            assert window.game_library_options.text() == "Library options" and window.game_library_options.isVisible()
+            passed("Library options is a visible, named button")
             for order in ("Name A to Z", "Launcher", "Largest known size", "Smallest known size", "Recently played", "Oldest played"):
                 window.game_sort.setCurrentText(order)
                 rows = window._shown_games

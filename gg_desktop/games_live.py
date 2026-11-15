@@ -90,7 +90,8 @@ class LiveGames:
     def values(self, game):
         facts = self.fact(game)
         played = self.last_played(game)
-        return dict(status=self.status_text(game), playtime=duration(facts.get("display_playtime", 0)),
+        seconds = facts.get("display_playtime", 0) or 0
+        return dict(status=self.status_text(game), playtime=duration(seconds) if seconds else "Not tracked yet",
                     last_played="Playing now" if game.key in self.tracker.ledger.active else age_text(played) if played else "Not yet recorded",
                     updates=facts.get("update_label") or "Managed by " + game.launcher)
 
@@ -139,13 +140,37 @@ class LiveGames:
                   "Not Installed": sum(self.fact(game).get("owned", False) and not self.is_installed(game) for game in self.records),
                   "Updates": sum(self.fact(game).get("update_available") is True for game in self.records),
                   "Favorites": sum(self.is_favorite(game) for game in self.records)}
+        unknown = sum(self.is_installed(game) and self.fact(game).get("update_available") is None for game in self.records)
         for name, control in self.window.game_chips.buttons.items():
             category = name.split(" (")[0]
             if category in values:
-                unknown = sum(self.is_installed(game) and self.fact(game).get("update_available") is None for game in self.records) if category == "Updates" else 0
-                control.setText(f"{category} ({values[category]}{'+' if unknown else ''})")
-                if category == "Updates":
-                    control.setToolTip(f"{values[category]} updates reported; {unknown} installations are managed by their launcher.")
+                control.setText(f"{category} ({values[category]})")
+        # One row of tabs carries the counts ("Installed (10)"); the full words stay in the tooltip.
+        tab_values = dict(values, **{"Library": values["All Games"],
+                                     "Recently Played": sum(self.last_played(game) is not None for game in self.records)})
+        fitter = getattr(metrics, "_games_fitter", None)
+        if fitter is not None:
+            fitter.counts = {name: tab_values[name] for name in self.window.game_tabs.buttons if name in tab_values}
+            fitter.apply()
+        updates_tab = self.window.game_tabs.buttons.get("Updates")
+        if updates_tab is not None:
+            updates_tab.setToolTip(f"{values['Updates']} updates reported by launchers that say so. "
+                                   f"{unknown} other installed game{'s are' if unknown != 1 else ' is'} kept up to date by "
+                                   "its launcher, which doesn't tell Game Grave.")
+        # Only launchers you have games from; the rest stay reachable through Filters.
+        cells = [item.widget() for index in range(metrics.layout().count())
+                 if (item := metrics.layout().itemAt(index)).widget() is not None
+                 and item.widget().objectName() == "stripCell"]
+        for index, cell in enumerate(cells):
+            if index == 0:
+                continue
+            bucket = LAUNCHERS[index - 1][0] if index - 1 < len(LAUNCHERS) else None
+            have = bucket is not None and any(launcher_bucket(game.launcher) == bucket for game in self.records)
+            cell.setVisible(have or bucket == self.bucket)
+            at = metrics.layout().indexOf(cell) - 1          # the divider in front of this cell
+            divider = metrics.layout().itemAt(at).widget() if at >= 0 else None
+            if divider is not None and divider.objectName() == "metricDivider":
+                divider.setVisible(cell.isVisibleTo(metrics))
         selected = self.window.game_filter.currentText()
         combo = self.window.game_filter
         combo.blockSignals(True)

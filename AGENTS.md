@@ -993,3 +993,12 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
     confirmation and verification are unchanged.
   - The live header shows the Ready Room symbol like every other tab.
   - Covered by the Ready Room tests and `tools/ready_room_live_smoke.py` (the save picker offers the scanned folder).
+- Games (all six approved):
+  - One row of tabs with counts ("Installed (10)", kept whole by `games_fit` with the count after the words); the second chip
+    row is hidden (its buttons still exist for the counts code).
+  - Filters opens one panel: Launcher and "Only large games (100 GB or more)".
+  - The launcher strip shows only launchers you have games from (and the one being filtered); the dividers follow.
+  - "Updates (N)" without "+"; the hover text says the other installed games are kept up to date by their launchers.
+  - Playtime reads "Not tracked yet" instead of "0s" when nothing was recorded.
+  - "Library options" is a visible, named button in the search row (Connect game libraries, Refresh library data, artwork).
+  - Covered by the updated `tools/games_triple_check.py`.

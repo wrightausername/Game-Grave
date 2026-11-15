@@ -29,6 +29,7 @@ class Fitter(QObject):
         self.strip, self.tabs = strip, tabs
         self.captions = [(caption, caption.text()) for caption in strip.captions]
         self.buttons = [(button, name) for name, button in tabs.buttons.items()]
+        self.counts = {}           # tab name -> count shown after its words ("Installed (10)")
         for button, name in self.buttons:
             button.setAccessibleName(name)
             if not button.toolTip():
@@ -51,8 +52,9 @@ class Fitter(QObject):
                 if caption.text() != wanted:
                     caption.setText(wanted)
             for button, full in self.buttons:
-                wanted = choose(full, TAB_SHORT.get(full, ""), button.fontMetrics().horizontalAdvance(full),
-                                button.width() - TAB_CHROME)
+                count = f" ({self.counts[full]})" if full in self.counts else ""
+                wanted = choose(full + count, TAB_SHORT.get(full, "") + count if TAB_SHORT.get(full) else "",
+                                button.fontMetrics().horizontalAdvance(full + count), button.width() - TAB_CHROME)
                 if button.text() != wanted:
                     button.setText(wanted)
         except RuntimeError:

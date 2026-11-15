@@ -58,16 +58,33 @@ class GamesScreens:
         searchbar.addWidget(label("View:", "caption"))
         searchbar.addWidget(_view_switch(self.game_grid.set_mode))
         self.game_filter = _combo(["All launchers"] + sorted({g.launcher for g in games}), "Filter by launcher")
-        self.game_filter.setVisible(False)
         preferred = getattr(self, "_pending_launcher_filter", None)
         if preferred:
             idx = self.game_filter.findText(preferred)
             self.game_filter.setCurrentIndex(max(0, idx))
-            self.game_filter.show()
         self._pending_launcher_filter = None
-        searchbar.addWidget(tool("Filters", "filter", lambda: self.game_filter.setVisible(not self.game_filter.isVisible())))
+        def toggle_filters():
+            self.game_filter_box.setVisible(not self.game_filter_box.isVisible())
+        searchbar.addWidget(tool("Filters", "filter", toggle_filters,
+                                 tip="Launcher and size filters. The tabs above pick installed, favourites and more."))
+        self.game_library_options = tool("Library options", "more", lambda: page.games.library_options(),
+                                         tip="Connect game libraries (Epic, GOG, Xbox…), refresh library data and artwork")
+        self.game_library_options.setAccessibleName("Game library options")
+        searchbar.addWidget(self.game_library_options)
         contents.addWidget(_widget(searchbar))
-        contents.addWidget(self.game_filter)
+        from PySide6.QtWidgets import QCheckBox
+        filters = row(spacing=10)
+        filters.addWidget(label("Launcher:", "caption"))
+        self.game_filter.setVisible(True)
+        filters.addWidget(self.game_filter)
+        self.game_large = QCheckBox("Only large games (100 GB or more)")
+        self.game_large.toggled.connect(lambda on: (setattr(self, "_game_chip", "Large" if on else "All Games"),
+                                                    self._fill_games()))
+        filters.addWidget(self.game_large)
+        filters.addStretch(1)
+        self.game_filter_box = _widget(filters)
+        self.game_filter_box.setVisible(bool(preferred))
+        contents.addWidget(self.game_filter_box)
         favorites = set(self.settings.get("desktop_favorites", []))
         self.game_chips = TabStrip([
             (f"All Games ({len(games)})", "game"),
@@ -78,11 +95,9 @@ class GamesScreens:
         ], framed=False)
         library_options = row(spacing=4)
         library_options.addWidget(self.game_chips, 1)
-        self.game_library_options = tool("", "more", page.games.library_options, tip="Library options and account connections")
-        self.game_library_options.setAccessibleName("Game library options")
-        self.game_library_options.setFixedSize(26, 28)
-        library_options.addWidget(self.game_library_options)
-        contents.addWidget(_widget(library_options))
+        chip_row = _widget(library_options)
+        chip_row.hide()          # one row of tabs: the tabs carry the counts, size is in Filters
+        contents.addWidget(chip_row)
         self.game_empty = label("", "emptyState", wrap=True)
         contents.addWidget(self.game_empty)
         contents.addWidget(self.game_grid, 1)
@@ -120,8 +135,9 @@ class GamesScreens:
         QTimer.singleShot(0, page.games.refresh_sources)
 
     def _set_game_tab(self, name):
-        self._game_tab = name
-        self._game_chip = "All Games"
+        self._game_tab = name.split(" (")[0]
+        self._game_chip = "Large" if getattr(self, "game_large", None) is not None and self.game_large.isChecked() \
+            else "All Games"
         self.game_chips.select(next(iter(self.game_chips.buttons)))
         self._fill_games()
 
