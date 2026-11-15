@@ -114,7 +114,8 @@ def main():
             assert window.game_grid.count() == 10
             first = window.game_grid.visualItemRect(window.game_grid.item(0))
             point = window.game_grid.viewport().mapTo(window, first.topLeft())
-            assert 237 <= point.x() <= 251 and 340 <= point.y() <= 360, (point.x(), point.y())
+            # The owner approved one row of tabs (2026-11-15), so the covers start one chip row higher than in the photo.
+            assert 237 <= point.x() <= 251 and 300 <= point.y() <= 320, (point.x(), point.y())
             screenshot(window, "photo-games-functional-1280.png")
             window.global_search.setText("Witcher")
             assert len(window._shown_games) == 1
