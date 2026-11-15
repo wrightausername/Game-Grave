@@ -281,9 +281,11 @@ def build(window):
     top.addWidget(self.assistant_scope)
     top.addWidget(tool("Clear Chat", "refresh", lambda: clear(self), tip="Remove this conversation's saved messages"))
     from gg_desktop import assistant_popout
-    self.assistant_popout_tab_button = tool("Pop out", "maximize", lambda: assistant_popout.open_popout(self),
-                                            tip="Open this chat in its own small window that stays beside any tab "
-                                                "(Ctrl+Shift+A)")
+    self.assistant_popout_tab_button = tool("", "maximize", lambda: assistant_popout.open_popout(self),
+                                            tip="Pop out: open this chat in its own small window that stays beside any "
+                                                "tab (Ctrl+Shift+A)")
+    self.assistant_popout_tab_button.setAccessibleName("Pop out the chat")
+    self.assistant_popout_tab_button.setFixedSize(30, 28)
     top.addWidget(self.assistant_popout_tab_button)
     body.addLayout(top)
     self.assistant_scroll = QScrollArea()
