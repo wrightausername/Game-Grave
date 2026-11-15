@@ -219,6 +219,7 @@ class DoctorDialog(ToolDialog):
                                              profile_key=self.key)
         self.runs = 0
         self.phase = "running"
+        self.gen = getattr(self, "gen", 0) + 1    # timers from an earlier, stopped run are ignored
         self._remember_active(True)
         log_event("crash_doctor_start", f"Crash Doctor started for {game.name} ({switcher.method}, {len(units)} mods)",
                   source="Mod Bisect")
@@ -382,11 +383,19 @@ class DoctorDialog(ToolDialog):
         step = self.flow.step()
         if result == "ok" and getattr(step, "runs", 1) > self.repeat and self.runs < cd.MAX_RUNS:
             self.repeat += 1                          # "only crashes sometimes": run the same test again
-            QTimer.singleShot(3000, lambda: self._start_run(step))
+            QTimer.singleShot(3000, self._later(lambda: self._start_run(step)))
             return
         self.flow.answer(result)
         self._save()                                  # Stop, a closed app or the launch limit can carry on later
-        QTimer.singleShot(3000, self.next_test)      # a moment for files to unlock before the next switch
+        QTimer.singleShot(3000, self._later(self.next_test))      # a moment for files to unlock before the next switch
+
+    def _later(self, fn):
+        gen = self.gen
+
+        def run():
+            if self.phase != "idle" and self.gen == gen:
+                fn()
+        return run
 
     def finish_search(self):
         """The whole search is done (it keeps going after the first cause until every cause is found)."""
