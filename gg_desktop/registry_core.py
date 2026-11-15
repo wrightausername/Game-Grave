@@ -177,8 +177,12 @@ def scan(reg, checks: Checks, progress=None) -> list:
             continue
     seen, unique = set(), []
     for f in found:
-        if f.ident not in seen:
-            seen.add(f.ident)
+        # Some keys (App Paths, SharedDLLs on many PCs) are one key seen through both the 64-bit and the WOW6432Node
+        # path. Listing both would remove it once and then "fail" on the second, so the same entry is kept once.
+        alias = (f.hive, re.sub(r"(?i)\\WOW6432Node\\", lambda _m: "\\", f.key).casefold(),
+                 None if f.value is None else f.value.casefold(), f.target.casefold())
+        if f.ident not in seen and alias not in seen:
+            seen.update((f.ident, alias))
             unique.append(f)
     return unique
 

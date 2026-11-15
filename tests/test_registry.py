@@ -66,6 +66,8 @@ class Scan(unittest.TestCase):
             ("HKLM", U + r"\Sys"): {"values": {"DisplayName": "Hidden", "SystemComponent": "1",
                                                 "UninstallString": r"C:\Program Files\H\u.exe"}},
             ("HKLM", U + r"\NoUninstaller"): {"values": {"DisplayName": "Odd", "UninstallString": "MsiExec.exe /X{1}"}},
+            ("HKLM", r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\SharedDLLs"): {"values": {
+                r"C:\Program Files\Gone\shared.dll": "1"}},
             ("HKLM", r"SOFTWARE\Microsoft\Windows\CurrentVersion\SharedDLLs"): {"values": {
                 r"C:\Program Files\Gone\shared.dll": "1", r"C:\Program Files\Real\unins000.exe": "1"}},
             ("HKCU", r"Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"): {"values": {
@@ -93,6 +95,9 @@ class Scan(unittest.TestCase):
         self.assertIn(("review", "MS Thing"), by)
         self.assertIn(("review", "OldSvc"), by)
         self.assertIn(("shared_dlls", "shared.dll"), by)
+        self.assertEqual(sum(1 for f in found if f.category == "shared_dlls"), 1,
+                         "the same entry seen through WOW6432Node is listed once")
+        self.assertNotIn("WOW6432Node", next(f for f in found if f.category == "shared_dlls").key)
         self.assertNotIn(("shared_dlls", "unins000.exe"), by)
         self.assertIn(("mui_cache", "app.exe"), by)
         self.assertNotIn(("mui_cache", "game.exe"), by)
@@ -135,7 +140,8 @@ class Scripts(unittest.TestCase):
         f = rc.Finding("startup", "HKLM", r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", "Old'Tool", r"C:\Old\t.exe")
         script = rw.elevated_script([f], True)
         self.assertIn("Checkpoint-Computer", script)
-        self.assertIn("Test-Path -LiteralPath 'C:\\Old\\t.exe'", script)
+        self.assertIn("elseif (Test-Path -LiteralPath 'C:\\Old\\t.exe')", script)
+        self.assertIn("Get-ItemProperty", script, "an entry already gone counts as done")
         self.assertIn("-Name 'Old''Tool'", script, "quotes are escaped")
         self.assertIn("Registry::HKEY_LOCAL_MACHINE\\SOFTWARE", script)
 

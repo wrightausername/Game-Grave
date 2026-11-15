@@ -157,12 +157,17 @@ def elevated_script(findings, restore_point):
     for f in findings:
         path = "Registry::" + f.full_key
         if f.action == "delete_key":
+            gone = f"-not (Test-Path -LiteralPath {_ps(path)})"
             change = f"Remove-Item -LiteralPath {_ps(path)} -Recurse -Force -ErrorAction Stop"
         elif f.action == "delete_value":
+            gone = (f"$null -eq (Get-ItemProperty -LiteralPath {_ps(path)} -Name {_ps(f.value)} -ErrorAction "
+                    "SilentlyContinue)")
             change = f"Remove-ItemProperty -LiteralPath {_ps(path)} -Name {_ps(f.value)} -Force -ErrorAction Stop"
         else:
             continue
-        lines.append(f"if (Test-Path -LiteralPath {_ps(f.target)}) {{ $out.kept += {_ps(f.ident)} }} else {{ "
+        # already gone: nothing to do; file came back: leave it; otherwise remove exactly this entry
+        lines.append(f"if ({gone}) {{ $out.done += {_ps(f.ident)} }} "
+                     f"elseif (Test-Path -LiteralPath {_ps(f.target)}) {{ $out.kept += {_ps(f.ident)} }} else {{ "
                      f"try {{ {change}; $out.done += {_ps(f.ident)} }} catch {{ $out.failed += {_ps(f.ident)} }} }}")
     lines.append("$out | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath '__RESULT__' -Encoding UTF8")
     return "\n".join(lines)
@@ -190,6 +195,11 @@ def change_own(findings, exists=os.path.exists):
             continue
         try:
             if f.action == "delete_key":
+                try:
+                    winreg.OpenKey(root, f.key).Close()
+                except FileNotFoundError:
+                    done.append(f.ident)           # already gone
+                    continue
                 _delete_tree(winreg, root, f.key)
             else:
                 with winreg.OpenKey(root, f.key, 0, winreg.KEY_SET_VALUE) as handle:
