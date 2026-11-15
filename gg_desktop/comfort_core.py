@@ -170,3 +170,71 @@ def paused_text(names):
         return ""
     shown = names[0] if len(names) == 1 else f"{names[0]} +{len(names) - 1}"
     return f"Paused while you play {shown}"
+
+
+# ------------------------------------------------------------------ undo right after a removal
+UNDO_MAX = 20   # the Undo Center's own batch limit
+
+
+def record_ids(records):
+    return {r.get("id") for r in records if isinstance(r, dict) and r.get("id")}
+
+
+def new_removals(before, records):
+    """Recycle Bin records added since `before` (a set of ids), newest last. Only records, never a guess from a path."""
+    return [r for r in records if isinstance(r, dict) and r.get("id") and r.get("id") not in before
+            and r.get("state") != "Restored"]
+
+
+def undo_text(rows):
+    """The pop-up line for a removal that just finished."""
+    if not rows:
+        return ""
+    name = os.path.basename(str(rows[0].get("path", "")).rstrip("\\/")) or "1 item"
+    size = sum(max(0, int(r.get("size") or 0)) for r in rows if isinstance(r.get("size"), (int, float)))
+    what = name if len(rows) == 1 else f"{len(rows):,} items"
+    from core import human_size
+    return f"{what} went to the Windows Recycle Bin ({human_size(size)}). Undo puts it back where it was."
+
+
+def undo_confirmation(rows):
+    shown = [str(r.get("path", "")) for r in rows[:UNDO_MAX]]
+    more = len(rows) - len(shown)
+    return ("Put these back from the Windows Recycle Bin to their exact original places?\n\n" + "\n".join(shown) +
+            (f"\n\n{more:,} more are in the Undo Center; restore them there." if more > 0 else "") +
+            "\n\nEach one is checked first. Windows must hold exactly one matching item, and nothing that already "
+            "exists at the original place is overwritten.")
+
+
+# ------------------------------------------------------------------ remember sort and filters per tab
+VIEWS_KEY = "view_memory"
+REMEMBER_PREFIXES = ("Sort ", "Filter ")
+
+
+def remembers(name):
+    """Only sort and filter choices are kept; search text and ticks never are."""
+    return isinstance(name, str) and name.startswith(REMEMBER_PREFIXES)
+
+
+def views_of(settings):
+    value = settings.get(VIEWS_KEY)
+    if not isinstance(value, dict):
+        return {}
+    return {r: {k: v for k, v in kept.items() if isinstance(k, str) and isinstance(v, str)}
+            for r, kept in value.items() if isinstance(r, str) and isinstance(kept, dict)}
+
+
+def remembered(settings, route, name):
+    return views_of(settings).get(route, {}).get(name)
+
+
+def with_view(settings, route, name, value):
+    views = views_of(settings)
+    kept = dict(views.get(route, {}))
+    kept[name[:80]] = str(value)[:80]
+    views[route] = dict(list(kept.items())[-24:])
+    return dict(settings, **{VIEWS_KEY: dict(list(views.items())[-30:])})
+
+
+def without_views(settings):
+    return {k: v for k, v in settings.items() if k != VIEWS_KEY}

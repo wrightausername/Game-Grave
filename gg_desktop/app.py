@@ -74,6 +74,20 @@ class Job(QRunnable):
 
 
 class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWindow):
+    @property
+    def cleaning(self):
+        return self.__dict__.get("_cleaning", False)
+
+    @cleaning.setter
+    def cleaning(self, value):
+        """Every removal sets this flag. Starting notes the Recycle Bin records; finishing offers Undo for new ones."""
+        was = self.__dict__.get("_cleaning", False)
+        self.__dict__["_cleaning"] = bool(value)
+        if "_comfort_ready" not in self.__dict__ or bool(value) == was:
+            return
+        from gg_desktop import comfort
+        (comfort.removal_started if value else comfort.removal_finished)(self)
+
     def __init__(self, *, reference_preview=False):
         super().__init__()
         self.reference_preview = reference_preview
@@ -99,6 +113,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self._create_shell()
         from gg_desktop import comfort          # Back, shortcuts, notifications, paused note, tray
         comfort.install(self, self._top_box, self.bell_button)
+        self._comfort_ready = True
         if not reference_preview:
             from gg_desktop import scan_cache    # the last results stay until the owner scans again
             try:
@@ -342,6 +357,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self._sync_scan_time()
         from gg_desktop import comfort
         comfort.visited(self, route)
+        comfort.remember_views(self, route)
+        QTimer.singleShot(400, lambda r=route: self.current_route == r and comfort.remember_views(self, r))
         from gg_desktop import assistant_popout
         pop = assistant_popout.current(self)
         if pop is not None:

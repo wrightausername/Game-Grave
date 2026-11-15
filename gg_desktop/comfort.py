@@ -478,3 +478,92 @@ def set_start_with_windows(window, on):
     log_event("start_with_windows", ("Added" if on else "Removed") + " Game Grave in HKCU\\" + core.RUN_KEY,
               result="on" if on else "off", source="tray")
     return True
+
+
+
+# ------------------------------------------------------------------ undo right after a removal
+def removal_started(window):
+    """Remember which Recycle Bin records already exist, so the ones a removal adds can be offered back."""
+    try:
+        from recovery import get_records
+        state_of(window).undo_before = core.record_ids(get_records())
+    except Exception:
+        state_of(window).undo_before = None
+
+
+def removal_finished(window):
+    st = state_of(window)
+    before, st.undo_before = getattr(st, "undo_before", None), None
+    if before is None:
+        return
+    try:
+        from recovery import get_records
+        rows = core.new_removals(before, get_records())
+    except Exception:
+        return
+    if not rows:
+        return
+    notify(window, "Moved to the Recycle Bin", core.undo_text(rows), "warn", "tab:Undo Center",
+           action=("Undo", lambda: undo_recent(window, rows)))
+
+
+def undo_recent(window, rows):
+    """Restore through the same checked path as the Undo Center: check each record, restore only AVAILABLE ones."""
+    if window.cleaning or window.scanning:
+        window.info("Game Grave is busy", "Finish the current operation first, then use Undo Center.")
+        return
+    rows = rows[:core.UNDO_MAX]
+    if not window.confirm("Undo this removal?", core.undo_confirmation(rows)):
+        return
+    from recovery import check_restore, restore as restore_recycled
+    from gg_desktop import undo_actions
+    entries = [SimpleNamespace(recovery_id=r["id"], name=os.path.basename(str(r.get("path", ""))) or str(r.get("path", "")),
+                               state="", path=str(r.get("path", ""))) for r in rows]
+    window.cleaning = True
+    window.status.setText("Putting files back through Windows. Each one is checked first.")
+
+    def done(outcome):
+        window.cleaning = False
+        status, value = outcome if isinstance(outcome, tuple) and len(outcome) == 2 else ("ok", outcome)
+        if status == "error":
+            window.error("Undo failed", str(value))
+            return
+        restored = sum(1 for _, code in value if code == "RESTORED")
+        window.status.setText(f"{restored} of {len(value)} put back.")
+        notify(window, "Undo finished", undo_actions.summarize(value).split("\n\n")[0],
+               "good" if restored == len(value) else "warn", "tab:Undo Center")
+        if restored < len(value):
+            window.info("Undo results", undo_actions.summarize(value))
+
+    def work(progress):
+        try:
+            return ("ok", undo_actions.restore(entries, check_restore, restore_recycled))
+        except Exception as exc:
+            return ("error", str(exc))
+    window.job(work, done, error_title="Undo")
+
+
+
+# ------------------------------------------------------------------ remember sort and filters per tab
+def remember_views(window, route=None):
+    """Put back the sort and filter choices last used on this tab, then keep any change. Only lists whose
+    accessible name starts with Sort or Filter are touched, and only to a choice the list still offers."""
+    from PySide6.QtWidgets import QComboBox
+    route = route or getattr(window, "current_route", "")
+    page = getattr(window, "page", None)
+    if not route or not _alive(page):
+        return
+    for combo in page.findChildren(QComboBox):
+        name = combo.accessibleName()
+        if not core.remembers(name) or combo.property("gg_remembered"):
+            continue
+        combo.setProperty("gg_remembered", True)
+        value = core.remembered(window.settings, route, name)
+        if value and value != combo.currentText() and combo.findText(value) >= 0:
+            combo.setCurrentText(value)
+        combo.currentTextChanged.connect(lambda text, r=route, n=name: _keep_view(window, r, n, text))
+
+
+def _keep_view(window, route, name, text):
+    if text:
+        _save(window, core.with_view(window.settings, route, name, text))

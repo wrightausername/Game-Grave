@@ -76,3 +76,45 @@ class ScrubOtherProfiles(unittest.TestCase):
         self.assertIn(r"C:\Users\<user>\Downloads", out)
         self.assertIn(r"C:\Users\Public", scrub(r"C:\Users\Public\Games", home="", user=""))
 
+
+
+class UndoAfterRemoval(unittest.TestCase):
+    def test_only_new_records_are_offered(self):
+        from gg_desktop import comfort_core as c
+        old = [{"id": "a", "path": r"C:\Games\old.txt", "size": 5}]
+        new = old + [{"id": "b", "path": r"D:\Mods\big.zip", "size": 2048}, {"id": "c", "path": r"D:\x", "state": "Restored"}]
+        rows = c.new_removals(c.record_ids(old), new)
+        self.assertEqual([r["id"] for r in rows], ["b"])
+        self.assertIn("big.zip went to the Windows Recycle Bin", c.undo_text(rows))
+        self.assertEqual(c.undo_text([]), "")
+        self.assertIn("2 items", c.undo_text(rows * 2))
+
+    def test_confirmation_names_paths_and_limit(self):
+        from gg_desktop import comfort_core as c
+        rows = [{"id": str(i), "path": f"C:\\f{i}"} for i in range(25)]
+        text = c.undo_confirmation(rows)
+        self.assertIn("C:\\f0", text)
+        self.assertNotIn("C:\\f24", text)
+        self.assertIn("5 more are in the Undo Center", text)
+        self.assertIn("nothing that already exists at the original place is overwritten", text)
+        self.assertNotIn("safe to remove", text.lower())
+
+
+class RememberViews(unittest.TestCase):
+    def test_only_sort_and_filter_kept(self):
+        from gg_desktop import comfort_core as c
+        self.assertTrue(c.remembers("Sort games"))
+        self.assertTrue(c.remembers("Filter by launcher"))
+        self.assertFalse(c.remembers("Search games"))
+        self.assertFalse(c.remembers(None))
+
+    def test_round_trip_and_bounds(self):
+        from gg_desktop import comfort_core as c
+        s = c.with_view({}, "Games", "Sort games", "Name A to Z")
+        self.assertEqual(c.remembered(s, "Games", "Sort games"), "Name A to Z")
+        self.assertIsNone(c.remembered(s, "Mods", "Sort games"))
+        for i in range(40):
+            s = c.with_view(s, f"Tab {i}", "Sort x", "y")
+        self.assertLessEqual(len(c.views_of(s)), 30)
+        self.assertEqual(c.views_of({c.VIEWS_KEY: ["junk"]}), {})
+        self.assertNotIn(c.VIEWS_KEY, c.without_views(s))

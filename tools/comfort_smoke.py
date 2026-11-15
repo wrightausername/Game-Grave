@@ -7,6 +7,7 @@ import argparse
 import os
 import sys
 import tempfile
+import time
 from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
@@ -156,6 +157,51 @@ def main():
             comfort.sync_paused(window)
             assert not window.paused_chip.isVisible()
 
+            # Sort and filters are remembered per tab.
+            window.navigate("Games")
+            settle()
+            window.game_sort.setCurrentText("Name A to Z")
+            settle()
+            window.navigate("Overview")
+            settle()
+            window.navigate("Games")
+            settle()
+            assert window.game_sort.currentText() == "Name A to Z", window.game_sort.currentText()
+            window.game_sort.setCurrentText("Recently played")
+            settle()
+
+            # Undo right after a removal: a new Recycle Bin record pops up with Undo, which asks first and then
+            # checks and restores through the recovery engine (both faked here; nothing on disk moves).
+            import recovery
+            records = [{"id": "old", "path": r"C:\Games\kept.txt", "size": 1}]
+            calls = []
+            with patch.object(recovery, "get_records", lambda: list(records)), \
+                    patch.object(recovery, "check_restore", lambda rid: calls.append(("check", rid)) or "AVAILABLE"), \
+                    patch.object(recovery, "restore", lambda rid: calls.append(("restore", rid)) or "RESTORED"):
+                window.cleaning = True
+                records.append({"id": "new", "path": r"D:\Mods\big.zip", "size": 4096})
+                window.cleaning = False
+                toast = comfort.state_of(window).toast
+                assert toast is not None and toast.isVisible() and getattr(toast, "action_button", None) is not None
+                assert toast.action_button.text() == "Undo"
+                assert window.grab().save(str(args.output / "shell-undo-toast.png"))
+                asked = []
+                with patch.object(type(window), "confirm", lambda self, title, text, **_: asked.append(text) or True):
+                    toast.action_button.click()
+                    for _ in range(100):
+                        settle()
+                        time.sleep(0.05)
+                        if not window.cleaning and calls:
+                            break
+                assert asked and "big.zip" in asked[0] and "overwritten" in asked[0], asked
+                assert calls == [("check", "new"), ("restore", "new")], calls
+                assert "1 of 1 put back" in window.status.text(), window.status.text()
+                # A job that removes nothing adds no record and shows no Undo.
+                comfort.state_of(window).toast = None
+                window.cleaning = True
+                window.cleaning = False
+                assert comfort.state_of(window).toast is None
+
             # Tray: closing hides the window and keeps it running; Quit closes it for real.
             tray = comfort.state_of(window).tray
             if tray is not None:
@@ -175,8 +221,8 @@ def main():
                 window._quitting = True
                 window.close()
             settle()
-    print("PASS: Back, Ctrl+1..9, shortcut list, notification centre with badge and pop-ups, Copy diagnostics, paused "
-          "note and tray behave.")
+    print("PASS: Back, Ctrl+1..9, shortcut list, notification centre with badge and pop-ups, Copy diagnostics, Undo after "
+          "a removal, paused note and tray behave.")
     return 0
 
 

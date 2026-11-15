@@ -315,6 +315,7 @@ def main():
             assert "Protected" in detail_text(window) and "never removed" in detail_text(window), detail_text(window)
             tick(window, "Skyrim")
             info.reset_mock()
+            saved.clear()          # the scan's own "scan finished" notice is saved too; only Protect counts here
             grave_page.protect(window)
             info.assert_called()
             assert not saved, "Settings and saves need no rule and nothing was saved"
