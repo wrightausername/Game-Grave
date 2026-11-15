@@ -177,12 +177,14 @@ def news_status_text(state, games, *, busy=False, failed=False, now=None):
         return ("No official news feed is available for these games. Only Steam publishes one."
                 if others else "Scan your games to follow official Steam news.")
     stamp = last_checked(state)
-    when = "not checked yet" if not stamp else (
+    when = "" if not stamp else (
         "just now" if now - stamp < 60 else f"{int((now - stamp) // 60)} min ago" if now - stamp < 3600
         else datetime.fromtimestamp(stamp).strftime("today %H:%M" if now - stamp < 86400 else "%d %b %H:%M"))
-    text = f"Official Steam news · last checked {when} · updates every 30 minutes while this page is open"
+    checked = f"last checked {when}" if when else "not checked yet"
+    text = f"Official Steam news · {checked} · updates every 30 minutes while this page is open"
     if failed:
-        text = f"Steam could not be reached · showing saved posts · last checked {when}"
+        text = ("Steam couldn't be reached, so saved posts are shown · " + (f"Last checked {when}" if when
+                                                                            else "Not checked yet"))
     non_steam = sum(1 for g in games if getattr(g, "launcher", "Steam") != "Steam")
     if non_steam and not failed:
         text += f" · {non_steam} non-Steam game{'s have' if non_steam != 1 else ' has'} no official feed"

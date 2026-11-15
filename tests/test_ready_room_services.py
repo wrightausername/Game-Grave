@@ -183,7 +183,7 @@ class LocalHistoryTests(unittest.TestCase):
         self.assertEqual(data.games[0].hours, "2 hrs")
         self.assertEqual(data.games[0].status, "Hotfix news")
         self.assertNotIn("Up to date", data.games[0].status)
-        self.assertEqual(data.health_caption, "Local checks")
+        self.assertEqual(data.health_caption, "checks OK")
         self.assertEqual(data.health_score, 100)
         self.assertIn("not verified", data.health_note)
 

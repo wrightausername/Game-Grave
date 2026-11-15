@@ -314,13 +314,14 @@ def action_button(text, action, glyph="", *, primary=False):
 
 
 class HealthGauge(QWidget):
-    def __init__(self, score, *, caption="System Ready", note="", action=None):
+    def __init__(self, score, *, caption="System Ready", note="", action=None, text=""):
         super().__init__()
         self.score = score
+        self.text = text
         self.caption = caption
         self.action = action
         self.setFixedSize(123, 119)
-        self.setAccessibleName(f"{caption}: {score}%" if score is not None
+        self.setAccessibleName(f"{text or str(score) + '%'} {caption}" if score is not None
                                else "System health has not been verified")
         self.setToolTip(note)
         if action:
@@ -361,7 +362,7 @@ class HealthGauge(QWidget):
         font.setWeight(QFont.DemiBold)
         painter.setFont(font)
         painter.drawText(QRectF(9, 36, 107, 37), Qt.AlignCenter,
-                         f"{self.score}%" if self.score is not None else "—")
+                         (self.text or f"{self.score}%") if self.score is not None else "—")
         font.setPixelSize(11)
         font.setWeight(QFont.Normal)
         painter.setFont(font)
@@ -447,11 +448,16 @@ class ReadyRoomContent(ScrollPage):
         hero.setFixedHeight(94)
         hero_row = row(spacing=12, margins=(13, 8, 0, 0))
         hero.setLayout(hero_row)
-        slash = label("/")
-        slash.setStyleSheet("color:#F02640;font-family:Arial;font-weight:700;font-size:52px;")
-        slash.setFixedWidth(21)
-        slash.setAlignment(Qt.AlignTop)
-        hero_row.addWidget(slash)
+        if data_is_reference(data):                      # the locked photo reference keeps its slash
+            slash = label("/")
+            slash.setStyleSheet("color:#F02640;font-family:Arial;font-weight:700;font-size:52px;")
+            slash.setFixedWidth(21)
+            slash.setAlignment(Qt.AlignTop)
+            hero_row.addWidget(slash)
+        else:                                            # like every other tab: its own sidebar symbol
+            mark = icon_label("radio", "#F02640", 40)
+            mark.setAccessibleName("Ready Room")
+            hero_row.addWidget(mark, 0, Qt.AlignTop)
         words = column(spacing=0)
         words.addWidget(label("Ready Room", "readyTitle"))
         words.addWidget(label("Your mission hub for updates, patches, mod alerts, and a\n"
@@ -618,7 +624,8 @@ class ReadyRoomContent(ScrollPage):
                         "No matching updates" if query else "Your watch starts here",
                         "Try another game or keyword." if query else
                         self.data.news_note,
-                        "Open Patch Watch", self.window_owner.ready_updates)
+                        "Open Patch Watch" if self.data.reference else "Refresh",
+                        self.window_owner.ready_updates if self.data.reference else self.window_owner.ready_refresh_news)
         if not games:
             self._empty(self.games.body_layout,
                         "No matching games" if query else "Make room for your games",
@@ -698,7 +705,8 @@ class ReadyRoomContent(ScrollPage):
         card.body_layout.addSpacing(10)
         controls = row(spacing=11)
         controls.addWidget(action_button("View Mods  →", lambda: self.window_owner.navigate("Mods")), 152)
-        controls.addWidget(action_button("Run Mod Scan", self.window_owner.start_scan, "scan", primary=True), 166)
+        controls.addWidget(action_button("Run Mod Scan" if self.data.reference else "Scan for Mods",
+                                         self.window_owner.start_scan, "scan", primary=True), 166)
         card.body_layout.addLayout(controls)
         return card
 
@@ -731,7 +739,8 @@ class ReadyRoomContent(ScrollPage):
         card.body_layout.setContentsMargins(9, 0, 12, 12)
         summary = row(spacing=12)
         summary.addWidget(HealthGauge(self.data.health_score, caption=self.data.health_caption,
-                                      note=self.data.health_note, action=self.window_owner.ready_health_details))
+                                      note=self.data.health_note, action=self.window_owner.ready_health_details,
+                                      text=getattr(self.data, "health_text", "")))
         checks = column(spacing=10, margins=(0, 10, 0, 15))
         checks.setAlignment(Qt.AlignVCenter)
         for title, tone in self.data.health:

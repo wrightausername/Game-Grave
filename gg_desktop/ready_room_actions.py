@@ -407,13 +407,34 @@ class ReadyRoomActions:
         stack.addLayout(controls)
         dialog.exec()
 
+    def _pick_save_folder(self):
+        """Save folders the scan found (labeled with their game) first; "Choose another folder…" opens the picker."""
+        found = []
+        for save in getattr(self.inventory, "saves", []) or []:
+            path = str(getattr(save, "path", "") or "")
+            if path and Path(path).is_dir() and all(path != p for _g, p in found):
+                found.append((str(getattr(save, "game", "") or "Unknown game"), path))
+        found.sort(key=lambda gp: (gp[0].casefold(), gp[1].casefold()))
+        other = "Choose another folder…"
+        if found:
+            from PySide6.QtWidgets import QInputDialog
+            items = [f"{game} saves  ({path})" for game, path in found[:60]] + [other]
+            choice, ok = QInputDialog.getItem(self, "Back up a save folder",
+                                              "Save folders your last scan found. Pick one, or choose another folder:",
+                                              items, 0, False)
+            if not ok:
+                return ""
+            if choice != other:
+                return found[items.index(choice)][1]
+        return QFileDialog.getExistingDirectory(self, "Choose the save folder to back up")
+
     def ready_backup_now(self):
         from save_vault import create_backup
         if self.scanning or self.cleaning:
             self.info("Game Grave is busy", "Finish the current scan or backup first.")
             return
         self.ready_init()
-        source = QFileDialog.getExistingDirectory(self, "Choose exact save / game profile folder to preserve")
+        source = self._pick_save_folder()
         if not source:
             return
         output, _ = QFileDialog.getSaveFileName(self, "Create a NEW verified Save Vault ZIP",

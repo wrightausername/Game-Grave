@@ -65,14 +65,15 @@ class ReadyRoomData:
     reference: bool = False
     health_caption: str = "System Ready"
     health_note: str = "Game integrity and mod compatibility have not been verified."
-    news_note: str = "Refresh public Steam news to connect Patch Watch."
+    news_note: str = "No news yet. Press Refresh to get official Steam news for your games."
+    health_text: str = ""             # "1 of 3" in the ring instead of a percentage (live data only)
 
 
 def live_ready_room(inventory, *, disk_free_percent: float | None = None,
                     session_backups: int = 0, state=None, evidence=None) -> ReadyRoomData:
     """Only values supported by an accepted local inventory or OS disk reading."""
     scanned = bool(inventory.scanned_at)
-    games = tuple(GamePulse(g.name, "— hrs", "Recorded install", "muted", "shield",
+    games = tuple(GamePulse(g.name, "No playtime yet", "No news yet", "muted", "shield",
                             artwork=game_artwork(g.name), key=g.key)
                   for g in inventory.games)
     mod_count = str(len(inventory.mods)) if scanned else "—"
@@ -83,8 +84,8 @@ def live_ready_room(inventory, *, disk_free_percent: float | None = None,
         counts=("—", "—", "—", "—", "—"),
         games=games,
         mod_state="Review mods" if scanned else "Not scanned",
-        mod_note="Open Mod Radar for evidence." if scanned else "Scan your local mod locations.",
-        mod_stats=((mod_count, "Mod locations"), ("—", "Updates available"),
+        mod_note="Open Mods to see them." if scanned else "Scan your PC to find your mods.",
+        mod_stats=((mod_count, "Mod folders"), ("—", "Updates available"),
                    ("—", "Compatibility checks")),
         backup_title=(f"{session_backups} Verified Backup" + ("s" if session_backups != 1 else "")
                       if session_backups else "Backup history unavailable"),
@@ -118,15 +119,15 @@ def live_ready_room(inventory, *, disk_free_percent: float | None = None,
         steam_id = getattr(game, "app_id", "") if getattr(game, "launcher", "") == "Steam" else ""
         minutes = playtimes.get(steam_id)
         latest = next((p for p in patches if p.app_id == steam_id), None)
-        status, tone, glyph = ("Recorded install", "muted", "shield")
+        status, tone, glyph = ("No news yet", "muted", "shield")
         launcher = getattr(game, "launcher", "")
         if launcher and launcher != "Steam":
-            status = "No official feed"
+            status = "Not on Steam, no news feed"
         if latest:
             status = {"update": "Patch news", "hotfix": "Hotfix news", "mod": "Mod news",
                       "maintenance": "Service news", "release": "Release news"}.get(latest.kind, "Game news")
             tone, glyph = latest.tone, latest.glyph
-        hours = f"{minutes / 60:.1f}".rstrip("0").rstrip(".") + " hrs" if minutes is not None else "— hrs"
+        hours = f"{minutes / 60:.1f}".rstrip("0").rstrip(".") + " hrs" if minutes is not None else "No playtime yet"
         games.append(GamePulse(game.name, hours,
                                status, tone, glyph, game_artwork(game.name), game.key))
     connected = bool(state.get("news_checked"))
@@ -139,24 +140,29 @@ def live_ready_room(inventory, *, disk_free_percent: float | None = None,
     health = list(result.health)
     if evidence and scanned:
         total = len(inventory.games)
-        health[1] = ((f"{total} install folders available", "green") if evidence["accessible_games"] == total
-                     else ("Install folder missing", "amber")) if total else ("No game folders to check", "muted")
-        health[2] = ("Scan sources available", "green") if not inventory.warnings else ("Partial scan: review warnings", "amber")
+        health[1] = ((f"{total} game folder{'s' if total != 1 else ''} found", "green")
+                     if evidence["accessible_games"] == total else ("A game folder is missing", "amber")) \
+            if total else ("No game folders to check", "muted")
+        health[2] = ("Scan read everything", "green") if not inventory.warnings else ("Scan couldn't read everything", "amber")
         managers = evidence["manager_count"]
         health[3] = (("Manager folders available", "green") if evidence["accessible_managers"] == managers
-                     else ("Manager folder unavailable", "amber")) if managers else ("No managers detected", "muted")
+                     else ("Mod manager folder missing", "amber")) if managers else ("No mod manager (that's fine)", "muted")
     checked = sum(tone != "muted" for _, tone in health)
     passed = sum(tone == "green" for _, tone in health)
     return replace(result, patches=patches, games=tuple(games), counts=counts,
-                   mod_state=("Needs Review" if alerts else "Reviewed") if evidence else result.mod_state,
-                   mod_note=(f"{alerts} evidence warnings." if alerts else "No association warnings.") if evidence else result.mod_note,
-                   mod_stats=((mod_count, "Mod locations"),
-                              (str(audit.get("enabled_profile_references", 0) + audit.get("disabled_profile_references", 0)), "Profile references") if evidence else ("—", "Profile references"),
-                              (str(alerts), "Review warnings") if evidence else ("—", "Review warnings")),
+                   mod_state=(("No mods found" if not inventory.mods else "Needs a look" if alerts else "Looks fine")
+                              if evidence else result.mod_state),
+                   mod_note=((f"{alerts} thing{'s' if alerts != 1 else ''} to check." if alerts else
+                              "Scan found no mod folders." if not inventory.mods else "Nothing to check.")
+                             if evidence else result.mod_note),
+                   mod_stats=((mod_count, "Mod folders"),
+                              (str(audit.get("enabled_profile_references", 0) + audit.get("disabled_profile_references", 0)), "Mods in profiles") if evidence else ("—", "Mods in profiles"),
+                              (str(alerts), "Things to check") if evidence else ("—", "Things to check")),
                    backup_title=f"{len(available)} Saved Backup" + ("s" if len(available) != 1 else ""),
                    backup_note=("Last backup: " + date_label(max(b["created_at"] for b in available))) if available else "Choose a save folder to back up.",
                    health=tuple(health), health_score=round(passed * 100 / checked) if evidence and scanned and checked else None,
-                   health_caption="Local checks",
+                   health_caption="checks OK",
+                   health_text=f"{passed} of {checked}" if evidence and scanned and checked else "",
                    health_note=f"{passed} of {checked} available local checks passed. "
                                "Folder access is checked; game-file integrity, mod compatibility and running managers are not verified.",
                    news_note=("Cached official Steam posts; news is not an installed-version check." if connected else result.news_note))

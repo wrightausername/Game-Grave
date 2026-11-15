@@ -979,3 +979,17 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
     Files, each with a hover line; the duplicate Scan PC and the misleading "Find Mods" are gone.
   - "Review cleanup in Graveyard" (was "Review Cleanup") is greyed until there is a scan.
   - Covered by the updated `tools/overview_live_smoke.py`.
+- Ready Room (all nine approved, live page only; the photo reference preview keeps its slash and sample wording):
+  - News line: "Steam couldn't be reached, so saved posts are shown · Not checked yet" (no "last checked not checked yet").
+  - Empty Patch Watch: "No news yet. Press Refresh to get official Steam news for your games." with a Refresh button.
+  - At a Glance: "No playtime yet", "No news yet", "Not on Steam, no news feed".
+  - Mod Radar: "No mods found" / "Looks fine" / "Needs a look" with "N things to check"; stats "Mod folders", "Mods in
+    profiles", "Things to check"; "Scan for Mods". Same facts as before.
+  - Health ring shows "N of M" with "checks OK" instead of a percentage; check lines in plain words; "No mod manager (that's
+    fine)" stays out of the count as before.
+  - Soulbind's closed line says how many games can take the preferences and how many settings files Game Grave can read.
+  - Squad Sync's "Use Steam's download command" reads "Get Workshop items through Steam" (same action and hover text).
+  - Backup Now lists the save folders the last scan found ("<game> saves (<path>)") with "Choose another folder…"; the ZIP,
+    confirmation and verification are unchanged.
+  - The live header shows the Ready Room symbol like every other tab.
+  - Covered by the Ready Room tests and `tools/ready_room_live_smoke.py` (the save picker offers the scanned folder).

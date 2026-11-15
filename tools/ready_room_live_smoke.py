@@ -101,8 +101,8 @@ def main():
             settle()
             assert fetch.call_count == 1 and not window._ready_news_busy
             assert window.page.data.counts[0] == "2" and window.page.data.counts[2] == "1" and window.page.data.counts[3] == "1"
-            assert window.page.data.health_caption == "Local checks"
-            assert window.page.data.games[0].hours == "— hrs"
+            assert window.page.data.health_caption == "checks OK"
+            assert window.page.data.games[0].hours == "No playtime yet"
 
             def choose_follow(dialog):
                 choices = dialog.findChild(QListWidget)
@@ -167,6 +167,26 @@ def main():
             assert window.page.data.backup_title == "1 Saved Backup"
             assert len(load_state(store)["backups"]) == 1
             assert save.read_bytes() == b"DISPOSABLE SAVE: MUST REMAIN INTACT"
+
+            # Backup Now offers the save folders the scan found before the folder picker.
+            from dataclasses import replace as _replace
+            from save_discovery import SaveLocation
+            window.inventory = _replace(window.inventory, saves=[SaveLocation("Disposable Game", str(source), "folder", "test")])
+            offered = []
+            second = destination.with_name("Second.zip")
+
+            def pick(_parent, _title, _label, items, *_a, **_k):
+                offered.extend(items)
+                return items[0], True
+            with patch("PySide6.QtWidgets.QInputDialog.getItem", side_effect=pick), \
+                 patch("gg_desktop.ready_room_actions.QFileDialog.getExistingDirectory",
+                       side_effect=AssertionError("the folder picker should not open")), \
+                 patch("gg_desktop.ready_room_actions.QFileDialog.getSaveFileName", return_value=(str(second), "ZIP")), \
+                 patch.object(window, "confirm", return_value=True):
+                next(b for b in window.page.findChildren(QPushButton) if b.text() == "Backup Now").click()
+                wait_for(lambda: not window.cleaning)
+            assert offered[0].startswith("Disposable Game saves") and offered[-1] == "Choose another folder…", offered
+            assert second.is_file(), "backup from the offered save folder was not made"
 
             def check_vault(dialog):
                 assert "VerifiedBackup.zip" in dialog.findChild(QListWidget).item(0).text()

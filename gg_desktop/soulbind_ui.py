@@ -246,10 +246,13 @@ class SoulbindBody(QWidget):
             return f"{chosen} preference{'s' if chosen != 1 else ''} chosen. Scan your PC to see which games it can check."
         waiting = sum(1 for row_ in self.rows if row_[2].tone == "amber")
         if not verifiable:
-            return f"{chosen} preference{'s' if chosen != 1 else ''} chosen. None of your scanned games can be verified yet."
+            return (f"{chosen} preference{'s' if chosen != 1 else ''} chosen. Game Grave can't read the settings file of "
+                    "any of your games yet.")
         if waiting:
-            return f"{waiting} of {len(verifiable)} verifiable game{'s' if len(verifiable) != 1 else ''} can take your preferences."
-        return f"All {len(verifiable)} verifiable game{'s' if len(verifiable) != 1 else ''} already match."
+            return (f"{waiting} game{'s' if waiting != 1 else ''} can take your preferences "
+                    f"(Game Grave can read the settings of {len(verifiable)} of your games).")
+        return (f"All {len(verifiable)} game{'s' if len(verifiable) != 1 else ''} whose settings Game Grave can read "
+                "already match.")
 
     def _game_row(self, game, adapter):
         path = sb.config_file(adapter, self.roots)

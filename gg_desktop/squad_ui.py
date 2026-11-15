@@ -153,7 +153,7 @@ class SquadBody(QWidget):
         self.profile_button = button("Make squad profile…", self.make_profile, kind="actionLink",
                                      tip="Makes a NEW Mod Organizer 2 profile with your friend's mods switched on in your "
                                          "friend's order. Your own profile is never changed.")
-        self.console_button = button("Use Steam's download command", self.steam_console, kind="actionLink",
+        self.console_button = button("Get Workshop items through Steam", self.steam_console, kind="actionLink",
                                      tip="Copies Steam's own workshop_download_item commands and opens Steam's console. "
                                          "Steam decides whether it allows this for the game.")
         fetch.addWidget(self.open_button)

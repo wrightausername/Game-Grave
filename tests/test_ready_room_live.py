@@ -50,7 +50,7 @@ class StatusLineTests(unittest.TestCase):
 
     def test_failure_is_stated_not_hidden(self):
         text = news_status_text({"news_checked": {"1145360": NOW - 7200}}, [STEAM], failed=True, now=NOW)
-        self.assertIn("could not be reached", text)
+        self.assertIn("couldn't be reached", text)
         self.assertIn("saved posts", text)
 
     def test_no_games_asks_for_a_scan(self):
@@ -62,8 +62,8 @@ class GamePulseTests(unittest.TestCase):
         data = live_ready_room(Inventory(games=[STEAM, EPIC], scanned_at="2026-11-08"), state={
             "followed": [], "news": [], "news_checked": {}, "news_warnings": [], "backups": []})
         status = {g.name: g.status for g in data.games}
-        self.assertEqual(status["Fortnite"], "No official feed")
-        self.assertEqual(status["Hades"], "Recorded install")
+        self.assertEqual(status["Fortnite"], "Not on Steam, no news feed")
+        self.assertEqual(status["Hades"], "No news yet")
 
 
 if __name__ == "__main__":
