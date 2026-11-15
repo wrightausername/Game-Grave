@@ -103,8 +103,19 @@ def main():
                         "1234567": {"title": "Metro Station Pack", "preview": "", "updated": 500, "size": 900000, "tags": []}}
         asked = []
 
+        farm = root / "Games" / "Pixel Farm"
+        for name in ("Better Crops", "Fishing Plus"):
+            (farm / "Mods" / name).mkdir(parents=True)
+            (farm / "Mods" / name / "manifest.json").write_text(name)
+        fallout = root / "Games" / "Fallout 4"
+        (fallout / "Data").mkdir(parents=True)
+        (fallout / "Data" / "Armor.esp").write_text("a")
+        (fallout / "Data" / "vortex.deployment.json").write_text(json.dumps(
+            {"files": [{"relPath": "Armor.esp", "source": "Armor Overhaul"}], "targetPath": str(fallout / "Data")}))
         steam = [SteamGame("489830", "Skyrim Special Edition", str(root), str(game), 1000, None, "Unknown"),
-                 SteamGame("255710", "Cities: Skylines", str(steam_root), str(root / "Games" / "Cities"), 1000, None, "Unknown")]
+                 SteamGame("255710", "Cities: Skylines", str(steam_root), str(root / "Games" / "Cities"), 1000, None, "Unknown"),
+                 SteamGame("377160", "Fallout 4", str(root), str(fallout), 1000, None, "Unknown"),
+                 SteamGame("413150", "Pixel Farm", str(root), str(farm), 1000, None, "Unknown")]
         mods = [ModFolder("mods", str(mods_dir), str(manager), "MO2: installed mods", ("MO2 INI: " + str(ini),), 1000, 1,
                           False, "Mod Organizer 2")]
         inventory = Inventory(steam=steam, games=merge_games(steam, []), mods=mods, scanned_at="Disposable mods QA")
@@ -214,6 +225,32 @@ def main():
             view.updates.on_click()
             settle()
             assert view.list.count() == 1, "the Updates card shows only items with a newer version"
+
+            stage("A plain Mods folder: switch off, undo, and Vortex read-only")
+            labels = [view.game_pick.itemText(i) for i in range(view.game_pick.count())]
+            assert "Pixel Farm · Mod folder" in labels and "Fallout 4 · Vortex" in labels, labels
+            view.game_pick.setCurrentIndex(labels.index("Pixel Farm · Mod folder"))
+            settle()
+            assert view.title.text() == "Pixel Farm" and "2 mods, 2 turned on" in view.subtitle.text(), view.subtitle.text()
+            switches = {sw.accessibleName(): sw for sw in view.list.findChildren(Switch)}
+            switches["Fishing Plus on"].click()
+            settle()
+            assert not (farm / "Mods" / "Fishing Plus").exists()
+            assert (farm / "Mods" / "_GameGrave_Turned_Off" / "Fishing Plus" / "manifest.json").is_file()
+            assert "1 off" in view.health.big.text() and view.undo_button.isEnabled(), view.health.big.text()
+            view.undo_button.click()
+            settle()
+            assert (farm / "Mods" / "Fishing Plus" / "manifest.json").is_file(), "Undo moved it back"
+            assert "Off" not in texts(view), "no separate Off label next to the switch"
+            with patch("gg_desktop.crashdoctor_ui.open_doctor") as doctor:
+                view.crash_button.click()
+                assert doctor.call_count == 1 and doctor.call_args[0][1].name == "Pixel Farm", doctor.call_args
+            view.game_pick.setCurrentIndex(labels.index("Fallout 4 · Vortex"))
+            settle()
+            assert "Armor Overhaul" in texts(view) and "Switch it in Vortex" in texts(view), texts(view)
+            assert not view.list.findChildren(Switch), "Vortex mods are read-only"
+            assert (fallout / "Data" / "Armor.esp").is_file()
+            assert window.grab().save(str(args.output / "mods-mymods-folder-1280.png"))
 
             stage("Advanced and back")
             view.advanced_button.click()

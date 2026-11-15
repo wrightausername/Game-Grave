@@ -1002,3 +1002,15 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   - Playtime reads "Not tracked yet" instead of "0s" when nothing was recorded.
   - "Library options" is a visible, named button in the search row (Connect game libraries, Refresh library data, artwork).
   - Covered by the updated `tools/games_triple_check.py`.
+- Mods (approved 1 to 4, with switches for plain mod folders):
+  - My Mods header: "Game crashing? Find the mod" opens Crash Doctor for the game shown.
+  - The separate "Off" label next to a switched-off mod's switch is gone (labels that say something stay).
+  - My Mods also lists games set up with Vortex (read from its deployment list, read-only, "Switch it in Vortex") and games
+    with a plain mod folder found by `crashdoctor_core.find_mod_folder` (Stardew Mods, BepInEx plugins and the like), after
+    Mod Organizer 2 and Workshop games and never for a game already shown through Mod Organizer 2. New write the owner
+    approved: a plain-folder mod's switch moves it into `_GameGrave_Turned_Off` inside the mod folder and back (the same
+    recorded, never-overwriting move as Crash Doctor's Turn it off; nothing deleted); Undo puts the last switch back; logged
+    as mod_toggle. Kept-off mods are not tested by Crash Doctor.
+  - Advanced Library opens on "Mods only", which leaves out the mod manager's own storage folders ("mods", "profiles");
+    "All Types" shows them. A storage folder's main button is Open Folder, never Open in Conflicts.
+  - Covered by `tools/mymods_smoke.py` (folder switch off and Undo, crash button, Vortex read-only).

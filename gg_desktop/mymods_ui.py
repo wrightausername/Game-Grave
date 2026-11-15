@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import hashlib
+from pathlib import Path
 import threading
 import urllib.request
 
@@ -169,6 +170,8 @@ class MyModsView(QWidget):
         self.profile = None
         self.report = None
         self.workshop = []
+        self.loose = None              # Vortex or plain mod folder: LooseMods
+        self.loose_last = None         # (name, was_on) of the last switch in a plain mod folder, for Undo
         self.filter_kind = ""
         self.busy = False
         self._previews = {}
@@ -198,6 +201,10 @@ class MyModsView(QWidget):
         self.profile_pick.setMinimumWidth(140)
         self.profile_pick.currentIndexChanged.connect(self.pick_profile)
         head.addWidget(self.profile_pick)
+        self.crash_button = button("Game crashing? Find the mod", self.find_crash, kind="primary",
+                                   tip="Crash Doctor tests your mods for you and names the one crashing this game. "
+                                       "Every mod is put back at the end.")
+        head.addWidget(self.crash_button)
         self.advanced_button = button("Advanced", lambda: set_mode(window, "advanced"),
                                       tip="The detailed view: load order, profiles, conflicts, cleanup and the "
                                           "crashing-mod finder (Mod Bisect).")
@@ -337,6 +344,8 @@ class MyModsView(QWidget):
         names = {str(getattr(g, "app_id", "")): g.name for g in getattr(window.inventory, "games", [])}
         for app_id in ws.workshop_games(libraries):
             sources.append((f"{names.get(app_id, 'Steam app ' + app_id)} · Steam Workshop", "workshop", (app_id, libraries)))
+        sources += loose_sources(getattr(window.inventory, "games", []), {t.split(" · ")[0].casefold() for t, k, _p in sources
+                                                                            if k == "mo2"})
         self.sources = sources
         self.game_pick.blockSignals(True)
         self.game_pick.clear()
@@ -353,10 +362,10 @@ class MyModsView(QWidget):
 
     def show_empty(self):
         self.title.setText("Your mods")
-        self.subtitle.setText("No Mod Organizer 2 setup or Steam Workshop items found yet.")
+        self.subtitle.setText("No mods found yet.")
         self.profile_pick.hide()
-        self.set_banner("Run Scan PC to find your mods. Mod Organizer 2 and Steam Workshop games show up here; other "
-                        "mod folders are in Advanced.", "info")
+        self.set_banner("Run Scan PC to find your mods. Games set up with Mod Organizer 2, Vortex, Steam Workshop or a "
+                        "Mods folder show up here.", "info")
         self.fix_button.hide()
         for c, big in ((self.health, "Nothing to check yet"), (self.updates, "No updates known"),
                        (self.clashes, "No clashes known")):
@@ -372,6 +381,16 @@ class MyModsView(QWidget):
         window.settings = dict(window.settings, mymods_game=text)
         self.filter_kind = ""
         self.problem_box.hide()
+        self.loose = None
+        if kind in ("vortex", "folder"):
+            self.instance = None
+            self.profile = None
+            self.report = None
+            self.workshop = []
+            self.profile_pick.hide()
+            self.loose = LooseMods(kind, *payload)
+            self.show_loose()
+            return
         if kind == "mo2":
             self.instance = payload
             self.workshop = []
@@ -395,6 +414,10 @@ class MyModsView(QWidget):
 
     # -------------------------------------------------------------- Mod Organizer 2
     def reload(self):
+        if self.loose is not None:
+            self.loose.read()
+            self.show_loose()
+            return
         if self.instance is None:
             if self.sources and self.sources[self.game_pick.currentIndex()][1] == "workshop":
                 self.pick_game(self.game_pick.currentIndex())
@@ -487,8 +510,6 @@ class MyModsView(QWidget):
             lay.addWidget(note(_short(problem), "bad"))
         elif mod.update:
             lay.addWidget(note(f"Update: {mod.version} → {mod.newest}", "warn"))
-        elif mod.kind == "mod" and not mod.enabled:
-            lay.addWidget(note("Off"))
         if mod.kind == "mod":
             from gg_desktop.settings_page import Switch
             switch = Switch(mod.enabled, name=f"{mod.name} on")
@@ -641,6 +662,8 @@ class MyModsView(QWidget):
                 names = {n for f in self.report.problems for n in f.mods + f.fix_mods}
                 rows = [m for m in rows if m.name in names]
             return [m for m in rows if not text or text in m.name.casefold()]
+        if self.loose is not None:
+            return [m for m in self.loose.mods if not text or text in m.name.casefold()]
         rows = list(self.workshop)
         if self.filter_kind == "update":
             rows = [i for i in rows if i.update_waiting]
@@ -659,7 +682,8 @@ class MyModsView(QWidget):
         self.clear_filter.setVisible(bool(self.filter_kind))
         for entry in rows[:3000]:
             item = QListWidgetItem()
-            widget = self.mo2_row(entry) if self.instance is not None else self.ws_row(entry)
+            widget = (self.mo2_row(entry) if self.instance is not None else self.loose_row(entry)
+                      if self.loose is not None else self.ws_row(entry))
             item.setSizeHint(QSize(10, 34 if getattr(entry, "kind", "") == "separator" else 62))
             item.setData(Qt.UserRole, getattr(entry, "name", ""))
             self.list.addItem(item)
@@ -766,6 +790,12 @@ class MyModsView(QWidget):
         _job(self.window_owner, work, done, failed)
 
     def undo(self):
+        if self.loose is not None:
+            if self.loose_last is not None and not self.busy:
+                name, was_on = self.loose_last
+                self.loose_last = None
+                self.loose_toggle(name, was_on, undoing=True)
+            return
         if self.profile is None or self.busy:
             return
         from gg_desktop.bisect_apply import mo2_running
@@ -779,6 +809,99 @@ class MyModsView(QWidget):
                   source="mods")
         self.window_owner.status.setText(f"Undone: {what}.")
         self.reload()
+
+    # -------------------------------------------------------------- crash finder
+    def find_crash(self):
+        """Crash Doctor for the game shown here (or the most recently played modded game when none is)."""
+        from gg_desktop import crashdoctor_ui
+        games = list(getattr(self.window_owner.inventory, "games", []) or [])
+        game = None
+        if self.loose is not None:
+            game = self.loose.game
+        elif self.instance is not None:
+            key = self.game_key(self.instance.game, self.instance.game_path)
+            game = next((g for g in games if g.key == key), None)
+        elif self.sources:
+            name = self.sources[self.game_pick.currentIndex()][0].split(" · ")[0]
+            game = next((g for g in games if g.name.casefold() == name.casefold()), None)
+        crashdoctor_ui.open_doctor(self.window_owner, game)
+
+    # -------------------------------------------------------------- Vortex and plain mod folders
+    def show_loose(self):
+        loose = self.loose
+        game = loose.game
+        self.title.setText(game.name)
+        self.set_game_art(game.name, getattr(game, "key", ""))
+        on = sum(m.on for m in loose.mods)
+        self.fix_button.hide()
+        self.list.setDragDropMode(QAbstractItemView.NoDragDrop)
+        if loose.kind == "vortex":
+            self.subtitle.setText(f"{len(loose.mods)} mods installed with Vortex")
+            self.set_banner("Installed with Vortex. Game Grave lists them here; turn them on or off in Vortex, so Vortex "
+                            "stays in charge of its own list.", "info")
+            self.hint.setText("Read from Vortex's own deployment list in the game folder. Game Grave doesn't change it.")
+            self.undo_button.hide()
+        else:
+            self.subtitle.setText(f"{len(loose.mods)} mods, {on} turned on · {loose.folder}")
+            self.set_banner("No mod manager: each file or folder in the mod folder is one mod. Switching one off moves it "
+                            "into _GameGrave_Turned_Off next to them; nothing is deleted.", "info" if not loose.error else "bad")
+            self.hint.setText("Close the game before switching mods. Undo puts the last switch back.")
+            self.undo_button.setVisible(True)
+            self.undo_button.setEnabled(self.loose_last is not None)
+        if loose.error:
+            self.set_banner(loose.error, "bad")
+        off = len(loose.mods) - on
+        self.health.set(f"{on} turned on" + (f", {off} off" if off else ""), "Every mod Game Grave found here.",
+                        "good", "shield")
+        self.updates.set("Not known", "Vortex and mod folders don't record updates Game Grave can read.", "muted", "download")
+        self.clashes.head.setText("CLASHES")
+        self.clashes.set("Not checked", "Game Grave checks clashes for Mod Organizer 2 setups.", "muted", "warning")
+        self.fill()
+
+    def loose_row(self, mod):
+        frame = QWidget()
+        frame.setAttribute(Qt.WA_TranslucentBackground)
+        lay = row(spacing=12, margins=(14, 8, 14, 8))
+        frame.setLayout(lay)
+        lay.addWidget(tile(mod.name, 40), 0, Qt.AlignVCenter)
+        words = column(spacing=2)
+        name = label(mod.name, "readyDetail")
+        name.setStyleSheet("color:#f4f7fb;font-size:14px;font-weight:700;")
+        words.addWidget(name)
+        sub = label(mod.detail, "caption")
+        sub.setStyleSheet("color:#8394a8;font-size:11px;")
+        words.addWidget(sub)
+        lay.addLayout(words, 1)
+        if self.loose.kind == "vortex":
+            lay.addWidget(note("Switch it in Vortex"))
+        else:
+            from gg_desktop.settings_page import Switch
+            switch = Switch(mod.on, name=f"{mod.name} on")
+            switch.setToolTip("Off moves it into _GameGrave_Turned_Off inside the mod folder; on moves it back. "
+                              "Nothing is deleted, and Undo puts the last switch back.")
+            switch.toggled.connect(lambda on, n=mod.name, s=switch: self.loose_toggle(n, on, s))
+            lay.addWidget(switch)
+        return frame
+
+    def loose_toggle(self, name, on, switch=None, undoing=False):
+        loose = self.loose
+        if loose is None or loose.kind != "folder" or self.busy:
+            return
+        problem = loose.switch(name, on)
+        if problem:
+            if switch is not None:
+                switch.blockSignals(True)
+                switch.setChecked(not on)
+                switch.blockSignals(False)
+            self.window_owner.error("Mod not changed", problem)
+            return
+        log_event("mod_toggle", f"Turned {'on' if on else 'off'} in mod folder {loose.folder}: {name}"
+                  + (" (undo)" if undoing else ""), result="on" if on else "off", source="mods")
+        self.loose_last = None if undoing else (name, not on)
+        self.window_owner.status.setText(f"{name} turned {'on' if on else 'off'}." + ("" if undoing else
+                                                                                    " Undo puts it back."))
+        loose.read()
+        self.show_loose()
 
     # -------------------------------------------------------------- banner
     def set_banner(self, text, tone):
@@ -863,3 +986,74 @@ def set_mode(window, which):
     except (OSError, ValueError):
         pass
     apply_mode(window)
+
+
+# ------------------------------------------------------------------ Vortex and plain mod folders
+class LooseMod:
+    def __init__(self, name, on, detail):
+        self.name, self.on, self.detail = name, on, detail
+
+
+class LooseMods:
+    """A game's mods that aren't in Mod Organizer 2 or the Workshop. Vortex: read from its deployment list, never
+    changed. Plain mod folder: each top-level file or folder is one mod; off ones wait in _GameGrave_Turned_Off (the same
+    move Crash Doctor's "Turn it off" uses, recorded before it happens and never overwriting)."""
+
+    def __init__(self, kind, game, folder=""):
+        self.kind, self.game, self.folder = kind, game, folder
+        self.mods, self.error = [], ""
+        self.read()
+
+    def read(self):
+        from gg_desktop import crashdoctor_core as cd
+        self.error = ""
+        try:
+            if self.kind == "vortex":
+                switcher = cd.VortexSwitcher(self.game.install_path)
+                self.mods = [LooseMod(u.name, True, f"{len(switcher.mods.get(u.key, []))} files deployed")
+                             for u in switcher.units()]
+                return
+            folder = Path(self.folder)
+            hold = cd._Holding(folder, cd.OFF_NAME)
+            present = sorted((p for p in folder.iterdir() if not p.name.startswith((".", "_GameGrave_"))),
+                             key=lambda p: p.name.casefold())
+            off = [rel for rel in hold.moved() if (hold.hold / rel).exists()]
+            self.mods = sorted([LooseMod(p.name, True, "Folder" if p.is_dir() else "File") for p in present] +
+                               [LooseMod(rel, False, "Turned off by Game Grave") for rel in off],
+                               key=lambda m: m.name.casefold())
+        except (cd.DoctorError, OSError) as problem:
+            self.mods, self.error = [], "Couldn't read the mods: " + str(problem)[:200]
+
+    def switch(self, name, on):
+        """Moves one mod out of or back into the mod folder. Returns a problem in words, or ''."""
+        from gg_desktop import crashdoctor_core as cd
+        hold = cd._Holding(Path(self.folder), cd.OFF_NAME)
+        try:
+            done = hold.move_back(name) if on else hold.move_out(name)
+        except OSError as problem:
+            return f"Windows refused to move {name} (is the game still running?): {problem}"
+        if not done:
+            return (f"Something new called {name} is already in the mod folder, so the turned-off copy was left where it "
+                    "is." if on else f"{name} couldn't be moved: it's gone, or a turned-off copy is already there.")
+        return ""
+
+
+def loose_sources(games, mo2_names):
+    """(label, kind, payload) for games with a Vortex deployment list or a known mod folder, skipping games already
+    shown through Mod Organizer 2."""
+    from gg_desktop import crashdoctor_core as cd
+    out = []
+    for game in games:
+        path = getattr(game, "install_path", "")
+        if not path or game.name.casefold() in mo2_names:
+            continue
+        try:
+            if cd.vortex_manifests(path):
+                out.append((f"{game.name} · Vortex", "vortex", (game, "")))
+                continue
+            folder = cd.find_mod_folder(path, game.name)
+        except OSError:
+            continue
+        if folder:
+            out.append((f"{game.name} · Mod folder", "folder", (game, folder)))
+    return out

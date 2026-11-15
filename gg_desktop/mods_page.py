@@ -55,6 +55,12 @@ def build(window, control):
     window._mod_tab_rows = []
     table = window.mod_table
     contents = window.mod_notice.parentWidget().layout()
+    # Mod managers' own storage folders ("mods", "profiles") are not mods: hidden unless "All Types" is picked.
+    window.mod_type.blockSignals(True)
+    window.mod_type.insertItem(0, "Mods only")
+    window.mod_type.setCurrentIndex(0)
+    window.mod_type.setItemData(0, "Every mod, without the mod manager's own storage folders", Qt.ToolTipRole)
+    window.mod_type.blockSignals(False)
     window.mod_profile = _combo(["—"], "Saved mod profile")
     window.mod_profile.currentIndexChanged.connect(lambda *_: profile_changed(window))
     contents.insertWidget(contents.indexOf(window.mod_notice) + 1, window.mod_profile)
@@ -483,7 +489,7 @@ def library_details(window):
                                 ("file", "Version", entry.version), ("help", "Author", entry.author),
                                 ("folder", "Location", entry.path)):
         detail_line(contents, symbol, name, value)
-    if control.findings(entry):
+    if control.findings(entry) and entry.kind == "mod":
         contents.addWidget(tool("Open in Conflicts", "warning", lambda: goto(window, "Conflicts"), kind="primary"))
         contents.addWidget(tool("Open Folder", "folder", lambda: control.open_folder(entry)))
     else:

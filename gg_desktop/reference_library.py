@@ -535,7 +535,8 @@ class LibraryScreens:
                 if (game == "All Games" or game == m.game)
                 and (not managers or m.manager in managers)
                 and (not query or query in (m.name + " " + m.manager + " " + m.game + " " + str(m.record.path)).casefold())
-                and (kind == "All Types" or (kind == "Game folders") == (m.game != "Unverified"))]
+                and (kind in ("All Types", "Mods only") or (kind == "Game folders") == (m.game != "Unverified"))
+                and (kind != "Mods only" or getattr(getattr(m.record, "catalog_entry", None), "kind", "mod") == "mod")]
         rows = mods_sort.sort_views(rows, self.mod_sort.currentText())
         tab = self._mod_tab
         notice = {"Library": "", "Mod Radar": "Read-only source evidence · All detected storage remains protected.",
