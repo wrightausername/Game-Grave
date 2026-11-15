@@ -260,6 +260,55 @@ def main():
             wait_for(lambda: plan.steps[0].status == "done", "the leftover scan")
             assert "scan_leftovers" in opened and plan.steps[0].result.startswith("12 leftover items")
 
+            # Pop the chat out: it stays beside any tab, shares the chat, and knows which tab you're on.
+            from gg_desktop import assistant_popout
+            window.navigate("Games")
+            settle()
+            assert window.assistant_popout_button.isVisible()
+            window.assistant_popout_button.click()
+            settle()
+            pop = assistant_popout.current(window)
+            assert pop is not None and pop.isVisible() and pop.pin.isChecked(), "Opens, kept on top by default"
+            assert "You're on: Games" in pop.where.text(), pop.where.text()
+            pop_text = lambda: " ".join(l.text() for l in pop.scroll.widget().findChildren(QLabel))
+            pop.input.setText("how do I use this tab")
+            QTest.keyClick(pop.input, Qt.Key_Return)
+            settle()
+            assert "Games shows every installed game" in pop_text(), pop_text()[-300:]
+            assert window.current_route == "Games", "Asking from the pop-out never switches the tab"
+            pop.input.setText("clean up temp files")
+            QTest.keyClick(pop.input, Qt.Key_Return)
+            plan = list(ui.state_of(window).plans.values())[-1]
+            wait_for(lambda: plan.steps[0].status == "done", "the check from the pop-out")
+            settle()
+            runs = [b for b in pop.scroll.widget().findChildren(QPushButton) if b.text().startswith("Run all") and b.isVisible()]
+            assert runs, "The plan card is in the pop-out"
+            before = len(cleaned)
+            runs[-1].click()
+            wait_for(lambda: plan.steps[1].status == "done", "the change from the pop-out")
+            assert len(cleaned) == before + 1
+            wait_for(lambda: "All done" in pop_text(), "the result in the pop-out")
+            window.navigate("Hardware")
+            settle()
+            assert "You're on: Hardware" in pop.where.text()
+            pop.resize(480, 700)
+            assert pop.grab().save(str(args.output / "assistant-popout.png"))
+            assert window.grab().save(str(args.output / "assistant-popout-beside-hardware.png"))
+            pop.pin.click()
+            settle()
+            assert saved[-1]["assistant_popout_on_top"] is False
+            pop.close()
+            settle()
+            assert saved[-1].get("assistant_popout_geometry"), "Where it was is remembered"
+            assert assistant_popout.current(window) is None
+            assistant_popout.toggle(window)
+            settle()
+            assert assistant_popout.current(window) is not None and not assistant_popout.current(window).pin.isChecked()
+            assistant_popout.toggle(window)
+            settle()
+            window.navigate("AI Assistant")
+            settle()
+
             # Pause and delete only change the saved routine.
             ui.pause_routine(window, routines[0]["id"])
             assert core.load_routines(saved[-1])[0]["on"] is False

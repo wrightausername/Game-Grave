@@ -187,6 +187,12 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.scan_button.hide()
         topbox.addWidget(tool("", "bell", lambda: self.info("Scan Status", self.status.text() +
             ("\n\n" + "\n".join(self.inventory.warnings) if self.inventory.warnings else "")), kind="chromeButton", tip="Scan status and warnings"))
+        from gg_desktop import assistant_popout
+        self.assistant_popout_button = tool("", "sparkles", lambda: assistant_popout.toggle(self), kind="chromeButton",
+                                            tip="Pop out the AI Assistant so it stays beside any tab (Ctrl+Shift+A)")
+        self.assistant_popout_button.setAccessibleName("Pop out the AI Assistant")
+        topbox.addWidget(self.assistant_popout_button)
+        QShortcut(QKeySequence("Ctrl+Shift+A"), self, activated=lambda: assistant_popout.toggle(self))
         help_button = tool("", "help", lambda: self.open_welcome_tour(), kind="chromeButton",
                            tip="Help: watch the welcome tour of Game Grave")
         help_button.setAccessibleName("Help: watch the welcome tour")
@@ -294,6 +300,11 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         control = self.nav_buttons.get("AI Assistant")
         if control is not None:
             control.setVisible(self.assistant_enabled())
+        if hasattr(self, "assistant_popout_button"):
+            self.assistant_popout_button.setVisible(self.assistant_enabled())
+            pop = getattr(self, "_assistant_popout", None)
+            if pop is not None and not self.assistant_enabled():
+                pop.close()
         from gg_desktop import nav_rail
         nav_rail.sync_groups(self)
 
@@ -324,6 +335,10 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         methods[route]()
         self._name_controls()
         self._sync_scan_time()
+        from gg_desktop import assistant_popout
+        pop = assistant_popout.current(self)
+        if pop is not None:
+            pop.follow(route)
         QTimer.singleShot(400, self._name_controls)   # tables and panels that fill in a moment later
 
     def _name_controls(self):

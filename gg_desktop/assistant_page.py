@@ -9,6 +9,7 @@ from __future__ import annotations
 from gg_desktop.nav_groups import display_name
 
 from types import SimpleNamespace
+import re
 import time
 
 from PySide6.QtCore import QRectF, QSize, Qt, QTimer
@@ -279,6 +280,11 @@ def build(window):
     self.assistant_scope.setFixedHeight(28)
     top.addWidget(self.assistant_scope)
     top.addWidget(tool("Clear Chat", "refresh", lambda: clear(self), tip="Remove this conversation's saved messages"))
+    from gg_desktop import assistant_popout
+    self.assistant_popout_tab_button = tool("Pop out", "maximize", lambda: assistant_popout.open_popout(self),
+                                            tip="Open this chat in its own small window that stays beside any tab "
+                                                "(Ctrl+Shift+A)")
+    top.addWidget(self.assistant_popout_tab_button)
     body.addLayout(top)
     self.assistant_scroll = QScrollArea()
     self.assistant_scroll.setWidgetResizable(True)
@@ -418,37 +424,41 @@ def fill_list(window):
     window.assistant_delete.setEnabled(any(c["messages"] for c in state.chats))
 
 
-def clear_messages(window):
-    layout = window.assistant_messages
+def clear_messages(window, layout=None):
+    layout = layout if layout is not None else window.assistant_messages
     while layout.count():
         item = layout.takeAt(0)
         if item.widget():
             item.widget().deleteLater()
 
 
-def render_chat(window):
-    clear_messages(window)
+def render_chat(window, layout=None, title=None, scroll=None, compact=False):
+    """Draw the current chat into the tab (default) or into another view, such as the pop-out window."""
+    layout = layout if layout is not None else window.assistant_messages
+    title = title if title is not None else window.assistant_title
+    clear_messages(window, layout)
     chat = current_chat(window)
-    window.assistant_title.setText(chat["title"] if chat and chat["messages"] else "New chat")
+    title.setText(chat["title"] if chat and chat["messages"] else "New chat")
     if not chat or not chat["messages"]:
         from gg_desktop import autopilot_ui
-        add_assistant_text(window, WELCOME_TOOLS if autopilot_ui.enabled(window) else WELCOME)
-        if local_ai_ui.show_card(window):
-            window.assistant_messages.addSpacing(6)
-            window.assistant_messages.addWidget(local_ai_ui.setup_card(window))
+        add_assistant_text(window, WELCOME_TOOLS if autopilot_ui.enabled(window) else WELCOME, layout)
+        if local_ai_ui.show_card(window) and not compact:
+            layout.addSpacing(6)
+            layout.addWidget(local_ai_ui.setup_card(window))
     else:
         question = ""
         for message in chat["messages"]:
             if message["role"] == "user":
                 question = message["text"]
-                window.assistant_messages.addWidget(bubble(message["text"]))
+                layout.addWidget(bubble(message["text"]))
             else:
-                add_answer(window, question, engine.answer_from_dict(message.get("answer") or {}), message.get("plan"))
-    window.assistant_messages.addStretch()
-    scroll_down(window)
+                add_answer(window, question, engine.answer_from_dict(message.get("answer") or {}), message.get("plan"),
+                           layout)
+    layout.addStretch()
+    scroll_down(window, scroll)
 
 
-def add_assistant_text(window, text):
+def add_assistant_text(window, text, layout=None):
     line = row(spacing=10, margins=(0, 0, 0, 0))
     holder = QWidget()
     holder.setLayout(line)
@@ -458,10 +468,10 @@ def add_assistant_text(window, text):
     words.setTextFormat(Qt.PlainText)
     words.setStyleSheet("color:#e8eef5;font-size:13px;")
     line.addWidget(words, 1)
-    window.assistant_messages.addWidget(holder)
+    (layout if layout is not None else window.assistant_messages).addWidget(holder)
 
 
-def add_answer(window, question, answer, plan=None):
+def add_answer(window, question, answer, plan=None, layout=None):
     if answer is None:
         return
     line = row(spacing=10)
@@ -512,7 +522,7 @@ def add_answer(window, question, answer, plan=None):
             if off and not autopilot_ui.enabled(window):
                 stack.insertWidget(2, _widget(_turn_on_row(window, question)))
     line.addLayout(stack, 1)
-    window.assistant_messages.addWidget(holder)
+    (layout if layout is not None else window.assistant_messages).addWidget(holder)
 
 
 def _turn_on_row(window, question):
@@ -541,24 +551,70 @@ def _alive_switch(window):
     return switch is not None and isValid(switch)
 
 
-def scroll_down(window):
+def scroll_down(window, scroll=None):
     def go():
-        if live(window):
-            bar = window.assistant_scroll.verticalScrollBar()
+        area = scroll if scroll is not None else (window.assistant_scroll if live(window) else None)
+        if area is not None and isValid(area):
+            bar = area.verticalScrollBar()
             bar.setValue(bar.maximum())
     QTimer.singleShot(0, go)
     QTimer.singleShot(60, go)
 
 
 # ------------------------------------------------------------------ actions
-def send(window, question=None):
-    if not live(window):
-        return
+def popout_of(window):
+    from gg_desktop import assistant_popout
+    return assistant_popout.current(window)
+
+
+def views(window):
+    """Every place the chat is on screen: the AI Assistant tab and the pop-out window."""
+    out = []
+    if live(window):
+        out.append(SimpleNamespace(messages=window.assistant_messages, input=window.assistant_input,
+                                   send=window.assistant_send, scroll=window.assistant_scroll))
+    pop = popout_of(window)
+    if pop is not None:
+        out.append(SimpleNamespace(messages=pop.messages, input=pop.input, send=pop.send_button, scroll=pop.scroll))
+    return out
+
+
+def refresh_all(window):
+    """Redraw the tab (when it is open) and the pop-out window (when it is open)."""
+    refresh(window)
+    pop = popout_of(window)
+    if pop is not None:
+        pop.refresh()
+
+
+def ensure_chats(window):
     state = state_of(window)
-    text = " ".join((question if question is not None else window.assistant_input.text()).split())[:actions.MAX_QUESTION]
+    if not state.chats:
+        state.chats = actions.load_chats(window.settings)
+        state.enabled = data.enabled_sources(window.settings)
+        state.scope = actions.scope_of(window.settings)
+    if not state.current or not any(c["id"] == state.current for c in state.chats):
+        chat = state.chats[0] if state.chats else actions.new_chat(time.time())
+        if not state.chats:
+            state.chats.append(chat)
+        state.current = chat["id"]
+    return state
+
+
+def send(window, question=None, source=None):
+    """Answer one message from the tab or the pop-out window (`source` is the input box it came from)."""
+    shown = views(window)
+    if not shown:
+        return
+    state = ensure_chats(window)
+    box = source if source is not None else shown[0].input
+    text = " ".join((question if question is not None else box.text()).split())[:actions.MAX_QUESTION]
     if not text:
         return
     from gg_desktop import autopilot_ui
+    if question is None:
+        box.clear()
+    text = here_question(window, text)
     if autopilot_ui.handle(window, text):  # a request to run Game Grave's own tools becomes a plan
         window.status.setText("Planned with Game Grave's own tools. Nothing changes until you press Run all.")
         return
@@ -579,9 +635,8 @@ def send(window, question=None):
         def arrived(specs):
             if specs is not None:
                 window.hardware_specs = specs
-            if live(window):
-                window.assistant_input.setText(text)
-                send(window)
+            if views(window):
+                send(window, text)
         window.job(work, arrived, error_title="Could not read the hardware")
         return
     chat = current_chat(window)
@@ -589,25 +644,25 @@ def send(window, question=None):
         chat = actions.new_chat(time.time())
         state.chats.insert(0, chat)
         state.current = chat["id"]
-    window.assistant_input.clear()
     if local_ai_ui.enabled(window) and result.intent not in ("greet", "thanks", "off", "hardware_unread"):
         msgs = chat["messages"]
         history = [(msgs[i]["text"], msgs[i + 1]["text"]) for i in range(0, len(msgs) - 1, 2)
                    if msgs[i]["role"] == "user" and msgs[i + 1]["role"] == "assistant"]
-        window.assistant_input.setEnabled(False)
-        window.assistant_send.setEnabled(False)
         starting = local_ai_ui.state_of(window).server is None
         window.status.setText("Local AI is starting on this PC (the first answer can take up to a minute)…" if starting
                               else "Local AI is writing the answer on this PC…")
-        # Show the question and a thinking line right away; the real answer replaces them.
-        layout = window.assistant_messages
-        if layout.count() and layout.itemAt(layout.count() - 1).spacerItem() is not None:
-            layout.takeAt(layout.count() - 1)
-        layout.addWidget(bubble(text))
-        add_assistant_text(window, "Starting the local AI model, this first answer can take up to a minute…" if starting
-                           else "Thinking…")
-        layout.addStretch()
-        scroll_down(window)
+        # Show the question and a thinking line right away in every view; the real answer replaces them.
+        for view in views(window):
+            view.input.setEnabled(False)
+            view.send.setEnabled(False)
+            layout = view.messages
+            if layout.count() and layout.itemAt(layout.count() - 1).spacerItem() is not None:
+                layout.takeAt(layout.count() - 1)
+            layout.addWidget(bubble(text))
+            add_assistant_text(window, "Starting the local AI model, this first answer can take up to a minute…"
+                               if starting else "Thinking…", layout)
+            layout.addStretch()
+            scroll_down(window, view.scroll)
         chat_id = chat["id"]
 
         def deliver(answer):
@@ -615,29 +670,55 @@ def send(window, question=None):
             if target is not None:
                 actions.add_exchange(target, text, answer, time.time())
                 persist_chats(window)
-            if live(window):
-                window.assistant_input.setEnabled(True)
-                window.assistant_send.setEnabled(True)
-                window.assistant_input.setFocus()
-                window.status.setText("Answered on this PC from scanned data. Nothing was changed.")
-                refresh(window)
+            for view in views(window):
+                view.input.setEnabled(True)
+                view.send.setEnabled(True)
+            if box is not None and isValid(box):
+                box.setFocus()
+            window.status.setText("Answered on this PC from scanned data. Nothing was changed.")
+            refresh_all(window)
         local_ai_ui.answer_async(window, text, result, facts, history, deliver)
         return
     actions.add_exchange(chat, text, result, time.time())
     persist_chats(window)
     window.status.setText("Answered from scanned data. Nothing was changed.")
-    refresh(window)
+    refresh_all(window)
+
+
+# "How do I use this?" asked from the pop-out means the tab you are looking at.
+_HERE = re.compile(r"\b(this (tab|page|screen|tool|one)|here|on this|in this)\b")
+ROUTE_FEATURE = {"Overview": "scan_pc", "Games": "games_tab", "Mods": "my_mods", "Captures": "captures",
+                 "Old Files": "old_files", "Other Storage": "other_storage", "Graveyard": "graveyard",
+                 "Game DNA": "game_dna", "Undo Center": "undo_center", "Hardware": "hardware", "Settings": "never_touch",
+                 "More Tools": "windows_cleanup", "Fix Kit": "resurrection_kit", "Ready Room": "soulbind"}
+
+
+def here_question(window, text):
+    """Name the current tab in a question that says "this tab" or "here", so the answer is about what is on screen."""
+    from gg_desktop import assistant_features as features
+    route = getattr(window, "current_route", "")
+    if route == "AI Assistant" or not _HERE.search(text.casefold()) or features.find_feature(text) is not None:
+        return text
+    if route == "Hardware" and getattr(window, "hardware_tab", "") == "Drivers & Startup":
+        key = "drivers_startup"
+    elif route == "More Tools":
+        return text + " (in the Toolbox)"
+    else:
+        key = ROUTE_FEATURE.get(route)
+    feature = features.BY_KEY.get(key) if key else None
+    return f"{text} ({feature.keywords[0]})" if feature else text
 
 
 def new_chat(window):
-    state = state_of(window)
+    state = ensure_chats(window)
     chat = current_chat(window)
     if chat is None or chat["messages"]:
         chat = actions.new_chat(time.time())
         state.chats.insert(0, chat)
         state.current = chat["id"]
-    refresh(window)
-    window.assistant_input.setFocus()
+    refresh_all(window)
+    if live(window):
+        window.assistant_input.setFocus()
 
 
 def pick_chat(window):

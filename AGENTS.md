@@ -692,3 +692,15 @@ want"). AI Assistant is reopened for its answers and automation; layout unchange
 - Covered by `tests/test_assistant_answers.py` (every feature has steps and buttons; task questions find the right tool; every
   "do" request makes a plan), `tests/test_autopilot.py` (scans, mod names, mod switch) and `tools/autopilot_smoke.py` (walkthrough
   buttons, Open, Do it for me, "open the hash checker", "turn off skyui" with Run all, "scan for leftovers").
+
+AI Assistant pop-out (owner instruction, 2026-11-14: "there needs to be an easy way to pop the ai assistant chat menu out as well so
+you can follow along without swapping back and fourth losing track"). This adds one top-bar button (shown only while the AI Assistant
+is on), the Ctrl+Shift+A shortcut and a Pop out button in the AI Assistant chat header. No tab layout changes.
+- `gg_desktop/assistant_popout.py`: the same chat in its own small window (460x720 by default, remembers position and size in
+  `assistant_popout_geometry`), kept on top of other windows by default with a pin to switch that off (`assistant_popout_on_top`),
+  New chat, and a button to open the full tab. A line under the chat says which tab the main window shows, and "how do I use
+  this tab" asked there is answered about that tab (`assistant_page.here_question`).
+- `assistant_page.send` now answers from the tab or the pop-out (`views`, `refresh_all`); plan cards are drawn in both and
+  stay in step (`autopilot_ui.cards_of`). Asking from the pop-out never switches the main window's tab.
+- Covered by the pop-out part of `tools/autopilot_smoke.py` (open from the top bar, follows the tab, this-tab question, a plan run
+  from the pop-out, pin saved, position saved, Ctrl+Shift+A toggle).

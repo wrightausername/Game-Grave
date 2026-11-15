@@ -177,13 +177,16 @@ def card(window, plan_dict, off=False):
         return None
     widget = PlanCard(window, plan, live, off)
     if live:
-        st.cards[plan.id] = widget
+        st.cards[plan.id] = [w for w in st.cards.get(plan.id, []) if _alive(w)] + [widget]
     return widget
 
 
+def cards_of(window, plan_id):
+    return [w for w in state_of(window).cards.get(plan_id, []) if _alive(w)]
+
+
 def redraw(window, plan):
-    widget = state_of(window).cards.get(plan.id)
-    if _alive(widget):
+    for widget in cards_of(window, plan.id):  # the tab and the pop-out window each have their own copy
         widget.update_view()
 
 
@@ -206,7 +209,7 @@ def open_target(window, target):
     target = str(target or "")
     if target.startswith("ask:"):
         from gg_desktop import assistant_page
-        if not assistant_page.live(window):
+        if not assistant_page.views(window):
             window.navigate("AI Assistant")
         QTimer.singleShot(0, lambda: assistant_page.send(window, target[4:]))
         return True
@@ -306,10 +309,7 @@ def _post(window, question, answer, plan, off_plan=None, chat_title=None, prepar
     if plan is not None:
         state_of(window).plans[plan.id] = plan
     assistant_page.persist_chats(window)
-    if assistant_page.live(window):
-        if hasattr(window, "assistant_input"):
-            window.assistant_input.clear()
-        assistant_page.refresh(window)
+    assistant_page.refresh_all(window)
     if plan is not None and not prepared:
         prepare(window, plan)
     return chat
@@ -506,11 +506,10 @@ def save_routine(window, plan_id):
         return
     if not _save(window, core.with_routines(window.settings, routines + [routine])):
         return
-    widget = state_of(window).cards.get(plan.id)
     note = "Saved: " + core.routine_line(routine, datetime.now()) + " Changes will wait for your OK."
     if left_out:
         note += " Left out (they need you there): " + ", ".join(left_out) + "."
-    if _alive(widget):
+    for widget in cards_of(window, plan.id):
         widget.banner.setText(note, shell.words.GOOD)
         widget.save_button.hide()
     sync_panel(window)
@@ -542,7 +541,7 @@ def build_panel(window, accent):
         _save(window, dict(window.settings, **{core.SETTING: bool(on)}))
         sync_panel(window)
         from gg_desktop import assistant_page
-        assistant_page.refresh(window)
+        assistant_page.refresh_all(window)
     switch.toggled.connect(toggled)
     sync_panel(window)
     return box
@@ -709,8 +708,9 @@ def show_notice(window, name, note, chat_id, plan_id):
         close()
         from gg_desktop import assistant_page
         assistant_page.state_of(window).current = chat_id
-        if window.current_route == "AI Assistant" and assistant_page.live(window):
-            assistant_page.refresh(window)
+        if assistant_page.popout_of(window) is not None or (window.current_route == "AI Assistant"
+                                                            and assistant_page.live(window)):
+            assistant_page.refresh_all(window)
         else:
             window.navigate("AI Assistant")
 
