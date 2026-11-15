@@ -477,7 +477,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         if parts:
             from gg_desktop import scan_parts
             self.status.setText("Quick scan: " + scan_parts.describe(parts) + ". The rest of the last scan is kept.")
-        self.job(lambda emitter: scan_inventory(settings, self.cancel.is_set, emitter, parts=parts, base=base),
+        self.job(lambda emitter: (scan_inventory(settings, self.cancel.is_set, emitter, parts=parts, base=base) if parts
+                                  else scan_inventory(settings, self.cancel.is_set, emitter)),
                  finish, error_title="Local scan incomplete", progress=progress)
 
     def cancel_scan(self):

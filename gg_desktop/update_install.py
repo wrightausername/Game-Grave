@@ -64,11 +64,12 @@ def download(window, release):
     def work(progress):
         token = up.find_token()
         expected = up.fetch_checksum(release, token)
-        path = up.download_setup(release, token, folder, expected, lambda d, t: progress(d, t))
+        path = up.download_setup(release, token, folder, expected,
+                                 lambda d, t: progress(int(d * 100 / max(1, t)), core.progress_text(d, t)))
         return str(path), expected
 
-    def moved(done, total):
-        window.status.setText(core.progress_text(done, total))
+    def moved(percent, words):          # the job's progress signal carries (percent, sentence)
+        window.status.setText(words)
 
     def done(result):
         window._update_busy = False
