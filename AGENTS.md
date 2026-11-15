@@ -695,7 +695,7 @@ want"). AI Assistant is reopened for its answers and automation; layout unchange
 
 AI Assistant pop-out (owner instruction, 2026-11-14: "there needs to be an easy way to pop the ai assistant chat menu out as well so
 you can follow along without swapping back and fourth losing track"). This adds one top-bar button (shown only while the AI Assistant
-is on), the Ctrl+Shift+A shortcut and a Pop out button in the AI Assistant chat header. No tab layout changes.
+is on) and the Ctrl+Shift+A shortcut. No tab layout changes (a header button did not fit the chat at 960 px).
 - `gg_desktop/assistant_popout.py`: the same chat in its own small window (460x720 by default, remembers position and size in
   `assistant_popout_geometry`), kept on top of other windows by default with a pin to switch that off (`assistant_popout_on_top`),
   New chat, and a button to open the full tab. A line under the chat says which tab the main window shows, and "how do I use
