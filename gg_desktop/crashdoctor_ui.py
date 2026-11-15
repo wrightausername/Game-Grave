@@ -3,6 +3,7 @@ Organizer 2, Vortex or a plain folder), how to start it and how long it must run
 Game Grave runs every Bisect test itself. Stop, or the end of the search, puts every mod back."""
 from __future__ import annotations
 
+import dataclasses
 import os
 import subprocess
 import time
@@ -76,7 +77,12 @@ class DoctorDialog(ToolDialog):
         self.body.addWidget(self.note)
         self.start_button = button("Start", self.start, kind="primary")
         self.stop_button = button("Stop and put everything back", self.stop)
-        self.add_actions(self.stop_button, self.start_button)
+        self.off_button = button("Turn the cause off", self.keep_off, kind="primary")
+        self.on_button = button("Turn them back on", self.back_on)
+        self.off_button.hide()
+        self.on_button.hide()
+        self.add_actions(self.on_button, self.stop_button, self.off_button, self.start_button)
+        self.found = ()                  # mods the finished search named
         self.folder = ""
         self.switcher = self.flow = self.proc = None
         self.timer = QTimer(self, interval=2000)
@@ -123,6 +129,7 @@ class DoctorDialog(ToolDialog):
         for words, command in cd.launch_choices(game):
             self.launch_box.addItem(words, ("direct", command))
         self.folder_button.setVisible(self.method() == "Folder")
+        self.on_button.setVisible(bool(self._kept_off()))
         self.note.setText({"Mod Organizer 2": "Mod Organizer 2 must be closed while it runs; Game Grave starts it for each test.",
                            "Vortex": "Close Vortex first, and don't deploy while it runs.",
                            "Folder": ("Mod folder: " + self.folder) if self.folder else
@@ -148,6 +155,41 @@ class DoctorDialog(ToolDialog):
             raise cd.DoctorError("Choose the folder that holds the mods first.")
         return cd.FolderSwitcher(self.folder)
 
+    def _where(self, switcher):
+        return getattr(switcher, "folder", None) or getattr(switcher, "profile_folder", None) or self.game().install_path
+
+    def _store(self):
+        from core import config_dir
+        return config_dir()
+
+    def _saved_flow(self, units):
+        """A search stopped earlier for the same game and mods: offer to carry on from its answers."""
+        from gg_desktop import bisect_flow, bisect_store
+        saved = bisect_store.load(self._store(), self.key)
+        if not saved:
+            return None
+        try:
+            flow = bisect_flow.Flow.restore(units, saved, self.key)
+        except ValueError as problem:
+            bisect_store.forget(self._store(), self.key)
+            self.result(f"The last search can't continue: {problem} Starting a new one.", "warn")
+            return None
+        answered = len(flow.answers)
+        if self.window_.confirm("Continue where it left off?",
+                                f"Crash Doctor already ran {answered} test{'s' if answered != 1 else ''} for this game "
+                                f"({flow.progress_text()}).\n\nYes carries on from there. No starts a new search and "
+                                "forgets those answers."):
+            return flow
+        bisect_store.forget(self._store(), self.key)
+        return None
+
+    def _save(self):
+        from gg_desktop import bisect_store
+        try:
+            bisect_store.save(self._store(), self.key, self.flow.snapshot())
+        except Exception:
+            pass
+
     def start(self):
         from gg_desktop import bisect_flow
         game = self.game()
@@ -165,11 +207,18 @@ class DoctorDialog(ToolDialog):
             return
         plan = cd.Plan(switcher.method, game.name, self.launch_box.currentText(), int(self.fine_box.currentData()),
                        self.sometimes.isChecked())
-        if not self.window_.confirm("Start Crash Doctor?", cd.confirmation(plan, len(units), self.folder)):
+        self.key = cd.resume_key(switcher.method, game.name, self._where(switcher))
+        flow = self._saved_flow(units)
+        if flow is None and not self.window_.confirm("Start Crash Doctor?", cd.confirmation(plan, len(units), self.folder)):
             return
-        self.switcher, self.plan = switcher, plan
-        self.flow = bisect_flow.Flow(units, bisect_flow.Setup(sometimes=plan.sometimes), now=time.time())
+        if flow is not None:
+            plan = dataclasses.replace(plan, sometimes=flow.setup.sometimes)
+        self.switcher, self.plan, self.found = switcher, plan, ()
+        self.off_button.hide()
+        self.flow = flow or bisect_flow.Flow(units, bisect_flow.Setup(sometimes=plan.sometimes), now=time.time(),
+                                             profile_key=self.key)
         self.runs = 0
+        self.phase = "running"
         self._remember_active(True)
         log_event("crash_doctor_start", f"Crash Doctor started for {game.name} ({switcher.method}, {len(units)} mods)",
                   source="Mod Bisect")
@@ -190,11 +239,18 @@ class DoctorDialog(ToolDialog):
         else:
             text = finished_text or "Stopped. Every mod is back where it was."
             tone = "good" if finished_text else "info"
+        if not finished_text and self.flow is not None and self.flow.answers:
+            text += (f" The {len(self.flow.answers)} answers so far are kept: press Start to carry on from where it "
+                     "stopped.")
         log_event("crash_doctor_end", text[:300], source="Mod Bisect")
         self.result(text, tone)
         self.step(4 if finished_text else 1)
-        self.switcher = None
         self.phase = "idle"
+        self.off_button.setVisible(bool(self.found))
+        if self.found:
+            self.off_button.setText("Turn off " + (self.found[0] if len(self.found) == 1 else f"these {len(self.found)} mods"))
+        else:
+            self.switcher = None
         for control in (self.game_box, self.method_box, self.launch_box, self.fine_box, self.sometimes, self.start_button):
             control.setEnabled(True)
 
@@ -216,13 +272,18 @@ class DoctorDialog(ToolDialog):
     # ------------------------------------------------------------ one test
     def next_test(self):
         from gg_desktop import bisect_flow
-        if self.flow.done() or self.runs >= cd.MAX_RUNS:
-            self.stop(self.flow.report_text(self.plan.game) if self.flow.done() else
-                      f"Stopped after {cd.MAX_RUNS} launches without a final answer. " + self.flow.progress_text())
+        if self.flow.done():
+            self.finish_search()
+            return
+        if self.runs >= cd.MAX_RUNS:
+            self._save()
+            self.stop()
+            self.result(f"Paused after {cd.MAX_RUNS} launches ({self.flow.progress_text()}). Every mod is back. Press "
+                        "Start to carry on from where it stopped.", "info")
             return
         step = self.flow.step()
         if not isinstance(step, bisect_flow.StepView):
-            self.stop(self.flow.report_text(self.plan.game))
+            self.finish_search()
             return
         try:
             self.switcher.apply(step.on_keys)
@@ -324,15 +385,70 @@ class DoctorDialog(ToolDialog):
             QTimer.singleShot(3000, lambda: self._start_run(step))
             return
         self.flow.answer(result)
+        self._save()                                  # Stop, a closed app or the launch limit can carry on later
         QTimer.singleShot(3000, self.next_test)      # a moment for files to unlock before the next switch
 
+    def finish_search(self):
+        """The whole search is done (it keeps going after the first cause until every cause is found)."""
+        from gg_desktop import bisect_store
+        verdict = self.flow.step()
+        bisect_store.forget(self._store(), self.key)
+        names = self.flow.names if hasattr(self.flow, "names") else {}
+        if getattr(verdict, "kind", "") in ("culprit", "interaction", "multiple"):
+            self.found = tuple(names.get(k, k) for k in verdict.keys)
+            self.found_keys = tuple(verdict.keys)
+        report = self.flow.report_text(self.plan.game)
+        if self.found:
+            report += ("\n\nEvery mod is back for now. Press the button to keep the cause turned off"
+                       + (" (Vortex may deploy it again; to keep it off for good, disable it in Vortex)."
+                          if self.plan.method == "Vortex" else "."))
+        self.stop(report)
+
+    def keep_off(self):
+        names = ", ".join(self.found[:10])
+        how = {"Mod Organizer 2": "unticks them in your Mod Organizer 2 profile (My Mods keeps a snapshot, so Undo there "
+                                  "turns them back on)",
+               "Vortex": f"moves their files into {cd.OFF_NAME} in the game folder",
+               "Folder": f"moves them into {cd.OFF_NAME} inside the mod folder"}[self.plan.method]
+        if not self.window_.confirm("Turn the cause off?", f"Turn off {names}?\n\nGame Grave {how}. Nothing is "
+                                    "deleted, and \"Turn them back on\" here puts them back."):
+            return
+        try:
+            failed = cd.turn_off(self.switcher, self.found_keys)
+        except Exception as problem:
+            self.result("Couldn't turn them off: " + str(problem)[:200], "warn")
+            return
+        log_event("crash_doctor_off", f"Crash Doctor turned off {names} for {self.plan.game} ({self.plan.method})",
+                  source="Mod Bisect")
+        self.found, self.switcher = (), None
+        self.off_button.hide()
+        self.result(f"Turned off: {names}. Start the game to check it's fixed." + (
+            " Couldn't move: " + ", ".join(failed[:6]) if failed else ""), "warn" if failed else "good")
+        self.fill_launch()
+
+    def _kept_off(self):
+        game = self.game()
+        if game is None or self.method() == "Mod Organizer 2":
+            return []
+        return cd.turned_off([p for p in (self.folder, game.install_path) if p])
+
+    def back_on(self):
+        left = []
+        for root in self._kept_off():
+            left += cd.turn_back_on(root)
+        log_event("crash_doctor_on", "Crash Doctor turned kept-off mods back on", source="Mod Bisect")
+        self.result("Turned back on." if not left else
+                    "Some couldn't go back because something new has the same name: " + ", ".join(left[:8]),
+                    "good" if not left else "warn")
+        self.fill_launch()
+
     def closeEvent(self, event):
-        if self.switcher is not None:
+        if self.phase != "idle":
             self.stop()
         super().closeEvent(event)
 
     def done(self, code):                # Close, Esc: never leave mods aside
-        if self.switcher is not None:
+        if self.phase != "idle":
             self.stop()
         super().done(code)
 

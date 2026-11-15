@@ -59,6 +59,26 @@ class Folder(unittest.TestCase):
             self.assertEqual((mods / "C" / "f.txt").read_text(), "C")
 
 
+    def test_keep_off_and_back_on(self):
+        with tempfile.TemporaryDirectory() as d:
+            mods = Path(d)
+            for name in ("Good", "Bad"):
+                (mods / name).mkdir()
+            sw = cd.FolderSwitcher(mods)
+            self.assertEqual(cd.turn_off(sw, ["Bad"]), [])
+            self.assertFalse((mods / "Bad").exists())
+            self.assertEqual([u.key for u in cd.FolderSwitcher(mods).units()], ["Good"], "kept-off mods aren't tested")
+            self.assertEqual(cd.turned_off([d]), [mods])
+            self.assertEqual(cd.leftovers([d]), [], "keeping off is not an unfinished test")
+            self.assertEqual(cd.turn_back_on(mods), [])
+            self.assertTrue((mods / "Bad").is_dir())
+            self.assertEqual(cd.turned_off([d]), [])
+
+    def test_resume_key(self):
+        self.assertEqual(cd.resume_key("Folder", "Stardew", "D:/Mods"), cd.resume_key("Folder", "Stardew", "d:/mods"))
+        self.assertNotEqual(cd.resume_key("Folder", "Stardew", "D:/Mods"), cd.resume_key("Vortex", "Stardew", "D:/Mods"))
+
+
 class Vortex(unittest.TestCase):
     def test_deployment_list(self):
         with tempfile.TemporaryDirectory() as d:

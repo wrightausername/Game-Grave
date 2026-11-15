@@ -890,6 +890,19 @@ not have to use either"):
   or 5 minutes) is "fine" and Game Grave closes only the game's own programs (then MO2 it started); never appearing is "not
   sure". "It only crashes sometimes" repeats a fine test up to the engine's run count. At most 40 launches. Logged as
   `crash_doctor_start` / `crash_doctor_end`. Best for crashes at start-up or loading; it says so.
+- One search finds every cause, not just the first: after a cause is pinned down the Bisect engine keeps it off and keeps
+  testing the rest, up to 8 separate causes (two mods that only crash together count as one cause). (Owner, 2026-11-15:
+  "Does it go through all of them and create a list or stops at the first sign of conflict? ... it should remember that and
+  start again where it left off".)
+- Carrying on: every answer is saved (the Bisect store, key `crash-doctor|method|game|folder`). Stop, closing the window,
+  Game Grave closing, or the 40-launch limit puts every mod back and keeps the answers; the next Start for the same game and
+  method asks "Continue where it left off?" (No forgets them). If the mods changed since, it says so and starts fresh. A
+  finished search forgets its answers.
+- Then what: the result names every cause, with a "Turn off <mod>" button. New writes the owner asked for: Folder and Vortex
+  move the named mods' files into `_GameGrave_Turned_Off` (never deleted; "Turn them back on" moves them back, never
+  overwriting; Vortex may redeploy them, which the result says); Mod Organizer 2 unticks them in the real profile through My
+  Mods' `set_enabled`, which takes its usual snapshot so My Mods' Undo turns them back on. It asks first and names the mods
+  and the change; logged as `crash_doctor_off` / `crash_doctor_on`.
 - Covered by `tests/test_crashdoctor.py` (judging, loaders, MO2 executables, folder and Vortex moves on temp folders, never
   overwriting, confirmation words) and `tools/crashdoctor_smoke.py` (Vortex offered, folder run with a fake game that crashes
   only with one mod, the report names it, everything back, "Put back" after a closed run).

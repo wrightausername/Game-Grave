@@ -147,9 +147,9 @@ def _unit(key, name, path=None):
 class _Holding:
     """A holding folder next to the mods with a manifest of exactly what was moved. Only moves; never overwrites."""
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, name: str = HOLD_NAME):
         self.root = Path(root)
-        self.hold = self.root / HOLD_NAME
+        self.hold = self.root / name
         self.manifest = self.hold / MANIFEST
 
     def moved(self) -> list:
@@ -213,7 +213,7 @@ class FolderSwitcher(Switcher):
     def units(self):
         names = set()
         try:
-            names = {p.name for p in self.folder.iterdir() if p.name != HOLD_NAME and not p.name.startswith(".")}
+            names = {p.name for p in self.folder.iterdir() if not p.name.startswith((".", "_GameGrave_"))}
         except OSError as exc:
             raise DoctorError("The mod folder can't be read: " + str(exc))
         names |= {Path(rel).parts[0] for rel in self.holding.moved()}
@@ -334,6 +334,52 @@ def put_back(root):
     return _Holding(Path(root)).restore()
 
 
+
+# ------------------------------------------------------------------ after the search: keep the cause off
+OFF_NAME = "_GameGrave_Turned_Off"     # mods the person chose to keep off after a search; separate from test moves
+
+
+def turn_off(switcher, keys) -> list:
+    """Keep the mods a search named turned off. Folder and Vortex: their files move into OFF_NAME (undo: turn_back_on).
+    Mod Organizer 2: unticked in the real profile through My Mods, which keeps a snapshot for its Undo.
+    Returns the names that could not be turned off."""
+    keys = list(keys)
+    if isinstance(switcher, MO2Switcher):
+        from gg_desktop import mymods_core
+        mymods_core.set_enabled(switcher.profile_folder, keys, False)
+        return []
+    failed = []
+    if isinstance(switcher, FolderSwitcher):
+        hold = _Holding(switcher.folder, OFF_NAME)
+        failed = [k for k in keys if (switcher.folder / k).exists() and not hold.move_out(k)]
+    elif isinstance(switcher, VortexSwitcher):
+        for name in keys:
+            for root, rel in switcher.mods.get(name, []):
+                if (Path(root) / rel).exists() and not _Holding(Path(root), OFF_NAME).move_out(rel):
+                    failed.append(name)
+                    break
+    return failed
+
+
+def turned_off(folders) -> list:
+    """Folders where Crash Doctor is keeping mods turned off."""
+    out = []
+    for folder in folders:
+        for root in (Path(folder), Path(folder) / "Data"):
+            if (root / OFF_NAME / MANIFEST).is_file() and root not in out:
+                out.append(root)
+    return out
+
+
+def turn_back_on(root) -> list:
+    return _Holding(Path(root), OFF_NAME).restore()
+
+
+def resume_key(method: str, game: str, where) -> str:
+    """Where a Crash Doctor search is saved, so Stop (or the launch limit) can continue later."""
+    return f"crash-doctor|{method}|{game}|{str(where).casefold()}"
+
+
 @dataclass
 class Plan:
     method: str
@@ -354,5 +400,6 @@ def confirmation(plan: Plan, units: int, folder: str = "") -> str:
             f"For each test it {how}, then starts the game with {plan.launch_words}. If the game is still running after "
             f"{plan.fine_after // 60} minute{'s' if plan.fine_after >= 120 else ''}, it counts as fine and Game Grave "
             "closes it; if it closes or crashes before that, it counts as a crash.\n\n"
-            "Nothing is deleted or overwritten. Stop puts everything back. Best for crashes on start-up or while loading; "
+            "Nothing is deleted or overwritten. Stop puts everything back and keeps the answers so far, so Start carries on "
+            "from where it stopped. Best for crashes on start-up or while loading; "
             "don't use the PC for the game while it runs.")

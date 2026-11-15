@@ -1,6 +1,6 @@
 """Crash Doctor, driven like the owner would: open it from Fix Kit, see Vortex offered when a deployment list exists,
-pick a plain mod folder, Start, and let it run every test with a fake game that crashes only while the mod "Bad Mod" is
-in the folder. It must name Bad Mod, put every mod back, and offer mods back after Game Grave closed mid-test. Only
+pick a plain mod folder, Start, Stop part-way and Start again (it carries on from the answers), and let it run every test with a fake game that crashes only while the mod "Bad Mod" is
+in the folder. It must name Bad Mod, put every mod back, keep Bad Mod off and turn it back on when asked, and offer mods back after Game Grave closed mid-test. Only
 temporary folders are touched; no game is started."""
 from __future__ import annotations
 
@@ -117,14 +117,30 @@ def main():
             original = crashdoctor_ui.QTimer.singleShot
             with patch.object(crashdoctor_ui, "QTimer", SimpleNamespace(singleShot=lambda ms, fn: original(30, fn))):
                 dialog.start()
-                assert dialog.switcher is not None, dialog.result_line.label.text()
+                assert dialog.phase != "idle", dialog.result_line.label.text()
                 dialog.plan = dataclasses.replace(dialog.plan, fine_after=1)
                 assert str(mods) in window.settings.get(crashdoctor_ui.ACTIVE_KEY, []), "the folder is remembered while busy"
-                deadline = time.time() + 120
-                while dialog.switcher is not None and time.time() < deadline:
+
+                # Stop part-way: everything goes back, the answers are kept, Start carries on from them.
+                deadline = time.time() + 60
+                while len(dialog.flow.answers) < 2 and time.time() < deadline:
                     settle()
                     time.sleep(0.02)
-            assert dialog.switcher is None, "Crash Doctor did not finish"
+                answered = len(dialog.flow.answers)
+                assert answered >= 2, answered
+                dialog.stop()
+                settle()
+                assert sorted(p.name for p in mods.iterdir()) == sorted(names), "Stop put everything back"
+                assert "carry on" in dialog.result_line.label.text(), dialog.result_line.label.text()
+                dialog.start()
+                assert len(dialog.flow.answers) >= answered, "the earlier answers were not carried on"
+                assert dialog.phase != "idle"
+                dialog.plan = dataclasses.replace(dialog.plan, fine_after=1)
+                deadline = time.time() + 120
+                while dialog.phase != "idle" and time.time() < deadline:
+                    settle()
+                    time.sleep(0.02)
+            assert dialog.phase == "idle", "Crash Doctor did not finish"
             report = dialog.result_line.label.text()
             print("Report:", report[:300], "| launches:", state.launches)
             assert "Bad Mod" in report, report
@@ -132,6 +148,16 @@ def main():
             assert sorted(p.name for p in mods.iterdir()) == sorted(names), list(mods.iterdir())
             assert not window.settings.get(crashdoctor_ui.ACTIVE_KEY), "the folder is forgotten when done"
             dialog.grab().save(str(args.output / "crash-doctor-found.png"))
+
+            # Then what: keep the cause off (moved aside, nothing deleted), and turn it back on.
+            assert dialog.off_button.isVisible() and "Bad Mod" in dialog.off_button.text(), dialog.off_button.text()
+            dialog.off_button.click()
+            settle()
+            assert not (mods / "Bad Mod").exists() and (mods / cd.OFF_NAME / "Bad Mod" / "manifest.json").is_file()
+            assert dialog.on_button.isVisible() and not dialog.off_button.isVisible()
+            dialog.on_button.click()
+            settle()
+            assert sorted(p.name for p in mods.iterdir()) == sorted(names), list(mods.iterdir())
 
             # Game Grave closed during a test: mods wait aside, the next start offers them back.
             switcher = cd.FolderSwitcher(mods)
