@@ -115,7 +115,7 @@ class GamesScreens:
         QShortcut(QKeySequence("Shift+F10"), page, activated=page.games.keyboard_options)
         QShortcut(QKeySequence("Return"), self.game_grid, activated=self._launch_selected_game).setContext(Qt.WidgetShortcut)
         QShortcut(QKeySequence("Enter"), self.game_grid, activated=self._launch_selected_game).setContext(Qt.WidgetShortcut)
-        QShortcut(QKeySequence("Ctrl+O"), self.game_grid, activated=self._open_selected_install).setContext(Qt.WidgetShortcut)
+        QShortcut(QKeySequence("Ctrl+O"), self.game_grid, activated=lambda: GamesScreens._open_selected_install(self)).setContext(Qt.WidgetShortcut)
         page.photo_inspector = ResponsiveInspector(page, self.game_details.parentWidget().parentWidget())
         QTimer.singleShot(0, page.games.refresh_sources)
 
@@ -251,7 +251,7 @@ class GamesScreens:
         for item in self.game_details.findChildren(QLabel):
             if item.objectName() == "detailKey":
                 item.setFixedWidth(104)        # "Tracked Playtime" and "Install Location" in full
-        self._add_place_buttons(contents, game)
+        GamesScreens._add_place_buttons(self, contents, game)
         actions = row(spacing=5)
         actions.addWidget(tile_action("Game DNA", "dna", lambda: self.page.games.show_dna(game)))
         actions.addWidget(tile_action("Mods", "mods", lambda: self.navigate("Mods")))
@@ -321,7 +321,7 @@ class GamesScreens:
                     save_open.setAccessibleName("Open save folder")
                     save_open.setToolTip("Open " + ("the save folder" if len(saves) == 1 else "a save folder") +
                                          " the save scanner labeled with this game:\n" + "\n".join(p.path for p in saves))
-                    save_open.clicked.connect(lambda _=False, g=game: self._open_saves(g, save_open))
+                    save_open.clicked.connect(lambda _=False, g=game: GamesScreens._open_saves(self, g, save_open))
                     for key in line.findChildren(QLabel):
                         if key.objectName() == "detailKey":
                             key.setFixedWidth(104)
