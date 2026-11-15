@@ -287,6 +287,37 @@ class GamesScreens:
         contents.addWidget(_widget(actions))
         contents.addStretch()
 
+    def _one_line_path(self, row_widget):
+        """The install path on one line, shortened in the middle (drive and folder name both show), full path on hover."""
+        from PySide6.QtGui import QFontMetrics
+        from PySide6.QtWidgets import QSizePolicy
+
+        class MiddleElided(QLabel):
+            def __init__(self, full):
+                super().__init__(full)
+                self.full = full
+                self.setObjectName("detailValue")
+                self.setToolTip(full)
+                self.setMinimumWidth(0)
+                self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+                self.setAccessibleName("Install location: " + full)
+
+            def resizeEvent(self, event):
+                super().resizeEvent(event)
+                self.setText(QFontMetrics(self.font()).elidedText(self.full, Qt.ElideMiddle, max(20, self.width())))
+
+        for value in row_widget.findChildren(QLabel):
+            if value.objectName() == "detailValue" and value.wordWrap():
+                lay = row_widget.layout()
+                index = lay.indexOf(value)
+                if index < 0:
+                    return
+                short = MiddleElided(value.toolTip() or value.text())
+                value.hide()
+                lay.insertWidget(index, short, 1)
+                self.game_install_path = short
+                return
+
     def _add_place_buttons(self, contents, game):
         """Open buttons right where the paths are: on the Install Location line, and a Saves line when the save scanner
         labeled folders with this game."""
@@ -296,6 +327,8 @@ class GamesScreens:
         for n in range(contents.count()):
             row_widget = contents.itemAt(n).widget()
             keys = [l.text() for l in row_widget.findChildren(QLabel) if l.objectName() == "detailKey"] if row_widget else []
+            if keys == ["Install Location"]:
+                GamesScreens._one_line_path(self, row_widget)
             if keys == ["Install Location"] and install is not None:
                 opener = QPushButton("Open")
                 opener.setObjectName("placeOpen")

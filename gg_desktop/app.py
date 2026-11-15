@@ -413,7 +413,13 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         if self.reference_preview:
             self.scan_time.setText("")
             return
-        self.scan_time.setText(scan_cache.label_for(self.current_route, self.inventory.scanned_at, scan_cache.times_of(self)))
+        quick = None
+        parts = tuple(getattr(self.inventory, "quick_parts", ()) or ())
+        if parts:
+            from gg_desktop import scan_parts
+            quick = (scan_parts.describe(parts), getattr(self.inventory, "full_scanned_at", ""))
+        self.scan_time.setText(scan_cache.label_for(self.current_route, self.inventory.scanned_at,
+                                                    scan_cache.times_of(self), quick=quick))
 
     def _scan_menu(self, pos=None):
         from PySide6.QtWidgets import QMenu
@@ -472,6 +478,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
                 f"{len(inventory.mods)} mod locations, {len(inventory.graveyard)} Graveyard findings."
                 + ("  •  Some sources unavailable." if inventory.warnings else ""))
             self.navigate(self.current_route)
+            from gg_desktop import first_scan
+            first_scan.after_scan(self, quick=bool(parts))   # once, after the first full scan
             from gg_desktop import soulbind_auto
             soulbind_auto.after_scan(self)      # only acts when the owner switched it on in Settings
         if parts:

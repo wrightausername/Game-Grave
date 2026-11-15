@@ -273,7 +273,7 @@ def main():
                 assert table.rowCount()>=5,"Empty coverage report"
                 assert any(table.item(i,0).text()=="Steam" for i in range(table.rowCount()))
                 dialog.reject()
-            for open_dialog in (window.overview_hero.locations.click,lambda:click(window.page,"Scan Results & Locations")):
+            for open_dialog in (window.overview_hero.locations.click,lambda:click(window.page,"Scan Results && Locations")):
                 drive_dialog(open_dialog,locations)
             scans=scanner.call_count
             drive_dialog(window.open_scan_locations,lambda d:d.findChild(QDialogButtonBox).button(QDialogButtonBox.Save).click())

@@ -31,7 +31,19 @@ class ScanParts(unittest.TestCase):
         self.assertEqual(out.graveyard, ["grave"])
         self.assertIn("Old Files folder unavailable (OSError).", out.warnings)
         self.assertTrue(out.scanned_at)
+        self.assertEqual(out.quick_parts, ("games",))
+        self.assertEqual(out.full_scanned_at, "2026-11-14 10:00")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QuickLabel(unittest.TestCase):
+    def test_top_bar_names_the_part(self):
+        from datetime import datetime
+        from gg_desktop import scan_cache
+        now = datetime(2026, 11, 14, 23, 30)
+        text = scan_cache.label_for("Games", "2026-11-14 23:20", {}, now=now, quick=("games", "2026-11-13 21:05"))
+        self.assertEqual(text, "Games scanned Today 11:20 PM · full scan Yesterday")
+        self.assertEqual(scan_cache.label_for("Games", "2026-11-14 23:20", {}, now=now), "Last scan Today 11:20 PM")

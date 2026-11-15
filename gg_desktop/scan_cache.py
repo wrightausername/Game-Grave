@@ -192,8 +192,9 @@ def when_text(moment, now=None):
     return moment.strftime("%d %b %Y").lstrip("0") + ", " + clock
 
 
-def label_for(route, inventory_time, others, now=None):
-    """The words for the top bar: which scan the page shows and when it ran."""
+def label_for(route, inventory_time, others, now=None, quick=None):
+    """The words for the top bar: which scan the page shows and when it ran. `quick` is (parts words, time of the last
+    full scan) after a quick scan, so the bar never suggests everything was scanned when only a part was."""
     own = {"Other Storage": "storage", "Captures": "captures", "Old Files": "old_files"}.get(route)
     if own == "old_files" and not others.get("old_files"):
         own = None
@@ -202,6 +203,10 @@ def label_for(route, inventory_time, others, now=None):
         return ("Scanned " + when_text(moment, now)) if moment else "Not scanned yet"
     if route == "Graveyard" and others.get("grave"):
         return "Leftovers scanned " + when_text(others["grave"], now)
+    if quick and inventory_time:
+        words, full = quick
+        tail = (" · full scan " + when_text(full, now).rsplit(" ", 2)[0].rstrip(",")) if full else ""
+        return words[:1].upper() + words[1:] + " scanned " + when_text(inventory_time, now) + tail
     return ("Last scan " + when_text(inventory_time, now)) if inventory_time else "Not scanned yet"
 
 

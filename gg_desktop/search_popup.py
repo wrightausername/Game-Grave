@@ -8,11 +8,15 @@ from PySide6.QtWidgets import QListWidget, QListWidgetItem
 from shiboken6 import isValid
 
 from gg_desktop import search_core as core
+from gg_desktop.reference_widgets import icon
 
 STYLE = ("QListWidget{background:#0b1118;border:1px solid #3a4652;border-radius:8px;color:#e5e8ee;padding:4px;outline:0;}"
          "QListWidget::item{padding:5px 8px;border-radius:5px;}"
          "QListWidget::item:selected{background:#7d1529;color:#ffffff;}")
 ROLE = Qt.UserRole + 41
+GROUP_ICONS = {"Tabs": ("grid", "#9fb0c2"), "Tools": ("wrench", "#13bcf5"), "Games": ("game", "#ff3b57"),
+               "Mods": ("mods", "#a879ff"), "Saves": ("archive", "#32d67a"), "Old Files": ("old_files", "#f6be24"),
+               "Captures": ("camera", "#ff8a3d")}
 
 
 def _tabs(window):
@@ -55,6 +59,8 @@ class SearchPopup(QObject):
                 head.setForeground(Qt.gray)
                 self.list.addItem(head)
             item = QListWidgetItem(f"{hit.title}    {hit.detail}"[:110])
+            symbol, color = GROUP_ICONS.get(hit.group, ("search", "#9fb0c2"))
+            item.setIcon(icon(symbol, color, 16))
             item.setData(ROLE, hit)
             item.setToolTip(hit.detail)
             self.list.addItem(item)

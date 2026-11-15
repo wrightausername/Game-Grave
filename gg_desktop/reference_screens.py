@@ -334,7 +334,7 @@ class ScreenMethods(OverviewScreens, RecoveryScreens, StorageScreens, LibraryScr
             "Old Files: " + str(self.settings.get("scan_folder", "")),
             "subtle", wrap=True))
         contents.addWidget(button("Choose Old Files folder…", self._choose_scan_folder))
-        contents.addWidget(button("Game Libraries & Scan Locations…", self.open_scan_locations))
+        contents.addWidget(button("Game Libraries && Scan Locations…", self.open_scan_locations))
         artwork_downloads = QCheckBox("Download missing Steam artwork automatically")
         artwork_downloads.setChecked(self.settings.get("steam_artwork_downloads", True))
         artwork_downloads.setToolTip("Uses public Steam cover images and keeps a local cache for offline use.")

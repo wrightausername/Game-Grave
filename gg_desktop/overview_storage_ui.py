@@ -283,12 +283,16 @@ class OverviewStorageController(QObject):
                 # shows disjoint bytes; the dialog explains the difference.
                 paths = {r.key: r.listed_bytes for r in roots}
                 text = "Unknown" if unknown else human_size(sum(paths.values())) + (" *" if s.category_partial(category) else "")
-                w.overview_metrics[category].set_value(text)
-                w.overview_metrics[category].setToolTip("Measured bytes in detected findings; overlapping categories are deduplicated in the pie. * indicates partial coverage. Click to inspect.")
+                why = unknown_reason(category, s.source_warnings.get(category)) if unknown else ""
+                w.overview_metrics[category].set_value(text, f"{category} · {why[0]}" if why else None)
+                w.overview_metrics[category].setToolTip(((why[1] + "\n\n") if why else "") + "Measured bytes in detected findings; overlapping categories are deduplicated in the pie. * indicates partial coverage. Click to inspect.")
             captures = {path_key(f.path) for f in (*w.inventory.screenshots, *w.inventory.recordings)}
             capture_partial = bool(s.source_warnings.get("Captures"))
-            w.overview_metrics["Captures"].set_value("Unknown" if capture_partial and not captures else str(len(captures)) + (" *" if capture_partial else ""))
-            w.overview_metrics["Captures"].setToolTip("Accepted capture findings within the scan's age and folder settings. * indicates incomplete source coverage. Click to inspect Captures.")
+            capture_unknown = capture_partial and not captures
+            why = unknown_reason("Captures", s.source_warnings.get("Captures")) if capture_unknown else ""
+            w.overview_metrics["Captures"].set_value("Unknown" if capture_unknown else str(len(captures)) + (" *" if capture_partial else ""),
+                                                     f"Captures · {why[0]}" if why else None)
+            w.overview_metrics["Captures"].setToolTip(((why[1] + "\n\n") if why else "") + "Accepted capture findings within the scan's age and folder settings. * indicates incomplete source coverage. Click to inspect Captures.")
         self.changed.emit()
 
     def storage_details(self, category=""):
@@ -549,3 +553,20 @@ class OverviewStorageController(QObject):
         box.addLayout(actions)
         dialog.exec()
         dialog.deleteLater()
+
+
+def unknown_reason(category, warnings):
+    """(short reason under an "Unknown" value, the longer note with what clicking does). Words only, read from the scan's
+    own warnings; nothing is guessed."""
+    text = " ".join(str(w) for w in (warnings or ())).casefold()
+    if category == "Old Files":
+        if "folder" in text and ("unavailable" in text or "not found" in text or "oserror" in text or "filenotfound" in text):
+            return ("folder not found", "The Old Files folder in Settings could not be read. Click to open Old Files, "
+                                         "choose a folder and press Scan Now.")
+        return ("not scanned", "Old Files has not measured its folder yet. Click to open Old Files and press Scan Now.")
+    if category == "Other Storage":
+        return ("not scanned", "Other Storage has not been measured yet. Click to open it and press Scan Other Storage.")
+    if category == "Captures":
+        return ("folders not readable" if text else "not scanned",
+                "Capture folders could not be read. Click to open Captures and add or check a capture folder in its Settings tab.")
+    return ("not measured", "This was not measured yet. Click to open the tab.")

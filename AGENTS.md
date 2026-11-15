@@ -784,3 +784,23 @@ drivers column and Ready Room's Soulbind panel for layout only; their facts, con
 - Soulbind: numbered steps (Tick what you want, Set each value, Press Apply on a game) above Your preferences.
 - My Mods already has the layout (status bar with the main button on the right, cards, Undo) and was left as it is. Squad Sync
   already has numbered steps.
+
+Polish batch (owner instruction, 2026-11-14: "Do the whole polishing batch", to the list after the quality-of-life pass). Fixes and
+small additions only; each names what it reopens.
+- Overview: the "Scan Results & Locations" link showed a stray underscore (Qt reads "&" as a shortcut mark); written as "&&" there
+  and on two older screens. An "Unknown" Old Files, Other Storage or Captures value now says why under it ("folder not found", "not
+  scanned", "folders not readable") from the scan's own warnings, and its tooltip says what clicking does (`unknown_reason`).
+- Games: the Install Location value is one line, shortened in the middle so the drive and the folder name both show, full path on
+  hover.
+- Ready Room / Soulbind: number boxes are wide enough for their largest value and unit.
+- Hardware / Drivers & Startup: the row with Update all and Restart now sits under the scrolling list, always in view.
+- Empty-screen next-step buttons use the red main-button style.
+- Top bar after a quick scan: "Games scanned Today 11:20 PM · full scan Yesterday" (`Inventory.quick_parts`, `full_scanned_at`).
+- Search results carry a coloured icon per group.
+- First full scan: a window "Here's what Game Grave found" with the counts and three next steps picked from what was found (Mods,
+  a Resurrection Kit, Old Files, Graveyard, Other Storage, the tour), each opening an existing tab or tool; shown once
+  (`first_scan_summary_seen`), not modal, never after a quick scan or in the photo-reference preview (`first_scan.py`, pure
+  `first_scan_core.py`). `GAME_GRAVE_FIRST_SCAN_CARD=0` turns it off in CI.
+- Covered by `tests/test_first_scan.py`, `tests/test_overview_reason.py`, `tests/test_scan_parts.py` and `tools/comfort_smoke.py`.
+- Owner rule (2026-11-14): new ideas must extend existing tools rather than add near-duplicates (for example, snapshot history
+  belongs in the Resurrection Kit and an unattended crash hunt belongs in Mod Bisect).

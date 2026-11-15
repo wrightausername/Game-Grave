@@ -297,7 +297,7 @@ class OverviewScreens:
         self.overview_scan_status = label("", "subtle", wrap=True)
         self.overview_scan_status.setStyleSheet("color:#bfccd9;font-size:12px;")
         scanline.addWidget(self.overview_scan_status, 1)
-        scanline.addWidget(button("Scan Results & Locations", self.open_scan_locations, kind="link"))
+        scanline.addWidget(button("Scan Results && Locations", self.open_scan_locations, kind="link"))
         self.overview_cancel = tool("Cancel Scan", "close", lambda: self.page.overview.cancel_current())
         scanline.addWidget(self.overview_cancel)
         page.content.addWidget(_widget(scanline))

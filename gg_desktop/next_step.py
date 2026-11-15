@@ -42,8 +42,7 @@ def show(anchor, caption, action, tip=""):
         if layout is None:
             return None
         button = QPushButton()
-        button.setObjectName("primaryButton")
-        button.setProperty("kind", "primary")
+        button.setObjectName("primary")          # the app's red main-button style
         button.setFixedHeight(30)
         button.setMaximumWidth(260)
         layout.insertWidget(index + 1, button)

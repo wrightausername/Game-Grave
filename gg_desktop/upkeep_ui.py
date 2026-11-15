@@ -150,7 +150,7 @@ class UpkeepTab(QWidget):
                                      tip="Downloads and installs the ticked driver updates through Windows Update.")
         self.install_button.hide()
         act.addWidget(self.install_button)
-        drivers.addLayout(act)
+        frame_lay.addLayout(act)               # pinned under the scrolling list, so Update all is always in view
         drivers.addWidget(label("Firmware", "readyGameTitle"))
         self.firmware_box = column(spacing=3)
         self.firmware_box.addWidget(label("Reading firmware versions…", "caption"))

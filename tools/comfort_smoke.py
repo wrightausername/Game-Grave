@@ -26,7 +26,7 @@ def main():
     from PySide6.QtCore import QCoreApplication, QEvent, QPointF, Qt, QTimer
     from PySide6.QtGui import QMouseEvent
     from PySide6.QtTest import QTest
-    from PySide6.QtWidgets import QApplication, QDialog, QLabel
+    from PySide6.QtWidgets import QApplication, QDialog, QLabel, QPushButton
     from core import SteamGame, default_settings
     from gg_desktop import comfort, comfort_core
     from gg_desktop.app import CrimsonWindow
@@ -195,6 +195,21 @@ def main():
             window.global_search.clear()
             settle()
 
+            # After the first full scan: what was found and three next steps, once.
+            from gg_desktop import first_scan
+            with patch.dict(os.environ, {"GAME_GRAVE_FIRST_SCAN_CARD": "1"}):
+                window.settings = dict(window.settings, first_scan_summary_seen=False)
+                dialog = first_scan.after_scan(window)
+                settle()
+                assert dialog is not None and dialog.isVisible()
+                assert window.settings.get("first_scan_summary_seen") is True
+                cards = [b for b in dialog.findChildren(QPushButton) if b.objectName() == "primary"]
+                assert len(cards) == 3, [b.text() for b in cards]
+                assert dialog.grab().save(str(args.output / "shell-first-scan.png"))
+                assert first_scan.after_scan(window) is None, "Shown once"
+                dialog.close()
+                settle()
+
             # Empty screens offer the next step.
             window.navigate("Other Storage")
             settle()
@@ -312,6 +327,8 @@ def main():
             assert seen == [("games",)], seen
             assert window.inventory.files == kept_files and window.inventory.saves == kept_saves
             assert comfort.state_of(window).notices[0].title == "Quick scan finished"
+            window._sync_scan_time()
+            assert window.scan_time.text().startswith("Games scanned Today "), window.scan_time.text()
             menu = window._scan_menu()
             assert [a.text() for a in menu.actions()][:2] == ["Everything", "Games only"]
             menu.close()

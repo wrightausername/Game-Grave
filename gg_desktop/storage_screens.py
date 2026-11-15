@@ -86,7 +86,7 @@ class StorageScreens:
         footer.addWidget(self.storage_selection)
         footer.addWidget(tool("Protect", "shield", lambda: self._protect_paths([r.path for r in self._selected_storage()], self._fill_storage)))
         footer.addWidget(tool("Add to Graveyard", "grave", self._watch_storage))
-        footer.addWidget(tool("Review & Clean…", "trash", self._review_storage, kind="danger"))
+        footer.addWidget(tool("Review && Clean…", "trash", self._review_storage, kind="danger"))
         footer.addWidget(tool("Cleanup Tools", "settings", self._launch_classic_tools))
         bar.addWidget(_widget(footer))
         page.content.addWidget(actions)

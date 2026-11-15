@@ -108,7 +108,8 @@ class SoulbindBody(QWidget):
             spin = QSpinBox()
             spin.setRange(*pref.options)
             spin.setSuffix(pref.unit)
-            spin.setFixedWidth(96)
+            widest = spin.fontMetrics().horizontalAdvance(f"{pref.options[1]}{pref.unit}")
+            spin.setFixedWidth(max(120, widest + 48))     # the whole value and its unit fit beside the arrows
             return spin
         combo = QComboBox()
         combo.setFixedWidth(120)

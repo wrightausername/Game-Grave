@@ -36,6 +36,8 @@ class Inventory:
     source_reports: list = field(default_factory=list)
     file_scan_root: str = ""
     file_scan_days: int | None = None
+    full_scanned_at: str = ""          # when everything was last scanned (a quick scan keeps the earlier time)
+    quick_parts: tuple = ()            # the parts the newest scan covered, when it was a quick scan
 
 
 STAGES = ("Steam and launchers", "Mod Radar", "Old files", "Game captures", "Protected saves")
@@ -134,6 +136,11 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
         recordings=staged.recordings, screenshots=staged.screenshots,
     )
     staged.scanned_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if wanted == set(PARTS):
+        staged.full_scanned_at, staged.quick_parts = staged.scanned_at, ()
+    else:
+        staged.full_scanned_at = base.full_scanned_at or base.scanned_at
+        staged.quick_parts = tuple(p for p in PARTS if p in wanted)
     if progress:
         progress(100, "Scan finished")
     return staged
