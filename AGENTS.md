@@ -906,3 +906,27 @@ not have to use either"):
 - Covered by `tests/test_crashdoctor.py` (judging, loaders, MO2 executables, folder and Vortex moves on temp folders, never
   overwriting, confirmation words) and `tools/crashdoctor_smoke.py` (Vortex offered, folder run with a fake game that crashes
   only with one mod, the report names it, everything back, "Put back" after a closed run).
+- Easy for anyone (owner, 2026-11-15: "needs to be easier for the average modder who doesnt know shit", then "implement" to
+  the seven-part plan):
+  - One screen, nothing to set up: Game Grave picks the modded game played most recently (or the one it was opened for),
+    finds its mods (Mod Organizer 2, else Vortex, else a known mod folder: Mods, BepInEx/plugins, MelonLoader/Mods,
+    archive/pc/mod, plugins, Baldur's Gate 3's AppData Mods; `find_mod_folder`) and how to start it, and says it in one
+    sentence with an estimate ("Game Grave will test your 42 Skyrim mods installed with Vortex. It takes about 20 to 45
+    minutes"). The earlier choices stay behind "Change game, mods or how it starts", opened by itself only when no mods are
+    found. Estimates come from the search's size (`estimate`, `remaining`), are labelled "about" and never promised.
+  - One question, "When does it crash?" (`WHEN`): on the main menu (60 s), loading a save (120 s), after playing a while
+    (300 s and repeats, with an honest note that crashes later than that can't be caught), randomly (120 s and repeats).
+  - Crash reports first: before a new search the same reports Mod Bisect reads (`bisect_tab.collect_reports`: crash logs
+    near the game and in Documents, Windows crash records for the game) order the suspects. They never decide the answer.
+  - Close it for me: Mod Organizer 2, Vortex or the game open is offered "Close them for you?" (asked first; a normal close
+    request so they can save; nothing else is closed; logged `crash_doctor_close`).
+  - Plain progress: "Test 3 of about 7 · 18 mods still suspected · about 12 minutes left · running 40 of 120 seconds", and a
+    Stop button only while it runs.
+  - Plain answer: "Found it: SkyUI is crashing your game." plus what that usually means (`HINTS`), the full report folded
+    under "Show technical details", and three buttons: Turn it off (as above), Look it up online (a web search for the
+    mod and game), Leave everything as it is.
+  - Offered at the right moment: when a game the Games tracker saw running closes, and Windows recorded a crash in that
+    game's folder in the last 90 seconds, and Crash Doctor can find its mods, a notice says "<game> just crashed. Find the
+    mod causing it?" with "Find the mod". One crash-record query per closed game, never while another game runs or Crash
+    Doctor is testing, at most once a day per game (`crash_doctor_offered`). `games_tracking.GameTracker` only gained a
+    `game_closed` signal; playtime counting is unchanged.

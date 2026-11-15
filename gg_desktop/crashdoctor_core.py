@@ -305,6 +305,7 @@ class MO2Switcher(Switcher):
         text = (self.profile_folder / "modlist.txt").read_text(encoding="utf-8", errors="replace")
         self.enabled = [name for name, mark in mymods_core.parse_modlist(text) if mark == "+"]
         self.copy = None
+        self.mods_dir = None                 # set by the window from the instance, for crash-report clues
 
     def units(self):
         return [_unit(name, name) for name in self.enabled]
@@ -378,6 +379,138 @@ def turn_back_on(root) -> list:
 def resume_key(method: str, game: str, where) -> str:
     """Where a Crash Doctor search is saved, so Stop (or the launch limit) can continue later."""
     return f"crash-doctor|{method}|{game}|{str(where).casefold()}"
+
+
+
+# ------------------------------------------------------------------ the easy path: guess everything, ask one question
+# Where games keep mods when no mod manager is used, checked in this order inside the game folder.
+MOD_FOLDERS = ("Mods", "mods", "BepInEx/plugins", "MelonLoader/Mods", "archive/pc/mod", "Mods/Mods", "plugins")
+OUTSIDE_FOLDERS = {"baldur's gate 3": "Larian Studios/Baldur's Gate 3/Mods"}     # under %LOCALAPPDATA%
+
+
+def find_mod_folder(install_path, game_name="", local_appdata=None):
+    """The folder that holds this game's mods when no mod manager is used, or "" when none is found."""
+    candidates = [Path(install_path) / rel for rel in MOD_FOLDERS] if install_path else []
+    base = local_appdata if local_appdata is not None else os.environ.get("LOCALAPPDATA", "")
+    for words, rel in OUTSIDE_FOLDERS.items():
+        if base and words in game_name.casefold():
+            candidates.insert(0, Path(base) / rel)
+    for folder in candidates:
+        try:
+            items = [p for p in folder.iterdir() if not p.name.startswith((".", "_GameGrave_"))]
+        except OSError:
+            continue
+        if items:
+            return str(folder)
+    return ""
+
+
+# "When does it crash?" -> (key, words, seconds it must run to count as fine, crashes only sometimes, honest note)
+WHEN = (("menu", "On the main menu or while it starts", 60, False, ""),
+        ("load", "When I load a save or enter a new area", 120, False,
+         "Load the save yourself in each test only if it doesn't load by itself; most games reach the menu and that's "
+         "enough for crashes on start-up."),
+        ("play", "After playing for a while", 300, True,
+         "This is the hardest kind: each test waits 5 minutes and may need more launches. If the crash takes longer than "
+         "that to happen, Crash Doctor can't catch it."),
+        ("random", "Randomly, not every time", 120, True, "Each test may run up to 3 times to be sure."))
+
+
+def when_choice(key):
+    return next((w for w in WHEN if w[0] == key), WHEN[0])
+
+
+def estimate(mods: int, fine_after: int, sometimes: bool = False):
+    """(fewest launches, most launches, fewest minutes, most minutes) for a search over this many mods. One cause takes
+    about log2(n) launches; a pair or a second cause adds more. Each launch is the wait plus about a minute to start."""
+    import math
+    low = max(1, math.ceil(math.log2(max(mods, 1) + 1))) + 1
+    high = low * 2 + 2
+    if sometimes:
+        low, high = low + 1, high * 2
+    per = (fine_after + 60) / 60
+    return low, min(high, MAX_RUNS), max(1, round(low * per)), max(2, round(min(high, MAX_RUNS) * per))
+
+
+def remaining(suspects: int, fine_after: int, sometimes: bool = False):
+    """(launches left, minutes left), roughly, while a search runs."""
+    low, _high, low_min, _ = estimate(max(suspects, 1), fine_after, sometimes)
+    return low, low_min
+
+
+HINTS = {
+    "culprit": "Usually this means the mod is out of date for your version of the game, needs another mod it depends on, "
+               "or is broken. Check its page for an update and for the mods it requires.",
+    "interaction": "These mods fight each other. Often one of them has a patch for the other; otherwise keep only one.",
+    "multiple": "Each of these crashes the game by itself. Turning them all off is the quick fix; check each one's page "
+                "for an update.",
+    "outside": "The game crashed even with every mod off, so a mod isn't the cause. Try Verify Files in Steam (or your "
+               "launcher), or Fix my game.",
+    "unreproducible": "It didn't crash in any test. If it crashes later in play, run it again and pick \"After playing "
+                      "for a while\".",
+    "undetermined": "It narrowed things down but couldn't finish. Press Start to carry on.",
+}
+
+
+def headline(kind, names):
+    """The one sentence a person reads first."""
+    if kind == "culprit" and names:
+        return f"Found it: {names[0]} is crashing your game."
+    if kind == "interaction" and names:
+        return f"Found it: {', '.join(names[:-1])} and {names[-1]} crash when they're on together."
+    if kind == "multiple" and names:
+        return f"Found {len(names)} mods that crash your game: {', '.join(names[:6])}."
+    return {"outside": "It isn't a mod.", "unreproducible": "The game didn't crash in any test.",
+            "undetermined": "Not finished yet."}.get(kind, "Done.")
+
+
+def look_up_url(mod, game):
+    from urllib.parse import quote_plus
+    return "https://www.google.com/search?q=" + quote_plus(f"{mod} {game} mod")
+
+
+TOOLS_TO_CLOSE = {"modorganizer.exe": "Mod Organizer 2", "vortex.exe": "Vortex"}
+
+
+def blockers(process_names, game_exes):
+    """Programs that must be closed before testing: the mod managers and the game itself. [(exe, friendly name)]"""
+    games = {g.casefold() for g in game_exes}
+    out = []
+    for name in process_names:
+        key = name.casefold()
+        if key in TOOLS_TO_CLOSE and (name, TOOLS_TO_CLOSE[key]) not in out:
+            out.append((name, TOOLS_TO_CLOSE[key]))
+        elif key in games and (name, "the game") not in out:
+            out.append((name, "the game"))
+    return out
+
+
+def files_by_mod(switcher, cap=2000):
+    """{mod key: file paths in it} so crash logs that name a file point at its mod (for the crash-report clues)."""
+    out = {}
+    if isinstance(switcher, VortexSwitcher):
+        return {name: [str(Path(r) / rel) for r, rel in files[:cap]] for name, files in switcher.mods.items()}
+    if isinstance(switcher, FolderSwitcher):
+        roots = {u.key: switcher.folder / u.key for u in switcher.units()}
+    elif isinstance(switcher, MO2Switcher):
+        roots = {k: switcher.mods_dir / k for k in switcher.enabled} if switcher.mods_dir else {}
+    else:
+        return out
+    for key, root in roots.items():
+        found = []
+        try:
+            if root.is_file():
+                found = [str(root)]
+            else:
+                for path in root.rglob("*"):
+                    if path.is_file():
+                        found.append(str(path))
+                        if len(found) >= cap:
+                            break
+        except OSError:
+            pass
+        out[key] = found
+    return out
 
 
 @dataclass

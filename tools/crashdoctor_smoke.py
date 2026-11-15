@@ -91,6 +91,10 @@ def main():
         stack.enter_context(patch.object(crashdoctor_ui.DoctorDialog, "_running", fake_running))
         stack.enter_context(patch.object(crashdoctor_ui.DoctorDialog, "_close_game", fake_close))
         stack.enter_context(patch.object(crashdoctor_ui.DoctorDialog, "_crash_recorded", lambda self: False))
+        cleared = []
+        stack.enter_context(patch.object(crashdoctor_ui.DoctorDialog, "_clear_the_way",
+                                         lambda self, game: cleared.append(game.name) or True))
+        stack.enter_context(patch.object(crashdoctor_ui.DoctorDialog, "_read_clues", lambda self, sw, units, game: None))
         with stack:
             window = CrimsonWindow()
             window.show()
@@ -103,22 +107,40 @@ def main():
             settle()
             dialog = window.crash_doctor
             assert dialog.isVisible()
+            # The easy part: the game and its mods are found without asking; the choices stay folded.
+            assert dialog.game().name == "Pixel Farm" and not dialog.advanced.isVisible()
+            assert "6 Pixel Farm mods" in dialog.found_line.text() and "minutes" in dialog.found_line.text(), \
+                dialog.found_line.text()
+            dialog.when_box.setCurrentIndex(dialog.when_box.findData("play"))
+            settle()
+            assert dialog.fine_box.currentData() == 300 and dialog.sometimes.isChecked() and dialog.when_note.text()
+            dialog.when_box.setCurrentIndex(dialog.when_box.findData("menu"))
+            settle()
+            assert dialog.fine_box.currentData() == 60 and not dialog.sometimes.isChecked()
             methods = [dialog.method_box.itemData(i) for i in range(dialog.method_box.count())]
             assert methods == ["Vortex", "Folder"], methods
             assert dialog.launch_box.count() >= 1, "no way to start the game"
             dialog.method_box.setCurrentIndex(methods.index("Folder"))
-            dialog.folder = str(mods)
-            dialog.fill_launch()
             settle()
-            assert "Mod folder:" in dialog.note.text()
+            assert Path(dialog.folder) == mods, "the Mods folder was not found by itself"
+            assert "Mod folder:" in dialog.note.text() and "no mod manager" in dialog.found_line.text()
             dialog.grab().save(str(args.output / "crash-doctor-setup.png"))
 
             dialog.timer.setInterval(40)
             original = crashdoctor_ui.QTimer.singleShot
             with patch.object(crashdoctor_ui, "QTimer", SimpleNamespace(singleShot=lambda ms, fn: original(30, fn))):
                 dialog.start()
+                deadline = time.time() + 30
+                while dialog.phase == "idle" and time.time() < deadline:     # crash reports are read first, in the background
+                    settle()
+                    time.sleep(0.02)
                 assert dialog.phase != "idle", dialog.result_line.label.text()
+                assert cleared == ["Pixel Farm"], cleared
                 dialog.plan = dataclasses.replace(dialog.plan, fine_after=1)
+                while "still suspected" not in dialog.result_line.label.text() and time.time() < deadline:
+                    settle()
+                    time.sleep(0.02)
+                assert "mods still suspected" in dialog.result_line.label.text(), dialog.result_line.label.text()
                 assert str(mods) in window.settings.get(crashdoctor_ui.ACTIVE_KEY, []), "the folder is remembered while busy"
 
                 # Stop part-way: everything goes back, the answers are kept, Start carries on from them.
@@ -150,7 +172,10 @@ def main():
             dialog.grab().save(str(args.output / "crash-doctor-found.png"))
 
             # Then what: keep the cause off (moved aside, nothing deleted), and turn it back on.
-            assert dialog.off_button.isVisible() and "Bad Mod" in dialog.off_button.text(), dialog.off_button.text()
+            assert report.startswith("Found it: Bad Mod"), report
+            assert "Bad Mod" in dialog.details.body.text(), "the full report is folded under the answer"
+            assert dialog.off_button.isVisible() and dialog.look_button.isVisible() and dialog.leave_button.isVisible()
+            assert dialog.off_button.text() == "Turn it off", dialog.off_button.text()
             dialog.off_button.click()
             settle()
             assert not (mods / "Bad Mod").exists() and (mods / cd.OFF_NAME / "Bad Mod" / "manifest.json").is_file()

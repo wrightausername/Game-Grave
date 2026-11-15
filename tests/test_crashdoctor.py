@@ -115,3 +115,38 @@ class Vortex(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EasyPath(unittest.TestCase):
+    def test_find_mod_folder(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(cd.find_mod_folder(d), "")
+            (Path(d) / "Mods").mkdir()
+            self.assertEqual(cd.find_mod_folder(d), "", "an empty Mods folder isn't a mod folder")
+            (Path(d) / "BepInEx" / "plugins").mkdir(parents=True)
+            (Path(d) / "BepInEx" / "plugins" / "a.dll").write_text("x")
+            self.assertEqual(Path(cd.find_mod_folder(d)), Path(d) / "BepInEx" / "plugins")
+            (Path(d) / "Mods" / "SMAPI-thing").mkdir()
+            self.assertEqual(Path(cd.find_mod_folder(d)), Path(d) / "Mods")
+        with tempfile.TemporaryDirectory() as local:
+            bg3 = Path(local) / "Larian Studios" / "Baldur's Gate 3" / "Mods"
+            bg3.mkdir(parents=True)
+            (bg3 / "x.pak").write_text("x")
+            self.assertEqual(Path(cd.find_mod_folder("", "Baldur's Gate 3", local)), bg3)
+
+    def test_when_and_estimate(self):
+        self.assertEqual(cd.when_choice("play")[2:4], (300, True))
+        self.assertEqual(cd.when_choice("nonsense")[0], "menu")
+        low, high, low_min, high_min = cd.estimate(40, 120)
+        self.assertTrue(2 <= low < high <= cd.MAX_RUNS and low_min < high_min)
+        self.assertGreater(cd.estimate(40, 120, True)[3], high_min)
+        self.assertLess(cd.remaining(3, 60)[0], cd.remaining(100, 60)[0])
+
+    def test_blockers_and_words(self):
+        found = cd.blockers(["explorer.exe", "Vortex.exe", "SkyrimSE.exe", "ModOrganizer.exe"], ["SkyrimSE.exe"])
+        self.assertEqual({f for _e, f in found}, {"Vortex", "the game", "Mod Organizer 2"})
+        self.assertEqual(cd.headline("culprit", ["SkyUI"]), "Found it: SkyUI is crashing your game.")
+        self.assertIn("A and B crash when", cd.headline("interaction", ["A", "B"]))
+        self.assertTrue(cd.look_up_url("Sky UI", "Skyrim").startswith("https://www.google.com/search?q=Sky+UI"))
+        for text in cd.HINTS.values():
+            self.assertNotIn("safe", text.lower())

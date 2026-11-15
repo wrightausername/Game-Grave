@@ -19,12 +19,14 @@ def next_interval(active, idle_checks):
 
 class GameTracker(QObject):
     changed = Signal()
+    game_closed = Signal(object)      # game keys that were running and are not any more (Crash Doctor's crash notice)
 
     def __init__(self, window):
         super().__init__(window)
         self.window, self.games = window, ()
         self.ledger = PlaytimeLedger()
         self.busy, self.stopped = False, False
+        self.last_active = set()
         self.idle_checks = 0
         self.timer = QTimer(self)
         self.timer.setInterval(FAST)
@@ -59,6 +61,10 @@ class GameTracker(QObject):
             if not isValid(self) or self.stopped:
                 return
             self.busy = False
+            closed = self.last_active - set(active)
+            self.last_active = set(active)
+            if closed:
+                self.game_closed.emit(closed)
             self.idle_checks = 0 if active else self.idle_checks + 1
             wanted = next_interval(active, self.idle_checks)
             if self.timer.interval() != wanted:

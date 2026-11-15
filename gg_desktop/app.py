@@ -116,6 +116,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self._comfort_ready = True
         from gg_desktop import crashdoctor_ui   # mods a closed Crash Doctor run left aside are offered back
         QTimer.singleShot(1500, lambda: crashdoctor_ui.check_leftovers(self))
+        crashdoctor_ui.watch_crashes(self)      # "Skyrim just crashed. Find the mod causing it?"
         from gg_desktop import search_popup     # results from everything under the top search box
         search_popup.install(self)
         if not reference_preview:
