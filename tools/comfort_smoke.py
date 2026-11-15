@@ -222,17 +222,24 @@ def main():
             night = squad.game_night
             friend_code = gn.make_code("Jay", [SimpleNamespace(name=window.inventory.games[0].name, launcher="Steam",
                                                                  app_id=window.inventory.games[0].app_id, size_bytes=1)])
+            store = {}
             with patch.object(gn, "fetch_modes", lambda ids, cache, **k: dict(cache, **{i: ("Online co-op",) for i in ids})), \
-                    patch.object(gn, "save_modes", lambda cache, path=None: None):
+                    patch.object(gn, "save_modes", lambda cache, path=None: store.update(cache)), \
+                    patch.object(gn, "load_modes", lambda path=None: dict(store)):
                 assert night.paste_code("lets play tonight " + friend_code)
-                for _ in range(60):
+                for _ in range(80):
                     settle()
                     time.sleep(0.05)
+                    night = window.page.squad.game_night      # Ready Room may rebuild itself (live news)
                     if night.rows and night.rows[0].modes:
                         break
-            assert "can all play 1 game" in night.headline.text(), night.headline.text()
-            assert night.rows[0].modes == ("Online co-op",), night.rows[0].modes
-            assert window.grab().save(str(args.output / "ready-room-game-night.png"))
+                assert "can all play 1 game" in night.headline.text(), night.headline.text()
+                assert night.rows[0].modes == ("Online co-op",), night.rows[0].modes
+                squad = window.page.squad
+                squad.set_open(True)
+                squad.squad_views[1].click()
+                settle()
+                assert window.grab().save(str(args.output / "ready-room-game-night.png"))
             squad.squad_views[0].click()
             window.settings = dict(window.settings, game_night_friends=[])
 
