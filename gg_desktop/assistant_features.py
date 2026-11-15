@@ -396,6 +396,18 @@ FEATURES = FEATURES + (
          "Use Next and Back (or the arrow keys); Skip intro closes it."),
         "", "The ? button at the top right.", "Settings", "A short tour of Game Grave."),
     Feature(
+        "game_night", "Game Night",
+        ("game night", "what can we play", "what should we play together", "play together", "games in common",
+         "games we both have", "games my friends have", "co-op games we own"),
+        "Game Night, inside Squad Sync, shows the games you and your friends can all play, and who still needs a "
+        "download. Co-op and multiplayer are marked from Steam's store.",
+        ("Open Ready Room, then Squad Sync, and pick Game night.",
+         "Press Copy my game night code and paste it in your group chat. It lists your installed games and the name you pick.",
+         "Each friend does the same; press Paste a friend's code for each one.",
+         "The list shows games everyone has first, then games one person still needs to download."),
+        "Codes go person to person; nothing is sent to a server. Only installed games are listed.",
+        "Ready Room, Squad Sync, Game night.", "Ready Room", "See which games your group can all play tonight."),
+    Feature(
         "fix_game", "Fix my game",
         ("fix my game", "won't start", "wont start", "won't launch", "wont launch", "keeps crashing", "game crashes",
          "game won't open", "black screen", "game freezes", "crashes on startup", "crashes to desktop"),
@@ -427,6 +439,7 @@ _GUIDES = {
     "other_storage": ("tab:Other Storage", "scan other storage"), "captures": ("tab:Captures", "scan my captures"),
     "games_tab": ("tab:Games", ""), "my_mods": ("tab:Mods", ""), "scan_pc": ("", "scan my games"),
     "never_touch": ("tab:Settings", ""), "welcome_tour": ("tour", ""), "fix_game": ("tab:Fix Kit", "fix my game"),
+    "game_night": ("tab:Ready Room", ""),
 }
 # Tabs that also hold scan data: "what is in other storage" is a question about the data, so their guide only answers a
 # how-to question ("how do I use other storage").

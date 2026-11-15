@@ -29,8 +29,35 @@ def build_panel(panel_cls, window):
     body = SquadBody(window)
     body.on_status = panel.set_subtitle
     panel.body_layout.setContentsMargins(14, 8, 14, 10)
-    panel.body_layout.addWidget(body)
+    # Two views: matching mods (as before) and Game Night (what can we all play tonight).
+    from PySide6.QtWidgets import QStackedWidget
+    from gg_desktop.gamenight_ui import GameNightBody
+    switch = row(spacing=6)
+    stack = QStackedWidget()
+    stack.addWidget(body)
+    night = GameNightBody(window)
+    stack.addWidget(night)
+    views = {}
+    for n, caption in enumerate(("Match mods", "Game night")):
+        choice = button(caption, None, kind="segment")
+        choice.setCheckable(True)
+        choice.setFixedHeight(28)
+        choice.setStyleSheet("QPushButton{padding:0 14px;border-radius:14px;background:#0b1118;border:1px solid #2b3846;"
+                             "color:#c9d2dc;font-weight:600;} QPushButton:checked{background:#7d1529;border-color:#e5243b;"
+                             "color:#ffffff;}")
+        choice.clicked.connect(lambda _=False, i=n: (stack.setCurrentIndex(i), [b.setChecked(k == i) for k, b in views.items()],
+                                                     setattr(window, "squad_view", i)))
+        views[n] = choice
+        switch.addWidget(choice)
+    switch.addStretch()
+    start = getattr(window, "squad_view", 0)
+    stack.setCurrentIndex(start)
+    views[start].setChecked(True)
+    panel.body_layout.addLayout(switch)
+    panel.body_layout.addWidget(stack, 1)
     panel.squad = body
+    panel.game_night = night
+    panel.squad_views = views
     body.report_status()
     return panel
 

@@ -210,6 +210,32 @@ def main():
                 dialog.close()
                 settle()
 
+            # Game Night in Squad Sync: a friend's code shows what you can all play, with Steam's co-op tags.
+            from gg_desktop import gamenight_core as gn
+            window.settings = dict(window.settings, game_night_name="Alex")
+            window.navigate("Ready Room")
+            settle()
+            squad = window.page.squad
+            squad.set_open(True)
+            squad.squad_views[1].click()
+            settle()
+            night = squad.game_night
+            friend_code = gn.make_code("Jay", [SimpleNamespace(name=window.inventory.games[0].name, launcher="Steam",
+                                                                 app_id=window.inventory.games[0].app_id, size_bytes=1)])
+            with patch.object(gn, "fetch_modes", lambda ids, cache, **k: dict(cache, **{i: ("Online co-op",) for i in ids})), \
+                    patch.object(gn, "save_modes", lambda cache, path=None: None):
+                assert night.paste_code("lets play tonight " + friend_code)
+                for _ in range(60):
+                    settle()
+                    time.sleep(0.05)
+                    if night.rows and night.rows[0].modes:
+                        break
+            assert "can all play 1 game" in night.headline.text(), night.headline.text()
+            assert night.rows[0].modes == ("Online co-op",), night.rows[0].modes
+            assert window.grab().save(str(args.output / "ready-room-game-night.png"))
+            squad.squad_views[0].click()
+            window.settings = dict(window.settings, game_night_friends=[])
+
             # Empty screens offer the next step.
             window.navigate("Other Storage")
             settle()
