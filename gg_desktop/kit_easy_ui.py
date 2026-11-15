@@ -370,6 +370,9 @@ class EasySetup(_Base):
                 self.refresh_summary()
                 return
             self.step(3)
+            from gg_desktop import comfort
+            comfort.notify(self.window_, "Kit saved and checked", f"{result['files']:,} files in {result['archive']}.",
+                           "good", "", toast=False)
             self.status.setText(f"Kit saved and checked: {result['archive']}\n{result['files']:,} files, {human_size(result['bytes'])}. "
                                 f"Parts: {', '.join(result['roles'])}.")
             self.create_button.hide()
@@ -624,6 +627,9 @@ class EasyRestore(_Base):
             skipped = f" Left alone because they already existed: {', '.join(result['skipped_existing'][:6])}." if result["skipped_existing"] else ""
             review = f" Parts for you to place yourself are in {result['review_folder']}." if result["review_folder"] else ""
             self.step(3)
+            from gg_desktop import comfort
+            comfort.notify(self.window_, "Game restored from a kit", f"Restored {result['files']:,} files.", "good", "",
+                           toast=False)
             self.status.setText(f"Restored {result['files']:,} files.{skipped}{review} {result['note']}")
             try:
                 from core import log_event

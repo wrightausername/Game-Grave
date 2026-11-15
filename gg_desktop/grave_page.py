@@ -941,6 +941,8 @@ def scan(window, automatic=False):
             from gg_desktop import scan_cache
             scan_cache.keep_async("grave", report)
             window._sync_scan_time()
+            from gg_desktop import comfort
+            comfort.notify(window, "Leftover scan finished", report.summary() + '.', "good", "Graveyard")
             invalidate(window)
             window.status.setText(report.summary() + ". Nothing was changed.")
         if live(window):

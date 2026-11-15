@@ -97,6 +97,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         QFontDatabase.addApplicationFont(str(Path(__file__).parent / "assets/ready_room/RobotoCondensed.ttf"))
         self.artwork = SteamArtwork(self)
         self._create_shell()
+        from gg_desktop import comfort          # Back, shortcuts, notifications, paused note, tray
+        comfort.install(self, self._top_box, self.bell_button)
         if not reference_preview:
             from gg_desktop import scan_cache    # the last results stay until the owner scans again
             try:
@@ -185,8 +187,11 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         self.scan_button.setFixedSize(105, 30)
         topbox.addWidget(self.scan_button)
         self.scan_button.hide()
-        topbox.addWidget(tool("", "bell", lambda: self.info("Scan Status", self.status.text() +
-            ("\n\n" + "\n".join(self.inventory.warnings) if self.inventory.warnings else "")), kind="chromeButton", tip="Scan status and warnings"))
+        from gg_desktop import comfort
+        self.bell_button = tool("", "bell", lambda: comfort.open_notices(self), kind="chromeButton",
+                                tip="Notifications and scan status (Ctrl+Shift+N)")
+        topbox.addWidget(self.bell_button)
+        self._top_box = topbox
         from gg_desktop import assistant_popout
         self.assistant_popout_button = tool("", "sparkles", lambda: assistant_popout.toggle(self), kind="chromeButton",
                                             tip="Pop out the AI Assistant so it stays beside any tab (Ctrl+Shift+A)")
@@ -335,6 +340,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         methods[route]()
         self._name_controls()
         self._sync_scan_time()
+        from gg_desktop import comfort
+        comfort.visited(self, route)
         from gg_desktop import assistant_popout
         pop = assistant_popout.current(self)
         if pop is not None:
@@ -418,6 +425,11 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             from gg_desktop import scan_cache
             scan_cache.keep_async("inventory", inventory)
             self._sync_scan_time()
+            from gg_desktop import comfort
+            comfort.notify(self, "Scan finished", f"{len(inventory.games)} games, {len(inventory.mods)} mod locations, "
+                           f"{len(inventory.graveyard)} Graveyard findings." + (" Some sources weren't available."
+                                                                               if inventory.warnings else ""),
+                           "warn" if inventory.warnings else "good", "Overview")
             self.status.setText(
                 f"Scanned {inventory.scanned_at}  •  {len(inventory.games)} game installs, "
                 f"{len(inventory.mods)} mod locations, {len(inventory.graveyard)} Graveyard findings."
@@ -451,6 +463,9 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         QMessageBox.warning(self, title, message)
 
     def closeEvent(self, event):
+        from gg_desktop import comfort
+        if comfort.close_to_tray(self, event):   # "Keep running when closed": hide in the tray instead
+            return
         if self.scanning or self.cleaning:
             self.error("Game Grave is busy",
                        "Cancel the scan or finish the approved recovery operation before closing.")
@@ -489,8 +504,11 @@ def main() -> int:
     app.setStyleSheet(STYLE)
     app.setQuitOnLastWindowClosed(True)
     win = CrimsonWindow(reference_preview="--ready-room-reference" in sys.argv)
-    if win.settings.get("start_minimized") is True and not win.reference_preview:
-        win.showMinimized()
+    hidden = "--minimized" in sys.argv or win.settings.get("start_minimized") is True
+    if hidden and not win.reference_preview:
+        from gg_desktop import comfort
+        if comfort.state_of(win).tray is None:
+            win.showMinimized()                   # no tray: start minimized on the taskbar
     else:
         win.show()
         from gg_desktop import welcome_ui      # first launch only: what Game Grave is, then the first scan

@@ -228,6 +228,9 @@ def download(window):
         window.status.setText(f"Local AI ready: {model_name(key)}. Ask a question to try it.")
         sync(window)
         refresh_chat(window)
+        from gg_desktop import comfort
+        comfort.notify(window, "Local AI is ready", f"{model_name(key)} is downloaded, checked and switched on.",
+                       "good", "AI Assistant", toast=False)
         window.info("Local AI is ready",
                     f"{model_name(key)} is downloaded, checked and switched on.\n\nAsk the assistant anything. The first "
                     "answer takes a little longer (up to a minute) while the model loads; after that it's quicker. You "

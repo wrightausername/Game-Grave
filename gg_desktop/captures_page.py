@@ -1328,6 +1328,8 @@ def scan(window, automatic=False):
             from gg_desktop import scan_cache
             scan_cache.keep_async("captures", report)
             window._sync_scan_time()
+            from gg_desktop import comfort
+            comfort.notify(window, "Captures scan finished", report.summary() + '.', "good", "Captures")
             state.duplicates = state.similar = None
             state.thumbs.clear()
             invalidate(window)

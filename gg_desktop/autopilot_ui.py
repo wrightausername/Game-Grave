@@ -452,9 +452,12 @@ def run_all(window, plan_id):
         st.running = ""
         remember(window, plan)
         redraw(window, plan)
-        text, _tone = run.outcome(plan)
+        text, tone = run.outcome(plan)
         window.status.setText(text)
         env.log(f"Plan \"{plan.request[:120]}\": {text}", "Plan finished")
+        from gg_desktop import comfort
+        comfort.notify(window, "Plan finished", f"{plan.request[:80]}: {text}", tone, "AI Assistant",
+                       toast=window.current_route != "AI Assistant")
 
     def next_step():
         if not order:
@@ -677,6 +680,9 @@ def tick(window, now=None):
         chat = _post(window, f"Routine: {routine['name']} ({core.describe_schedule(done_plan.schedule)})", answer,
                      done_plan, chat_title=ROUTINES_CHAT, prepared=True)
         show_notice(window, routine["name"], note, chat["id"], done_plan.id if waiting else "")
+        from gg_desktop import comfort
+        comfort.notify(window, "Routine: " + routine["name"], note, "warn" if waiting else "good", "AI Assistant",
+                       toast=False)
     prepare(window, plan, after=after)
     return routine
 

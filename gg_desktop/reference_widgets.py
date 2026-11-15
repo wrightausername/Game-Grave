@@ -61,6 +61,7 @@ PATHS = {
     "minus": '<path d="M4 12h16"/>',
     "maximize": '<rect x="5" y="5" width="14" height="14" rx="1"/>',
     "pin": '<path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/>',
+    "back": '<path d="M15 5l-7 7 7 7"/>',
     "more": '<circle cx="4" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="20" cy="12" r="1"/>',
     "chevron": '<path d="m6 9 6 6 6-6"/>',
     "plus": '<path d="M12 3v18M3 12h18"/>',

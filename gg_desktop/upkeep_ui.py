@@ -481,6 +481,9 @@ class UpkeepTab(QWidget):
             text = ("Done: " if ok else "Not finished: ") + words + (" Restart Windows to finish." if reboot else "")
             self.banner(text, tone)
             self.install_banner = (text, tone) if ok else None
+            from gg_desktop import comfort
+            comfort.notify(window, "Driver updates " + ("installed" if ok else "not finished"), text,
+                           {"good": "good", "warn": "warn"}.get(tone, "bad"), "tab:Hardware/Drivers & Startup")
             self.restart_button.setVisible(bool(reboot))
             log_event("driver_update", f"Driver updates through Windows Update: {words}",
                       result="installed" if ok else "not installed", source="hardware")

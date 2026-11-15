@@ -714,3 +714,21 @@ where the games / files are stored"). Games is reopened for this only.
   several) appears when such save folders exist. The right-click menu starts with Open install folder (Ctrl+O), Open save folder
   (disabled with a hint when none is known) and Open library folder. The bottom Open Folder action stays. Opening changes nothing.
 - Covered by `tools/games_triple_check.py` (Open buttons, menu entries, Ctrl+O, the exact-name save rule).
+
+Quality-of-life pass, batch A (owner instruction, 2026-11-14: "like it all except for reopen... go ahead", to the list of 17).
+Shell only; no tab layout changes. `gg_desktop/comfort_core.py` (pure, `tests/test_comfort.py`) and `gg_desktop/comfort.py`.
+- Back: an arrow at the left of the top bar, Alt+Left and the mouse's back button return to the previous tab (`History`).
+- Shortcuts: Ctrl+1..9 open the visible sidebar tabs in order; Ctrl+/ lists every shortcut; Ctrl+Shift+N opens notifications.
+- Notification centre: the bell opens a list of finished jobs (PC scan, Old Files / Other Storage / Captures / leftover scans,
+  driver installs, kits, Local AI, assistant plans and routines), newest 40 kept in `notices`, a red unread badge, Open buttons,
+  Clear all, the scan status and warnings (what the bell used to show), Copy diagnostics and Shortcuts.
+- Pop-up when a job finishes: bottom right, Open button, an optional extra action (used by Undo in batch B), gone after 8 s; a
+  Windows tray message instead when Game Grave is minimized or hidden.
+- "Paused while you play <game>" chip in the top bar while the Games tracker sees a game running (checked every 10 s; reads only).
+- Copy diagnostics: version, Windows, scan counts, warnings, the last 20 error messages and activity lines, main switches; the user
+  name is replaced in paths (`scrub`).
+- Tray icon: Open, Pop out the AI Assistant, Scan PC, Notifications, "Keep running when closed" (`close_to_tray`, default on; close
+  hides the window, a one-time tray message says how to quit), "Start with Windows (in the tray)" (installed app only: one value
+  in the owner's own HKCU Run key, removed when switched off, logged), Quit. `--minimized` starts hidden in the tray.
+  `GAME_GRAVE_TRAY=0` turns the tray off (set in CI so other checks close normally).
+- Covered by `tests/test_comfort.py`, `tools/comfort_smoke.py` and the updated Overview check (the bell opens Notifications).

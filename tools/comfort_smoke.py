@@ -1,0 +1,184 @@
+"""Everyday comforts, driven like the owner would: Back (button, Alt+Left, mouse back), Ctrl+1..9, the shortcut list, the
+notification centre and its badge, the pop-up with Open, Copy diagnostics, the "Paused while you play" note, and the tray
+(close hides it, Quit really quits). Nothing on this PC is changed."""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+import tempfile
+from contextlib import ExitStack
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=Path("_ci_temp"))
+    args = parser.parse_args()
+    args.output.mkdir(parents=True, exist_ok=True)
+    os.environ["GAME_GRAVE_TRAY"] = "1"
+    if sys.platform.startswith("linux"):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from PySide6.QtCore import QCoreApplication, QEvent, QPointF, Qt, QTimer
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QDialog, QLabel
+    from core import SteamGame, default_settings
+    from gg_desktop import comfort, comfort_core
+    from gg_desktop.app import CrimsonWindow
+    from gg_desktop.backend import Inventory
+    from gg_desktop.models import merge_games
+
+    app = QApplication.instance() or QApplication([])
+
+    def settle():
+        app.processEvents()
+        QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+        app.processEvents()
+
+    def modal(open_it, check):
+        seen = []
+
+        def look():
+            dialog = app.activeModalWidget()
+            try:
+                assert isinstance(dialog, QDialog), dialog
+                check(dialog)
+                seen.append(True)
+            finally:
+                if dialog is not None:
+                    dialog.reject()
+        QTimer.singleShot(60, look)
+        open_it()
+        settle()
+        assert seen, "The dialog did not open"
+
+    with tempfile.TemporaryDirectory(prefix="GG-comfort-") as temp:
+        root = Path(temp)
+        settings = dict(default_settings(), welcome_at_startup=False)
+        saved = []
+        stack = ExitStack()
+        for target, options in (
+            ("gg_desktop.app.load_settings", dict(return_value=settings)),
+            ("core.save_settings", dict(side_effect=lambda s: saved.append(dict(s)))),
+            ("core.config_dir", dict(return_value=root / "Preferences")),
+            ("gg_desktop.backend.save_settings", {}),
+            ("gg_desktop.backend.log_event", {}),
+            ("gg_desktop.ready_room_services.config_dir", dict(return_value=root / "Preferences")),
+            ("gg_desktop.game_artwork.artwork_dir", dict(return_value=root / "Artwork")),
+            ("gg_desktop.game_artwork._request", dict(side_effect=AssertionError("No automatic network"))),
+        ):
+            stack.enter_context(patch(target, **options))
+        stack.enter_context(patch.object(CrimsonWindow, "error"))
+        stack.enter_context(patch.object(CrimsonWindow, "info"))
+        with stack:
+            window = CrimsonWindow()
+            window.show()
+            window.resize(1440, 900)
+            steam = [SteamGame("1", "Elden Ring", "C:\\Steam", "C:\\Steam\\common\\ELDEN RING", 50 * 1024 ** 3, None, "Steam")]
+            window.inventory = Inventory(steam=steam, games=merge_games(steam, []), scanned_at="2026-11-14 17:40",
+                                         warnings=[r"Old Files folder C:\Users\someone\Downloads unavailable"])
+            settle()
+
+            # Back: the arrow, Alt+Left and the mouse's back button.
+            assert not window.back_button.isEnabled()
+            window.navigate("Games")
+            window.navigate("Mods")
+            window.navigate("Hardware")
+            settle()
+            assert window.back_button.isEnabled() and "Mods" in window.back_button.toolTip()
+            window.back_button.click()
+            settle()
+            assert window.current_route == "Mods", window.current_route
+            QTest.keyClick(window, Qt.Key_Left, Qt.AltModifier)
+            settle()
+            assert window.current_route == "Games", window.current_route
+            press = QMouseEvent(QEvent.MouseButtonPress, QPointF(10, 10), QPointF(10, 10), Qt.BackButton, Qt.BackButton,
+                                Qt.NoModifier)
+            QApplication.sendEvent(window, press)
+            settle()
+            assert window.current_route == "Overview", window.current_route
+
+            # Ctrl+1..9 follow the sidebar order.
+            QTest.keyClick(window, Qt.Key_3, Qt.ControlModifier)
+            settle()
+            from gg_desktop import nav_groups
+            visible = [r for r in nav_groups.routes() if not window.nav_buttons[r].isHidden()]
+            assert window.current_route == visible[2], (window.current_route, visible[:4])
+            modal(lambda: QTest.keyClick(window, Qt.Key_Slash, Qt.ControlModifier),
+                  lambda d: [l.text() for l in d.findChildren(QLabel)].index("Alt+Left") >= 0)
+
+            # A finished job: a pop-up with Open, a badge on the bell, a row in the notification centre.
+            window.navigate("Overview")
+            settle()
+            comfort.notify(window, "Driver updates installed", "2 of 2 installed.", "good", "Hardware")
+            settle()
+            toast = comfort.state_of(window).toast
+            assert toast is not None and toast.isVisible()
+            assert window.bell_badge.isVisible() and window.bell_badge.text() == "1"
+            assert window.grab().save(str(args.output / "shell-toast.png"))
+            open_button = next(b for b in toast.findChildren(type(window.back_button)) if b.text() == "Open")
+            open_button.click()
+            settle()
+            assert window.current_route == "Hardware"
+            assert saved and saved[-1]["notices"][0]["title"] == "Driver updates installed"
+            undone = []
+            comfort.notify(window, "Moved 3 files to the Recycle Bin", "From Old Files.", "good", "Undo Center",
+                           action=("Undo", lambda: undone.append(True)))
+            settle()
+            comfort.state_of(window).toast.action_button.click()
+            assert undone == [True], "The extra button (Undo) runs"
+
+            def centre(dialog):
+                words = " ".join(l.text() for l in dialog.findChildren(QLabel))
+                assert "Driver updates installed" in words and "Moved 3 files" in words and "Scan status:" in words
+                assert dialog.grab().save(str(args.output / "shell-notifications.png"))
+            modal(window.bell_button.click, centre)
+            assert not window.bell_badge.isVisible(), "Opening the list marks everything read"
+            modal(lambda: QTest.keyClick(window, Qt.Key_N, Qt.ControlModifier | Qt.ShiftModifier), lambda d: True)
+
+            # Copy diagnostics: version, counts, warnings, no user name.
+            comfort.copy_diagnostics(window)
+            text = app.clipboard().text()
+            assert "Game Grave diagnostics" in text and "games: 1" in text and "someone" not in text.replace(
+                os.path.expanduser("~"), "")
+            assert "Old Files folder" in text
+
+            # Paused while you play: shown while the Games tracker sees a game running.
+            window._games_tracker = SimpleNamespace(ledger=SimpleNamespace(active={window.inventory.games[0].key: 1}))
+            comfort.sync_paused(window)
+            assert window.paused_chip.isVisible() and window.paused_chip.text() == "Paused while you play Elden Ring"
+            assert window.grab().save(str(args.output / "shell-paused.png"))
+            window._games_tracker = SimpleNamespace(ledger=SimpleNamespace(active={}))
+            comfort.sync_paused(window)
+            assert not window.paused_chip.isVisible()
+
+            # Tray: closing hides the window and keeps it running; Quit closes it for real.
+            tray = comfort.state_of(window).tray
+            if tray is not None:
+                window.close()
+                settle()
+                assert not window.isVisible() and comfort.state_of(window).told_tray
+                comfort.show_window(window)
+                settle()
+                assert window.isVisible()
+                labels = [a.text() for a in comfort.state_of(window).tray_menu.actions()]
+                assert "Keep running when closed" in labels and "Quit Game Grave" in labels, labels
+                comfort.quit_app(window)
+                settle()
+                assert not window.isVisible()
+            else:
+                print("NOTE: this machine has no system tray; tray checks skipped.")
+                window._quitting = True
+                window.close()
+            settle()
+    print("PASS: Back, Ctrl+1..9, shortcut list, notification centre with badge and pop-ups, Copy diagnostics, paused "
+          "note and tray behave.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

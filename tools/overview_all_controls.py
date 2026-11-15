@@ -80,7 +80,7 @@ def check_controls(*, window, inventory, storage, root, app, home, drive, clicke
             drive(lambda widget=widget: QTest.mouseClick(widget, Qt.LeftButton), category_dialog)
             completed("Mouse: " + category + " legend " + part, "Open the same category from every part of the legend.")
     for tip, title in (("Help: watch the welcome tour of Game Grave", "Welcome to Game Grave"),
-                       ("Scan status and warnings", "Scan Status")):
+                       ("Notifications and scan status (Ctrl+Shift+N)", "Notifications")):
         def message(dialog, title=title):
             assert dialog.windowTitle() == title
             readable(dialog)
@@ -88,7 +88,8 @@ def check_controls(*, window, inventory, storage, root, app, home, drive, clicke
             if title.startswith("Welcome"):
                 dialog.reject()   # the ? button opens the welcome tour; Skip closes it
             else:
-                dismiss_message(dialog)
+                assert "Scan status:" in " ".join(l.text() for l in dialog.findChildren(QLabel))
+                dialog.reject()   # the bell opens the notification centre, which shows the scan status too
         drive(lambda tip=tip: QTest.mouseClick(header(tip), Qt.LeftButton), message)
         completed("Mouse: " + tip.split(":")[0], "Open a readable message and close it normally.")
     def activity_history(dialog):
@@ -367,7 +368,7 @@ def check_controls(*, window, inventory, storage, root, app, home, drive, clicke
     wait_for(lambda: not window.workers)
     def other_tab_message(dialog):
         assert not dialog.property("overviewReadable")
-        QTest.mouseClick(dialog.button(QMessageBox.Ok), Qt.LeftButton)
-    drive(lambda: QTest.mouseClick(header("Scan status and warnings"), Qt.LeftButton), other_tab_message)
+        dialog.reject()
+    drive(lambda: QTest.mouseClick(header("Notifications and scan status (Ctrl+Shift+N)"), Qt.LeftButton), other_tab_message)
     completed("Isolation: leave Overview and use shared Help", "Preserve the other tab's existing message behavior.")
     home()
