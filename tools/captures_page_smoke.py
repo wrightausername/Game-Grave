@@ -378,7 +378,7 @@ def main():
             assert str(extra) in window.settings["screenshot_roots"]
             assert "extra_shot.png" in [c.name for c in captures_page.universe(window)]
             window.capture_roots_list.setCurrentRow(next(i for i in range(window.capture_roots_list.count())
-                                                         if str(extra) in window.capture_roots_list.item(i).text()))
+                                                         if window.capture_roots_list.item(i).data(Qt.UserRole) == str(extra)))
             captures_page.remove_folder(window)
             wait_for(lambda: not state.busy and not window.workers)
             assert str(extra) not in window.settings["screenshot_roots"]
