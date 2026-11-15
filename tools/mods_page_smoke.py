@@ -163,7 +163,7 @@ def main():
             for option in mods_sort.OPTIONS:
                 window.mod_sort.setCurrentText(option)
                 settle()
-                assert window.mod_type.currentText() == "Mods only"      # storage folders are left out by default
+                assert window.mod_type.currentText() == "Mods only"      # storage folders left out when mods are known
                 kept = [v for v in window._mod_views
                         if getattr(getattr(v.record, "catalog_entry", None), "kind", "mod") == "mod"]
                 expected = [v.name for v in mods_sort.sort_views(kept, option)]

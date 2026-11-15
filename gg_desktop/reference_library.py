@@ -531,6 +531,9 @@ class LibraryScreens:
         game = game_item.data(Qt.UserRole) if game_item else "All Games"
         managers = {c.property("manager") for c in self.mod_manager_checks if c.isChecked()}
         kind = self.mod_type.currentText()
+        if kind == "Mods only" and not any(getattr(getattr(m.record, "catalog_entry", None), "kind", "mod") == "mod"
+                                           for m in self._mod_views):
+            kind = "All Types"       # no individual mods known: the folders are all there is to show
         rows = [m for m in self._mod_views
                 if (game == "All Games" or game == m.game)
                 and (not managers or m.manager in managers)
