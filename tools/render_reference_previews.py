@@ -172,6 +172,12 @@ def main():
                         raise RuntimeError("Failed to render " + route)
                     print(path)
             finally:
+                for _ in range(400):      # an Old Files folder scan started by opening the tab must finish first,
+                    if not (window.scanning or window.cleaning):   # or closing would show the "busy" message box
+                        break
+                    app.processEvents()
+                    time.sleep(.05)
+                window.scanning = window.cleaning = False
                 window.close()
                 app.processEvents()
     return 0
