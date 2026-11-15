@@ -286,9 +286,9 @@ def handle(window, text, shown=None):
                "startup_off": "Hardware", "scan_library": "Overview"}.get(step.key, "More Tools")
         if tab not in tabs:
             tabs.append(tab)
-    shown = {"More Tools": "Toolbox"}
+    tab_names = {"More Tools": "Toolbox"}
     answer = engine.Answer("autopilot" if on else "autopilot_off", core.intro(plan, on), sources=("Game Grave tools",),
-                           handoffs=tuple(("Open " + shown.get(t, t), t) for t in tabs[:3]))
+                           handoffs=tuple(("Open " + tab_names.get(t, t), t) for t in tabs[:3]))
     _post(window, shown or text, answer, plan if on else None, off_plan=None if on else plan)
     return True
 
