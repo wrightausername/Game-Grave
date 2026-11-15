@@ -189,7 +189,9 @@ def main():
             assert second.is_file(), "backup from the offered save folder was not made"
 
             def check_vault(dialog):
-                assert "VerifiedBackup.zip" in dialog.findChild(QListWidget).item(0).text()
+                vault = dialog.findChild(QListWidget)
+                texts = [vault.item(i).text() for i in range(vault.count())]
+                assert any("VerifiedBackup.zip" in t for t in texts) and any("Second.zip" in t for t in texts), texts
                 dialog.accept()
             drive_dialog(window.ready_manage_saves, check_vault)
             def check_health(dialog):
@@ -206,7 +208,7 @@ def main():
             window.navigate("Ready Room")
             settle()
             assert window.page.data.counts[4] == "1"
-            assert window.page.data.backup_title == "1 Saved Backup"
+            assert window.page.data.backup_title == "2 Saved Backups"
             assert window.grab().save(str(args.output / "ready-room-live-functional.png"))
             error.assert_not_called()
             assert not window.workers
