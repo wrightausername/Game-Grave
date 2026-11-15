@@ -109,8 +109,8 @@ def main():
             assert dialog.isVisible()
             # The easy part: the game and its mods are found without asking; the choices stay folded.
             assert dialog.game().name == "Pixel Farm" and not dialog.advanced.isVisible()
-            assert "6 Pixel Farm mods" in dialog.found_line.text() and "minutes" in dialog.found_line.text(), \
-                dialog.found_line.text()
+            assert "1 Pixel Farm mod installed with Vortex" in dialog.found_line.text(), dialog.found_line.text()
+            assert "minutes" in dialog.found_line.text()
             dialog.when_box.setCurrentIndex(dialog.when_box.findData("play"))
             settle()
             assert dialog.fine_box.currentData() == 300 and dialog.sometimes.isChecked() and dialog.when_note.text()
@@ -124,6 +124,7 @@ def main():
             settle()
             assert Path(dialog.folder) == mods, "the Mods folder was not found by itself"
             assert "Mod folder:" in dialog.note.text() and "no mod manager" in dialog.found_line.text()
+            assert "6 Pixel Farm mods" in dialog.found_line.text(), dialog.found_line.text()
             dialog.grab().save(str(args.output / "crash-doctor-setup.png"))
 
             dialog.timer.setInterval(40)

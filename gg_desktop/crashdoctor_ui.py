@@ -186,7 +186,7 @@ class DoctorDialog(ToolDialog):
                      "Folder": f"in {Path(self.folder).name or self.folder} (no mod manager)"}[method]
             fine = int(self.fine_box.currentData() or 120)
             _lo, _hi, low_min, high_min = cd.estimate(count, fine, self.sometimes.isChecked())
-            text = (f"Game Grave will test your {count} {game.name} mods {where}. It takes about {low_min} to "
+            text = (f"Game Grave will test your {count} {game.name} mod{'s' if count != 1 else ''} {where}. It takes about {low_min} to "
                     f"{high_min} minutes; leave the PC alone while it runs.")
         self.found_line.setText(text)
         self.start_button.setEnabled(bool(count) and self.phase == "idle")
