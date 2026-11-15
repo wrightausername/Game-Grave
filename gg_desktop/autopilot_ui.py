@@ -256,8 +256,9 @@ def opens_for(text):
 
 
 # ------------------------------------------------------------------ chat requests
-def handle(window, text):
-    """Called by the AI Assistant before its built-in answers. True when the request became a plan or opened a tool."""
+def handle(window, text, shown=None):
+    """Called by the AI Assistant before its built-in answers. True when the request became a plan or opened a tool.
+    `shown` is what the chat shows as the person's message (a follow-up like "proceed" instead of the original request)."""
     feature = opens_for(text)
     leads = re.match(r"^(please |can you |could you )?(open|take me|go to|launch|show me|bring up|pull up|start)\b",
                      " ".join(text.casefold().split()))
@@ -284,7 +285,7 @@ def handle(window, text):
     shown = {"More Tools": "Toolbox"}
     answer = engine.Answer("autopilot" if on else "autopilot_off", core.intro(plan, on), sources=("Game Grave tools",),
                            handoffs=tuple(("Open " + shown.get(t, t), t) for t in tabs[:3]))
-    _post(window, text, answer, plan if on else None, off_plan=None if on else plan)
+    _post(window, shown or text, answer, plan if on else None, off_plan=None if on else plan)
     return True
 
 

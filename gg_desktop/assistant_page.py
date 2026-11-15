@@ -39,15 +39,27 @@ WELCOME_TOOLS = ("Ask me about your games, storage, mods, captures or cleanup hi
                  "\"get my PC ready to play\" or \"every Sunday at 9pm clean temp files\". Answers only use what Game Grave "
                  "has scanned. To do something I show a plan of Game Grave's own tools, and nothing changes until you "
                  "press Run all.")
+PROMPT_CHIP = ("QPushButton{background:#0f161e;border:1px solid #243243;border-radius:13px;color:#c9d4df;font-size:11px;"
+               "padding:0 10px;text-align:left;} QPushButton:hover{border-color:#e5243b;color:#ffffff;}")
+PILL = ("QLabel{{color:{0};background:{1};border:1px solid {0};border-radius:10px;padding:2px 9px;font-size:11px;"
+        "font-weight:700;}}")
+SUGGESTIONS = (   # the empty chat's cards: (icon, title, example asked when clicked)
+    ("list", "Largest games", "What are my largest games by size?"),
+    ("storage", "Free up space", "Where can I free up space?"),
+    ("warning", "Fix a game", "My game won't start, fix it"),
+    ("game", "Play with friends", "What can my friends and I play together?"),
+    ("sparkles", "Make a game run better", "How do I make a game run better?"),
+    ("trash", "Clean temp files", "Clean up my temp files"),
+)
 ACCENTS = {"red": "255,37,74", "yellow": "246,190,36", "cyan": "19,188,245", "green": "50,214,122"}
 
 
 def accent(frame, name, tone):
     rgb = ACCENTS[tone]
     frame.setObjectName(name)
-    frame.setStyleSheet(
-        f"QFrame#{name}{{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 rgba({rgb},38),stop:.4 #08101a,stop:1 #060b12);"
-        f"border:1.5px solid rgba({rgb},215);border-radius:10px;}}")
+    frame.setStyleSheet(   # calm: one quiet border, a thin coloured line on top, a faint tint
+        f"QFrame#{name}{{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 rgba({rgb},14),stop:.25 #0a1017,stop:1 #080d13);"
+        f"border:1px solid #1b2633;border-top:2px solid rgba({rgb},170);border-radius:12px;}}")
     return frame
 
 
@@ -106,8 +118,9 @@ class Avatar(QLabel):
         super().__init__()
         self.setFixedSize(30, 30)
         self.setAlignment(Qt.AlignCenter)
-        self.setPixmap(icon("sparkles", "#ff254a", 17).pixmap(17, 17))
-        self.setStyleSheet("background:#14060b;border:1px solid #ff254a;border-radius:15px;")
+        self.setPixmap(icon("sparkles", "#ff5a73", 16).pixmap(16, 16))
+        self.setStyleSheet("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #3a0d18,stop:1 #170910);"
+                           "border:1px solid #5c1726;border-radius:15px;")
 
 
 def bubble(text):
@@ -117,8 +130,8 @@ def bubble(text):
     line.addStretch()
     frame = QFrame()
     frame.setObjectName("assistantAsk")
-    frame.setStyleSheet("QFrame#assistantAsk{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 rgba(255,37,74,80),"
-                        "stop:1 rgba(255,37,74,30));border:1px solid #8c1b2f;border-radius:10px;}")
+    frame.setStyleSheet("QFrame#assistantAsk{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #4a1220,stop:1 #2a0c15);"
+                        "border:1px solid #6a1a2b;border-radius:14px;border-bottom-right-radius:4px;}")
     inner = column(spacing=0, margins=(12, 8, 12, 8))
     frame.setLayout(inner)
     text_label = label(text, "subtle", wrap=True)
@@ -213,6 +226,7 @@ def build(window):
         ("shield", "Read Only", "Assistant Mode", "#32d67a"), ("storage", "0 of 5", "Data Sources On", "#f2a5b2")],
         compact=True)
     page.content.addWidget(self.assistant_metrics)
+    self.assistant_metrics.hide()     # calmer page: the mode is a pill in the chat header, counts live in Data Used
 
     # --- left: conversations and quick prompts
     convo, side = panel(kind="fileFilterPanel", padding=9, spacing=6)
@@ -242,25 +256,10 @@ def build(window):
     self.assistant_list.itemSelectionChanged.connect(lambda: pick_chat(self))
     side.addWidget(self.assistant_list, 1)
 
-    prompts, box = panel(kind="fileFilterPanel", padding=9, spacing=5)
-    accent(prompts, "assistantPrompts", "yellow")
-    prompts.setMinimumWidth(190)
-    prompts.setMaximumWidth(235)
-    head2 = row(spacing=6)
-    bolt = QLabel()
-    bolt.setPixmap(icon("sparkles", "#f6be24", 18).pixmap(18, 18))
-    head2.addWidget(bolt)
-    head2.addWidget(label("Quick Prompts", "sectionTitle"), 1)
-    box.addLayout(head2)
-    for symbol, text, question in engine.QUICK_PROMPTS:
-        control = tool(text, symbol, lambda _=False, q=question: send(self, q), tip=question)
-        control.setStyleSheet("text-align:left;font-size:12px;")
-        box.addWidget(control)
     left = QWidget()
     left_lay = column(spacing=8)
     left.setLayout(left_lay)
-    left_lay.addWidget(convo, 5)
-    left_lay.addWidget(prompts, 4)
+    left_lay.addWidget(convo, 1)
     left.setMinimumWidth(190)
     left.setMaximumWidth(235)
 
@@ -275,6 +274,9 @@ def build(window):
     self.assistant_title.setMinimumWidth(0)
     self.assistant_title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
     top.addWidget(self.assistant_title, 1)
+    self.assistant_mode = QLabel("Read only")
+    self.assistant_mode.setAccessibleName("Assistant mode")
+    top.addWidget(self.assistant_mode)
     self.assistant_scope = tool("All Games", "game", lambda: choose_scope(self),
                                 tip="Limit answers to one game, or all games")
     self.assistant_scope.setFixedHeight(28)
@@ -292,19 +294,27 @@ def build(window):
     self.assistant_scroll.setWidget(holder)
     body.addWidget(self.assistant_scroll, 1)
 
-    using_box = QWidget()
-    using_box.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-    using_box.setMinimumWidth(0)
-    using = row(spacing=6, margins=(12, 4, 12, 0))
-    using_box.setLayout(using)
-    using.addWidget(label("Using", "caption"))
-    self.assistant_using = row(spacing=5)
-    using.addLayout(self.assistant_using)
-    using.addStretch()
-    body.addWidget(using_box)
-    compose = row(spacing=8, margins=(12, 6, 12, 10))
+    prompt_box = QWidget()
+    prompt_box.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+    prompt_box.setMinimumWidth(0)
+    prompt_row = ActionFlow(spacing=6)
+    prompt_row.setContentsMargins(14, 6, 14, 0)
+    prompt_box.setLayout(prompt_row)
+    for symbol, text, question in engine.QUICK_PROMPTS:
+        chip_button = tool(text, symbol, lambda _=False, q=question: send(self, q), tip=question)
+        chip_button.setFixedHeight(26)
+        chip_button.setStyleSheet(PROMPT_CHIP)
+        prompt_row.addWidget(chip_button)
+    body.addWidget(prompt_box)
+    compose_box = QFrame()
+    compose_box.setObjectName("assistantCompose")
+    compose_box.setStyleSheet("QFrame#assistantCompose{background:#0d141c;border:1px solid #263445;border-radius:22px;}"
+                              "QFrame#assistantCompose QLineEdit{background:transparent;border:0;color:#f2f5f8;"
+                              "font-size:13px;padding:0 4px;}")
+    compose = row(spacing=6, margins=(14, 4, 5, 4))
+    compose_box.setLayout(compose)
     self.assistant_input = QLineEdit()
-    self.assistant_input.setPlaceholderText("Ask about your games, mods, storage, or cleanup history…")
+    self.assistant_input.setPlaceholderText("Ask anything, or tell me what to do… (Enter to send)")
     self.assistant_input.setAccessibleName("Message the assistant")
     self.assistant_input.setMaxLength(engine_limit())
     self.assistant_input.setFixedHeight(36)
@@ -312,9 +322,22 @@ def build(window):
     self.assistant_input.returnPressed.connect(lambda: send(self))
     compose.addWidget(self.assistant_input, 1)
     self.assistant_send = tool("Send", "chevron", lambda: send(self), kind="primary", tip="Ask (Enter)")
-    self.assistant_send.setFixedHeight(36)
+    self.assistant_send.setFixedHeight(34)
+    self.assistant_send.setStyleSheet("border-radius:17px;padding:0 16px;")
     compose.addWidget(self.assistant_send)
-    body.addLayout(compose)
+    outer = row(spacing=0, margins=(12, 8, 12, 4))
+    outer.addWidget(compose_box, 1)
+    body.addLayout(outer)
+    using_box = QWidget()
+    using_box.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+    using_box.setMinimumWidth(0)
+    using = row(spacing=5, margins=(18, 0, 12, 8))
+    using_box.setLayout(using)
+    using.addWidget(label("Answers use", "caption"))
+    self.assistant_using = row(spacing=4)
+    using.addLayout(self.assistant_using)
+    using.addStretch()
+    body.addWidget(using_box)
 
     # --- right: data used and what it can do
     used, used_lay = panel(kind="fileFilterPanel", padding=9, spacing=4)
@@ -376,6 +399,11 @@ def refresh(window):
     strip.set_value(3, metrics["scan"])
     from gg_desktop import autopilot_ui
     strip.set_value(4, "Runs Tools" if autopilot_ui.enabled(window) else "Read Only")
+    runs = autopilot_ui.enabled(window)
+    window.assistant_mode.setText("Runs tools (asks first)" if runs else "Read only")
+    window.assistant_mode.setToolTip("The assistant can run Game Grave's own tools; nothing changes until you press Run all."
+                                     if runs else "The assistant only answers. Turn on running tools in Automation.")
+    window.assistant_mode.setStyleSheet(PILL.format("#32d67a" if runs else "#9fb0c2", "#0b1a12" if runs else "#0f161e"))
     strip.set_value(5, f"{metrics['sources_on']} of {metrics['sources_total']}")
     for source in data.source_states(facts):
         check, detail = window.assistant_source_rows[source.key]
@@ -436,7 +464,7 @@ def render_chat(window, layout=None, title=None, scroll=None, compact=False):
     title.setText(chat["title"] if chat and chat["messages"] else "New chat")
     if not chat or not chat["messages"]:
         from gg_desktop import autopilot_ui
-        add_assistant_text(window, WELCOME_TOOLS if autopilot_ui.enabled(window) else WELCOME, layout)
+        layout.addWidget(welcome_hero(window, WELCOME_TOOLS if autopilot_ui.enabled(window) else WELCOME, compact))
         if local_ai_ui.show_card(window) and not compact:
             layout.addSpacing(6)
             layout.addWidget(local_ai_ui.setup_card(window))
@@ -451,6 +479,64 @@ def render_chat(window, layout=None, title=None, scroll=None, compact=False):
                            layout)
     layout.addStretch()
     scroll_down(window, scroll)
+
+
+def welcome_hero(window, text, compact=False):
+    """The empty chat: a friendly heading, what the assistant does in one paragraph, and cards to start from."""
+    from PySide6.QtWidgets import QGridLayout
+    hero = QWidget()
+    box = column(spacing=10, margins=(4 if compact else 24, 10 if compact else 26, 4 if compact else 24, 6))
+    hero.setLayout(box)
+    mark = QLabel()
+    mark.setFixedSize(52, 52)
+    mark.setAlignment(Qt.AlignCenter)
+    mark.setPixmap(icon("sparkles", "#ff5a73", 26).pixmap(26, 26))
+    mark.setStyleSheet("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #4a1220,stop:1 #170910);"
+                       "border:1px solid #6a1a2b;border-radius:26px;")
+    box.addWidget(mark, 0, Qt.AlignHCenter)
+    title = label("What can I help with?", "sectionTitle")
+    title.setStyleSheet("font-size:%dpx;font-weight:800;color:#ffffff;" % (17 if compact else 22))
+    title.setAlignment(Qt.AlignCenter)
+    box.addWidget(title)
+    words = label(text, "subtle", wrap=True)
+    words.setTextFormat(Qt.PlainText)
+    words.setAlignment(Qt.AlignCenter)
+    words.setStyleSheet("color:#aab6c3;font-size:12px;")
+    words.setMaximumWidth(560)
+    box.addWidget(words, 0, Qt.AlignHCenter)
+    grid = QGridLayout()
+    grid.setHorizontalSpacing(8)
+    grid.setVerticalSpacing(8)
+    columns = 1 if compact else 3
+    for n, (symbol, name, question) in enumerate(SUGGESTIONS):
+        card = QPushButton()
+        card.setObjectName("assistantSuggestion")
+        card.setCursor(Qt.PointingHandCursor)
+        card.setAccessibleName(name)
+        card.setToolTip(question)
+        card.setMinimumHeight(58)
+        card.setStyleSheet("QPushButton#assistantSuggestion{background:#0d141c;border:1px solid #213040;border-radius:12px;"
+                           "text-align:left;padding:8px 12px;} QPushButton#assistantSuggestion:hover{border-color:#e5243b;"
+                           "background:#13101a;}")
+        inner = row(spacing=10, margins=(0, 0, 0, 0))
+        card.setLayout(inner)
+        glyph = QLabel()
+        glyph.setPixmap(icon(symbol, ROW_COLORS[n % len(ROW_COLORS)], 18).pixmap(18, 18))
+        glyph.setAttribute(Qt.WA_TransparentForMouseEvents)
+        inner.addWidget(glyph, 0, Qt.AlignTop)
+        texts = column(spacing=1)
+        head = label(name, "detailValue")
+        head.setStyleSheet("font-weight:700;color:#f2f5f8;font-size:12px;")
+        example = label("\u201c" + question + "\u201d", "caption", wrap=True)
+        example.setStyleSheet("color:#8d9aa8;font-size:11px;")
+        for part in (head, example):
+            part.setAttribute(Qt.WA_TransparentForMouseEvents)
+            texts.addWidget(part)
+        inner.addLayout(texts, 1)
+        card.clicked.connect(lambda _=False, q=question: send(window, q))
+        grid.addWidget(card, n // columns, n % columns)
+    box.addLayout(grid)
+    return hero
 
 
 def add_assistant_text(window, text, layout=None):
@@ -610,6 +696,8 @@ def send(window, question=None, source=None):
     if question is None:
         box.clear()
     text = here_question(window, text)
+    if follow_up(window, text):          # "proceed", "yes", "do it": act on what the assistant just offered
+        return
     if autopilot_ui.handle(window, text):  # a request to run Game Grave's own tools becomes a plan
         window.status.setText("Planned with Game Grave's own tools. Nothing changes until you press Run all.")
         return
@@ -678,6 +766,58 @@ def send(window, question=None, source=None):
     persist_chats(window)
     window.status.setText("Answered from scanned data. Nothing was changed.")
     refresh_all(window)
+
+
+def _say(window, text, reply):
+    state = ensure_chats(window)
+    chat = current_chat(window)
+    if chat is None:
+        chat = actions.new_chat(time.time())
+        state.chats.insert(0, chat)
+        state.current = chat["id"]
+    actions.add_exchange(chat, text, engine.Answer("followup", reply), time.time())
+    persist_chats(window)
+    refresh_all(window)
+
+
+def follow_up(window, text):
+    """True when `text` was a reply to the assistant's last offer and has been acted on."""
+    from gg_desktop import assistant_followup as fu
+    go, no = fu.is_go_ahead(text), fu.is_no(text)
+    if not (go or no):
+        return False
+    offer = fu.last_offer(current_chat(window))
+    if offer is None:
+        if go:
+            _say(window, text, fu.NOTHING)
+            return True
+        return False
+    if no:
+        _say(window, text, fu.DECLINED)
+        return True
+    from gg_desktop import autopilot_core, autopilot_ui
+    if offer.kind == "turn_on":
+        if not save(window, dict(window.settings, **{autopilot_core.SETTING: True})):
+            return True
+        if _alive_switch(window):
+            window.autopilot_switch.blockSignals(True)
+            window.autopilot_switch.setChecked(True)
+            window.autopilot_switch.blockSignals(False)
+        autopilot_ui.sync_panel(window)
+        autopilot_ui.handle(window, offer.request, shown=text)     # the plan; nothing changes until Run all
+        window.status.setText("Running tools is on. Here is the plan; nothing changes until you press Run all.")
+        return True
+    if offer.kind == "plan":
+        if offer.plan_id not in autopilot_ui.state_of(window).plans:
+            _say(window, text, fu.STALE)
+            return True
+        _say(window, text, fu.RUNNING)
+        autopilot_ui.run_all(window, offer.plan_id)                  # its one confirmation still comes first
+        return True
+    if offer.kind == "do":
+        send(window, offer.request)
+        return True
+    return False
 
 
 # "How do I use this?" asked from the pop-out means the tab you are looking at.

@@ -143,7 +143,9 @@ def main():
             ask(window, "clean up my temp files")
             assert "running tools is switched off" in transcript(window), transcript(window)
             assert not cleaned and not log
-            press(window, "Turn on and plan it")
+            assert "Turn on and plan it" in [b.text() for b in window.assistant_scroll.widget().findChildren(QPushButton)]
+            ask(window, "proceed")       # a typed follow-up does what the button does: turn on, then plan the request
+            assert "proceed" in transcript(window)
             assert ui.enabled(window) and window.autopilot_switch.isChecked() and saved[-1][core.SETTING] is True
             plan = list(ui.state_of(window).plans.values())[-1]
             wait_for(lambda: plan.steps[0].status == "done", "the temp-file check")
@@ -155,7 +157,7 @@ def main():
 
             # Run all: one confirmation naming the exact change, then the change, logged.
             confirm.reset_mock()
-            press(window, "Run all")
+            ask(window, "yes go ahead")  # "yes" presses Run all; its one confirmation still comes first
             assert confirm.called and "no Recycle Bin" in confirm.call_args[0][1], confirm.call_args
             wait_for(lambda: plan.steps[1].status == "done", "the clean-up")
             assert cleaned == [3] and log[0][0].startswith("Delete old temporary files: Deleted 3 files")

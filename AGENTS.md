@@ -841,3 +841,21 @@ on another tab and only fold back up when i click the same one again"). This rep
 sidebar: each heading opens or folds only its own group (`nav_groups.toggled` on a set); going to a tab opens that tab's group if
 it was folded and folds nothing else (`open_for`); the open groups are kept in `nav_open_groups` and come back at the next start
 (`saved_open`, unknown headings dropped). Covered by `tests/test_nav_groups.py` and `tools/shell_polish_smoke.py`.
+
+AI Assistant, sleeker and remembers what it offered (owner instructions, 2026-11-15: "AI UI needs to be sleeker and beautiful to
+follow and easy" and "it seems to forget things easily... i ask it to automate something it says i need to turn it on thats fine
+but then i say proceed in the next text and it doesnt know"). AI Assistant layout and follow-ups are reopened; answers, sources,
+automation rules and every confirmation are unchanged.
+- Look: panels use one quiet border with a thin coloured top line instead of glowing coloured outlines (`accent`, also used by the
+  Local AI and Automation panels); the numbers strip is hidden (still filled, for checks) and the mode is a pill in the chat header
+  ("Read only" / "Runs tools (asks first)"); the Quick Prompts box is gone, so Conversations has the full height, and the same five
+  prompts are chips above a rounded message box; "Answers use" chips sit under it. An empty chat shows "What can I help with?",
+  the welcome paragraph and six suggestion cards (largest games, free up space, fix a game, play with friends, make a game run
+  better, clean temp files); the pop-out shows them in one column. Softer message bubble and avatar.
+- Follow-ups (`assistant_followup.py`, `assistant_page.follow_up`): a short "proceed / yes / go ahead / do it / run it / turn it
+  on" acts on the newest assistant message in the same chat. After the "running tools is off" preview it turns running tools on
+  and makes the plan (shown under the person's "proceed"); after a plan with waiting changes it presses Run all, whose one
+  confirmation still comes first; after a walkthrough with "Do it for me" it asks that. A plan from before a restart is not run
+  ("ask again"). "No / cancel" changes nothing and says so. With nothing offered, it says what it can do instead of guessing.
+- Covered by `tests/test_followup.py`, `tools/autopilot_smoke.py` ("proceed" turns on and plans, "yes go ahead" runs with the
+  confirmation) and `tools/assistant_page_smoke.py`.
