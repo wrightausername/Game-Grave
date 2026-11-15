@@ -64,20 +64,28 @@ def main():
             assert order[-3:] == ["More Tools", "AI Assistant", "Settings"], order
             visible = [route for route, control in window.nav_buttons.items() if not control.isHidden()]
             assert visible[-2:] == ["More Tools", "Settings"], visible
-            # Dropdown groups: one open at a time, the current tab's group opens by itself, one click folds it.
+            # Dropdown groups: each stays open until its own heading is clicked again; going to a tab never folds others.
             from PySide6.QtCore import QPoint
             from gg_desktop import nav_rail
-            assert window.nav_open_group == "Home" and window.nav_bodies["Home"].isVisible()
-            assert all(not window.nav_bodies[g].isVisible() for g in window.nav_bodies if g != "Home"), "Only one group is open"
+            assert window.nav_open_groups == {"Home"} and window.nav_bodies["Home"].isVisible()
+            assert all(not window.nav_bodies[g].isVisible() for g in window.nav_bodies if g != "Home")
             window.nav_heads["Library"].click()
             settle()
-            assert window.nav_open_group == "Library" and not window.nav_bodies["Home"].isVisible()
+            assert window.nav_open_groups == {"Home", "Library"}, window.nav_open_groups
+            assert window.nav_bodies["Home"].isVisible() and window.nav_bodies["Library"].isVisible(), "Opening one keeps the other"
+            window.navigate("Old Files")
+            settle()
+            assert window.nav_bodies["Library"].isVisible() and window.nav_bodies["Home"].isVisible(), "Another tab folds nothing"
+            assert window.nav_open_groups == {"Home", "Library", "Clean Up"}, window.nav_open_groups
             window.nav_heads["Library"].click()
             settle()
-            assert window.nav_open_group == "" and not window.nav_bodies["Library"].isVisible(), "A second click folds it away"
+            assert "Library" not in window.nav_open_groups and not window.nav_bodies["Library"].isVisible(), "Its own heading folds it"
+            assert window.settings.get("nav_open_groups") == ["Home", "Clean Up"], window.settings.get("nav_open_groups")
+            for heading in ("Home", "Clean Up"):                     # fold them so the row check below sees one group
+                window.nav_heads[heading].click()
             window.navigate("Hardware")
             settle()
-            assert window.nav_open_group == "PC and Help" and window.nav_buttons["Hardware"].isVisibleTo(window)
+            assert window.nav_open_groups == {"PC and Help"} and window.nav_buttons["Hardware"].isVisibleTo(window)
             QTest.qWait(250)
             settle()
             holder = window.nav_scroll.widget()

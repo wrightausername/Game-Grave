@@ -27,12 +27,14 @@ class NavGroupTests(unittest.TestCase):
         self.assertEqual(nav_groups.group_of("Fix Kit"), "Fix and Protect")
         self.assertEqual(nav_groups.group_of("Nope"), "")
 
-    def test_dropdown_accordion(self):
-        self.assertEqual(nav_groups.toggled("Home", "Library"), "Library")
-        self.assertEqual(nav_groups.toggled("Library", "Library"), "")
-        self.assertEqual(nav_groups.toggled("", "Clean Up"), "Clean Up")
-        self.assertEqual(nav_groups.open_for("Hardware", "Home"), "PC and Help")
-        self.assertEqual(nav_groups.open_for("Nope", "Home"), "Home")
+    def test_groups_open_and_fold_on_their_own(self):
+        self.assertEqual(nav_groups.toggled({"Home"}, "Library"), {"Home", "Library"})
+        self.assertEqual(nav_groups.toggled({"Home", "Library"}, "Library"), {"Home"})
+        self.assertEqual(nav_groups.toggled(set(), "Clean Up"), {"Clean Up"})
+        self.assertEqual(nav_groups.open_for("Hardware", {"Home"}), {"Home", "PC and Help"}, "other groups stay open")
+        self.assertEqual(nav_groups.open_for("Nope", {"Home"}), {"Home"})
+        self.assertEqual(nav_groups.saved_open({nav_groups.OPEN_KEY: ["Library", "Gone"]}), {"Library"})
+        self.assertEqual(nav_groups.saved_open({nav_groups.OPEN_KEY: "Library"}), frozenset())
 
     def test_every_route_has_a_symbol_and_banner(self):
         import re

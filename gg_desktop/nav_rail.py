@@ -156,16 +156,18 @@ def build(window, rail_layout):
     scroll.setWidget(holder)
     rail_layout.addWidget(scroll, 1)
     window.nav_scroll, window.nav_heads, window.nav_bodies = scroll, heads, bodies
-    window.nav_open_group = ""
-    show_group(window, nav_groups.group_of(window.current_route), animate=False)
+    window.nav_open_groups = frozenset()
+    start = nav_groups.open_for(window.current_route, nav_groups.saved_open(getattr(window, "settings", {}) or {}))
+    show_groups(window, start, animate=False)
     return buttons
 
 
-def show_group(window, heading, *, animate=True):
-    """Open one group (or none, with ""), fold the others. Opening slides down; folding is instant."""
-    window.nav_open_group = heading
+def show_groups(window, groups, *, animate=True):
+    """Open exactly these groups. A group that opens slides down; folding is instant; the rest stay as they are."""
+    groups = frozenset(groups)
+    window.nav_open_groups = groups
     for name, body in getattr(window, "nav_bodies", {}).items():
-        opened = name == heading
+        opened = name in groups
         window.nav_heads[name].set_open(opened)
         if opened and body.isHidden():
             body.setVisible(True)
@@ -189,14 +191,26 @@ def show_group(window, heading, *, animate=True):
 
 
 def toggle(window, heading):
-    show_group(window, nav_groups.toggled(window.nav_open_group, heading))
+    """A click on a heading opens or folds only that group, and the choice is kept for next time."""
+    show_groups(window, nav_groups.toggled(window.nav_open_groups, heading))
+    _remember(window)
 
 
 def follow(window, route):
-    """Called on every navigation: the tab you are on is always in an open group."""
-    wanted = nav_groups.open_for(route, window.nav_open_group)
-    if wanted != window.nav_open_group:
-        show_group(window, wanted, animate=False)
+    """Called on every navigation: the tab you are on is in an open group; no other group is folded."""
+    wanted = nav_groups.open_for(route, window.nav_open_groups)
+    if wanted != window.nav_open_groups:
+        show_groups(window, wanted, animate=False)
+
+
+def _remember(window):
+    order = [heading for heading, _ in nav_groups.GROUPS if heading in window.nav_open_groups]
+    window.settings = dict(getattr(window, "settings", {}) or {}, **{nav_groups.OPEN_KEY: order})
+    try:
+        from core import save_settings
+        save_settings(window.settings)
+    except Exception:
+        pass             # remembering is a convenience; the sidebar works the same without it
 
 
 def sync_groups(window):

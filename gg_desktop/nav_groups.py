@@ -60,11 +60,24 @@ def group_of(route: str) -> str:
     return ""
 
 
-def toggled(open_group: str, clicked: str) -> str:
-    """Accordion: clicking the open heading folds it away; clicking another opens it and folds the rest."""
-    return "" if clicked == open_group else clicked
+OPEN_KEY = "nav_open_groups"
 
 
-def open_for(route: str, open_group: str) -> str:
-    """Going to a tab opens its group so the highlighted tab is always on screen."""
-    return group_of(route) or open_group
+def toggled(open_groups, clicked: str) -> frozenset:
+    """Each group opens and folds on its own: a click on a heading flips only that group."""
+    groups = set(open_groups)
+    groups.symmetric_difference_update({clicked})
+    return frozenset(groups)
+
+
+def open_for(route: str, open_groups) -> frozenset:
+    """Going to a tab opens its group if it was folded, so the highlighted tab is on screen. Other groups stay as they are."""
+    heading = group_of(route)
+    return frozenset(set(open_groups) | ({heading} if heading else set()))
+
+
+def saved_open(settings) -> frozenset:
+    """The groups that were open last time, keeping only headings that still exist."""
+    names = {heading for heading, _ in GROUPS}
+    value = settings.get(OPEN_KEY)
+    return frozenset(v for v in value if v in names) if isinstance(value, list) else frozenset()

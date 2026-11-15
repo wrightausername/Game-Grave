@@ -835,3 +835,9 @@ to four ideas for everyday players; owner rule: extend existing tools, no near-d
   FPS ("within noise" says so). Put back restores the backup. `tools/presentmon_real_check.py` downloads and runs it for real on CI.
 - Covered by `tests/test_fixgame.py`, `tests/test_gamenight.py`, `tests/test_space.py`, `tests/test_tune.py`,
   `tools/autopilot_smoke.py` (Fix my game) and `tools/comfort_smoke.py` (Game Night, space card and Put to rest, Make it run better).
+
+Sidebar groups stay open (owner instruction, 2026-11-15: "if i click to unfold them they should remain unfolded even if i click
+on another tab and only fold back up when i click the same one again"). This replaces "one group open at a time" in the dropdown
+sidebar: each heading opens or folds only its own group (`nav_groups.toggled` on a set); going to a tab opens that tab's group if
+it was folded and folds nothing else (`open_for`); the open groups are kept in `nav_open_groups` and come back at the next start
+(`saved_open`, unknown headings dropped). Covered by `tests/test_nav_groups.py` and `tools/shell_polish_smoke.py`.
