@@ -754,3 +754,33 @@ their layouts, rules and removal paths are unchanged.
 - Diagnostics now also take any other `C:\Users\<name>` out of paths. The notifications list is dark behind its rows.
 - Covered by `tests/test_comfort.py`, `tests/test_ask_about.py`, `tools/comfort_smoke.py` (Undo with faked recovery calls, sort
   remembered, ask-about, next step).
+
+Quality-of-life pass, batch C (same owner instruction). This reopens the top bar's search box and Scan PC button, Settings' update
+controls (one button) and the PC scan's stages in `backend.py`; nothing else.
+- One search for everything (`search_core.py` pure, `search_popup.py`): typing in the top box still filters the page you are on,
+  and a list under the box shows matching tabs, tools (from `assistant_features`), games, mods, saves, old files and captures from
+  the last scan (it reads nothing from disk). Arrow keys pick a result and Enter opens it (Enter without a pick keeps the page's own
+  Enter, such as Overview's search window); a click opens it too; Esc closes the list. Opening goes to the tab with that tab's search
+  set to the item, or opens the tool.
+- Updates from inside the app (`update_install.py`, pure parts in `update_install_core.py`): after the update check finds a newer
+  build, Settings shows "Download and install" and the launch check pops up "Update available" with Download. It asks first, then
+  uses the Updater's own code (`updater/gg_updater.py`: newest release with installer and checksum, exact size, SHA-256 checked,
+  thrown away on mismatch) to download into `<config>/updates`, checks free space, and logs update_download. "Install now" asks
+  again, naming what happens, then starts a hidden PowerShell that waits for Game Grave to close, runs the verified installer
+  (/SILENT /NORESTART /CLOSEAPPLICATIONS), records the build in the Updater's state file only when the installer exits 0, deletes
+  the installer and opens Game Grave again; logged as update_install. Nothing downloads or installs without those two OKs.
+- Faster rescans (`scan_parts.py`, `backend.scan_inventory(parts=, base=)`): F5 on Games and Ready Room rescans only games, on Mods
+  only mods, on Captures only captures, and keeps the rest of the last scan; the Graveyard is rebuilt from the result. Right-click
+  Scan PC for Everything, Games, Mods, Captures, Saves or Old files only. The Scan PC button, F5 elsewhere, and any scan before the
+  first full one still scan everything. The finished notice says "Quick scan finished".
+- Covered by `tests/test_search_core.py`, `tests/test_update_install.py`, `tests/test_scan_parts.py` and `tools/comfort_smoke.py`
+  (search and open, the update flow with GitHub and the installer faked, F5 on Games scanning only games).
+
+Quality-of-life pass, batch D (same owner instruction: the Toolbox layout for other tools). This reopens Hardware's Drivers & Startup
+drivers column and Ready Room's Soulbind panel for layout only; their facts, controls and writes are unchanged.
+- Drivers: numbered steps (Check, Tick what you want, Update) that tick off as the check, the ticking and the install finish; the
+  maker's link moved left and Update all / Restart now to the right; every label in the column wraps, so long driver names no
+  longer push "Check for driver updates" and other text past the right edge.
+- Soulbind: numbered steps (Tick what you want, Set each value, Press Apply on a game) above Your preferences.
+- My Mods already has the layout (status bar with the main button on the right, cards, Undo) and was left as it is. Squad Sync
+  already has numbered steps.

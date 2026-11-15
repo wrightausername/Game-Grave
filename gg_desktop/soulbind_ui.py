@@ -52,6 +52,9 @@ class SoulbindBody(QWidget):
     # ------------------------------------------------------------ your preferences
     def _profile_column(self):
         box = column(spacing=4)
+        from gg_desktop.tools_shell import Steps
+        self.steps = Steps(("Tick what you want", "Set each value", "Press Apply on a game"), "#e5243b")
+        box.addWidget(self.steps)
         box.addWidget(label("Your preferences", "readyGameTitle"))
         box.addWidget(label("Tick what you want every game to follow. Unticked preferences are left alone.",
                             "readyDetail", wrap=True))
@@ -220,6 +223,8 @@ class SoulbindBody(QWidget):
             self.games_column.addWidget(note)
         self.games_column.addStretch()
         self.copy_button.setEnabled(bool(self.profile))
+        if not getattr(self, "_applied_once", False):
+            self.steps.set(2 if self.profile else 0)
         if self.on_status is not None:
             self.on_status(self.status_line(games, verifiable))
 
@@ -308,6 +313,8 @@ class SoulbindBody(QWidget):
             return
         if done is not None:
             window.status.setText(f"Soulbind applied to {adapter.title}. Backup saved.")
+            self._applied_once = True
+            self.steps.set(3)
         self.refresh()
 
     def undo(self, entry):

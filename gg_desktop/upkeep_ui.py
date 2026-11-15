@@ -8,9 +8,9 @@ from __future__ import annotations
 from dataclasses import replace
 import os
 
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QCheckBox, QFrame, QProgressBar, QScrollArea, QWidget
+from PySide6.QtWidgets import QCheckBox, QFrame, QLabel, QProgressBar, QScrollArea, QSizePolicy, QWidget
 
 from core import human_size, log_event
 from gg_desktop import upkeep_core as up
@@ -35,6 +35,24 @@ def _scroll(inner_layout, minimum=220):
     area.viewport().setStyleSheet("background:transparent;")
     area.setWidget(holder)
     return area
+
+
+class _FitWidth(QObject):
+    """Keeps the Drivers column inside its width: every label in it wraps instead of pushing the column (and its
+    buttons) past the right edge, which used to cut off "Check for driver updates" and long driver names."""
+
+    def __init__(self, inner):
+        super().__init__(inner)
+        self.inner = inner
+        inner.installEventFilter(self)
+
+    def eventFilter(self, target, event):
+        if event.type() in (QEvent.LayoutRequest, QEvent.ChildAdded):
+            for text in self.inner.findChildren(QLabel):
+                if not text.wordWrap() and text.objectName() != "stepDot":
+                    text.setWordWrap(True)
+                    text.setMinimumWidth(0)
+        return False
 
 
 def _clear(layout):
@@ -70,6 +88,8 @@ class UpkeepTab(QWidget):
         holder.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         holder.setStyleSheet("QScrollArea{background:transparent;} QScrollArea > QWidget > QWidget{background:transparent;}")
         holder.setWidget(inner)
+        inner.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self._fit = _FitWidth(inner)
         frame_lay.addWidget(holder, 1)
         head = row(spacing=8)
         head.addWidget(label("Drivers", "sectionTitle"), 1)
@@ -78,6 +98,9 @@ class UpkeepTab(QWidget):
                                        "Settings, Windows Update, Optional updates). Changes nothing. Can take a few minutes.")
         head.addWidget(self.check_button)
         drivers.addLayout(head)
+        from gg_desktop.tools_shell import Steps
+        self.driver_steps = Steps(("Check", "Tick what you want", "Update"), "#13bcf5")
+        drivers.addWidget(self.driver_steps)
         drivers.addWidget(label("Updates come from Windows Update (checked three ways, including Microsoft Update's "
                                 "optional drivers). Installing asks for administrator permission, and Windows may need a "
                                 "restart afterwards.", "readyDetail", wrap=True))
@@ -114,19 +137,19 @@ class UpkeepTab(QWidget):
         self._clock_start, self._clock_words = 0.0, ""
         self.update_box = column(spacing=4)
         drivers.addWidget(_scroll(self.update_box, 140), 1)
-        act = row(spacing=10)
-        self.install_button = button("Update all", self.install_selected, kind="primary",
-                                     tip="Downloads and installs the ticked driver updates through Windows Update.")
-        self.install_button.hide()
-        act.addWidget(self.install_button)
-        self.restart_button = button("Restart now", self.restart, kind="primary",
-                                     tip="Windows restarts in 60 seconds to finish the driver updates. Save your work first.")
-        self.restart_button.hide()
-        act.addWidget(self.restart_button)
+        act = row(spacing=10)                # the maker's link on the left, the main action on the right
         self.maker_button = button("", self.open_maker, kind="actionLink")
         self.maker_button.hide()
         act.addWidget(self.maker_button)
         act.addStretch()
+        self.restart_button = button("Restart now", self.restart, kind="primary",
+                                     tip="Windows restarts in 60 seconds to finish the driver updates. Save your work first.")
+        self.restart_button.hide()
+        act.addWidget(self.restart_button)
+        self.install_button = button("Update all", self.install_selected, kind="primary",
+                                     tip="Downloads and installs the ticked driver updates through Windows Update.")
+        self.install_button.hide()
+        act.addWidget(self.install_button)
         drivers.addLayout(act)
         drivers.addWidget(label("Firmware", "readyGameTitle"))
         self.firmware_box = column(spacing=3)
@@ -350,6 +373,7 @@ class UpkeepTab(QWidget):
         self.window_owner.job(work, done, error_title="Drivers could not be read")
 
     def check_updates(self):
+        self.driver_steps.set(0)
         self.check_button.setEnabled(False)
         self.driver_status.setText("Asking Windows Update (usually 1 to 3 minutes). You can keep using Game Grave.")
         self.busy("Checking Windows Update and Device Manager…")
@@ -405,6 +429,7 @@ class UpkeepTab(QWidget):
             self.driver_status.setText(before + "Windows Update has no other driver updates for this PC right now."
                                        + (" Graphics drivers can still be newer at the maker's site." if self.maker else ""))
             self.install_button.hide()
+            self.driver_steps.set(3)
             return
         total = sum(u.size for u in self.updates)
         self.driver_status.setText(before + f"Windows Update offers {len(self.updates)} driver update{'s' if len(self.updates) != 1 else ''}"
@@ -431,6 +456,7 @@ class UpkeepTab(QWidget):
     def sync_install(self, *_):
         chosen = self.chosen()
         self.install_button.setEnabled(bool(chosen))
+        self.driver_steps.set(2 if chosen else 1)
         self.install_button.setText("Update all" if len(chosen) == len(self.updates) else f"Update {len(chosen)} selected")
 
     def install_selected(self):
@@ -480,6 +506,7 @@ class UpkeepTab(QWidget):
             tone = "good" if ok and not failed and not reboot else ("warn" if ok else "bad")
             text = ("Done: " if ok else "Not finished: ") + words + (" Restart Windows to finish." if reboot else "")
             self.banner(text, tone)
+            self.driver_steps.set(3 if ok else 2)
             self.install_banner = (text, tone) if ok else None
             from gg_desktop import comfort
             comfort.notify(window, "Driver updates " + ("installed" if ok else "not finished"), text,
