@@ -322,6 +322,9 @@ def build(window):
     self.storage_categories.currentRowChanged.connect(self._fill_storage)
     self.storage_table.itemSelectionChanged.connect(self._storage_details)
     self.storage_table.itemChanged.connect(self._storage_selection_count)
+    from gg_desktop import ask_about
+    ask_about.install_table(self, self.storage_table, "storage",
+                            lambda r: self._shown_storage[r] if 0 <= r < len(self._shown_storage) else None)
     from gg_desktop import old_files_select   # double-click, Shift+click and Ctrl+click ticking, as in Old Files
     self.storage_tick_helper = old_files_select.TickHelper(self.storage_table, lambda: self._storage_selection_count())
     refresh(self)

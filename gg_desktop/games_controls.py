@@ -464,6 +464,8 @@ class GamesActions(LiveGames, GamesController):
         menu.addAction("Use default launcher", lambda: self.clear_executable(game))
         copy = menu.addAction("Copy installation path", lambda: self.copy_path(game))
         copy.setEnabled(bool(game.install_path))
+        from gg_desktop import ask_about
+        ask_about.add_to_menu(menu, self.window, "game", game)
         menu.exec(position or self.window.game_grid.mapToGlobal(self.window.game_grid.rect().center()))
         menu.deleteLater()
 

@@ -217,6 +217,12 @@ def build(window):
         self.old_table.setColumnWidth(i, width)
     self.old_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
     self.old_table.setSelectionMode(QAbstractItemView.SingleSelection)
+    from gg_desktop import ask_about
+
+    def old_row(r, window=self):
+        shown = getattr(getattr(window.page, "old_files", None), "shown", [])
+        return shown[r] if 0 <= r < len(shown) else None
+    ask_about.install_table(self, self.old_table, "old_file", old_row)
     self.old_table.setIconSize(self.old_table.iconSize().__class__(28, 28))
     contents.addWidget(self.old_table, 1)
     self.old_pager = InventoryPager()

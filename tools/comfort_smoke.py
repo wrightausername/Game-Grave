@@ -149,6 +149,7 @@ def main():
             assert "Old Files folder" in text
 
             # Paused while you play: shown while the Games tracker sees a game running.
+            real_tracker = getattr(window, "_games_tracker", None)
             window._games_tracker = SimpleNamespace(ledger=SimpleNamespace(active={window.inventory.games[0].key: 1}))
             comfort.sync_paused(window)
             assert window.paused_chip.isVisible() and window.paused_chip.text() == "Paused while you play Elden Ring"
@@ -156,6 +157,10 @@ def main():
             window._games_tracker = SimpleNamespace(ledger=SimpleNamespace(active={}))
             comfort.sync_paused(window)
             assert not window.paused_chip.isVisible()
+            if real_tracker is not None:
+                window._games_tracker = real_tracker
+            else:
+                del window._games_tracker
 
             # Sort and filters are remembered per tab.
             window.navigate("Games")
@@ -169,6 +174,28 @@ def main():
             assert window.game_sort.currentText() == "Name A to Z", window.game_sort.currentText()
             window.game_sort.setCurrentText("Recently played")
             settle()
+
+            # Right-click "Ask the assistant about this": answered in the pop-out from the row itself.
+            from gg_desktop import ask_about, assistant_page, assistant_popout
+            from PySide6.QtWidgets import QMenu
+            menu = QMenu(window)
+            off = ask_about.add_to_menu(menu, window, "storage", SimpleNamespace(name="x"))
+            assert not off.isEnabled() and "turn on the AI Assistant" in off.text()
+            window.settings = dict(window.settings, assistant_enabled=True)
+            row = SimpleNamespace(name="Battle.net Cache", path=r"C:\ProgramData\Battle.net\Cache", size=4096,
+                                  related="Battle.net", category="Launcher cache", summary="Launcher cache folder")
+            route = window.current_route
+            assert ask_about.ask(window, "storage", row)
+            settle()
+            pop = assistant_popout.current(window)
+            assert pop is not None and pop.isVisible()
+            chat = assistant_page.current_chat(window)
+            assert chat["messages"][-1]["role"] == "assistant" and "Battle.net Cache is in Other Storage" in chat["messages"][-1]["text"]
+            assert window.current_route == route, "Asking never switches the tab"
+            assert pop.grab().save(str(args.output / "shell-ask-about.png"))
+            pop.close()
+            settle()
+            window.settings = dict(window.settings, assistant_enabled=False)
 
             # Undo right after a removal: a new Recycle Bin record pops up with Undo, which asks first and then
             # checks and restores through the recovery engine (both faked here; nothing on disk moves).

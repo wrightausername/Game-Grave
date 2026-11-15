@@ -361,6 +361,14 @@ def build(window):
     self.capture_select_all = QCheckBox("0 selected (0 B)")
     self.capture_select_all.setTristate(False)
     self.capture_select_all.clicked.connect(lambda checked: select_visible(self, checked))
+    from gg_desktop import ask_about
+    ask_about.install_table(self, self.capture_table, "capture",
+                            lambda r: self._shown_captures[r] if 0 <= r < len(getattr(self, "_shown_captures", [])) else None)
+
+    def grid_item(r, grid=self.capture_grid):
+        cell = grid.item(r)
+        return (cell.data(CAPTURE_ROLE) or {}).get("item") if cell is not None else None
+    ask_about.install_list(self, self.capture_grid, "capture", grid_item)
     from gg_desktop import old_files_select   # Shift+click a range, Ctrl+click one (double-click still opens a capture)
     self.capture_grid_ticks = old_files_select.GridTickHelper(self.capture_grid, lambda: grid_ticks_changed(self))
     self.capture_table_ticks = old_files_select.TickHelper(

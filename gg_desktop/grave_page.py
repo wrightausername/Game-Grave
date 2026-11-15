@@ -363,6 +363,9 @@ def build(window):
     self.grave_table.setItemDelegateForColumn(1, NameDelegate(self.grave_table))
     self.grave_table.setItemDelegateForColumn(5, PillDelegate(self.grave_table))
     contents.addWidget(self.grave_table, 1)
+    from gg_desktop import ask_about
+    ask_about.install_table(self, self.grave_table, "grave",
+                            lambda r: self._shown_graves[r] if 0 <= r < len(getattr(self, "_shown_graves", [])) else None)
     self.grave_pager = InventoryPager()
     self.grave_pager.changed.connect(lambda number: fill(self, requested_page=number))
     contents.addWidget(self.grave_pager)

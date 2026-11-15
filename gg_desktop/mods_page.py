@@ -811,6 +811,8 @@ def build_menu(window, control, parent):
     menu.addSeparator()
     tools_action = menu.addAction("Advanced tools window…")
     tools_action.triggered.connect(control.open_tools)
+    from gg_desktop import ask_about
+    ask_about.add_to_menu(menu, window, "mod", entries[0] if len(entries) == 1 else None)
     return menu
 
 
