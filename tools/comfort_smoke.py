@@ -236,6 +236,41 @@ def main():
             squad.squad_views[0].click()
             window.settings = dict(window.settings, game_night_friends=[])
 
+            # Never run out of space: a low game drive shows a Graveyard card; Put to rest = kit, then Steam's uninstall.
+            from gg_desktop import space_core as sp, space_ui, kit_easy_ui
+            GB = 1024 ** 3
+            old_game = SimpleNamespace(name="Old Giant", install_path="C:\\Steam\\common\\Old Giant", size_bytes=150 * GB,
+                                       last_played_at=time.time() - 300 * 86400, launcher="Steam", app_id="4242", key="og")
+            usage = {"C:\\": SimpleNamespace(free=15 * GB, total=500 * GB), "E:\\": SimpleNamespace(free=800 * GB, total=2000 * GB)}
+            real_games = list(window.inventory.games)
+            window.inventory.games = real_games + [old_game, SimpleNamespace(name="Big E", install_path="E:\\G\\Big",
+                                                                             size_bytes=1, last_played_at=None, launcher="Steam",
+                                                                             app_id="1", key="be")]
+            kits, started = [], []
+            with patch.dict(os.environ, {"GAME_GRAVE_SPACE_CARD": "1"}), \
+                    patch.object(sp, "game_drives", lambda games, usage_fn=None: [sp.Drive(r, u.free, u.total) for r, u in usage.items()]), \
+                    patch.object(kit_easy_ui, "open_easy_setup", lambda w, game=None, folder=None, after=None:
+                                 (kits.append((game.name, folder)), after({"archive": "E:\\Game Grave Kits\\Old Giant.zip"}))), \
+                    patch("os.startfile", lambda link: started.append(link), create=True), \
+                    patch.object(type(window), "confirm", lambda self, t, text, **_: True):
+                window.navigate("Graveyard")
+                settle()
+                assert getattr(window, "space_card", None) is not None and window.space_card.isVisible()
+                assert window.grab().save(str(args.output / "graveyard-space-card.png"))
+                drive, drives, picks = space_ui.low_drive(window)
+                assert [p.game.name for p in picks] == ["Old Giant"], [p.game.name for p in picks]
+                dialog = space_ui.open_review(window, drive, drives, picks)
+                settle()
+                assert dialog.grab().save(str(args.output / "graveyard-space-review.png"))
+                rest = next(b for b in dialog.findChildren(QPushButton) if b.text() == "Put to rest")
+                rest.click()
+                settle()
+                assert kits == [("Old Giant", "E:\\Game Grave Kits")], kits
+                assert started == ["steam://uninstall/4242"], started
+                dialog.close()
+            window.inventory.games = real_games
+            window.space_card = None
+
             # Empty screens offer the next step.
             window.navigate("Other Storage")
             settle()

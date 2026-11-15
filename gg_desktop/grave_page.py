@@ -277,6 +277,9 @@ def build(window):
         ("mods", "0", "Mods / Addons", "#d76ce6"), ("download", "0", "Downloads", "#16baf1"),
         ("shield", "0", "Reviewable", "#2bd971")], compact=True)
     page.content.addWidget(self.grave_metrics)
+    if not getattr(self, "reference_preview", False):
+        from gg_desktop import space_ui        # only shows when a drive holding games is almost full
+        space_ui.add_card(self, page.content)
     self.grave_tabs = TabStrip([(name, TAB_ICONS[name]) for name in data.TABS], selected=state.tab)
     for control in self.grave_tabs.buttons.values():
         control.setStyleSheet("font-size:11px; padding:4px 3px;")

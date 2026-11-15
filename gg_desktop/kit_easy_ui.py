@@ -146,8 +146,9 @@ def _percent(done, total):
 
 # ====================================================================== create
 class EasySetup(_Base):
-    def __init__(self, window):
+    def __init__(self, window, game=None, folder=None, after=None):
         super().__init__(window, "Set up a Resurrection Kit")
+        self.after = after           # called with the result once a kit is saved and checked (Put to rest uses it)
         self.plan = None
         self.checks = {}
         self.games = sorted((g for g in window.inventory.games if getattr(g, "install_path", "")),
@@ -165,6 +166,10 @@ class EasySetup(_Base):
             self.combo.addItem(f"{game.name}  ·  {game.launcher}")
         top.addWidget(self.combo, 1)
         self.box.addLayout(top)
+        if game is not None:
+            at = next((i for i, g in enumerate(self.games) if g.key == getattr(game, "key", None)), -1)
+            if at >= 0:
+                self.combo.setCurrentIndex(at)
         self.parts_box = column(spacing=6)
         holder = QWidget()
         holder.setLayout(self.parts_box)
@@ -184,7 +189,7 @@ class EasySetup(_Base):
         self.box.addWidget(self.notes)
         where = row(spacing=8)
         where.addWidget(label("Save the kit in", "caption"))
-        self.folder = QLineEdit(str(kits_folder()))
+        self.folder = QLineEdit(str(folder or kits_folder()))
         self.folder.setAccessibleName("Folder for the kit")
         self.folder.textChanged.connect(self.refresh_summary)
         where.addWidget(self.folder, 1)
@@ -386,13 +391,16 @@ class EasySetup(_Base):
                 log_event("kit_created", f"Resurrection Kit for {game_name}: {result['files']} files, {human_size(result['bytes'])}")
             except Exception:
                 pass
+            if self.after is not None:
+                after, self.after = self.after, None
+                after(result)
         self.run(work, done, title="Kit")
 
 
-def open_easy_setup(window):
+def open_easy_setup(window, game=None, folder=None, after=None):
     if _busy(window):
         return
-    dialog = EasySetup(window)
+    dialog = EasySetup(window, game, folder, after)
     window._kit_easy_dialog = dialog
     dialog.exec()
 

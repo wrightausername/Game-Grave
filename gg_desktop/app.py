@@ -480,6 +480,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             self.navigate(self.current_route)
             from gg_desktop import first_scan
             first_scan.after_scan(self, quick=bool(parts))   # once, after the first full scan
+            from gg_desktop import space_ui
+            space_ui.notify_if_low(self)                     # at most once a day, only when a game drive is low
             from gg_desktop import soulbind_auto
             soulbind_auto.after_scan(self)      # only acts when the owner switched it on in Settings
         if parts:
