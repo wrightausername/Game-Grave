@@ -49,7 +49,7 @@ class _FitWidth(QObject):
     def eventFilter(self, target, event):
         if event.type() in (QEvent.LayoutRequest, QEvent.ChildAdded):
             for text in self.inner.findChildren(QLabel):
-                if not text.wordWrap() and text.objectName() != "stepDot":
+                if not text.wordWrap() and text.minimumWidth() != text.maximumWidth():   # fixed-size marks keep their size
                     text.setWordWrap(True)
                     text.setMinimumWidth(0)
         return False
