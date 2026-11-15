@@ -163,8 +163,10 @@ def main():
             for option in mods_sort.OPTIONS:
                 window.mod_sort.setCurrentText(option)
                 settle()
-                expected = [v.name for v in mods_sort.sort_views(window._mod_views, option)
-                            if v in [x for x in window._mod_views]]
+                assert window.mod_type.currentText() == "Mods only"      # storage folders are left out by default
+                kept = [v for v in window._mod_views
+                        if getattr(getattr(v.record, "catalog_entry", None), "kind", "mod") == "mod"]
+                expected = [v.name for v in mods_sort.sort_views(kept, option)]
                 shown = library_names()
                 assert shown == expected[:len(shown)], (option, shown, expected)
             window.mod_sort.setCurrentText("Name (A–Z)")
