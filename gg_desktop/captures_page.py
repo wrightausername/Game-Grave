@@ -361,6 +361,11 @@ def build(window):
     self.capture_select_all = QCheckBox("0 selected (0 B)")
     self.capture_select_all.setTristate(False)
     self.capture_select_all.clicked.connect(lambda checked: select_visible(self, checked))
+    from gg_desktop import old_files_select   # Shift+click a range, Ctrl+click one (double-click still opens a capture)
+    self.capture_grid_ticks = old_files_select.GridTickHelper(self.capture_grid, lambda: grid_ticks_changed(self))
+    self.capture_table_ticks = old_files_select.TickHelper(
+        self.capture_table, lambda: table_ticks_changed(self), double_click=False,
+        hint="Shift+click ticks a range · Ctrl+click adds one · double-click opens the capture")
     footer.addWidget(self.capture_select_all)
     footer.addWidget(tool("Protect", "shield", lambda: protect(self), tip="Adds Never Touch rules for the checked captures"))
     footer.addWidget(tool("Add to Graveyard", "grave", lambda: add_to_graveyard(self),
@@ -748,6 +753,26 @@ def table_checked(window, item):
     state = state_of(window)
     key = window._shown_captures[item.row()].key
     (state.checked.add if item.checkState() == Qt.Checked else state.checked.discard)(key)
+    selection_count(window)
+
+
+def grid_ticks_changed(window):
+    state = state_of(window)
+    for i in range(window.capture_grid.count()):
+        item = window.capture_grid.item(i)
+        capture = (item.data(CAPTURE_ROLE) or {}).get("item")
+        if capture is not None:
+            (state.checked.add if item.checkState() == Qt.Checked else state.checked.discard)(capture.key)
+    selection_count(window)
+    window.capture_grid.viewport().update()
+
+
+def table_ticks_changed(window):
+    state = state_of(window)
+    for i in range(window.capture_table.rowCount()):
+        cell = window.capture_table.item(i, 0)
+        if cell is not None and i < len(window._shown_captures):
+            (state.checked.add if cell.checkState() == Qt.Checked else state.checked.discard)(window._shown_captures[i].key)
     selection_count(window)
 
 

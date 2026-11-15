@@ -17,11 +17,11 @@ def rows_between(anchor, row):
 
 
 class TickHelper(QObject):
-    def __init__(self, table, changed):
+    def __init__(self, table, changed, double_click=True, hint=HINT):
         super().__init__(table)
-        self.table, self.changed, self.anchor = table, changed, None
+        self.table, self.changed, self.anchor, self.double_click = table, changed, None, double_click
         table.viewport().installEventFilter(self)
-        table.setToolTip(HINT)
+        table.setToolTip(hint)
 
     def _set(self, rows, state):
         table = self.table
@@ -48,7 +48,7 @@ class TickHelper(QObject):
         row = index.row()
         mods = event.modifiers()
         if kind == QEvent.MouseButtonDblClick:
-            if index.column() == 0:
+            if index.column() == 0 or not self.double_click:
                 return False           # the box itself already flips on a click
             self._flip(row)
             self.anchor = row
@@ -70,3 +70,42 @@ class TickHelper(QObject):
 def install(window):
     window.old_tick_helper = TickHelper(window.old_table, window._old_selection_count)
     return window.old_tick_helper
+
+
+GRID_HINT = "Shift+click ticks every picture from the last one you clicked · Ctrl+click ticks or unticks one"
+
+
+class GridTickHelper(QObject):
+    """The same ticking for a picture grid (a list of checkable items): Shift+click a range, Ctrl+click one."""
+
+    def __init__(self, grid, changed):
+        super().__init__(grid)
+        self.grid, self.changed, self.anchor = grid, changed, None
+        grid.viewport().installEventFilter(self)
+        grid.setToolTip(GRID_HINT)
+
+    def eventFilter(self, target, event):
+        if event.type() != QEvent.MouseButtonPress or event.button() != Qt.LeftButton:
+            return False
+        item = self.grid.itemAt(event.position().toPoint())
+        if item is None:
+            return False
+        row = self.grid.row(item)
+        mods = event.modifiers()
+        if mods & Qt.ShiftModifier:
+            with QSignalBlocker(self.grid):
+                for r in rows_between(self.anchor, row):
+                    other = self.grid.item(r)
+                    if other is not None and other.flags() & Qt.ItemIsUserCheckable:
+                        other.setCheckState(Qt.Checked)
+            self.anchor = row
+            self.changed()
+            return True
+        if mods & Qt.ControlModifier:
+            with QSignalBlocker(self.grid):
+                item.setCheckState(Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked)
+            self.anchor = row
+            self.changed()
+            return True
+        self.anchor = row
+        return False

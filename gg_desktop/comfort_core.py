@@ -136,6 +136,8 @@ def scrub(text, home=None, user=None):
         text = re.sub(re.escape(home), "%USERPROFILE%", text, flags=re.IGNORECASE)
     if user and len(user) > 2:
         text = re.sub(r"(?i)([\\/])" + re.escape(user) + r"([\\/])", r"\1<user>\2", text)
+    # Any other account folder too (a second Windows user, an old profile path in a warning).
+    text = re.sub(r"(?i)\b([a-z]:[\\/]users[\\/])(?!public\b|default\b|<user>)[^\\/\s\"']+", r"\1<user>", text)
     return text
 
 

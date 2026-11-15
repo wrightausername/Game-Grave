@@ -66,3 +66,13 @@ class ComfortTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScrubOtherProfiles(unittest.TestCase):
+    def test_any_profile_name_goes(self):
+        from gg_desktop.comfort_core import scrub
+        out = scrub(r"Old Files folder C:\Users\someone\Downloads unavailable", home=r"C:\Users\me", user="me")
+        self.assertNotIn("someone", out)
+        self.assertIn(r"C:\Users\<user>\Downloads", out)
+        self.assertIn(r"C:\Users\Public", scrub(r"C:\Users\Public\Games", home="", user=""))
+

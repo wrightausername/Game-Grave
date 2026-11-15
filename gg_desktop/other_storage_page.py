@@ -294,6 +294,9 @@ def build(window):
                              self._scan_other_storage, kind="primary",
                              tip="Reads sizes and dates of known game-related folders. Nothing is changed.")
     footer.addWidget(self.storage_scan)
+    self.storage_select_all = tool("Select all", "check", lambda: toggle_all(self),
+                                   tip="Tick every item shown (press again to clear). Ticking only marks items.")
+    footer.addWidget(self.storage_select_all)
     self.storage_selection = label("0 selected", "caption")
     footer.addWidget(self.storage_selection)
     footer.addWidget(tool("Protect", "shield", lambda: self._protect_paths([r.path for r in self._selected_storage()], self._fill_storage),
@@ -319,6 +322,8 @@ def build(window):
     self.storage_categories.currentRowChanged.connect(self._fill_storage)
     self.storage_table.itemSelectionChanged.connect(self._storage_details)
     self.storage_table.itemChanged.connect(self._storage_selection_count)
+    from gg_desktop import old_files_select   # double-click, Shift+click and Ctrl+click ticking, as in Old Files
+    self.storage_tick_helper = old_files_select.TickHelper(self.storage_table, lambda: self._storage_selection_count())
     refresh(self)
 
 
@@ -424,11 +429,24 @@ def checked_entries(window):
     return [shown[i] for i in _checked(window.storage_table) if i < len(shown)] if hasattr(window, "storage_table") and isValid(window.storage_table) else []
 
 
+def toggle_all(window):
+    table = window.storage_table
+    rows = [i for i in range(table.rowCount()) if table.item(i, 0) is not None]
+    everything = bool(rows) and all(table.item(i, 0).checkState() == Qt.Checked for i in rows)
+    with QSignalBlocker(table):
+        for i in rows:
+            table.item(i, 0).setCheckState(Qt.Unchecked if everything else Qt.Checked)
+    window._storage_selection_count()
+
+
 def selection_count(window):
     if not live(window):
         return
     rows = checked_entries(window)
     window.storage_selection.setText(f"{len(rows)} selected ({human_size(sum(e.size for e in rows))})")
+    if hasattr(window, "storage_select_all") and isValid(window.storage_select_all):
+        shown = window.storage_table.rowCount()
+        window.storage_select_all.setText("Clear selection" if shown and len(rows) >= shown else "Select all")
     rules = window.settings.get("never_touch", [])
     hit = any(is_protected_path(Path(e.path), rules) for e in rows)
     enabled, tip = insight.selection_state(rows, hit)
