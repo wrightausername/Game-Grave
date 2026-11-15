@@ -217,7 +217,7 @@ def build(window):
     self.capture_metrics = MetricStrip([
         ("camera", "0", "Screenshots", "#db77e6"), ("play", "0", "Recordings", "#13baef"),
         ("box", "0 B", "Total Captures", "#f3c52c"), ("game", "0", "Games", "#ff2145"),
-        ("clock", "None", "Oldest Capture", "#f7c327"), ("trash", "0 B", "Cleanup Candidates", "#e867c5")], compact=True)
+        ("clock", "None", "Oldest Capture", "#f7c327"), ("trash", "0 B", "Older than 6 months", "#e867c5")], compact=True)
     page.content.addWidget(self.capture_metrics)
     self.capture_tabs = TabStrip(TABS, selected=state.tab)
     for control in self.capture_tabs.buttons.values():
@@ -335,6 +335,12 @@ def build(window):
     self.capture_action.clicked.connect(lambda: contextual_action(self))
     self.capture_action.hide()
     notice_row.addWidget(self.capture_action)
+    self.capture_extras = QPushButton("Tick extra copies (keeps the oldest)")
+    self.capture_extras.setToolTip("Ticks every copy except the oldest one in each group of identical files. Nothing is "
+                                   "removed until you press Move to Recycle Bin.")
+    self.capture_extras.clicked.connect(lambda: select_extra_copies(self))
+    self.capture_extras.hide()
+    notice_row.addWidget(self.capture_extras)
     contents.addWidget(_widget(notice_row))
     self.capture_stack = QStackedWidget()
     self.capture_grid = CaptureGrid()
@@ -376,9 +382,9 @@ def build(window):
         hint="Shift+click ticks a range · Ctrl+click adds one · double-click opens the capture")
     footer.addWidget(self.capture_select_all)
     footer.addWidget(tool("Protect", "shield", lambda: protect(self), tip="Adds Never Touch rules for the checked captures"))
-    footer.addWidget(tool("Add to Graveyard", "grave", lambda: add_to_graveyard(self),
-                          tip="Adds the checked files to protected Graveyard review. Nothing is moved."))
-    self.capture_delete = tool("Delete…", "trash", lambda: delete_selected(self), kind="danger")
+    footer.addWidget(tool("Review later in Graveyard", "grave", lambda: add_to_graveyard(self),
+                          tip="Adds the checked captures to Graveyard's review list. Nothing is moved."))
+    self.capture_delete = tool("Move to Recycle Bin…", "trash", lambda: delete_selected(self), kind="danger")
     footer.addWidget(self.capture_delete)
     self.capture_more = tool("More Actions", "settings", None, tip="Open, copy, tag, rescan and selection tools")
     self.capture_menu = QMenu(self.capture_more)
@@ -477,6 +483,11 @@ def counted(window):
     return [c for c in universe(window) if c.kind in kinds]
 
 
+def shown_game(name):
+    """The words on screen for a game filter or column: "Not matched to a game" instead of the internal "Unverified"."""
+    return "Not matched to a game" if name == data.UNVERIFIED else name
+
+
 def rebuild_game_list(window, refill=True):
     captures = counted(window)
     wanted = window.capture_game_search.text().strip().casefold()
@@ -487,7 +498,7 @@ def rebuild_game_list(window, refill=True):
         entries = [(insight.ALL_GAMES, len(captures))] + [(g, n) for g, n in insight.game_counts(captures)
                                                           if not wanted or wanted in g.casefold()]
         for name, count in entries:
-            item = QListWidgetItem(name)
+            item = QListWidgetItem(shown_game(name))
             item.setData(Qt.UserRole, name)
             item.setData(Qt.UserRole + 1, f"{count:,}")
             window.capture_game.addItem(item)
@@ -645,7 +656,7 @@ def fill_table(window, previous):
             if c.key in state.checked:
                 table.item(i, 0).setCheckState(Qt.Checked)
             _text(table, i, 1, c.name, "camera" if c.kind == "Screenshots" else "play", "#a8b5c6")
-            _text(table, i, 2, c.game)
+            _text(table, i, 2, shown_game(c.game))
             _text(table, i, 3, datetime.fromtimestamp(c.modified).strftime("%Y-%m-%d"))
             _text(table, i, 4, human_size(c.size))
             _text(table, i, 5, f"{c.width} × {c.height}" if c.dimensions else "Unknown")
@@ -666,8 +677,12 @@ def fill_settings(window):
     window.capture_roots_list = QListWidget()
     window.capture_roots_list.setObjectName("sourceFilters")
     window.capture_roots_list.setAccessibleName("Capture folders")
+    window.capture_roots_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)   # long paths shorten in the middle
+    window.capture_roots_list.setTextElideMode(Qt.ElideMiddle)
+    window.capture_roots_list.setMinimumWidth(0)
     for root in roots:
-        item = QListWidgetItem(f"{root.path}   ({root.label})")
+        place = Path(str(root.path))
+        item = QListWidgetItem(f"{place.name or str(place)}  ·  {root.label}  ·  {place.parent}")
         item.setData(Qt.UserRole, str(root.path))
         item.setData(Qt.UserRole + 1, root.user)
         item.setToolTip(str(root.path))
@@ -729,6 +744,9 @@ def update_notice(window, rows):
     window.capture_notice.setVisible(bool(notice))
     window.capture_action.setText(action)
     window.capture_action.setVisible(bool(action))
+    extras = getattr(window, "capture_extras", None)
+    if extras is not None:
+        extras.setVisible(state.tab == "Duplicates" and bool(state.duplicates) and not state.busy)
     from gg_desktop import next_step
     step = ("", None)
     if not rows and not action and state.tab not in ("Settings",) and not state.busy:
@@ -869,7 +887,7 @@ def details(window):
         contents.addStretch()
         return
     mine = tags_of(window).get(capture.key, [])
-    title = label(capture.game if capture.game != data.UNVERIFIED else "Local Capture", "detailTitle", wrap=True)
+    title = label(capture.game if capture.game != data.UNVERIFIED else capture.name, "detailTitle", wrap=True)
     contents.addWidget(title)
     modified = datetime.fromtimestamp(capture.modified).strftime("%b %d, %Y")
     contents.addWidget(label(f"{capture.kind[:-1]} · {modified} · {human_size(capture.size)}", "caption"))

@@ -273,9 +273,12 @@ def main():
             assert state.duplicates is not None and len(state.duplicates) == 1
             assert set(every(window)) == {"dup_one.png", "dup_two.png"}, every(window)
             assert window.grab().save(str(args.output / "captures-duplicates-1280.png"))
-            captures_page.select_extra_copies(window)
+            assert window.capture_extras.isVisible(), "the extra-copies button shows after a duplicate check"
+            window.capture_extras.click()
             settle()
             assert [c.name for c in captures_page.selected_captures(window)] == ["dup_two.png"], "The oldest copy is kept"
+            assert window.capture_delete.text() == "Move to Recycle Bin…"
+            assert window.capture_metrics.captions[5].text() == "Older than 6 months"
             window.capture_grid.setCurrentRow(shown(window).index("dup_one.png"))
             settle()
             window._capture_subtab = "Related"

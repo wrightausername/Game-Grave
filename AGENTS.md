@@ -1014,3 +1014,9 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   - Advanced Library opens on "Mods only", which leaves out the mod manager's own storage folders ("mods", "profiles");
     "All Types" shows them. A storage folder's main button is Open Folder, never Open in Conflicts.
   - Covered by `tools/mymods_smoke.py` (folder switch off and Undo, crash button, Vortex read-only).
+- Captures (all six approved): "Move to Recycle Bin…" (was "Delete…", same verified Recycle Bin path), "Review later in
+  Graveyard" (was "Add to Graveyard"), the card "Older than 6 months" (was "Cleanup Candidates", same rule), "Not matched to a
+  game" on screen for the internal "Unverified" and the file name as the details title, a visible "Tick extra copies (keeps
+  the oldest)" button after Find Duplicates, and capture folders shown as name · type · parent folder with the full path on
+  hover and no sideways scroll, so the folder buttons wrap instead of running off at 1280. Covered by
+  `tools/captures_page_smoke.py`.
