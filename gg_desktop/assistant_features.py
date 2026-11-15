@@ -194,6 +194,23 @@ FEATURES = (
         "Hardware, then Drivers & Startup.", "Hardware",
         "Driver updates from Windows Update, and on/off switches for apps that start with Windows."),
     Feature(
+        "registry_cleanup", "Registry Cleanup",
+        ("registry", "registry cleaner", "registry fixer", "clean the registry", "fix the registry", "registry errors",
+         "ccleaner registry", "broken registry entries", "registry leftovers"),
+        "Registry Cleanup is the fourth tab inside Hardware. It finds registry entries that point to programs and files "
+        "that are no longer on this PC, like CCleaner's registry cleaner, and removes them with a backup first.",
+        ("Open Hardware, then Registry Cleanup, and press Scan the registry. Scanning only reads.",
+         "Results are grouped: startup entries, uninstall list leftovers, program shortcuts, Open with programs, shared "
+         "file counts, the program name cache, compatibility settings, help files, sound events and installer folders. "
+         "A few kinds are shown for review only and never changed.",
+         "Untick anything you want to keep, then press Fix. Game Grave makes a System Restore point (ticked by default), "
+         "exports every key it will touch, checks each file is still missing, then removes only those entries.",
+         "Undo last fix puts everything back from its backup."),
+        "Only entries whose file is really gone are listed; unplugged drives and the Windows folder are never treated as "
+        "missing. A cleaner registry doesn't make games faster; it keeps lists like Installed apps accurate.",
+        "Hardware, then Registry Cleanup.", "Hardware",
+        "Removes registry leftovers of programs that are gone, with a backup and Undo."),
+    Feature(
         "updates", "Check for Updates",
         ("check for updates", "updater", "update game grave", "new version", "new build", "latest version",
          "latest build", "how do i update"),
@@ -454,6 +471,7 @@ _GUIDES = {
     "graveyard": ("tab:Graveyard", "scan for leftovers"), "old_files": ("tab:Old Files", ""),
     "game_dna": ("tab:Game DNA", ""), "mods_library": ("tab:Mods", ""), "mod_bisect": ("bisect", ""),
     "hardware": ("tab:Hardware", ""), "drivers_startup": ("tab:Hardware/Drivers & Startup", "check my drivers"),
+    "registry_cleanup": ("tab:Hardware/Registry Cleanup", ""),
     "updates": ("tab:Settings", "check for updates to game grave"), "hash_checker": ("tool:hash", ""),
     "windows_cleanup": ("tool:windows_cleanup", "clean up temp files"),
     "game_optimizer": ("tool:game_optimizer", "turn on game mode and turn off background recording"),

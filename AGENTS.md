@@ -930,3 +930,33 @@ not have to use either"):
     mod causing it?" with "Find the mod". One crash-record query per closed game, never while another game runs or Crash
     Doctor is testing, at most once a day per game (`crash_doctor_offered`). `games_tracking.GameTracker` only gained a
     `game_closed` signal; playtime counting is unchanged.
+
+Registry Cleanup (owner instruction, 2026-11-15: "for the hardware and updates tab there needs to be a Registry fixer for old
+things no longer on the device, like CCleaners registery fixer... needs to be extensive and priority is not to break a users
+PC"). Hardware is reopened for one new inner tab, "Registry Cleanup" (fourth, built the first time it is opened); Your PC,
+Upgrade Advisor and Drivers & Startup are unchanged. `gg_desktop/registry_core.py` (pure, `tests/test_registry.py`),
+`gg_desktop/registry_win.py` (winreg, reg export / import, the elevated script), `gg_desktop/registry_ui.py` (Qt).
+- What it looks at (CCleaner's areas that can be proven): startup entries (HKCU/HKLM Run and RunOnce, WOW6432Node),
+  uninstall list entries, App Paths, "Open with" applications (HKCU Classes\Applications), SharedDLLs counts, the MuiCache,
+  compatibility Layers and Compatibility Assistant records, HTML Help / Help files, sound events (set to none, never deleted),
+  and Windows Installer folder records (listed unticked). Review only, never changed: uninstall records that are Windows
+  Installer (MSI) or Microsoft's, and services whose program is gone. ActiveX/COM, file-type classes, fonts, firewall rules
+  and "obsolete software" keys are not touched at all: they can't be proven leftover and are where cleaners break PCs.
+- Never breaking the PC: an entry is listed only when it names one absolute path on a drive letter (commands parsed;
+  MsiExec, rundll32 handled, relative names and @resources skipped), the drive is present and FIXED (an unplugged USB or
+  network drive never makes anything "missing"), the path is outside the Windows folder (32/64-bit redirection), and the file
+  is really not there. Uninstall entries need both the uninstaller and the install folder gone, and are skipped when marked
+  SystemComponent or a child update. One unreadable area never stops the rest.
+- Fixing: nothing changes until Fix and one confirmation that lists every key or value exactly. A System Restore point is
+  ticked by default (Windows makes at most one per 24 hours, and the result says when it didn't). Every key is exported with
+  `reg export` into `<config>/registry_backups/<date>` with changes.json / changes.txt BEFORE anything changes; if any export
+  fails nothing changes. Each entry is checked again right before it changes and left alone if its file came back. Your own
+  entries change directly; all-users entries go through one Windows prompt (`upkeep_core.run_elevated`), and declining
+  changes nothing. Only the exact value or key is removed, never a parent. At most 500 per fix. Undo last fix imports that
+  backup (all-users through the prompt). Logged: registry_fix, registry_undo.
+- Honest words: "points to a file that's no longer on this PC", never "safe", never "errors fixed", and the tab says a tidier
+  registry doesn't make games faster. The assistant has a Registry Cleanup walkthrough.
+- Covered by `tests/test_registry.py`, `tools/registry_smoke.py` (fake registry: nothing read before Scan, review items
+  unclickable, unticked entries left out of the confirmation and the fix, Undo) and `tools/registry_real_check.py`, which on
+  the Windows CI machine creates a test HKCU Run value and a test HKLM App Paths key pointing to a missing folder, runs the real
+  scan, the real backup and fix (elevated, with a restore point asked for) and the real Undo, then removes its test entries.

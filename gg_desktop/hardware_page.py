@@ -202,11 +202,12 @@ def build(window):
     page.banner_artwork = HeaderBannerArtwork(self, page, page.content.itemAt(0).widget(), route="Hardware",
                                               scene="undo", source=(915, 28, 365, 83), excluded=((1090, 0, 190, 40),))
     ui = page.hardware = Body(self, monitor)
-    ui.tabs = TabStrip([("Your PC", "chip"), ("Upgrade Advisor", "radio"), ("Drivers & Startup", "settings")],
+    ui.tabs = TabStrip([("Your PC", "chip"), ("Upgrade Advisor", "radio"), ("Drivers & Startup", "settings"),
+                        ("Registry Cleanup", "trash")],
                        selected=getattr(self, "hardware_tab", "Your PC"))
     ui.tabs.buttons["Drivers & Startup"].setText("Drivers && Startup")   # a single & would become a keyboard hint
     ui.tabs.setMinimumWidth(560)
-    ui.tabs.setMaximumWidth(780)
+    ui.tabs.setMaximumWidth(960)
     page.content.addWidget(ui.metrics)
     page.content.addWidget(ui.tabs)
     ui.pc_tab, pc = QWidget(), column(spacing=10)
@@ -231,6 +232,8 @@ def build(window):
     page.content.addWidget(ui.pc_tab)
     page.content.addWidget(ui.adv_tab)
     page.content.addWidget(ui.upkeep_tab, 1)
+    ui.registry_tab = None                # built the first time it is opened; it reads nothing until Scan
+    ui.content_layout = page.content
     page.content.addStretch()
     ui.tabs.changed.connect(ui.show_tab)
     ui.show_tab(getattr(self, "hardware_tab", "Your PC"))
@@ -451,13 +454,22 @@ class Body(QObject):
         self.draw_metrics_static(specs)
 
     def show_tab(self, name):
-        name = name if name in ("Your PC", "Upgrade Advisor", "Drivers & Startup") else "Your PC"
+        name = name if name in ("Your PC", "Upgrade Advisor", "Drivers & Startup", "Registry Cleanup") else "Your PC"
         self.window_owner.hardware_tab = name
         self.pc_tab.setVisible(name == "Your PC")
         self.adv_tab.setVisible(name == "Upgrade Advisor")
         upkeep = getattr(self, "upkeep_tab", None)
         if upkeep is not None:
             upkeep.setVisible(name == "Drivers & Startup")
+        if name == "Registry Cleanup" and getattr(self, "registry_tab", "x") is None and upkeep is not None:
+            from gg_desktop.registry_ui import RegistryTab
+            self.registry_tab = RegistryTab(self.window_owner)
+            layout = getattr(self, "content_layout", None)
+            if layout is not None:
+                layout.insertWidget(layout.indexOf(upkeep) + 1, self.registry_tab, 1)
+        registry = getattr(self, "registry_tab", None)
+        if registry is not None:
+            registry.setVisible(name == "Registry Cleanup")
         self.tabs.select(name)
 
     def draw_metrics_static(self, specs):
