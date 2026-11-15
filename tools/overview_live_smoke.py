@@ -150,8 +150,7 @@ def main():
             window.overview_hero.scan.click()
             wait_for(entered.is_set)
             assert not window.overview_hero.scan.isEnabled()
-            assert not window.overview_quick_scan.isEnabled()
-            window.overview_quick_scan.click()
+            window.overview_hero.scan.click()
             assert scanner.call_count==1,"Duplicate scan"
             window.overview_cancel.click()
             assert not window.overview_cancel.isEnabled()
@@ -257,12 +256,21 @@ def main():
                 assert any("Disposable Overview test event" in l.text() for l in dialog.findChildren(QLabel))
                 click(dialog,"Close")
             drive_dialog(window.overview_activity[0][0].click,event_details)
-            for title,route in (("Find Mods   ›","Mods"),("Review Old Files   ›","Old Files"),
-                                ("Manage Captures   ›","Captures"),("Open Graveyard   ›","Graveyard"),
-                                ("Review Cleanup","Graveyard"),("View All Games →","Games"),("View History →","Undo Center")):
+            for title,route in (("Fix a game   ›","Fix Kit"),("Free up space   ›","Graveyard"),("Open Mods   ›","Mods"),
+                                ("Review Old Files   ›","Old Files"),("Review cleanup in Graveyard","Graveyard"),
+                                ("View All Games →","Games"),("View History →","Undo Center")):
                 click(window.page,title)
                 assert window.current_route==route,title
                 control=overview()
+            with patch("gg_desktop.crashdoctor_ui.open_doctor") as doctor:
+                click(window.page,"Find a crashing mod   ›")
+                assert doctor.call_count==1,"Find a crashing mod did not open Crash Doctor"
+            assert "Scan Locations" in [b.text() for b in window.page.findChildren(QPushButton)]
+            assert "Scan Results & Locations" not in [b.text().replace("&&","&") for b in window.page.findChildren(QPushButton)], \
+                "one button for scan locations"
+            for metric in window.overview_metrics.values():
+                assert "*" not in metric.value_label.text(), metric.value_label.text()
+            assert window.overview_metrics["Mods"].caption_label.text()=="Mods"
             for title in list(window.overview_metrics):
                 window.overview_metrics[title].click()
                 settle()
@@ -273,13 +281,20 @@ def main():
                 assert table.rowCount()>=5,"Empty coverage report"
                 assert any(table.item(i,0).text()=="Steam" for i in range(table.rowCount()))
                 dialog.reject()
-            for open_dialog in (window.overview_hero.locations.click,lambda:click(window.page,"Scan Results && Locations")):
-                drive_dialog(open_dialog,locations)
-            scans=scanner.call_count
+            drive_dialog(window.overview_hero.locations.click,locations)
+            scans,saves=scanner.call_count,len(saved)
             drive_dialog(window.open_scan_locations,lambda d:d.findChild(QDialogButtonBox).button(QDialogButtonBox.Save).click())
             QTest.qWait(30)
             wait_for(lambda:not window.workers)
-            assert scanner.call_count==scans+1 and saved
+            assert scanner.call_count==scans and len(saved)==saves,"Save with nothing changed must not rescan"
+            def add_and_save(dialog):
+                with patch("gg_desktop.reference_overview.QFileDialog.getExistingDirectory",return_value=str(steam_root)):
+                    click(dialog,"Add Folder…")
+                dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.Save).click()
+            drive_dialog(window.open_scan_locations,add_and_save)
+            QTest.qWait(30)
+            wait_for(lambda:not window.workers)
+            assert scanner.call_count==scans+1 and len(saved)>saves,"Save after adding a folder rescans"
             control=window.page.overview
             pending={"steam_extra_roots":[]}
             window._add_scan_location("steam_extra_roots",str(steam_root/"steamapps"),pending,lambda:None)
@@ -307,7 +322,7 @@ def main():
             window.inventory=inventory
             control=overview()
             mode[0]="failure"
-            window.overview_quick_scan.click()
+            window.overview_hero.scan.click()
             wait_for(lambda:not window.workers)
             assert window.inventory is inventory and not window.scanning
             assert window.overview_hero.scan.isEnabled()

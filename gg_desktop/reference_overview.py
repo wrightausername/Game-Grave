@@ -52,6 +52,7 @@ class OverviewHero(QWidget):
         self.scan.setMinimumSize(140, 36)
         actions.addWidget(self.scan)
         self.locations = tool("Scan Locations", "folder", window.open_scan_locations)
+        self.locations.setToolTip("The folders Game Grave scans, and what the last scan found in each place.")
         self.locations.setAccessibleName("Manage scan locations and coverage")
         actions.addWidget(self.locations)
         box.addLayout(actions)
@@ -250,6 +251,11 @@ class OverviewPanels(QWidget):
             self.setFixedHeight(880)
 
 
+def counted(n, word):
+    """'1 game', '3 games'."""
+    return f"{n:,} {word}{'' if n == 1 else 's'}"
+
+
 class OverviewLibrary(CoverGrid):
     def __init__(self):
         super().__init__()
@@ -297,7 +303,6 @@ class OverviewScreens:
         self.overview_scan_status = label("", "subtle", wrap=True)
         self.overview_scan_status.setStyleSheet("color:#bfccd9;font-size:12px;")
         scanline.addWidget(self.overview_scan_status, 1)
-        scanline.addWidget(button("Scan Results && Locations", self.open_scan_locations, kind="link"))
         self.overview_cancel = tool("Cancel Scan", "close", lambda: self.page.overview.cancel_current())
         scanline.addWidget(self.overview_cancel)
         page.content.addWidget(_widget(scanline))
@@ -315,8 +320,19 @@ class OverviewScreens:
             date_label = label(info["date"], "caption")
             recent.addWidget(date_label)
             self.overview_activity.append((entry, date_label, event))
-        if not events:
-            recent.addWidget(label("Your local scan and review history will appear here.", "subtle", wrap=True))
+        if not events and found:
+            from gg_desktop import scan_cache
+            inv = self.inventory
+            scanned = label(f"Last scan {scan_cache.when_text(inv.scanned_at)}: {counted(len(inv.games), 'game')}, "
+                            f"{counted(len(inv.mods), 'mod location')}, {counted(len(inv.graveyard), 'Graveyard finding')}.",
+                            "subtle", wrap=True)
+            scanned.setStyleSheet("color:#cfd9e4;")
+            recent.addWidget(scanned)
+            recent.addWidget(label("Changes you make, like clean-ups, mod switches and fixes, will be listed here.",
+                                   "caption", wrap=True))
+        elif not events:
+            recent.addWidget(label("Nothing yet. Scan your PC and Game Grave lists what it found, then every change you "
+                                   "make here.", "subtle", wrap=True))
             recent.addWidget(button("Scan your library →", self.start_scan, kind="link"))
         recent.addStretch()
 
@@ -349,6 +365,8 @@ class OverviewScreens:
             percent = "<0.1%" if total and 0 < size / total < .001 else f"{size / total:.1%}" if total else "0%"
             value_label = label((human_size(size) + " · " + percent) if found else "Not scanned", "subtle")
             value_label.setStyleSheet("color:" + color + ";font-size:11px;")
+            value_label.setMinimumWidth(value_label.fontMetrics().horizontalAdvance("999.9 GB · 100.0%") + 6)
+            value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             line.addWidget(value_label)
             legend.addWidget(_widget(line))
             self.overview_legend[name] = (name_label, value_label, color)
@@ -357,16 +375,31 @@ class OverviewScreens:
         self.overview_storage_note = label("Measure detected game and mod folders after Scan PC.", "caption", wrap=True)
         self.overview_storage_note.setToolTip("Logged moves this month: " + human_size(amount) + ". Not confirmed free space.")
         contents.addWidget(self.overview_storage_note)
-        contents.addWidget(tool("Review Cleanup", "sparkles", lambda: self.navigate("Graveyard"), kind="primary"))
+        self.overview_review = tool("Review cleanup in Graveyard", "sparkles", lambda: self.navigate("Graveyard"),
+                                    kind="primary")
+        self.overview_review.setEnabled(found)
+        self.overview_review.setToolTip("Opens Graveyard, where leftovers from the last scan wait for your review."
+                                        if found else "Scan PC first; there is nothing to review yet.")
+        contents.addWidget(self.overview_review)
 
         actions, quick = section("Quick Actions", "sparkles")
-        self.overview_quick_scan = tool("Scan PC   ›", "search", self.start_scan, kind="overviewQuick")
-        self.overview_quick_scan.setAccessibleName("Scan PC from Quick Actions")
-        quick.addWidget(self.overview_quick_scan)
-        for name, symbol, route in (("Find Mods", "mods", "Mods"), ("Review Old Files", "archive", "Old Files"),
-            ("Manage Captures", "camera", "Captures"), ("Open Graveyard", "grave", "Graveyard")):
-            control = tool(name + "   ›", symbol, lambda _=False, route=route: self.navigate(route), kind="overviewQuick")
+        def crash_doctor():
+            from gg_desktop import crashdoctor_ui
+            crashdoctor_ui.open_doctor(self)
+        self.overview_quick = {}
+        for name, symbol, act, tip in (
+                ("Fix a game", "wrench", lambda: self.navigate("Fix Kit"),
+                 "Fix Kit: crash records, the usual fixes, Mod Bisect and Resurrection Kit."),
+                ("Find a crashing mod", "warning", crash_doctor,
+                 "Crash Doctor tests your mods for you and names the one crashing the game."),
+                ("Free up space", "storage", lambda: self.navigate("Graveyard"),
+                 "Graveyard: leftovers, old games and archives to review."),
+                ("Open Mods", "mods", lambda: self.navigate("Mods"), "Your mods, one game at a time."),
+                ("Review Old Files", "archive", lambda: self.navigate("Old Files"), "Old downloads and installers.")):
+            control = tool(name + "   ›", symbol, act, kind="overviewQuick")
+            control.setToolTip(tip)
             quick.addWidget(control)
+            self.overview_quick[name] = control
         quick.addStretch()
         page.content.addWidget(OverviewPanels((activity, storage, actions)))
 
@@ -395,8 +428,8 @@ class OverviewScreens:
         shelf.addWidget(self.overview_search_hint)
         pager = row(spacing=6)
         pager.addStretch()
-        self.overview_previous = tool("Previous", "minus", lambda: self._overview_library_move(-1))
-        self.overview_next = tool("Next", "chevron", lambda: self._overview_library_move(1))
+        self.overview_previous = tool("Previous", "back", lambda: self._overview_library_move(-1))
+        self.overview_next = tool("Next", "next", lambda: self._overview_library_move(1))
         pager.addWidget(self.overview_previous)
         pager.addWidget(self.overview_next)
         shelf.addWidget(_widget(pager))
@@ -489,7 +522,10 @@ class OverviewScreens:
             control.setEnabled(not busy)
         remove_control.setEnabled(roots.currentRow() >= 0 and not busy)
         contents.addWidget(buttons)
+        before = {key: list(self.settings.get(key, [])) for key in groups.values()}
         if dialog.exec() == QDialog.Accepted:
+            if pending == before:
+                return                      # nothing added or removed: no need to scan again
             updated = dict(self.settings, **pending)
             updated["desktop_favorites"] = sorted(self._overview_favorites)
             try:

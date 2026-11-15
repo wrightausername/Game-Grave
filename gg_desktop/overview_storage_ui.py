@@ -126,7 +126,7 @@ class OverviewStorageController(QObject):
         if not self.valid():
             return
         w = self.window
-        for control in (w.overview_hero.scan, w.overview_quick_scan):
+        for control in (w.overview_hero.scan,):
             control.setEnabled(not w.scanning and not w.cleaning)
         w.overview_hero.locations.setEnabled(not w.cleaning)
         w.overview_cancel.setVisible(w.scanning or self.storage_busy)
@@ -258,14 +258,18 @@ class OverviewStorageController(QObject):
                 partial = s.category_partial(name)
                 category_roots = [r for r in s.roots if r.category == name]
                 unknown = (bool(category_roots) and not any(r.valid for r in category_roots)) or (not category_roots and bool(s.source_warnings.get(name)))
-                value.setText("Unknown" if unknown else human_size(amount) + " · " + percentage + (" *" if partial else ""))
-                tip = (f"{name}: {amount:,} measured bytes. " + ("Incomplete coverage. " if partial else "")
+                value.setText("Unknown" if unknown else human_size(amount) + " · " + percentage)
+                tip = (f"{name}: {amount:,} measured bytes. " + ("Partly measured: some folders couldn't be read. "
+                                                               if partial else "")
                        + "Percentage of measured files, not total drive capacity. Click to inspect folders.")
                 caption.setToolTip(tip)
                 value.setToolTip(tip)
             w.overview_metrics["Games"].set_value(str(s.game_count))
-            w.overview_metrics["Mods"].set_value(str(s.mod_count) + ("+" if s.mod_count_partial else ""), s.mod_unit)
-            w.overview_metrics["Mods"].setToolTip("Present individual packages from local manager metadata. + indicates incomplete catalog coverage, including missing folders. Where individual packages cannot be identified, the count is labeled Mod locations. Click to inspect Mods.")
+            w.overview_metrics["Mods"].set_value(str(s.mod_count) + ("+" if s.mod_count_partial else ""), "Mods")
+            w.overview_metrics["Mods"].setToolTip(
+                f"Counted as: {s.mod_unit.lower()}. Individual mods come from your mod manager's own records; where Game "
+                "Grave can't tell mods apart it counts mod folders instead. A + means some mod folders couldn't be read. "
+                "Click to open Mods.")
             game_roots = {r.key: r for r in s.roots if r.category == "Games"}
             for i, game in enumerate(w._overview_games):
                 root = game_roots.get(path_key(game.install_path))
@@ -282,17 +286,24 @@ class OverviewStorageController(QObject):
                 # Metrics describe accepted findings, including overlaps. Pie
                 # shows disjoint bytes; the dialog explains the difference.
                 paths = {r.key: r.listed_bytes for r in roots}
-                text = "Unknown" if unknown else human_size(sum(paths.values())) + (" *" if s.category_partial(category) else "")
+                part = s.category_partial(category) and not unknown
+                text = "Unknown" if unknown else human_size(sum(paths.values()))
                 why = unknown_reason(category, s.source_warnings.get(category)) if unknown else ""
-                w.overview_metrics[category].set_value(text, f"{category} · {why[0]}" if why else None)
-                w.overview_metrics[category].setToolTip(((why[1] + "\n\n") if why else "") + "Measured bytes in detected findings; overlapping categories are deduplicated in the pie. * indicates partial coverage. Click to inspect.")
+                w.overview_metrics[category].set_value(text, f"{category} · {why[0]}" if why else
+                                                       f"{category} · partly measured" if part else category)
+                w.overview_metrics[category].setToolTip(((why[1] + "\n\n") if why else "") + "Measured bytes in the scan's "
+                    "findings; files counted in two places are counted once in the ring." + (" Partly measured: some "
+                    "folders couldn't be read." if part else "") + " Click to open.")
             captures = {path_key(f.path) for f in (*w.inventory.screenshots, *w.inventory.recordings)}
             capture_partial = bool(s.source_warnings.get("Captures"))
             capture_unknown = capture_partial and not captures
             why = unknown_reason("Captures", s.source_warnings.get("Captures")) if capture_unknown else ""
-            w.overview_metrics["Captures"].set_value("Unknown" if capture_unknown else str(len(captures)) + (" *" if capture_partial else ""),
-                                                     f"Captures · {why[0]}" if why else None)
-            w.overview_metrics["Captures"].setToolTip(((why[1] + "\n\n") if why else "") + "Accepted capture findings within the scan's age and folder settings. * indicates incomplete source coverage. Click to inspect Captures.")
+            w.overview_metrics["Captures"].set_value("Unknown" if capture_unknown else str(len(captures)),
+                                                     f"Captures · {why[0]}" if why else
+                                                     "Captures · partly checked" if capture_partial else "Captures")
+            w.overview_metrics["Captures"].setToolTip(((why[1] + "\n\n") if why else "") + "Screenshots and recordings "
+                "within the scan's age and folder settings." + (" Some capture folders couldn't be read." if capture_partial
+                                                                 else "") + " Click to open Captures.")
         self.changed.emit()
 
     def storage_details(self, category=""):

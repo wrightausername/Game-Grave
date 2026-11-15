@@ -79,7 +79,7 @@ class AssistantPopout(QWidget):
         self.input.setFixedHeight(34)
         self.input.returnPressed.connect(self.send)
         compose.addWidget(self.input, 1)
-        self.send_button = tool("Send", "chevron", self.send, kind="primary", tip="Ask (Enter)")
+        self.send_button = tool("Send", "next", self.send, kind="primary", tip="Ask (Enter)")
         self.send_button.setFixedHeight(34)
         compose.addWidget(self.send_button)
         lay.addLayout(compose)

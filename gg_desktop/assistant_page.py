@@ -102,9 +102,9 @@ class AnswerRow(QFrame):
             words.addWidget(Bar(item.share, color))
         line.addLayout(words, 1)
         if item.tab:
-            go = tool("Open", "chevron", lambda _=False, tab=item.tab: window.navigate(tab), tip="Open " + display_name(item.tab))
+            go = tool("Open", "next", lambda _=False, tab=item.tab: window.navigate(tab), tip="Open " + display_name(item.tab))
             go.setText("Open " + display_name(item.tab))
-            go.setIcon(icon("chevron", "#e8eef5", 12))
+            go.setIcon(icon("next", "#e8eef5", 12))
             go.setFixedHeight(26)
             go.setStyleSheet("font-size:11px;padding:0 9px;")
             line.addWidget(go)
@@ -326,7 +326,7 @@ def build(window):
     self.assistant_input.setMinimumWidth(60)
     self.assistant_input.returnPressed.connect(lambda: send(self))
     compose.addWidget(self.assistant_input, 1)
-    self.assistant_send = tool("Send", "chevron", lambda: send(self), kind="primary", tip="Ask (Enter)")
+    self.assistant_send = tool("Send", "next", lambda: send(self), kind="primary", tip="Ask (Enter)")
     self.assistant_send.setFixedHeight(34)
     self.assistant_send.setStyleSheet("border-radius:17px;padding:0 16px;")
     compose.addWidget(self.assistant_send)
@@ -605,13 +605,13 @@ def add_answer(window, question, answer, plan=None, layout=None):
     for caption, tab in answer.handoffs:
         if ":" in tab or tab in ("bisect", "tour") or "/" in tab:
             asks = tab.startswith("ask:")
-            special = tool(caption, "play" if asks else "chevron", lambda _=False, t=tab: autopilot_ui.open_target(window, t),
+            special = tool(caption, "play" if asks else "next", lambda _=False, t=tab: autopilot_ui.open_target(window, t),
                            kind="primary" if asks else "",
                            tip=("Plan it with Game Grave's own tools; nothing changes until you press Run all" if asks
                                 else "Open it now. It asks before it changes anything."))
             actions_row.addWidget(special)
             continue
-        actions_row.addWidget(tool(caption, "chevron", lambda _=False, t=tab: window.navigate(t), tip=f"Open the {tab} tab"))
+        actions_row.addWidget(tool(caption, "next", lambda _=False, t=tab: window.navigate(t), tip=f"Open the {tab} tab"))
     actions_row.addWidget(tool("Copy", "file", lambda _=False, q=question, a=answer: copy_answer(window, q, a),
                                tip="Copy this question and answer"))
     stack.addWidget(_widget(actions_row))

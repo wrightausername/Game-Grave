@@ -472,13 +472,14 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             scan_cache.keep_async("inventory", inventory)
             self._sync_scan_time()
             from gg_desktop import comfort
-            comfort.notify(self, "Quick scan finished" if parts else "Scan finished", f"{len(inventory.games)} games, {len(inventory.mods)} mod locations, "
-                           f"{len(inventory.graveyard)} Graveyard findings." + (" Some sources weren't available."
+            from gg_desktop.reference_overview import counted
+            found_words = (f"{counted(len(inventory.games), 'game')}, {counted(len(inventory.mods), 'mod location')}, "
+                           f"{counted(len(inventory.graveyard), 'Graveyard finding')}.")
+            comfort.notify(self, "Quick scan finished" if parts else "Scan finished", found_words + (" Some sources weren't available."
                                                                                if inventory.warnings else ""),
                            "warn" if inventory.warnings else "good", "Overview")
             self.status.setText(
-                f"Scanned {inventory.scanned_at}  •  {len(inventory.games)} game installs, "
-                f"{len(inventory.mods)} mod locations, {len(inventory.graveyard)} Graveyard findings."
+                f"Scanned {inventory.scanned_at}  •  " + found_words
                 + ("  •  Some sources unavailable." if inventory.warnings else ""))
             self.navigate(self.current_route)
             from gg_desktop import first_scan

@@ -43,9 +43,9 @@ def check_controls(*, window, inventory, storage, root, app, home, drive, clicke
         assert window.current_route == name
         completed("Mouse: " + name + " metric", "Open the corresponding tab.")
         control = home()
-    for title, route in (("Find Mods   ›", "Mods"), ("Review Old Files   ›", "Old Files"),
-                         ("Manage Captures   ›", "Captures"), ("Open Graveyard   ›", "Graveyard"),
-                         ("Review Cleanup", "Graveyard"), ("View All Games →", "Games"),
+    for title, route in (("Fix a game   ›", "Fix Kit"), ("Free up space   ›", "Graveyard"), ("Open Mods   ›", "Mods"),
+                         ("Review Old Files   ›", "Old Files"),
+                         ("Review cleanup in Graveyard", "Graveyard"), ("View All Games →", "Games"),
                          ("View History →", "Undo Center")):
         clicked(window.page, title)
         assert window.current_route == route
@@ -151,11 +151,11 @@ def check_controls(*, window, inventory, storage, root, app, home, drive, clicke
                 QTest.qWait(50)
                 QTest.keyClick(window, Qt.Key_F5)
             else:
-                target = window.overview_hero.scan if start == "hero" else window.overview_quick_scan
+                target = window.overview_hero.scan
                 window.page.ensureWidgetVisible(target)
                 QTest.mouseClick(target, Qt.LeftButton)
             wait_for(entered.is_set)
-            assert not window.overview_hero.scan.isEnabled() and not window.overview_quick_scan.isEnabled()
+            assert not window.overview_hero.scan.isEnabled()
             QTest.mouseClick(window.overview_hero.scan, Qt.LeftButton)
             assert scanner.call_count == 1
             assert window.overview_cancel.text() == "Cancel Scan"

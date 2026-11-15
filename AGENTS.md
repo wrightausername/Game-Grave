@@ -960,3 +960,22 @@ Upgrade Advisor and Drivers & Startup are unchanged. `gg_desktop/registry_core.p
   unclickable, unticked entries left out of the confirmation and the fix, Undo) and `tools/registry_real_check.py`, which on
   the Windows CI machine creates a test HKCU Run value and a test HKLM App Paths key pointing to a missing folder, runs the real
   scan, the real backup and fix (elevated, with a restore point asked for) and the real Undo, then removes its test entries.
+
+Tab-by-tab review (owner instruction, 2026-11-15: "start going down the tabs one by one and testing the tools, determine what
+makes sense and what needs reworking / tweaking / polished", then "Yes then proceed" to the Overview findings). Each tab is
+reviewed, the findings are listed to the owner, and only the approved fixes are made; each entry below names what it reopens.
+- Overview (all nine approved):
+  - Recent Activity after a scan shows "Last scan <when>: N games, N mod locations, N Graveyard findings" and says changes will
+    be listed there, instead of "history will appear here" with a scan link (scans are not activity-log events).
+  - Storage legend values have a fixed width so "100.0%" is no longer cut; the bare " *" is gone from the legend and the cards:
+    a partly measured card says "<name> · partly measured" and the hover text explains it.
+  - The Mods card always says "Mods"; what was counted (mods or mod folders) is in its hover text.
+  - Singular and plural wording in the scan-finished pop-up and scan line ("1 game", `reference_overview.counted`).
+  - Scan Locations: Save rescans only when a folder was added or removed. The duplicate "Scan Results & Locations" link is gone;
+    the header's Scan Locations button opens the same window and says so on hover.
+  - Library pager uses back / next arrows (new `next` icon in `reference_widgets.ICONS`); the AI chat's Send and Open buttons use
+    `next` instead of the down chevron.
+  - Quick Actions: Fix a game (Fix Kit), Find a crashing mod (Crash Doctor), Free up space (Graveyard), Open Mods, Review Old
+    Files, each with a hover line; the duplicate Scan PC and the misleading "Find Mods" are gone.
+  - "Review cleanup in Graveyard" (was "Review Cleanup") is greyed until there is a scan.
+  - Covered by the updated `tools/overview_live_smoke.py`.
