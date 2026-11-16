@@ -46,17 +46,40 @@ class NarrowFit(QObject):
                 if caption.text() != wanted:
                     caption.setText(wanted)
                 caption.setToolTip(full)
+            for value in getattr(self.strip, "values", []):
+                self.fit_value(value)
             for button, full in self.buttons:
                 wanted = choose(full, self.short_tabs.get(full, ""), button.fontMetrics().horizontalAdvance(full),
                                 button.width() - TAB_CHROME)
-                if button.text() != wanted:
-                    button.setText(wanted)
+                shown = wanted.replace("&", "&&")          # a lone & would be eaten as a keyboard mnemonic
+                if button.text() != shown:
+                    button.setText(shown)
             if self.table is not None:
                 tight = self.page.width() < self.narrow
                 for column in self.hide:
                     self.table.setColumnHidden(column, tight)
         except RuntimeError:
             pass          # the page was rebuilt
+
+
+    def fit_value(self, value):
+        """A big number that doesn't fit its card gets a smaller font instead of being cut ("114.4 M")."""
+        if not hasattr(value, "_narrow_base"):
+            value._narrow_base = value.styleSheet()
+            value._narrow_size = value.font().pixelSize() if value.font().pixelSize() > 0 else 22
+        cell = value.parentWidget()
+        room = (cell.width() if cell else 0) - CELL_CHROME
+        size = value._narrow_size
+        font = value.font()
+        while size > 12:
+            font.setPixelSize(size)
+            from PySide6.QtGui import QFontMetrics
+            if QFontMetrics(font).horizontalAdvance(value.text()) <= room:
+                break
+            size -= 1
+        wanted = value._narrow_base if size == value._narrow_size else value._narrow_base + f"font-size:{size}px;"
+        if value.styleSheet() != wanted:
+            value.setStyleSheet(wanted)
 
 
 def install(page, strip=None, tabs=None, **options):

@@ -1044,3 +1044,9 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   "Find the crashing mod" for games Crash Doctor can find mods for; Mod Bisect's setup buttons read "These are the mods I
   added recently", "Pick a downloaded pack…" and "Let Crash Doctor run the tests"; Autopsy's empty line mentions Make it
   run better. Covered by `tools/crashdoctor_smoke.py` and `tools/bisect_tab_smoke.py`.
+- Game DNA (all four approved): Top Locations shows what each place is ("Game install folder · path") shortened in the middle
+  with the full path on hover; each Cleanup Suggestion is a link "… → Other Storage / Captures / Graveyard" that opens that
+  tab filtered to the game (no tick boxes; Review & Clean opens the first one); "Open in Graveyard" (was "Add to
+  Graveyard"; it always opened the game's Graveyard entry); in a narrow window the cards and tabs use whole short words and
+  big values shrink instead of being cut (`narrow_fit` now also escapes "&" in tab names and fits values). Covered by
+  `tools/dna_page_smoke.py`.

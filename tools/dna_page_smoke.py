@@ -266,9 +266,7 @@ def main():
             window.navigate("Game DNA")
             settle()
             choose(window, "Cyberpunk 2077")
-            for s, line in state.suggestion_rows:
-                line.box.setChecked(s.route == "Captures")
-            dna_page.review_and_clean(window)
+            next(line for s, line in state.suggestion_rows if s.route == "Captures").click()   # each suggestion is a link
             settle()
             assert window.current_route == "Captures" and window.capture_search.text() == "Cyberpunk 2077"
             window.navigate("Game DNA")

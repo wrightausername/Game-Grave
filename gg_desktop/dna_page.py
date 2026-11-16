@@ -24,7 +24,6 @@ from core import human_size, save_settings
 from game_intelligence import build_game_dna
 from gg_desktop import dna_actions as actions
 from gg_desktop import dna_data as data
-from gg_desktop.grave_page import CheckRow
 from gg_desktop.header_banner import HeaderBannerArtwork
 from gg_desktop.insight_models import capture_items
 from gg_desktop.insight_widgets import FootprintRing
@@ -227,6 +226,7 @@ def build(window):
     self.dna_locations.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
     self.dna_locations.setColumnWidth(2, 200)
     self.dna_locations.setItemDelegateForColumn(2, BarDelegate(self.dna_locations))
+    self.dna_locations.setTextElideMode(Qt.ElideMiddle)      # what the place is, and the folder's own name, stay visible
     loc.addWidget(self.dna_locations)
     bottom.addWidget(locations, 5)
 
@@ -241,8 +241,9 @@ def build(window):
     bottom.addWidget(suggestions, 4)
     actions_panel, act = panel(kind="fileResults", padding=6, spacing=6)
     self.dna_review_button = tool("Review && Clean", "sparkles", lambda: review_and_clean(self), kind="primary",
-                                  tip="Opens the tab that owns removal, filtered to this game. Nothing is removed here")
-    self.dna_graveyard_button = tool("Add to Graveyard", "grave", lambda: add_to_graveyard(self),
+                                  tip="Opens the first suggestion's tab (Other Storage, Captures or Graveyard), filtered to "
+                                      "this game. Nothing is removed here")
+    self.dna_graveyard_button = tool("Open in Graveyard", "grave", lambda: add_to_graveyard(self),
                                      tip="Opens this game's Graveyard entry")
     act.addWidget(self.dna_review_button)
     act.addWidget(self.dna_graveyard_button)
@@ -253,6 +254,13 @@ def build(window):
     bottom_box.setMaximumHeight(156)
     page.content.addWidget(bottom_box)
 
+    from gg_desktop import narrow_fit      # whole words in a narrow window
+    narrow_fit.install(page, self.dna_metrics, self.dna_tabs,
+                       captions={"Game DNA Profile": "Profile", "Total Footprint": "Footprint", "Total Items": "Items",
+                                 "Last Accessed": "Last used"},
+                       tab_names={"Storage DNA": "Storage", "Files & Locations": "Files", "Mods & Addons": "Mods",
+                                  "Config / Settings": "Configs", "Screenshots": "Shots", "Recordings": "Videos"},
+                       narrow=1100)
     page.dna_ready = True
     self.dna_search.textChanged.connect(lambda *_: fill_games(self))
     self.dna_games.currentRowChanged.connect(lambda *_: pick_game(self))
@@ -495,7 +503,8 @@ def render_top_locations(window, profile, total):
         check = _text(table, i, 0, "")
         check.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
         check.setCheckState(Qt.Unchecked)
-        _text(table, i, 1, loc.path)
+        place = _text(table, i, 1, f"{loc.label}  ·  {loc.path}" if getattr(loc, "label", "") else loc.path)
+        place.setToolTip(loc.path)
         size = _text(table, i, 2, "Not measured" if loc.size is None else readable_bytes(loc.size))
         size.setData(Qt.UserRole, 0 if not total or loc.size is None else loc.size / total)
         table.setRowHeight(i, 22)
@@ -509,10 +518,11 @@ def render_suggestions(window, profile):
     destroy_layout(body)
     state.suggestion_rows = []
     suggestions = profile.suggestions if profile else []
-    for s in suggestions:
-        line = CheckRow(s.title + (f"  ({human_size(s.size)})" if s.size else ""), True)
-        line.setToolTip(s.detail)
-        line.count.setText("")
+    for s in suggestions:          # each is a link to the tab that handles it (nothing is removed from this page)
+        line = button(s.title + (f"  ({human_size(s.size)})" if s.size else "") + f"  →  {s.route}",
+                      lambda _=False, item=s: open_suggestion(window, item), kind="actionLink")
+        line.setToolTip(s.detail + f"\nOpens {s.route}, filtered to this game. Nothing is removed until you confirm there.")
+        line.setStyleSheet("text-align:left;")
         state.suggestion_rows.append((s, line))
         body.addWidget(line)
     if not suggestions:
@@ -636,14 +646,17 @@ def unlink_folder(window):
 
 
 def review_and_clean(window):
+    """Opens the first suggestion's tab; each suggestion line opens its own."""
     state = state_of(window)
-    picked = [s for s, line in state.suggestion_rows if line.box.isChecked()]
-    if not picked:
-        window.info("Choose suggestions", "Check the items you want to review.")
+    if not state.suggestion_rows:
+        window.info("Nothing to review", "Game Grave has no suggestions for this game.")
         return
-    first = picked[0]
+    open_suggestion(window, state.suggestion_rows[0][0], more=len(state.suggestion_rows) - 1)
+
+
+def open_suggestion(window, first, more=0):
     window.status.setText(f"Opening {first.route} for {first.search}. Nothing is removed until you confirm there."
-                          + (f" {len(picked) - 1} more checked item(s) are in other tabs." if len(picked) > 1 else ""))
+                          + (f" {more} more suggestion(s) are listed in Game DNA." if more else ""))
     if first.pending_key:
         window._pending_grave_key = first.pending_key
     window.navigate(first.route)
