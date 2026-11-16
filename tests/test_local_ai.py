@@ -247,7 +247,10 @@ class Prompt(unittest.TestCase):
         self.assertEqual(msgs[0]["role"], "system")
         self.assertIn("Starfield", msgs[0]["content"])
         self.assertIn("Never promise that something is safe", msgs[0]["content"])
-        self.assertEqual(msgs[-1]["content"], "what are my biggest games? /no_think")
+        self.assertTrue(msgs[-1]["content"].endswith("what are my biggest games? /no_think"))
+        self.assertIn("quick lookup", msgs[-1]["content"], "the lookup goes with the question, not the cached system text")
+        other = prompt.build_messages("how many mods", engine.answer("how many mods", f), f)
+        self.assertEqual(other[0]["content"], msgs[0]["content"], "the system text is the same for every question")
         self.assertEqual([m["role"] for m in msgs[1:3]], ["user", "assistant"])
 
     def test_model_knows_what_game_grave_already_does(self):
@@ -263,10 +266,10 @@ class Prompt(unittest.TestCase):
         f = facts()
         miss = engine.answer("zzqq blorp", f)
         self.assertEqual(miss.intent, "unknown")
-        system = prompt.build_messages("zzqq blorp", miss, f)[0]["content"]
-        self.assertNotIn("I don't have an answer", system)
-        self.assertNotIn("quick lookup", system)
-        found = prompt.build_messages("biggest games", engine.answer("largest games", f), f)[0]["content"]
+        sent = " ".join(m["content"] for m in prompt.build_messages("zzqq blorp", miss, f))
+        self.assertNotIn("I don't have an answer", sent)
+        self.assertNotIn("quick lookup", sent)
+        found = prompt.build_messages("biggest games", engine.answer("largest games", f), f)[-1]["content"]
         self.assertIn("quick lookup", found)
 
     def test_thinking_models_reason_and_keep_more_history(self):

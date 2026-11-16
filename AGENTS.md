@@ -1176,3 +1176,11 @@ and its answers; layout unchanged except one "Not helpful" button under each ans
 - Covered by `tests/test_local_ai_tools.py` (lookups, failing reads, plans, the loop, text-written calls, the answer check,
   knowledge), `tests/test_local_ai.py`, `tests/test_assistant_understand.py` and `tools/assistant_page_smoke.py` (a lookup
   then an answer with "Checked: Games", a wrong size corrected, a model plan with a dropped job, Not helpful).
+- First real-model bench (Small, CI): 8 of 16. It answered from the facts correctly but skipped lookups on problem and mod
+  questions, once gave another game's mod, and told the user to "use the Game Crashes tool". Fixes: Game Grave now runs the
+  obvious lookups itself before the model answers (`local_ai_tools.prefetch`: crashes, known fixes, runtimes and open apps
+  for a problem; the game's mods; PC status; startup apps; the error guide for pasted errors; the manual for how-to; recent
+  activity; Game Grave's state), the global mods list is left out when lookups are on so games can't be mixed up, the rules
+  forbid naming a lookup to the user, and the per-question quick lookup moved out of the system text so the prompt cache
+  reuses it. The bench counts Game Grave's own lookups, and each CI run starts at a different question
+  (`GITHUB_RUN_NUMBER`) so all 60 get asked over a few runs.

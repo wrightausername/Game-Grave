@@ -135,7 +135,8 @@ def run(server, think=False, budget_s=35 * 60, cases=CASES, log=print):
             return reply
         t = time.monotonic()
         try:
-            result = lookups.converse(chat, messages, ctx)
+            result = lookups.converse(chat, messages, ctx, question=question)
+            called.extend(result.get("looked") or [])
         except Exception as exc:          # one slow or broken answer must not end the bench
             misses.append((question, [f"error: {exc}"]))
             log(f"  ERROR {question}: {exc}")

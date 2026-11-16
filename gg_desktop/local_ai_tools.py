@@ -476,11 +476,13 @@ def today():
 
 
 # ------------------------------------------------------------------ the conversation loop (pure: chat_fn is injected)
-def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS):
+def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS, question=None):
     """Let the model look things up, then answer. chat_fn(messages, tools) returns the reply message dict.
-    Returns dict(text, jobs, summary, checked, results): `jobs` is set when the model proposed a plan."""
-    messages = list(messages)
-    checked, results = [], []
+    Returns dict(text, jobs, summary, checked, results, looked): `jobs` is set when the model proposed a plan.
+    With `question`, the lookups it obviously needs are run first (`prefetch`)."""
+    first = prefetch(question, ctx) if question else []
+    messages, results, checked = with_prefetch(messages, ctx, first)
+    looked = [fn for fn, _args in first]
     tools = tool_specs()
     for round_no in range(max_rounds + 1):
         offer = tools if round_no < max_rounds else None       # the last round must answer in words
@@ -488,7 +490,7 @@ def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS):
         calls = calls_in(reply)
         if not calls or offer is None:
             text = _TEXT_CALL.sub("", str(reply.get("content") or "")).strip()
-            return {"text": text, "jobs": None, "summary": "", "checked": checked, "results": results}
+            return {"text": text, "jobs": None, "summary": "", "checked": checked, "results": results, "looked": looked}
         messages.append({"role": "assistant", "content": reply.get("content") or "",
                          "tool_calls": [{"id": cid, "type": "function",
                                          "function": {"name": name, "arguments": args if isinstance(args, str)
@@ -497,14 +499,15 @@ def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS):
             if name == "make_plan":
                 data = args if isinstance(args, dict) else _json(args)
                 return {"text": "", "jobs": data.get("jobs") or [], "summary": str(data.get("summary") or "")[:300],
-                        "checked": checked, "results": results}
+                        "checked": checked, "results": results, "looked": looked}
+            looked.append(name)
             result = run(ctx, name, args)
             results.append(result)
             label = CHECKED_NAMES.get(name)
             if label and label not in checked:
                 checked.append(label)
             messages.append({"role": "tool", "tool_call_id": cid, "name": name, "content": result})
-    return {"text": "", "jobs": None, "summary": "", "checked": checked, "results": results}
+    return {"text": "", "jobs": None, "summary": "", "checked": checked, "results": results, "looked": looked}
 
 
 def _json(text):
@@ -568,3 +571,89 @@ def problems(text, facts, results=()):
 
 FIX_NOTE = ("Some of that doesn't match Game Grave's data: {problems}. Check with the lookups and answer again using only "
             "figures and games from the data. Keep the rest of your answer.")
+
+
+# ------------------------------------------------------------------ lookups Game Grave runs first (small models skip them)
+_PROBLEM = re.compile(r"crash|ctd|won'?t (start|launch|open|load|run)|doesn'?t (start|launch|open|load|run)|not (starting|"
+                      r"launching|loading|working)|black screen|freez|stutter|lag|fps|choppy|error|broke|broken|"
+                      r"keeps closing|closes (itself|immediately)|fix")
+_HARDWARE = re.compile(r"\b(ram|memory|graphics|gpu|video card|cpu|processor|drive|disk|space|storage|free|specs?|"
+                       r"windows version|bios|xmp|expo|ssd|hdd|nvme)\b")
+_MODS = re.compile(r"\bmods?\b|modded|load order|plugins?|skse|f4se|nexus|vortex|organizer")
+_STARTUP = re.compile(r"start(s|ing)? (up )?with windows|startup|start-up|on boot")
+_OPEN_APPS = re.compile(r"\b(open|running|background) (apps?|programs?)\b|is \w+ (open|running)|overlay|discord|overwolf|"
+                        r"rivatuner|afterburner|what'?s running")
+_ERROR = re.compile(r"0x[0-9a-f]{8}|\.dll\b|error code|exception|dxgi_|msvcp|vcruntime|is missing|not found|"
+                    r"can'?t start because")
+_HOWTO = re.compile(r"^(how (do|can|would|should) i|how to|where (do|can|is)|what does|what'?s the|what is the) |"
+                    r"\bhow do i\b|\bwalk me through\b|\bwhere do i\b")
+_RECENT = re.compile(r"\b(recent(ly)?|last (cleanup|change)|what did (game grave|you) (do|delete|change)|history)\b")
+_STATE = re.compile(r"\b(what tab|which tab|this tab|this game|selected|automation|routines?|never touch|settings)\b")
+
+
+def prefetch(question, ctx):
+    """The lookups a good answer to this question needs, run before the model sees it: [(name, arguments)]. The model
+    can still ask for more. Small models often answer without looking, so Game Grave looks for them."""
+    q = " ".join(str(question or "").casefold().replace("’", "'").split())
+    f = ctx.facts
+    game = None
+    for g in sorted(getattr(f, "games", ()), key=lambda g: -len(g.name)):
+        if g.name.casefold() in q:
+            game = g
+            break
+    if game is None:
+        from gg_desktop import assistant_understand as understand
+        game = understand.fuzzy_game(f, q)[0] or find_game(f, q) if len(q.split()) <= 3 else understand.fuzzy_game(f, q)[0]
+    if game is None and ctx.screen.get("selected") and re.search(r"\b(this|it|the game|selected)\b", q):
+        game = find_game(f, ctx.screen["selected"])
+    name = game.name if game is not None else ""
+    calls = []
+
+    def add(fn, **args):
+        if (fn, args) not in calls and len(calls) < 4:
+            calls.append((fn, args))
+    if _ERROR.search(q):
+        add("explain_error", text=str(question)[:600])
+    if _PROBLEM.search(q):
+        if name:
+            add("game_crashes", name=name)
+        add("known_fixes", problem=str(question)[:200], game=name)
+        if re.search(r"crash|won'?t|doesn'?t|not (start|launch|load)|closes|error|fix", q):
+            add("runtimes")
+            add("open_apps")
+    if name and _MODS.search(q):
+        add("game_mods", name=name)
+    elif name and not calls:
+        add("look_up_game", name=name)
+    if _HARDWARE.search(q) and not _MODS.search(q):
+        add("pc_status")
+    if _STARTUP.search(q):
+        add("startup_apps")
+    if _OPEN_APPS.search(q):
+        add("open_apps")
+    if _HOWTO.search(q) and not calls:
+        add("app_help", topic=str(question)[:200])
+    if _RECENT.search(q):
+        add("recent_activity")
+    if _STATE.search(q):
+        add("game_grave_state")
+    return calls
+
+
+def with_prefetch(messages, ctx, calls):
+    """The messages with Game Grave's own lookups already asked and answered, in the chat's tool-call form."""
+    if not calls:
+        return list(messages), [], []
+    ids = [f"gg{i}" for i in range(len(calls))]
+    out = list(messages) + [{"role": "assistant", "content": "", "tool_calls": [
+        {"id": cid, "type": "function", "function": {"name": fn, "arguments": json.dumps(args)}}
+        for cid, (fn, args) in zip(ids, calls)]}]
+    results, checked = [], []
+    for cid, (fn, args) in zip(ids, calls):
+        result = run(ctx, fn, args)
+        results.append(result)
+        label = CHECKED_NAMES.get(fn)
+        if label and label not in checked:
+            checked.append(label)
+        out.append({"role": "tool", "tool_call_id": cid, "name": fn, "content": result})
+    return out, results, checked

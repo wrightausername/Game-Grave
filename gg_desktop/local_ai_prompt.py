@@ -81,7 +81,7 @@ def _within(path, root):
     return bool(root) and (path == root or path.startswith(root + "\\"))
 
 
-def facts_digest(facts, limit=80, cap=None):
+def facts_digest(facts, limit=80, cap=None, tools=False):
     """What Game Grave has on record, in plain text for the model: every enabled source, with per-game links (saves,
     mods, captures) worked out so the model can answer about one game. Kept under CONTEXT_CHARS."""
     lines = []
@@ -116,7 +116,7 @@ def facts_digest(facts, limit=80, cap=None):
                          + (" (" + ", ".join(extra) + ")" if extra else ""))
         if len(ordered) > limit:
             lines.append(f"- and {len(ordered) - limit} smaller games")
-    if facts.on("mods") and facts.mods:
+    if facts.on("mods") and facts.mods and not tools:
         total = sum(max(0, m.apparent_bytes) for m in facts.mods)
         lines.append(f"\nMODS (Mods tab): {len(facts.mods)} mod folders and locations, {human_size(total)} reported:")
         for m in sorted(facts.mods, key=lambda m: -max(0, m.apparent_bytes))[:40]:
@@ -225,6 +225,9 @@ TOOL_RULES = (
     "step needs the user, say exactly what to click.\n"
     "- When the user asks you to DO something Game Grave can do, call make_plan with the right jobs and targets. "
     "Nothing runs until they press OK. If Game Grave can't do it, say how they can do it themselves.\n"
+    "- Game Grave may already have run some lookups for the question; their results follow it. Use them first.\n"
+    "- Never name a lookup or tell the user to run one; look it up yourself. Never mix up games: a game's mods, saves "
+    "and sizes are only the ones its own lookup returns.\n"
     "- Look up only what you need (a few lookups at most), then answer."
 )
 
@@ -234,17 +237,21 @@ def build_messages(question, answer, facts, history=(), think=False, tools=False
     six are kept. `think` lets Qwen3 reason before answering (Medium and Large). `tools` means the model can call the
     lookups in `local_ai_tools`, so the facts here are shorter and the rules say how to use them."""
     from gg_desktop import local_ai_tools as lookups
-    digest = facts_digest(facts, limit=40 if tools else 80, cap=12000 if tools else None)
+    digest = facts_digest(facts, limit=40 if tools else 80, cap=12000 if tools else None, tools=tools)
     context = f"Today is {lookups.today()}. " + lookups.screen_line(screen)
     context += f"\n\nPC facts (what Game Grave has on record):\n{digest}\n\nWhat Game Grave can do (features and " \
                f"where they are):\n{feature_list()}"
     context += "\n\n" + (TOOL_RULES if tools else PLAN_RULE + "; ".join(requests_list()) + ".")
-    if answer is not None and answer.intent not in NO_LOOKUP:
-        context += f"\n\nGame Grave's own quick lookup for this question (use its numbers if they fit):\n{lookup_text(answer)}"
+    # The system text stays the same from question to question, so llama-server's prompt cache can reuse it; what
+    # belongs to this one question (the quick lookup) goes with the question instead.
     messages = [{"role": "system", "content": SYSTEM + "\n\n" + context}]
     for q, a in list(history)[-6:]:
         messages += [{"role": "user", "content": q[:600]}, {"role": "assistant", "content": a[:1500]}]
-    messages.append({"role": "user", "content": question[:800] + ("" if think else " /no_think")})
+    ask = question[:800]
+    if answer is not None and answer.intent not in NO_LOOKUP:
+        ask = (f"(Game Grave's own quick lookup for this, use its numbers if they fit:\n{lookup_text(answer)})\n\n"
+               f"{ask}")
+    messages.append({"role": "user", "content": ask + ("" if think else " /no_think")})
     return messages
 
 

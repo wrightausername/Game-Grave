@@ -369,7 +369,7 @@ def answer_async(window, question, base_answer, facts, history, deliver):
                                              screen=screen)
             budget = dict(max_tokens=2600, timeout=420) if think else dict(max_tokens=900, timeout=240)
             chat_fn = lambda msgs, tools: server.chat_message(msgs, tools, **budget)
-            result = lookups.converse(chat_fn, messages, ctx)
+            result = lookups.converse(chat_fn, messages, ctx, question=question)
             if result["jobs"] is not None:
                 return result
             raw = result["text"]

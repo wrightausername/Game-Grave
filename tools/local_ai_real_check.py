@@ -63,7 +63,12 @@ def main():
         print(f"\nQuestion bench ({len(bench.CASES)} questions, Small model, lookups on):", flush=True)
         import os
         minutes = float(os.environ.get("GG_BENCH_MINUTES", "20"))
-        passed, asked, misses = bench.run(server, think=False, budget_s=minutes * 60, log=lambda line: print(line, flush=True))
+        # Each CI run starts at a different question, so every case gets asked over a few runs.
+        start = (int(os.environ.get("GITHUB_RUN_NUMBER", "0") or 0) * 15) % len(bench.CASES)
+        cases = bench.CASES[start:] + bench.CASES[:start]
+        print(f"Starting at question {start + 1}.")
+        passed, asked, misses = bench.run(server, think=False, budget_s=minutes * 60, cases=cases,
+                                          log=lambda line: print(line, flush=True))
         score = passed / asked if asked else 0
         print(f"\nBench: {passed} of {asked} passed ({score:.0%}).")
         for question, why in misses:

@@ -115,6 +115,32 @@ class Loop(unittest.TestCase):
         self.assertIsNone(offers[-1])
 
 
+class Prefetch(unittest.TestCase):
+    def test_obvious_lookups_run_first(self):
+        c = ctx()
+        names = lambda q: [fn for fn, _a in t.prefetch(q, c)]
+        self.assertEqual(names("what mods do i have for cyberpunk"), ["game_mods"])
+        self.assertIn("game_crashes", names("Cyberpunk won't launch"))
+        self.assertIn("known_fixes", names("my game crashes on startup what do i do"))
+        self.assertIn("pc_status", names("how much ram do i have"))
+        self.assertIn("explain_error", names("MSVCP140.dll is missing"))
+        self.assertIn("startup_apps", names("what starts with windows"))
+        self.assertIn("app_help", names("how do i back up a game"))
+        self.assertEqual(names("hi"), [])
+
+    def test_prefetched_results_reach_the_model_before_it_answers(self):
+        seen = []
+
+        def chat(messages, tools):
+            seen.append(list(messages))
+            return {"content": "Cyberpunk 2077 has SkyUI on."}
+        out = t.converse(chat, [{"role": "user", "content": "mods for cyberpunk?"}], ctx(), question="mods for cyberpunk?")
+        self.assertEqual(out["looked"], ["game_mods"])
+        self.assertEqual(out["checked"], ["Mods"])
+        self.assertEqual([m["role"] for m in seen[0]][-2:], ["assistant", "tool"])
+        self.assertIn("SkyUI", seen[0][-1]["content"])
+
+
 class Checking(unittest.TestCase):
     def test_sizes_and_games_must_match_the_data(self):
         f = facts()
