@@ -1206,3 +1206,6 @@ and its answers; layout unchanged except one "Not helpful" button under each ans
 - Fifth bench run: 37 of 39 (95%) on questions 31 to 60 and 1 to 9. The two misses are fixed: a how-to question gets the
   manual first and no diagnosis lookups (runtimes, open apps) that pulled the Small model off topic, and "is there a newer
   Game Grave" gets the Check for Updates manual entry (it stays a question; the built-in answer covers it, as before).
+- Sixth bench run: 40 of 45 (89%) on another slice. Fixes: lookups read last-played times as Unix seconds (they showed
+  "unknown days ago"); a well-known game that isn't installed ("why does Skyrim need SKSE") gets its general notes first
+  instead of "it isn't on your PC"; a model that only says "let me look that up" is told once to go ahead and look.

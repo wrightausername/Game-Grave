@@ -22,10 +22,13 @@ def _size(n):
 
 
 def _days(when, now):
+    """Whole days between two times; Game Grave keeps them as Unix seconds, but datetimes work too."""
     if not when:
         return None
     try:
-        return max(0, int((now - when).total_seconds() // 86400))
+        gap = now - when
+        seconds = gap.total_seconds() if hasattr(gap, "total_seconds") else float(gap)
+        return max(0, int(seconds // 86400))
     except Exception:
         return None
 
@@ -557,6 +560,12 @@ def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS, question=None):
         offer = tools if round_no < max_rounds else None       # the last round must answer in words
         reply = chat_fn(messages, offer) or {}
         calls = calls_in(reply)
+        said = str(reply.get("content") or "")
+        if not calls and offer is not None and round_no == 0 and _PROMISE.search(said):
+            # "Let me look that up" without looking: tell it to go ahead, once.
+            messages += [{"role": "assistant", "content": said},
+                         {"role": "user", "content": "Go ahead: use the lookups now, then answer."}]
+            continue
         if not calls or offer is None:
             text = _TEXT_CALL.sub("", str(reply.get("content") or "")).strip()
             return {"text": text, "jobs": None, "summary": "", "checked": checked, "results": results, "looked": looked}
@@ -577,6 +586,9 @@ def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS, question=None):
                 checked.append(label)
             messages.append({"role": "tool", "tool_call_id": cid, "name": name, "content": result})
     return {"text": "", "jobs": None, "summary": "", "checked": checked, "results": results, "looked": looked}
+
+
+_PROMISE = re.compile(r"\b(let me|i'?ll|i will|i'?m going to) (check|look|find|see|pull|get)\b", re.I)
 
 
 def _json(text):
@@ -680,6 +692,8 @@ def prefetch(question, ctx):
         game = find_game(f, ctx.screen["selected"])
     name = game.name if game is not None else ""
     calls = []
+    from gg_desktop import local_ai_knowledge as kb
+    known_game = next((k for k in kb.KNOWN_GAMES if k in q), "")
 
     def add(fn, **args):
         if (fn, args) not in calls and len(calls) < 4:
@@ -698,6 +712,8 @@ def prefetch(question, ctx):
         if not howto and re.search(r"crash|won'?t|doesn'?t|not (start|launch|load)|closes|error|fix", q):
             add("runtimes")
             add("open_apps")
+    if known_game and not name:     # a well-known game that isn't installed: general notes, not "it isn't on your PC"
+        add("known_fixes", problem=str(question)[:200], game=known_game)
     if name and _MODS.search(q):
         add("game_mods", name=name)
     elif name and not calls:

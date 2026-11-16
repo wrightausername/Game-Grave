@@ -116,6 +116,17 @@ class Loop(unittest.TestCase):
         self.assertEqual(out["jobs"], [{"job": "scan_games"}])
         self.assertEqual(out["summary"], "Scan.")
 
+    def test_a_promise_to_look_is_followed_up_once(self):
+        replies = iter([{"content": "Let me look that up for you."},
+                        {"content": "", "tool_calls": [{"id": "1", "function": {"name": "pc_status", "arguments": "{}"}}]},
+                        {"content": "You have 32 GB."}])
+        out = t.converse(lambda m, tl: next(replies), [], ctx())
+        self.assertEqual(out["text"], "You have 32 GB.")
+        self.assertEqual(out["looked"], ["pc_status"])
+
+    def test_last_played_days_from_unix_seconds(self):
+        self.assertEqual(json.loads(t.run(ctx(), "look_up_game", {"name": "cyberpunk"}))["last_played_days_ago"], 400)
+
     def test_the_last_round_must_answer(self):
         call = {"content": "", "tool_calls": [{"id": "1", "function": {"name": "pc_status", "arguments": "{}"}}]}
         offers = []
