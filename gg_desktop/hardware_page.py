@@ -424,6 +424,9 @@ class Body(QObject):
             m = specs.memory
             slots = f"{m.sticks} of {m.slots} slots used" if m.slots else f"{m.sticks} module{'s' if m.sticks != 1 else ''}"
             speed = (f"Running at {m.running_mts} MT/s" + (f", rated {m.rated_mts}" if m.rated_mts else "")) if m.running_mts else ""
+            if m.running_mts and m.rated_mts and m.running_mts < m.rated_mts * 0.95:
+                speed += (". Running slower than rated: the memory profile (XMP or EXPO) may be off in your BIOS. "
+                          "Game Grave doesn't change the BIOS")
             kind = f" {m.kind}" if m.kind else ""
             extra = []
             if m.slots or m.sticks:

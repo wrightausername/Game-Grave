@@ -74,6 +74,9 @@ class RegistryTab(QWidget):
             "QTreeWidget{background:#0b1118;color:#e8eef5;border:1px solid #1b2633;border-radius:8px;font-size:13px;}"
             "QTreeWidget::item{padding:4px 2px;}"
             "QTreeWidget::item:selected{background:#16324a;color:#ffffff;}"
+            "QTreeWidget::indicator{width:14px;height:14px;border:1px solid #4a5a6d;border-radius:3px;background:#0b1118;}"
+            "QTreeWidget::indicator:checked{background:#e8264a;border-color:#ff5a73;}"
+            "QTreeWidget::indicator:indeterminate{background:#6b2232;border-color:#e8264a;}"
             "QHeaderView::section{background:#0f1720;color:#9fb0c3;border:none;border-bottom:1px solid #1b2633;"
             "padding:6px;font-weight:600;}")
         self.tree.itemChanged.connect(lambda *_: self.count())

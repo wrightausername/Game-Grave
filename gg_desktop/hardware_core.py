@@ -678,15 +678,15 @@ def _storage_note(specs: Specs, games: list) -> Note:
             return Note("storage", "Move games off the hard drive", "NO PURCHASE NEEDED", "green",
                         "A fast drive here has room for the games that sit on a hard drive.",
                         tuple(points + low_points + ["Moving games is done in Steam or the launcher. Game Grave moves nothing."]),
-                        limit, ("Open More Tools", "More Tools"))
+                        limit, ("Open Games", "Games"))
         return Note("storage", "Move games off the hard drive", "WORTH A LOOK", "amber",
                     "Games sit on a hard drive and the fast drives here do not have room for all of them.",
-                    tuple(points + low_points), limit, ("Open More Tools", "More Tools"))
+                    tuple(points + low_points), limit, ("Open Games", "Games"))
     if not specs.drives:
         return Note("storage", "Drives", "CANNOT BE READ", "amber", "Windows did not report any drives.", (), limit)
     if low_points:
         return Note("storage", "Drive space", "LOW SPACE", "amber", "A drive is nearly full.", tuple(low_points), limit,
-                    ("Open More Tools", "More Tools"))
+                    ("Open Toolbox", "More Tools"))
     kinds = ", ".join(f"{d.letter}: {d.kind}" for d in specs.drives)
     return Note("storage", "Drives", "NOTHING TO MOVE", "cyan", "No installed game was found on a hard drive.",
                 (f"Drives found: {kinds}.",), limit)

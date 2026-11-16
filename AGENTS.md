@@ -1055,3 +1055,8 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   "Skipped", "Turned on") with the full wording on hover; no size reads "—"; the list is called "History"; Registry Cleanup
   and Crash Doctor events read in plain words with where to undo them (`undo_data.FEATURE_EVENTS`); narrow cards use whole
   short words. Restoring is unchanged (`recovery.py` untouched). Covered by `tools/undo_page_smoke.py`.
+- Hardware (all three approved): Upgrade Advisor's move-games notes link "Open Games" and the low-space note "Open Toolbox"
+  (was "Open More Tools"); Registry Cleanup's tree uses one tick-box style for ticked, unticked and partly ticked groups;
+  the RAM card adds "Running slower than rated: the memory profile (XMP or EXPO) may be off in your BIOS. Game Grave doesn't
+  change the BIOS" only when the running speed is under 95% of the rated one. Covered by `tests/test_hardware.py` and the
+  hardware and registry smokes.
