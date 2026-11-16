@@ -159,7 +159,10 @@ _WHY = re.compile(r"^(?:why|how come|how do you know|where(?:'s| is| does) that 
 _MORE = re.compile(r"^(?:tell me more|more|more info|more details|go on|explain|explain that|details|elaborate)\W*$")
 _ORDINALS = {"first": 1, "1st": 1, "top": 1, "second": 2, "2nd": 2, "third": 3, "3rd": 3, "fourth": 4, "4th": 4,
              "fifth": 5, "5th": 5, "last": -1}
-_ORDINAL = re.compile(r"\b(first|1st|top|second|2nd|third|3rd|fourth|4th|fifth|5th|last)\b(?: one| game| item)?|#\s*(\d)")
+_ORDINAL = re.compile(r"\b(?:(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th)\b(?: one| game| item)?|"
+                      r"(?:the )?(top|last) (?:one|game|item)\b)|#\s*(\d)")
+_PICK_FILLER = {"the", "one", "and", "what", "about", "how", "tell", "me", "more", "show", "is", "it", "that", "on", "of",
+                "please", "so", "ok", "okay", "info", "details", "with", "whats", "what's"}
 
 
 def _strip_games(text, facts):
@@ -185,8 +188,10 @@ def follow_up(text, facts, previous_question="", previous_answer=None):
     if short and _MORE.match(text):
         return previous_question + " details"
     found = _ORDINAL.search(text)
-    if short and found and rows:
-        n = int(found.group(2)) if found.group(2) else _ORDINALS[found.group(1)]
+    leftover = [w for w in re.findall(r"[a-z0-9']+", _ORDINAL.sub(" ", text)) if w not in _PICK_FILLER]
+    if short and found and rows and len(leftover) <= 2:    # "the second one", not "explain my last cleanup"
+        word = found.group(1) or found.group(2)
+        n = int(found.group(3)) if found.group(3) else _ORDINALS[word]
         index = len(rows) - 1 if n == -1 else n - 1
         if 0 <= index < len(rows):
             label = str(rows[index][0])
