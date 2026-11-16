@@ -58,7 +58,7 @@ def add_card(window, layout):
 
 def notify_if_low(window):
     """After a scan: one notice a day when a game drive is low."""
-    if not sp.notice_due(window.settings):
+    if window.settings.get("low_space_notice", True) is False or not sp.notice_due(window.settings):
         return
     try:
         drive, _drives, picks = low_drive(window)

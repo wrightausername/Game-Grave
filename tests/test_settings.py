@@ -211,6 +211,19 @@ class Autostart(unittest.TestCase):
         system.set_enabled(False, reg)
         self.assertFalse(system.is_enabled(reg))
 
+    def test_old_tray_entry_counts_as_on_and_is_removed_so_the_app_never_starts_twice(self):
+        reg = FakeRegistry()
+        reg.values[system.LEGACY_NAME] = system.command() + " --minimized"
+        self.assertTrue(system.is_enabled(reg) and system.has_legacy(reg))
+        system.set_enabled(True, reg)
+        self.assertEqual(set(reg.values), {system.VALUE_NAME}, "one start-up entry, not two")
+        reg.values[system.LEGACY_NAME] = system.command() + " --minimized"
+        system.set_enabled(False, reg)
+        self.assertEqual(reg.values, {})
+        reg.values[system.LEGACY_NAME] = '"C:\\Other\\app.exe"'
+        system.set_enabled(False, reg)
+        self.assertIn(system.LEGACY_NAME, reg.values, "another program's value with that name is left alone")
+
     def test_unavailable_outside_the_installed_windows_app(self):
         with patch.object(system.sys, "platform", "linux"):
             self.assertFalse(system.available())

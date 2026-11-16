@@ -300,12 +300,25 @@ def main():
             window.settings_tab_buttons["Notifications"].click()
             settle()
             texts = " ".join(l.text() for l in window.findChildren(settings_page.QLabel))
-            assert "no pop-up alerts" in texts and "status line" in texts
+            assert "Pop-up notices" in texts and "A game just crashed" in texts and "Keep running when closed" in texts
+            assert "no pop-up alerts" not in texts, "the old claim is gone"
+            # The crash notice switch is staged like any setting and saved by Apply.
+            crash = next(s for s in window.settings_controls["crash_notice"])
+            crash.click()
+            settle()
+            assert "Crash notice" in window.settings_footer.text(), window.settings_footer.text()
+            window.settings_apply.click()
+            settle()
+            assert on_disk()["crash_notice"] is False and window.settings["crash_notice"] is False
+            crash.click()
+            window.settings_apply.click()
+            settle()
+            assert on_disk()["crash_notice"] is True
             assert window.grab().save(str(args.output / "settings-notifications-1280.png"))
             window.settings_tab_buttons["Appearance"].click()
             settle()
             texts = " ".join(l.text() for l in window.findChildren(settings_page.QLabel))
-            assert "Crimson Command" in texts
+            assert "Crimson Command" in texts and "Open Toolbox…" not in [b.text() for b in window.findChildren(settings_page.QPushButton)]
             from PySide6.QtWidgets import QComboBox
             scale = next(c for c in window.findChildren(QComboBox) if c.accessibleName() == "Interface scale")
             assert scale.currentText() == "100% native" and scale.count() == 4, "the native size is the default"

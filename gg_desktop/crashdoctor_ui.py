@@ -711,6 +711,8 @@ def watch_crashes(window):
     tracker = tracker_for(window)
 
     def closed(keys):
+        if window.settings.get("crash_notice", True) is False:   # switched off in Settings > Notifications
+            return
         if getattr(getattr(window, "crash_doctor", None), "phase", "idle") != "idle":
             return
         if tracker.last_active:                   # another game is running: do nothing now

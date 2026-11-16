@@ -1073,3 +1073,21 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   filtered to that game (nothing is launched); plan cards show a tick box only on a change still waiting for your OK, and
   steps of a plan made while tools are off read "Off" instead of "Waiting". Covered by `tests/test_assistant.py` and
   `tools/assistant_page_smoke.py`.
+- Settings (all six approved):
+  - One start-up entry. Settings > General "Launch with Windows" and the tray's "Start with Windows" now both use
+    `settings_system` and the single HKCU\Software\Microsoft\Windows\CurrentVersion\Run value `GameGrave`. Older tray
+    menus wrote a second value `Game Grave` (with --minimized), which could start the app twice; it is read as on and
+    removed whenever either switch changes, but only when it points at this Game Grave. Changes are logged
+    (`start_with_windows` from the tray, "Settings changed" from Apply). The tray no longer turns on Start minimized; that
+    stays its own switch under General.
+  - Notifications page: the old "no pop-up alerts, runs nothing in the background" text was untrue and is gone. Real
+    switches, staged and saved by Apply: Pop-up notices (`popup_notices`, off keeps notices on the bell), A game just
+    crashed (`crash_notice`, read by `crashdoctor_ui.watch_crashes`), Low disk space (`low_space_notice`, read by
+    `space_ui.notify_if_low`), Keep running when closed (`close_to_tray`, the same setting as the tray menu item).
+  - Protection: built-in rules show a green check mark "On" instead of switches that looked flippable; its button is
+    "Protect a Folder". Never Touch Rules: the Protect a Folder and Remove… buttons sit above the list so they never scroll
+    out of view.
+  - Appearance: removed the stray "Open Toolbox…" button; Theme and Language show as plain text, not drop-down lookalikes;
+    Language & Region is only on Appearance (no longer repeated on General).
+  - Scanning: "Files idle after" is "Old Files: unused for", "Graveyard age signal" is "Graveyard: flag as old after".
+  Covered by `tests/test_settings.py` (old tray entry) and `tools/settings_page_smoke.py` (notice switch round trip).

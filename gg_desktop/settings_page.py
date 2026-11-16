@@ -38,11 +38,13 @@ TONES = {"yellow": "246,190,36", "cyan": "19,188,245", "purple": "180,85,255", "
 TONE_HEX = {"yellow": "#f6be24", "cyan": "#13bcf5", "purple": "#b455ff", "red": "#ff3b57", "green": "#32d67a"}
 FOOTER = "Changes save to this PC when you press Apply. Reset to Defaults never touches your files, mods or recovery records."
 NAMES = {"start_minimized": "Start minimized", "scan_on_launch": "Scan when Game Grave starts",
-         "files_stale_days": "Files idle after", "graveyard_days": "Graveyard age signal",
+         "files_stale_days": "Old Files: unused for", "graveyard_days": "Graveyard: flag as old after",
          "excluded_folders": "Excluded folders", "steam_artwork_downloads": "Steam artwork downloads",
          "autostart": "Launch with Windows", "assistant_enabled": "AI Assistant tab",
          "check_updates_on_launch": "Check for updates on launch", "soulbind_new_games": "Soulbind new games",
-         "interface_scale": "Interface scale"}
+         "interface_scale": "Interface scale", "welcome_at_startup": "Welcome tour at startup",
+         "popup_notices": "Pop-up notices", "crash_notice": "Crash notice", "low_space_notice": "Low disk space notice",
+         "close_to_tray": "Keep running when closed"}
 
 
 # ------------------------------------------------------------------ small widgets
@@ -159,10 +161,19 @@ def line(title, caption, control, *, top=False):
 
 
 def pill(text):
+    """A fixed value shown as plain text, so it doesn't look like a drop-down you can open."""
     chip = QLabel(text)
-    chip.setStyleSheet("color:#e8eef5;background:#0c1520;border:1px solid #243244;border-radius:6px;padding:4px 10px;font-size:12px;")
+    chip.setStyleSheet("color:#e8eef5;font-size:12px;font-weight:600;")
     chip.setMinimumWidth(0)
     return chip
+
+
+def always_on():
+    """Protection that is built in: a check mark, not a switch that looks like it can be flipped."""
+    mark = QLabel("\u2713 On")
+    mark.setStyleSheet("color:#32d67a;font-size:12px;font-weight:700;")
+    mark.setToolTip("Always on. Built-in protection can't be switched off.")
+    return mark
 
 
 class TabButton(QPushButton):
@@ -326,10 +337,8 @@ def autostart_switch(window):
     return line("Launch with Windows", "Opens Game Grave when you sign in to Windows." if usable else system.reason(), switch)
 
 
-def fixed_switch(title, caption, *, on=True, enabled=True):
-    switch = Switch(on, locked=True, name=title)
-    switch.setEnabled(enabled)
-    return line(title, caption, switch)
+def fixed_check(title, caption):
+    return line(title, caption, always_on())
 
 
 def day_combo(window, key, choices, name):
@@ -414,8 +423,9 @@ def scanning_panel(window, compact=False):
     lay.addLayout(words, 1)
     lay.addWidget(pick)
     body.addWidget(holder)
-    body.addWidget(line("Files idle after", "", day_combo(window, "files_stale_days", data.FILE_DAYS, "Files idle after")))
-    body.addWidget(line("Graveyard age signal", "", day_combo(window, "graveyard_days", data.GRAVE_DAYS, "Graveyard age signal")))
+    body.addWidget(line("Old Files: unused for", "", day_combo(window, "files_stale_days", data.FILE_DAYS, "Old Files: unused for")))
+    body.addWidget(line("Graveyard: flag as old after", "", day_combo(window, "graveyard_days", data.GRAVE_DAYS,
+                                                                      "Graveyard: flag as old after")))
     counts = {}
     total = label("", "detailValue")
     if compact:
@@ -440,7 +450,7 @@ def scanning_panel(window, compact=False):
     manage = tool("Manage Scan Locations…", "folder", window.open_scan_locations, tip="Add or remove library, mod and capture folders")
     manage.setFixedHeight(28)
     body.addWidget(manage)
-    body.addWidget(label("Idle ages apply to the next scan.", "caption", wrap=True))
+    body.addWidget(label("These ages apply to the next scan.", "caption", wrap=True))
     body.addStretch()
 
     def refresh():
@@ -532,11 +542,11 @@ def remove_excluded(window, path):
 
 def protection_panel(window):
     box, body = frame("settingsProtection", "green", "Protection", "shield", badge="ALWAYS ON")
-    body.addWidget(fixed_switch("Recycle Bin only", "Removals never skip the Recycle Bin."))
-    body.addWidget(fixed_switch("Confirm every cleanup", "You approve each action."))
-    body.addWidget(fixed_switch("Protect launcher and save folders", "Built-in rules cannot be turned off."))
+    body.addWidget(fixed_check("Recycle Bin only", "Removals never skip the Recycle Bin."))
+    body.addWidget(fixed_check("Confirm every cleanup", "You approve each action."))
+    body.addWidget(fixed_check("Protect launcher and save folders", "Built-in rules cannot be turned off."))
     count = label("", "detailValue")
-    manage = tool("Manage Rules", "shield", lambda: show_tab(window, "Protection"), tip="Open your personal Never Touch rules")
+    manage = tool("Protect a Folder", "plus", lambda: add_rule(window), tip="Add a personal Never Touch rule for a folder")
     manage.setFixedHeight(28)
     holder = QWidget()
     lay = row(spacing=8)
@@ -562,16 +572,16 @@ def never_touch_panel(window):
     rules = QListWidget()
     rules.setAccessibleName("Personal Never Touch rules")
     rules.setMinimumHeight(120)
-    body.addWidget(rules, 1)
     window.settings_never_list = rules
     actions = row(spacing=8)
     add = tool("Protect a Folder", "plus", lambda: add_rule(window), tip="Protect an ordinary personal folder")
-    drop = tool("Remove Selected Rule…", "trash", lambda: remove_rule(window), kind="danger", tip="Remove your selected personal rule")
+    drop = tool("Remove…", "trash", lambda: remove_rule(window), kind="danger", tip="Remove your selected personal rule")
     for control in (add, drop):
         control.setFixedHeight(30)
         actions.addWidget(control)
     actions.addStretch()
-    body.addLayout(actions)
+    body.addLayout(actions)            # above the list, so the buttons never scroll out of view
+    body.addWidget(rules, 1)
 
     def refresh():
         current = window.settings.get("never_touch", [])
@@ -630,15 +640,11 @@ def appearance_panel(window):
     body.addWidget(line("Interface scale", "", scale_combo(window)))
     body.addWidget(label("The theme is fixed so every tab keeps its approved layout. A larger scale enlarges the whole "
                          "window evenly and is used the next time Game Grave starts.", "caption", wrap=True))
-    classic = tool("Open Toolbox…", "more", lambda: window.navigate("More Tools"),
-                   tip="Windows tools, backups, reports and file utilities live in Toolbox")
-    classic.setFixedHeight(28)
     tour = tool("Watch the welcome tour", "help", lambda: _open_tour(window),
                 tip="A short tour of every part of Game Grave. Skip it or close it any time.")
     tour.setFixedHeight(28)
     tour.setAccessibleName("Watch the welcome tour")
     buttons = row(spacing=6)
-    buttons.addWidget(classic)
     buttons.addWidget(tour)
     buttons.addStretch()
     body.addLayout(buttons)
@@ -656,9 +662,19 @@ def scan_behavior_panel(window):
 
 def notifications_panel(window):
     box, body = frame("settingsNotifications", "yellow", "Notifications", "bell")
-    body.addWidget(label("Game Grave shows no pop-up alerts and runs nothing in the background. When a scan finishes, the "
-                         "result appears in the status line at the bottom of the window.", "subtle", wrap=True))
-    body.addWidget(label("Start minimized and Scan when Game Grave starts are under General.", "caption", wrap=True))
+    body.addWidget(bool_switch(window, "popup_notices", "Pop-up notices",
+                               "Shows a short notice in the corner when a scan or job finishes. Off: notices still "
+                               "collect on the bell."))
+    body.addWidget(bool_switch(window, "crash_notice", "A game just crashed",
+                               "After a modded game closes with a Windows crash record, offers Crash Doctor. At most "
+                               "once a day per game."))
+    body.addWidget(bool_switch(window, "low_space_notice", "Low disk space",
+                               "After a scan, at most once a day, when a game drive is almost full."))
+    body.addWidget(bool_switch(window, "close_to_tray", "Keep running when closed",
+                               "Closing the window keeps Game Grave in the tray by the clock, so routines you set up "
+                               "in the AI Assistant can still run. Also in the tray menu."))
+    body.addWidget(label("Nothing runs in the background unless you set up a routine, and nothing runs while a game is "
+                         "being played.", "caption", wrap=True))
     body.addStretch()
     return box
 
@@ -856,7 +872,7 @@ def apply_changes(window):
         pass
     if problem:
         window.error("Launch with Windows not changed", problem)
-    window.status.setText("Settings applied. Idle ages and excluded folders take effect on the next scan.")
+    window.status.setText("Settings applied. Age settings and excluded folders take effect on the next scan.")
     sync(window)
 
 
@@ -931,7 +947,7 @@ def build(window):
     page.content.addWidget(holder)
 
     self.settings_stack = QStackedWidget()
-    self.settings_stack.addWidget(columns((1, [startup_panel(self), language_panel(self)]),
+    self.settings_stack.addWidget(columns((1, [startup_panel(self)]),
                                           (1, [scanning_panel(self, compact=True), excluded_panel(self)]),
                                           (1, [protection_panel(self), appearance_panel(self)])))
     self.settings_stack.addWidget(columns((1, [scanning_panel(self)]), (1, [excluded_panel(self)]),

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import platform
-import sys
 from types import SimpleNamespace
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer
@@ -178,7 +177,7 @@ def notify(window, title, text, tone="good", target="", action=None, toast=True)
     st.notices = core.add_notice(st.notices, item)
     _save(window, core.with_notices(window.settings, st.notices))
     sync_badge(window)
-    if toast and not getattr(window, "reference_preview", False):
+    if toast and window.settings.get("popup_notices", True) is not False and not getattr(window, "reference_preview", False):
         show_toast(window, item, action)
     return item
 
@@ -405,12 +404,13 @@ def install_tray(window):
     menu.addSeparator()
     keep = QAction("Keep running when closed", menu, checkable=True)
     keep.setChecked(keep_running(window))
-    keep.toggled.connect(lambda on: _save(window, dict(window.settings, **{core.TRAY_KEY: bool(on)})))
+    keep.toggled.connect(lambda on: set_keep_running(window, on))
     menu.addAction(keep)
-    start = QAction("Start with Windows (in the tray)", menu, checkable=True)
-    start.setChecked(window.settings.get(core.START_KEY) is True)
-    start.setEnabled(getattr(sys, "frozen", False) and sys.platform == "win32")
-    start.setToolTip("Adds Game Grave to your own Windows start-up list. Switch it off to remove it.")
+    from gg_desktop import settings_system
+    start = QAction("Start with Windows", menu, checkable=True)
+    start.setChecked(settings_system.is_enabled())
+    start.setEnabled(settings_system.available())
+    start.setToolTip("The same switch as Settings > General > Launch with Windows. Start minimized is set there.")
     start.toggled.connect(lambda on: set_start_with_windows(window, on))
     menu.addAction(start)
     menu.addSeparator()
@@ -426,6 +426,14 @@ def install_tray(window):
 def _pop(window):
     from gg_desktop import assistant_popout
     assistant_popout.open_popout(window)
+
+
+def set_keep_running(window, on):
+    """The tray's "Keep running when closed"; the same setting as Settings > Notifications."""
+    _save(window, dict(window.settings, **{core.TRAY_KEY: bool(on)}))
+    pending = getattr(getattr(window, "_settings_state", None), "pending", None)
+    if isinstance(pending, dict):
+        pending[core.TRAY_KEY] = bool(on)
 
 
 def keep_running(window):
@@ -461,27 +469,21 @@ def close_to_tray(window, event):
 
 
 def set_start_with_windows(window, on):
-    """One value in the owner's own Run key (HKCU). Only in the installed app; logged either way."""
-    if not (getattr(sys, "frozen", False) and sys.platform == "win32"):
+    """The single start-up entry in the owner's own Run key (HKCU), shared with Settings. Only in the installed app; logged."""
+    from gg_desktop import settings_system
+    if not settings_system.available():
         return False
-    import winreg
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, core.RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
-            if on:
-                winreg.SetValueEx(key, core.RUN_NAME, 0, winreg.REG_SZ, core.run_command(sys.executable))
-            else:
-                try:
-                    winreg.DeleteValue(key, core.RUN_NAME)
-                except FileNotFoundError:
-                    pass
+        settings_system.set_enabled(bool(on))
     except OSError as exc:
         window.error("Start with Windows not changed", str(exc))
         return False
-    _save(window, dict(window.settings, **{core.START_KEY: bool(on), "start_minimized": bool(on) or
-                                            window.settings.get("start_minimized") is True}))
+    _save(window, dict(window.settings, **{core.START_KEY: bool(on)}))
     from core import log_event
     log_event("start_with_windows", ("Added" if on else "Removed") + " Game Grave in HKCU\\" + core.RUN_KEY,
               result="on" if on else "off", source="tray")
+    if hasattr(window, "_settings_state"):
+        window._settings_state.autostart = bool(on)
     return True
 
 

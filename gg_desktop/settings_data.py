@@ -32,6 +32,10 @@ OWNED = {
     "soulbind_new_games": False,        # apply the Soulbind profile to newly installed games; off until switched on
     "interface_scale": 100,             # whole-window size in percent; used the next time the app starts
     "welcome_at_startup": True,         # the welcome tour opens when Game Grave starts until the owner turns it off
+    "popup_notices": True,              # notices pop up in the corner; off keeps them on the bell only
+    "crash_notice": True,               # "a game just crashed" offer of Crash Doctor after a modded game closes
+    "low_space_notice": True,           # at most once a day when a game drive is almost full
+    "close_to_tray": True,              # closing the window keeps Game Grave in the tray (also in the tray menu)
 }
 LIBRARY_KEYS = ("steam_extra_roots", "other_library_roots", "mod_extra_roots", "screenshot_roots", "recording_roots")
 LIBRARY_NAMES = {"steam_extra_roots": "Steam libraries", "other_library_roots": "Other / Xbox libraries",
@@ -77,6 +81,10 @@ def current(settings):
         "soulbind_new_games": settings.get("soulbind_new_games") is True,
         "interface_scale": pick_days(settings.get("interface_scale"), SCALES, 100),
         "welcome_at_startup": settings.get("welcome_at_startup", True) is not False,
+        "popup_notices": settings.get("popup_notices", True) is not False,
+        "crash_notice": settings.get("crash_notice", True) is not False,
+        "low_space_notice": settings.get("low_space_notice", True) is not False,
+        "close_to_tray": settings.get("close_to_tray", True) is not False,
     }
 
 
