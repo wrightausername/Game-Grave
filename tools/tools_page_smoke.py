@@ -322,7 +322,7 @@ def main():
                 state.cpu = system.CpuMeter(iter([(0, 100), (70, 200)]).__next__)
                 tools_page.tick(window, full=True)
                 assert window.tools_values["storage"].text() == "72%" and window.tools_values["memory"].text() == "46%"
-                assert window.tools_values["cpu"].text() == "…"
+                assert window.tools_values["cpu"].text() == "Measuring…"
                 tools_page.tick(window)
                 assert window.tools_values["cpu"].text() == "30%" and window.tools_meters["cpu"].value == 30
             with patch.object(system, "storage_percent", return_value=None), patch.object(system, "memory_percent", return_value=None):
