@@ -365,35 +365,7 @@ def answer_async(window, question, base_answer, facts, history, deliver):
                     server.stop()
                 server = st.server = ai.LocalServer(key)
                 ai.start_best(server)
-            messages = prompt.build_messages(question, base_answer, facts, history, think=think, tools=True,
-                                             screen=screen)
-            budget = dict(max_tokens=2600, timeout=420) if think else dict(max_tokens=900, timeout=240)
-            chat_fn = lambda msgs, tools: server.chat_message(msgs, tools, **budget)
-            result = lookups.converse(chat_fn, messages, ctx, question=question)
-            if result["jobs"] is not None:
-                return result
-            raw = result["text"]
-            planned = prompt.plan_request(prompt.clean_reply(raw))
-            if planned:
-                return dict(result, jobs=[], request=planned)
-            text = prompt.clean_reply(raw)
-            if not text and raw.strip():
-                # Broke a rule or ran out of room while thinking: ask once more, shorter, before giving up.
-                retry = messages + [{"role": "assistant", "content": prompt.clean_reply(raw.replace("<think>", "")) or "…"},
-                                    {"role": "user", "content": prompt.RETRY_NOTE + " /no_think"}]
-                text = prompt.clean_reply(server.chat(retry, max_tokens=900, timeout=240))
-            wrong = lookups.problems(text, facts, result["results"]) if text else []
-            if wrong:
-                # Says something the data doesn't back up: show the model what and let it correct itself once.
-                fix = messages + [{"role": "assistant", "content": text},
-                                  {"role": "user", "content": lookups.FIX_NOTE.format(problems="; ".join(wrong)) +
-                                   " /no_think"}]
-                again = prompt.clean_reply(server.chat(fix, max_tokens=900, timeout=240))
-                still = lookups.problems(again, facts, result["results"]) if again else wrong
-                text = again if again and len(still) < len(wrong) else text
-                result["unchecked"] = still if again else wrong
-            result["text"] = text
-            return result
+            return lookups.answer(server, question, base_answer, facts, history, ctx, think=think)
 
     def done(result):
         st.busy = False

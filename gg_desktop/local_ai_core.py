@@ -58,7 +58,7 @@ MODELS = (
 )
 BY_KEY = {m.key: m for m in MODELS}
 # How much text each model may hold at once. Bigger lets it see more of the PC and think longer; Small stays light.
-CONTEXT = {"small": 8192, "medium": 12288, "large": 12288}
+CONTEXT = {"small": 12288, "medium": 12288, "large": 12288}
 THINKS = frozenset({"medium", "large"})       # these reason step by step before answering
 DEFAULT_MODEL = "medium"
 

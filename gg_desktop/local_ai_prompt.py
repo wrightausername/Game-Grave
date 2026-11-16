@@ -66,6 +66,9 @@ FORBIDDEN = (
     r"\b(i|game grave|we) (just |have |'ve )?(freed|reclaimed)\b",
     r"\bi (have |just )?(deleted|removed|moved|installed|changed|uninstalled|cleared)\b",
     r"\bi('ve| have) (deleted|removed|moved|installed|changed|uninstalled|cleared)\b",
+    # It can't change anything itself, so it never reports a change as done ("your settings have been restored").
+    r"\b(has|have) (now |just )?been (restored|deleted|removed|changed|reset|updated|installed|uninstalled|cleaned|"
+    r"cleared|closed|disabled|enabled|turned (on|off)|switched (on|off)|fixed)\b",
 )
 RETRY_NOTE = ("Rewrite your last answer so it keeps the rules: don't promise anything is safe to delete, don't say space "
               "was freed, and don't say you changed anything yourself. Keep everything else that was useful.")
@@ -228,6 +231,9 @@ TOOL_RULES = (
     "- Game Grave may already have run some lookups for the question; their results follow it. Use them first.\n"
     "- Never name a lookup or tell the user to run one; look it up yourself. Never mix up games: a game's mods, saves "
     "and sizes are only the ones its own lookup returns.\n"
+    "- A question about a game that isn't installed, or about games in general, is answered from general knowledge; "
+    "don't refuse because it isn't on this PC.\n"
+    "- When the user asks you to DO something, never answer as if it was done; propose it with make_plan.\n"
     "- Look up only what you need (a few lookups at most), then answer."
 )
 

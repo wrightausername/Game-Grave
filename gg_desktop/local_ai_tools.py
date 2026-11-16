@@ -12,7 +12,7 @@ import json
 import re
 from datetime import datetime
 
-MAX_RESULT = 3500          # characters of one lookup result handed back to the model
+MAX_RESULT = 2400          # characters of one lookup result handed back to the model
 MAX_CALLS = 6              # lookups per question before the model must answer
 
 
@@ -437,10 +437,30 @@ def run(ctx, name, arguments):
         result = func(ctx, **kwargs)
     except Exception as exc:        # a lookup that fails must not end the answer
         result = {"error": f"That lookup failed: {exc}"}
+    return fit(result)
+
+
+def _trim(value, items, chars):
+    if isinstance(value, dict):
+        return {k: _trim(v, items, chars) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        kept = [_trim(v, items, chars) for v in list(value)[:items]]
+        return kept + ([f"...and {len(value) - items} more"] if len(value) > items else [])
+    if isinstance(value, str) and len(value) > chars:
+        return value[:chars] + "…"
+    return value
+
+
+def fit(result, limit=None):
+    """A lookup result as JSON under the size limit, shortened by keeping fewer items and shorter text, so it stays
+    valid JSON the model can read."""
+    limit = limit or MAX_RESULT
     text = json.dumps(result, default=str, ensure_ascii=False)
-    if len(text) > MAX_RESULT:
-        text = text[:MAX_RESULT] + '..."(cut short)"'
-    return text
+    for items, chars in ((20, 400), (10, 250), (6, 160), (3, 100)):
+        if len(text) <= limit:
+            return text
+        text = json.dumps(_trim(result, items, chars), default=str, ensure_ascii=False)
+    return text if len(text) <= limit else json.dumps({"note": "Too much to show; ask about something narrower."})
 
 
 # ------------------------------------------------------------------ calls written as text
@@ -657,3 +677,58 @@ def with_prefetch(messages, ctx, calls):
             checked.append(label)
         out.append({"role": "tool", "tool_call_id": cid, "name": fn, "content": result})
     return out, results, checked
+
+
+# ------------------------------------------------------------------ one whole answer, as the app and the bench run it
+def _shrink(messages, limit=1200):
+    """The same messages with every lookup result cut short, for when the model's context ran out."""
+    out = []
+    for m in messages:
+        if m.get("role") == "tool" and len(str(m.get("content", ""))) > limit:
+            m = dict(m, content=fit(_json(m["content"]) or {"note": "cut short"}, limit))
+        out.append(m)
+    return out
+
+
+def answer(server, question, base_answer, facts, history, ctx, think=False):
+    """Ask the model with lookups, then check what it said. `server` has chat_message() and chat(). Returns the result
+    dict from `converse`, with the final text (empty when it broke a rule twice) and `unchecked` problems."""
+    from gg_desktop import local_ai_prompt as prompt
+    messages = prompt.build_messages(question, base_answer, facts, history, think=think, tools=True, screen=ctx.screen)
+    budget = dict(max_tokens=2600, timeout=420) if think else dict(max_tokens=900, timeout=240)
+    shrunk = {"on": False}
+
+    def chat_fn(msgs, tools):
+        if shrunk["on"]:
+            msgs = _shrink(msgs)
+        try:
+            return server.chat_message(msgs, tools, **budget)
+        except Exception as exc:
+            if "400" not in str(exc) or shrunk["on"]:
+                raise
+            shrunk["on"] = True                       # too long for the model's window: cut lookup results and retry
+            return server.chat_message(_shrink(msgs), tools, **budget)
+    result = converse(chat_fn, messages, ctx, question=question)
+    if result["jobs"] is not None:
+        return result
+    raw = result["text"]
+    planned = prompt.plan_request(prompt.clean_reply(raw))
+    if planned:
+        return dict(result, jobs=[], request=planned)
+    text = prompt.clean_reply(raw)
+    if not text and raw.strip():
+        # Broke a rule or ran out of room while thinking: ask once more, shorter, before giving up.
+        retry = messages + [{"role": "assistant", "content": prompt.clean_reply(raw.replace("<think>", "")) or "…"},
+                            {"role": "user", "content": prompt.RETRY_NOTE + " /no_think"}]
+        text = prompt.clean_reply(server.chat(retry, max_tokens=900, timeout=240))
+    wrong = problems(text, facts, result["results"]) if text else []
+    if wrong:
+        # Says something the data doesn't back up: show the model what and let it correct itself once.
+        fix = messages + [{"role": "assistant", "content": text},
+                          {"role": "user", "content": FIX_NOTE.format(problems="; ".join(wrong)) + " /no_think"}]
+        again = prompt.clean_reply(server.chat(fix, max_tokens=900, timeout=240))
+        still = problems(again, facts, result["results"]) if again else wrong
+        text = again if again and len(still) < len(wrong) else text
+        result["unchecked"] = still if again else wrong
+    result["text"] = text
+    return result

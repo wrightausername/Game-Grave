@@ -1184,3 +1184,10 @@ and its answers; layout unchanged except one "Not helpful" button under each ans
   forbid naming a lookup to the user, and the per-question quick lookup moved out of the system text so the prompt cache
   reuses it. The bench counts Game Grave's own lookups, and each CI run starts at a different question
   (`GITHUB_RUN_NUMBER`) so all 60 get asked over a few runs.
+- Second bench run: 16 of 25 (64%), answers 3 to 10 times faster thanks to the prompt cache. Fixes from it: one shared
+  `local_ai_tools.answer` (lookups, the rule retry, the answer check) used by both the app and the bench; a prompt too long
+  for the model's window (HTTP 400) is retried with shorter lookup results; lookup results are shortened by keeping fewer
+  items so they stay valid JSON (`fit`); Small now gets a 12,288-token window; the rules block reporting a change as done
+  ("your settings have been restored") and tell the model to answer general questions about games that aren't installed;
+  "fix <game>" and "put my Windows settings back" are planned by Game Grave's own request reading before the model is asked
+  (as the app does), and the bench follows the same order.

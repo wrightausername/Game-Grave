@@ -115,6 +115,35 @@ def judge(expect, result, text):
     return misses
 
 
+STEP_JOBS = {"scan_library": "scan_games", "scan_leftovers": "scan_leftovers", "scan_storage": "scan_other_storage",
+             "scan_captures": "scan_captures", "clear_temp": "clean_temp_files", "check_temp": "clean_temp_files",
+             "check_drivers": "check_drivers", "install_drivers": "install_driver_updates", "game_mode_on": "game_mode_on",
+             "recording_off": "background_recording_off", "power_high": "high_performance_power",
+             "undo_optimizer": "undo_windows_settings", "check_mods": "mod_off", "check_game_fix": "fix_game",
+             "check_app_update": "check_game_grave_update", "check_memory": "close_app", "check_startup": "stop_startup_app"}
+
+
+def jobs_of(steps):
+    jobs = []
+    for s in steps:
+        job = STEP_JOBS.get(s.key)
+        if s.key == "check_mods" and s.args.get("on"):
+            job = "mod_on"
+        if job and job not in jobs:
+            jobs.append(job)
+    if {"game_mode_on", "background_recording_off"} <= set(jobs) and "close_app" in jobs:
+        jobs.append("get_ready_to_play")
+    return jobs
+
+
+def built_in_plan(question, ctx):
+    """What the app's own request reading turns this into before the model is asked (as `assistant_page.send` does)."""
+    from gg_desktop import assistant_understand as understand
+    from gg_desktop import autopilot_core as core
+    plan = core.plan_for(question) or core.plan_for(understand.normalize(question, ctx.facts))
+    return jobs_of(plan.steps) if plan else None
+
+
 def run(server, think=False, budget_s=35 * 60, cases=CASES, log=print):
     """Ask every case (until the time budget runs out). Returns (passed, asked, misses)."""
     ctx = context()
@@ -126,24 +155,31 @@ def run(server, think=False, budget_s=35 * 60, cases=CASES, log=print):
             break
         asked += 1
         base = engine.answer(question, ctx.facts)
-        messages = prompt.build_messages(question, base, ctx.facts, think=think, tools=True, screen=ctx.screen)
         called = []
-
-        def chat(msgs, tools):
-            reply = server.chat_message(msgs, tools, max_tokens=1600 if think else 500, timeout=600)
-            called.extend(name for _cid, name, _a in lookups.calls_in(reply))
-            return reply
         t = time.monotonic()
-        try:
-            result = lookups.converse(chat, messages, ctx, question=question)
+        built_in = built_in_plan(question, ctx)
+        if built_in is not None:          # the app plans these before the model is asked
+            result = {"text": "", "jobs": [{"job": j} for j in built_in], "results": [], "looked": []}
+        else:
+            class Counting:
+                def chat_message(self, msgs, tools, **budget):
+                    reply = server.chat_message(msgs, tools, **dict(budget, max_tokens=1600 if think else 500))
+                    called.extend(name for _cid, name, _a in lookups.calls_in(reply))
+                    return reply
+
+                def chat(self, msgs, **budget):
+                    return server.chat(msgs, **dict(budget, max_tokens=500))
+            try:
+                result = lookups.answer(Counting(), question, base, ctx.facts, (), ctx, think=think)
+            except Exception as exc:          # one slow or broken answer must not end the bench
+                misses.append((question, [f"error: {exc}"]))
+                log(f"  ERROR {question}: {exc}")
+                continue
             called.extend(result.get("looked") or [])
-        except Exception as exc:          # one slow or broken answer must not end the bench
-            misses.append((question, [f"error: {exc}"]))
-            log(f"  ERROR {question}: {exc}")
-            continue
-        text = prompt.clean_reply(result["text"]) if result["text"] else ""
-        if result["text"] and not text:
-            text = "[blocked by the rules]"
+            if result.get("request"):
+                plan = __import__("gg_desktop.autopilot_core", fromlist=["x"]).plan_for(result["request"])
+                result = dict(result, jobs=[{"job": j} for j in jobs_of(plan.steps if plan else [])])
+        text = result["text"] or ("" if result.get("jobs") is not None else "[blocked by the rules twice]")
         result = dict(result)
         holder = SimpleNamespace(called=called)
         holder.get = result.get

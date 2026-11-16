@@ -142,6 +142,12 @@ def normalize(question, facts=None):
     names = set()
     for g in getattr(facts, "games", ()) if facts is not None else ():
         names.update(_plain(g.name).split())
+    wants_fix = re.match(r"^(?:please |can you |could you )?(?:fix|repair) (?:my |the )?(.+?)\W*$", text)
+    if wants_fix and facts is not None:     # "fix cyberpunk": the fix-my-game plan for that installed game
+        from gg_desktop.local_ai_tools import find_game
+        game = find_game(facts, wants_fix.group(1))
+        if game is not None:
+            return "fix my game " + game.name.casefold()
     fixed = []
     for word in text.split():
         bare = word.strip(".,!?'\"")

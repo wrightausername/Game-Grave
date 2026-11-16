@@ -195,7 +195,8 @@ _MOD_SWITCH = re.compile(r"\b(turn|switch|toggle) (it |them |that |those )?(off|
 _GAME_MODE = re.compile(r"game ?mode")
 _RECORDING = re.compile(r"recording|game ?bar|game ?dvr|captures? in the background")
 _POWER = re.compile(r"power plan|high performance|full power|max(imum)? performance|full speed")
-_UNDO = re.compile(r"\b(undo|revert|put (it|them|those|my settings|everything) back|restore my settings|change (it|them) back)\b")
+_UNDO = re.compile(r"\b(undo|revert|put (it|them|those|my settings|my windows settings|windows settings|everything) back|"
+                   r"restore my (windows )?settings|change (it|them) back)\b")
 _APP_UPDATE = re.compile(r"update game grave|new(er)? (version|build) of game grave|game grave update|check for updates|"
                          r"is there an update|latest version")
 

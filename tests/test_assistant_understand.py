@@ -44,6 +44,10 @@ class LooseQuestions(unittest.TestCase):
         self.assertIn("Starfield reports 120.0 GB", text)
         self.assertIn("You last played Cyberpunk 2077 400 days ago", text)
 
+    def test_fix_a_named_game_becomes_the_fix_plan(self):
+        self.assertEqual(u.normalize("fix cyberpunk", self.facts), "fix my game cyberpunk 2077")
+        self.assertEqual(u.normalize("fix my car", self.facts), "fix my car")
+
     def test_a_miss_offers_best_guesses_not_a_dead_end(self):
         a = self.ask("asdkjh qwe")
         self.assertEqual(a.intent, "suggest")
