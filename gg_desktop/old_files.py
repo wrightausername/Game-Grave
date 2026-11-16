@@ -100,7 +100,7 @@ class OldFilesSession(QObject):
                 scan_cache.keep_async("old_files", result)
                 window._sync_scan_time()
                 from gg_desktop import comfort
-                comfort.notify(window, "Old Files scan finished", result.short_summary(), "good", "Old Files")
+                comfort.notify(window, "Old Files scan finished", short_summary(result), "good", "Old Files")
             window.status.setText(message_text("Old Files: " + self.message))
             self.changed.emit()
         def work(emit):
@@ -382,3 +382,13 @@ class OldFilesController(QObject):
                 active.fill()
             state.changed.emit()
         state.task(lambda emit: recycle_reviewed(result, selected, rules, session, emit), finish)
+
+
+def short_summary(result):
+    """The finished pop-up: one plain line (the detailed numbers stay in result.summary(); old_files_data is protected)."""
+    days = result.plan.days
+    months = days // 30
+    age = f"{months}+ month{'s' if months != 1 else ''}" if days >= 60 else f"{days}+ days"
+    n = len(result.files)
+    return (("Partly scanned. " if result.limited else "") + f"Found {n:,} file{'s' if n != 1 else ''} not changed in "
+            f"{age}. Age alone doesn't prove a file is unused.")

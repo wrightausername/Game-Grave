@@ -1024,5 +1024,5 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   shortens in the middle with the full path on hover; "Scan the whole drive (slower)" with a line saying what Off scans; the
   tab reads "Installers" (key and hover keep "Unused Installers"); the ticking tips moved into the selection count's hover
   text; the finished pop-up says "Found N files not changed in 6+ months. Age alone doesn't prove a file is unused."
-  (`OldFilesResult.short_summary`, the detailed numbers stay in `summary`); the details picture is the type's icon in the
+  (`old_files.short_summary`; the protected `old_files_data.py` is unchanged and its `summary` keeps the detailed numbers); the details picture is the type's icon in the
   type's colour instead of initials. Covered by `tools/old_files_page_smoke.py`.
