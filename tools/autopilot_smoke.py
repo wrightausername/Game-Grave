@@ -184,6 +184,20 @@ def main():
             wait_for(lambda: all(s.status != "waiting" for s in plan.steps if s.ticked), "the ready-to-play plan")
             assert closed == {10, 12} and 14 not in closed and applied == ["game_mode"], (closed, applied)
             assert next(s for s in plan.steps if s.key == "power_high").status == "waiting", "Unticked steps never run"
+            # "Undo that" plans the way back through the existing undo paths; nothing changes until Run all.
+            ask(window, "undo that")
+            undo = list(ui.state_of(window).plans.values())[-1]
+            assert [s.key for s in undo.steps] == ["undo_optimizer"], [s.key for s in undo.steps]
+            assert "Closed apps aren't reopened" in transcript(window), transcript(window)[-400:]
+            if any(b.text() == "Cancel" and b.isVisible() for b in window.assistant_scroll.widget().findChildren(QPushButton)):
+                press(window, "Cancel")
+            # Notes: kept on this PC, listed and forgotten only when asked.
+            ask(window, "remember that I mod Skyrim with Vortex")
+            assert "Noted" in transcript(window) and window.settings["assistant_notes"][-1]["text"] == "I mod Skyrim with Vortex"
+            ask(window, "what do you remember about me")
+            assert "1. I mod Skyrim with Vortex" in transcript(window)
+            ask(window, "forget note 1")
+            assert window.settings["assistant_notes"] == [] and "Forgotten" in transcript(window)
 
             # A game starting stops the rest of a plan; nothing runs while it is open.
             ask(window, "clean up temp files")
@@ -275,6 +289,12 @@ def main():
             assert "steam://validate/1245620" in confirm.call_args[0][1]
             wait_for(lambda: all(s.status in ("done", "skipped", "problem") for s in plan.steps if s.ticked), "the fixes")
             assert opened_urls == ["steam://validate/1245620"] and vc_runs == [1], (opened_urls, vc_runs)
+            # It remembers what was tried and asks whether it helped; "still broken" is remembered too.
+            wait_for(lambda: "Did that fix Elden Ring?" in transcript(window), "the did-it-help question")
+            assert window.settings["fix_history"]["Elden Ring"][-1]["result"] == "tried"
+            press(window, "No, still broken")
+            assert window.settings["fix_history"]["Elden Ring"][-1]["result"] == "not_fixed"
+            assert "didn't help" in transcript(window) and "Next things to try" in transcript(window)
 
             # The tabs' own scans run from a plan too.
             ask(window, "scan for leftovers")

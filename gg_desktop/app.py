@@ -467,7 +467,10 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
                 self.status.setText("Scan canceled. The earlier inventory was not replaced.")
                 return
             self._last_scan_seconds = seconds
+            previous = getattr(self, "inventory", None)
             self.inventory = inventory
+            from gg_desktop import assistant_page
+            assistant_page.after_scan(self, previous, inventory)   # one line in the chat if something important changed
             from gg_desktop import scan_cache
             scan_cache.keep_async("inventory", inventory)
             self._sync_scan_time()

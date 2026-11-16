@@ -788,6 +788,8 @@ def send(window, question=None, source=None):
     if question is None:
         box.clear()
     text = here_question(window, text)
+    if memory_reply(window, text):       # notes, "undo that", "it's fixed" / "still broken"
+        return
     if follow_up(window, text):          # "proceed", "yes", "do it": act on what the assistant just offered
         return
     from gg_desktop import assistant_understand as understand
@@ -862,6 +864,167 @@ def send(window, question=None, source=None):
     persist_chats(window)
     window.status.setText("Answered from scanned data. Nothing was changed.")
     refresh_all(window)
+
+
+def _reply(window, text, answer, plan=None):
+    state = ensure_chats(window)
+    chat = current_chat(window)
+    if chat is None:
+        chat = actions.new_chat(time.time())
+        state.chats.insert(0, chat)
+        state.current = chat["id"]
+    actions.add_exchange(chat, text, answer, time.time())
+    persist_chats(window)
+    refresh_all(window)
+
+
+def _fix_game_of(window, plan):
+    """The installed game a finished fix plan was for, or ''."""
+    check = next((s for s in plan.steps if s.key == "check_game_fix"), None)
+    if check is None:
+        return ""
+    if check.args.get("name"):              # the check found the game and wrote its name
+        return str(check.args["name"])
+    from gg_desktop import fixgame_core as fx
+    from gg_desktop.local_ai_tools import find_game
+    games = list(getattr(getattr(window, "inventory", None), "games", []) or [])
+    game = fx.game_named(games, plan.request)
+    if game is None:
+        words = re.sub(r"^.*?\b(fix|repair)\b( my game| the game| my)?", "", plan.request.casefold()).strip()
+        game = find_game(make_facts(window), words) if words else None
+    return getattr(game, "name", "") or ""
+
+
+def after_plan(window, plan):
+    """After a fix plan for a game: remember what was tried, then ask whether it fixed it (two buttons)."""
+    from gg_desktop import assistant_memory as memory, autopilot_core as core
+    game = _fix_game_of(window, plan)
+    if not game:
+        return
+    done = [s.title for s in plan.steps if s.status == "done" and s.kind == core.CHANGE]
+    tried = ", ".join(done) if done else "checked the usual causes (crash records, overlays, runtimes, drivers)"
+    save(window, memory.record_fix(window.settings, game, tried))
+    answer = engine.Answer("ask_fixed", memory.ASK_FIXED.format(game=game), sources=("Fix history",),
+                           handoffs=(("Yes, it's fixed", "q:it's fixed"), ("No, still broken", "q:still broken")))
+    _append_assistant(window, answer, fix_game=game)
+
+
+NEWS_KEY = "assistant_scan_news"
+
+
+def after_scan(window, previous, inventory):
+    """After a scan: when something important changed, the assistant opens with one line about it. Reads only."""
+    try:
+        from gg_desktop import assistant_memory as memory, space_ui
+        before = [g.name for g in getattr(previous, "games", []) or []]
+        games = [g.name for g in getattr(inventory, "games", []) or []]
+        low = []
+        try:
+            drive, _drives, _picks = space_ui.low_drive(window)
+            if drive is not None:
+                low = [drive.root.rstrip("\\/")]
+        except Exception:
+            pass
+        lines = memory.scan_news(before, games, low, len(getattr(previous, "mods", []) or []),
+                                 len(getattr(inventory, "mods", []) or []))
+    except Exception:
+        return
+    if not lines or window.settings.get(NEWS_KEY, True) is False:
+        return
+    answer = engine.Answer("news", "Since the last scan: " + " ".join(lines),
+                           sources=("Last scan",), handoffs=(("Open Graveyard", "Graveyard"),) if low else ())
+    chat = current_chat(window)
+    if chat is None or not chat.get("messages"):
+        return                                        # an empty chat keeps its welcome; the scan notice covers it
+    _append_assistant(window, answer)
+
+
+def _append_assistant(window, answer, **extra):
+    """An assistant message on its own (no question before it), in the current chat."""
+    chat = current_chat(window)
+    if chat is None:
+        return
+    chat.setdefault("messages", []).append(dict({"role": "assistant", "text": answer.text, "at": time.time(),
+                                                 "answer": answer.to_dict()}, **extra))
+    del chat["messages"][:-actions.MAX_MESSAGES]
+    persist_chats(window)
+    refresh_all(window)
+
+
+def _asked_fixed(chat):
+    """The game the newest "Did that fix it?" in this chat was about, if it is the last assistant message."""
+    for message in reversed((chat or {}).get("messages") or []):
+        if message.get("role") == "assistant":
+            return message.get("fix_game", "")
+    return ""
+
+
+def memory_reply(window, text):
+    """Notes ("remember that…", "what do you remember", "forget…"), "undo that", and answers to "Did that fix it?"."""
+    from gg_desktop import assistant_memory as memory
+    chat = current_chat(window)
+    game = _asked_fixed(chat)
+    verdict = memory.fix_reply(text) if game else ""
+    if verdict:
+        save(window, memory.mark_last(window.settings, game, verdict))
+        if verdict == "fixed":
+            _reply(window, text, engine.Answer("fix_noted", f"Great, glad {game} works. I'll remember what fixed it.",
+                                               sources=("Fix history",)))
+            return True
+        from gg_desktop import local_ai_knowledge as kb
+        fixes = kb.known_fixes("crash on start won't start crash while playing", game).get("known_fixes", [])
+        tried = memory.tried_line(window.settings, game)
+        steps = [s for f in fixes for s in f.get("usual_fixes", f.get("known_notes", []))]
+        steps = [s for s in steps if not any(w in s for w in ("Check the usual fixes", "Verify"))][:4]
+        body = (f"Okay, noted that it didn't help. {tried}\n\nNext things to try:\n" +
+                "\n".join(f"{i}. {s}" for i, s in enumerate(steps, 1)))
+        _reply(window, text, engine.Answer("fix_noted", body, sources=("Fix history", "Known fixes"),
+                                           handoffs=(("Find the crashing mod", "bisect"), ("Open Fix Kit", "Fix Kit"))))
+        return True
+    kind, value = memory.note_command(text)
+    if kind == "remember":
+        save(window, memory.add_note(window.settings, value))
+        _reply(window, text, engine.Answer("note", f"Noted: \"{value}\". I'll keep it in mind on this PC. Ask \"what do you "
+                                                   "remember\" to see your notes, or \"forget\" one to remove it.",
+                                           sources=("Your notes",)))
+        return True
+    if kind == "recall":
+        items = memory.notes(window.settings)
+        if not items:
+            body = "I haven't been asked to remember anything yet. Say \"remember that …\" and I'll keep it on this PC."
+            buttons = ()
+        else:
+            body = "What you've asked me to remember:\n" + "\n".join(f"{i}. {n['text']}" for i, n in enumerate(items, 1))
+            buttons = tuple((f"Forget {i}", f"q:forget note {i}") for i in range(1, min(len(items), 4) + 1))
+            buttons += (("Forget all", "q:forget all notes"),)
+        _reply(window, text, engine.Answer("note", body, sources=("Your notes",), handoffs=buttons))
+        return True
+    if kind == "forget":
+        updated, gone = memory.forget(window.settings, value)
+        if gone:
+            save(window, updated)
+            body = "Forgotten: " + "; ".join(gone) + "."
+        else:
+            body = "I couldn't find a note like that. Ask \"what do you remember\" to see them."
+        _reply(window, text, engine.Answer("note", body, sources=("Your notes",)))
+        return True
+    if memory.is_undo(text):
+        steps, notes, request = memory.undo_steps(chat)
+        if steps is None:
+            _reply(window, text, engine.Answer("undo", memory.NOTHING_TO_UNDO,
+                                               handoffs=(("Open Undo Center", "Undo Center"),)))
+            return True
+        if not steps:
+            _reply(window, text, engine.Answer("undo", "Nothing from that plan can be put back by Game Grave. " +
+                                               " ".join(notes), handoffs=(("Open Undo Center", "Undo Center"),)))
+            return True
+        from gg_desktop import autopilot_core as core, autopilot_ui
+        plan = core.Plan(("Undo: " + request)[:300], steps)
+        autopilot_ui.post_plan(window, plan, text)
+        if notes:
+            _append_assistant(window, engine.Answer("undo", " ".join(notes)))
+        return True
+    return False
 
 
 def _say(window, text, reply):

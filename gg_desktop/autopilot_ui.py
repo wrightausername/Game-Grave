@@ -481,6 +481,8 @@ def run_all(window, plan_id):
         from gg_desktop import comfort
         comfort.notify(window, "Plan finished", f"{plan.request[:80]}: {text}", tone, "AI Assistant",
                        toast=window.current_route != "AI Assistant")
+        from gg_desktop import assistant_page
+        assistant_page.after_plan(window, plan)          # a fix for a game is remembered, then "Did that fix it?"
 
     def next_step():
         if not order:

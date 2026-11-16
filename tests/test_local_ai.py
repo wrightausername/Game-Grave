@@ -52,7 +52,8 @@ class Hosts(unittest.TestCase):
         self.assertFalse(ai.host_allowed("https://example.com/x"))
 
     def test_models_are_open_licensed_official_repos(self):
-        self.assertEqual([m.key for m in ai.MODELS], ["small", "medium", "large"])
+        self.assertEqual([m.key for m in ai.MODELS], ["small", "medium", "large", "xl"])
+        self.assertLessEqual(max(m.approx_bytes for m in ai.MODELS), ai.MAX_DOWNLOAD)
         for m in ai.MODELS:
             self.assertTrue(m.repo.startswith(("ggml-org/Qwen3-", "Qwen/Qwen3-")), m.repo)
 

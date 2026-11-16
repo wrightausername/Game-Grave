@@ -25,12 +25,17 @@ def main():
         assert hashlib.sha256(raw).hexdigest() == expected["sha256"], "Owner photo changed: " + name
         original = subprocess.check_output(["git", "show", PHOTO_SOURCE + ":gg_desktop/assets/references/" + name + ".jpg"], cwd=root)
         assert raw == original, "Owner photo differs from its original upload: " + name
+    # Wording edits the owner approved inside a locked engine (2026-11-16: "go ahead" to removing the last on-screen
+    # dash). Each is applied to the baseline text before comparing, so any other change still fails.
+    approved = {"gg_desktop/mod_conflicts.py": (("File overlap — review load order", "File overlap: review load order"),)}
     for path in ("core.py", "cleanup_actions.py", "recovery.py", "graveyard.py", "graveyard_protection.py",
                  "manager_profiles.py", "mod_sources.py", "gg_desktop/mods_data.py", "gg_desktop/mod_conflicts.py",
                  "gg_desktop/game_artwork.py", "gg_desktop/games_data.py", "gg_desktop/old_files_data.py"):
         # Ready Room's actions, data and services were released from this guard by the owner's polish-pass
         # request ("game updates, maintenance and new releases need to be working and live").
         original = subprocess.check_output(["git", "show", BASELINE + ":" + path], cwd=root).decode("utf-8").replace("\r\n", "\n")
+        for before, after in approved.get(path, ()):
+            original = original.replace(before, after)
         assert (root / path).read_text(encoding="utf-8") == original, "Safety/data engine changed: " + path
     print("PASS: Eight original owner photos are unchanged; scanning, protection, recovery, artwork, mod evidence and Ready Room data engines match the tested baseline. Visual layout is checked against the photos by photo_ui_smoke and actual render review.")
     return 0

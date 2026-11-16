@@ -268,6 +268,18 @@ FEATURES = FEATURES + (
         "It only uses tools from Game Grave's fixed list and never types a command of its own. Closing apps and "
         "switching off startup apps always need you there.", "AI Assistant, Automation panel on the right.",
         "AI Assistant", "Let the assistant run Game Grave's own tools when you ask."),
+    Feature(
+        "assistant_memory", "Assistant notes and undo",
+        ("assistant notes", "your notes", "remember things", "undo that", "undo by asking", "fix history"),
+        "The assistant can keep notes you ask it to (\"remember that I mod Skyrim with Vortex\"), put back what a plan "
+        "changed when you say \"undo that\", and remember which fixes it already tried for a game.",
+        ("Say \"remember that …\" to add a note, \"what do you remember\" to see them, \"forget note 2\" or \"forget "
+         "all notes\" to remove them.",
+         "After a plan ran, say \"undo that\": Game Grave plans the way back (Game Optimizer's backup, the mod switch, "
+         "the startup switch) and it waits for your OK. Deleted temp files and closed apps can't be brought back.",
+         "After a fix plan for a game, answer \"Did that fix it?\" so the same fix isn't suggested twice."),
+        "Notes and fix history stay in this PC's settings and are never sent anywhere.", "AI Assistant chat.",
+        "AI Assistant", "Notes, undo by asking and fix history in the AI Assistant."),
 )
 
 # Every tool in the app, so "how do I ..." always has a walkthrough (owner, 2026-11-14: "if somebody doesn't know how to

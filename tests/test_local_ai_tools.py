@@ -182,6 +182,25 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class Blank(unittest.TestCase):
+    def test_an_empty_reply_is_asked_once_more(self):
+        class Server:
+            def __init__(self):
+                self.asked = []
+
+            def chat_message(self, msgs, tools, **k):
+                return {"content": ""}
+
+            def chat(self, msgs, **k):
+                self.asked.append(msgs[-1]["content"])
+                return "It usually means the graphics driver stopped responding."
+        server = Server()
+        from gg_desktop import assistant_engine as engine
+        out = t.answer(server, "i got DXGI_ERROR_DEVICE_HUNG", engine.answer("x", ctx().facts), ctx().facts, (), ctx())
+        self.assertIn("graphics driver", out["text"])
+        self.assertTrue(server.asked and "Answer the question now" in server.asked[0])
+
+
 class Knowledge(unittest.TestCase):
     def test_known_fixes_and_errors(self):
         from gg_desktop import local_ai_knowledge as kb

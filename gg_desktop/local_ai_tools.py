@@ -264,6 +264,16 @@ def app_help(ctx, topic=""):
                           "where": f.where, "can_plan": f.do} for f in picks]}
 
 
+def tried_before(ctx, name=""):
+    """What was already tried for this game's problems and whether it helped (from earlier fix plans)."""
+    from gg_desktop import assistant_memory as memory
+    g = find_game(ctx.facts, name)
+    game = g.name if g is not None else str(name)
+    rows = memory.tried_for(ctx.settings or {}, game)
+    return {"game": game, "tried": rows[-10:], "note": "Don't suggest a fix that already didn't help; say so and move on."
+            if rows else "Nothing has been tried for this game through Game Grave yet."}
+
+
 def known_fixes(ctx, problem="", game=""):
     from gg_desktop import local_ai_knowledge as kb
     return kb.known_fixes(problem, game)
@@ -434,6 +444,8 @@ def tool_specs():
         _fn("known_fixes", "Well-known fixes for a PC gaming problem (crashing, won't start, stutter, mods not loading, "
             "out of space, black screen, controller, lost saves, broken after an update), and notes for popular modded "
             "games.", problem=_s("The problem in the user's words"), game=_s("The game, if any", optional=True)),
+        _fn("tried_before", "What was already tried for a game's problem through Game Grave, and whether it helped.",
+            name=_s("The game's name")),
         _fn("explain_error", "What an error message, error code or DLL name usually means and the usual next step.",
             text=_s("The error text exactly as the user pasted it")),
         _fn("tab_help", "What a Game Grave tab has and which buttons are on it.", tab=_s("The tab's name")),
@@ -458,13 +470,14 @@ def tool_specs():
 LOOKUPS = {"look_up_game": look_up_game, "game_mods": game_mods, "game_crashes": game_crashes, "pc_status": pc_status,
            "open_apps": open_apps, "startup_apps": startup_apps, "space_use": space_use, "runtimes": runtimes, "game_storage": game_storage,
            "app_help": app_help, "game_grave_state": game_grave_state, "known_fixes": known_fixes,
-           "explain_error": explain_error, "tab_help": tab_help, "recent_activity": recent_activity,
+           "explain_error": explain_error, "tab_help": tab_help, "tried_before": tried_before, "recent_activity": recent_activity,
            "make_plan": make_plan}
 
 CHECKED_NAMES = {"look_up_game": "Games", "game_mods": "Mods", "game_crashes": "Black Box", "pc_status": "Hardware",
                  "open_apps": "Open apps", "startup_apps": "Startup", "space_use": "Storage", "runtimes": "Runtimes", "game_storage": "Storage",
                  "app_help": "Manual", "game_grave_state": "Settings", "recent_activity": "Activity",
-                 "known_fixes": "Known fixes", "explain_error": "Error guide", "tab_help": "Manual"}
+                 "known_fixes": "Known fixes", "explain_error": "Error guide", "tab_help": "Manual",
+                 "tried_before": "Fix history"}
 
 
 def run(ctx, name, arguments):
@@ -698,7 +711,7 @@ def prefetch(question, ctx):
     known_game = next((k for k in kb.KNOWN_GAMES if k in q), "")
 
     def add(fn, **args):
-        if (fn, args) not in calls and len(calls) < 4:
+        if (fn, args) not in calls and len(calls) < 5:
             calls.append((fn, args))
     howto = bool(_HOWTO.search(q))
     if "game grave" in q and re.search(r"\b(update|newer|latest|new version|new build)\b", q):
@@ -710,6 +723,9 @@ def prefetch(question, ctx):
     if _PROBLEM.search(q):
         if name:
             add("game_crashes", name=name)
+            from gg_desktop import assistant_memory as memory
+            if memory.tried_for(ctx.settings or {}, name):
+                add("tried_before", name=name)
         add("known_fixes", problem=str(question)[:200], game=name)
         if not howto and re.search(r"crash|won'?t|doesn'?t|not (start|launch|load)|closes|error|fix", q):
             add("runtimes")
@@ -776,7 +792,9 @@ def answer(server, question, base_answer, facts, history, ctx, think=False):
     """Ask the model with lookups, then check what it said. `server` has chat_message() and chat(). Returns the result
     dict from `converse`, with the final text (empty when it broke a rule twice) and `unchecked` problems."""
     from gg_desktop import local_ai_prompt as prompt
-    messages = prompt.build_messages(question, base_answer, facts, history, think=think, tools=True, screen=ctx.screen)
+    from gg_desktop import assistant_memory as memory
+    messages = prompt.build_messages(question, base_answer, facts, history, think=think, tools=True, screen=ctx.screen,
+                                     notes=memory.notes_text(ctx.settings or {}))
     budget = dict(max_tokens=2600, timeout=420) if think else dict(max_tokens=900, timeout=240)
     shrunk = {"on": False}
 
@@ -794,6 +812,12 @@ def answer(server, question, base_answer, facts, history, ctx, think=False):
     if result["jobs"] is not None:
         return result
     raw = result["text"]
+    if not raw.strip():
+        # No words at all (the Small model sometimes stops after its lookups): ask once more for the answer itself.
+        nudge = messages + [{"role": "user", "content": "Answer the question now in plain words, using what you looked "
+                                                         "up. /no_think"}]
+        raw = server.chat(nudge, max_tokens=700, timeout=240) or ""
+        result["blank"] = not raw.strip()
     planned = prompt.plan_request(prompt.clean_reply(raw))
     if planned:
         return dict(result, jobs=[], request=planned)

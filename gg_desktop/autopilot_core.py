@@ -89,6 +89,10 @@ ACTIONS = {a.key: a for a in (
            "Turns the app's startup switch off, the same switch as Task Manager. The app is not removed.",
            "StartupApproved value set to off (or the Store task or scheduled task disabled).", routine=False,
            undo="Turn it back on in Hardware > Drivers & Startup."),
+    Action("startup_on", "Let an app start with Windows again", CHANGE,
+           "Turns the app's startup switch back on, the same switch as Task Manager.",
+           "StartupApproved value set to on (or the Store task or scheduled task enabled).", routine=False,
+           undo="Turn it off again in Hardware > Drivers & Startup."),
     Action("mod_off", "Turn off a mod", CHANGE, "Switches the mod off in its Mod Organizer 2 profile. The mod folder "
            "stays where it is.", "modlist.txt: the mod's line changes from + to -, after a snapshot of the profile's files.",
            routine=False, undo="Undo in Mods > My Mods."),
@@ -130,6 +134,8 @@ class Step:
             return "Close " + name
         if self.key == "startup_off" and name:
             return f"Stop {name} starting with Windows"
+        if self.key == "startup_on" and name:
+            return f"Let {name} start with Windows again"
         if self.key == "verify_game" and name:
             return f"Ask Steam to check {name}'s files"
         if self.key == "check_game_fix" and name:

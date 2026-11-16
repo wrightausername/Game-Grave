@@ -244,7 +244,7 @@ def inspect_conflicts(catalog: Catalog, canceled=lambda: False, progress=lambda 
                 if len(paths) < 10:
                     paths.append(path)
         for pair, (count, paths) in pairs.items():
-            add("File overlap — review load order", profile, pair,
+            add("File overlap: review load order", profile, pair,
                 f"{count} relative file paths occur in both enabled mod folders. An override can be intentional; "
                 "the effective winner and in-game compatibility have not been established.", paths, count)
     unprofiled = sum(e.kind == "mod" and not e.profiles for e in catalog.entries)

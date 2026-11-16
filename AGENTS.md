@@ -1213,3 +1213,34 @@ and its answers; layout unchanged except one "Not helpful" button under each ans
   look up PC status before drive space; a tab named in the question gets tab_help; game_grave_state is only offered when the
   question is about Game Grave itself (the Small model reached for it on unrelated questions); "crashing" finds the
   crash fixes; a lookup result echoed back as the answer is treated as no answer and retried.
+
+AI Assistant extras and the last dash (owner instruction, 2026-11-16: "go ahead", to the list of what was waiting on them:
+the five remaining assistant ideas and unlocking the protected file with the last on-screen dash). AI Assistant is reopened
+for these; `app.py` gains one call after a scan; Mods' conflict wording changes in one place.
+- Undo by asking (`assistant_memory.is_undo` / `undo_steps`): "undo that" / "put it back" plans the reverse of the newest
+  plan's finished changes in this chat through the existing paths: Game Mode, recording and power plan back through Game
+  Optimizer's backup (`undo_optimizer`), a mod switched back on or off (`mod_on` / `mod_off`, My Mods' snapshot write), and a
+  startup app switched back on (new action `startup_on`, Task Manager's same StartupApproved switch). It is a normal plan:
+  nothing changes until Run all. What can't be undone is said plainly (deleted temp files, closed apps, launcher verifies,
+  runtimes and drivers, with where to roll them back).
+- Fix history (`fix_history`, newest 20 per game): when a fix-my-game plan finishes, what was tried is recorded for that game
+  and the chat asks "Did that fix <game>?" with Yes / No buttons (typed answers work too). "Still broken" is recorded and
+  answered with the next things to try (the known fixes it hasn't done, Crash Doctor, Fix Kit). The local AI gets a
+  tried_before lookup, run first for a problem with a game that has history, and is told not to repeat a fix that didn't help.
+- Notes (`assistant_notes`, up to 40): "remember that …" saves a note, "what do you remember" lists them with Forget buttons,
+  "forget note 2" / "forget <words>" / "forget all notes" removes them. The local AI gets them in its instructions. Kept only in
+  this PC's settings; nothing is sent anywhere. A manual entry "Assistant notes and undo" explains all three.
+- Scan news (`assistant_page.after_scan`, `assistant_memory.scan_news`): after a scan, when the chat already has messages and
+  something important changed (a game drive almost full, games added or removed, new mod locations), one assistant line says
+  so, with Open Graveyard for low space. It reads only and never runs anything.
+- Extra Large model: Qwen3 14B Q4_K_M (`Qwen/Qwen3-14B-GGUF`, about 9 GB) in the Local AI panel with a plain warning (12 GB+
+  graphics card, 32 GB memory, slow on less); the empty-chat card still offers the first three sizes. It reasons like Medium
+  and Large. The download cap is 11 GB; the real CI check resolves its file and fingerprint with the others.
+- An empty model reply is asked once more for the answer itself; if it is still empty the built-in answer shows with "The
+  local AI didn't give an answer" instead of the safety-rules note.
+- Mods: the conflict kind reads "File overlap: review load order". `gg_desktop/mod_conflicts.py` is still locked by
+  `tools/photo_reference_guard.py`; the guard now applies this one approved wording change to the baseline before comparing,
+  so any other edit still fails.
+- Covered by `tests/test_assistant_memory.py`, `tests/test_local_ai_tools.py` (empty reply), `tests/test_local_ai.py` (four
+  sizes) and `tools/autopilot_smoke.py` ("undo that" after ready-to-play, notes round trip, "Did that fix Elden Ring?" and
+  "No, still broken").

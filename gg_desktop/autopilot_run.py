@@ -334,14 +334,19 @@ def run_change(step, env, on_step=None):
             text = (f"{name} is still open. It may be asking about unsaved work." if still else f"Closed {name}.")
             env.log(f"Asked {name} (PID {pid}) to close. " + text, "Some still running" if still else "Closed")
             return _mark(step, "problem" if still else "done", text)
-        if key == "startup_off":
+        if key in ("startup_off", "startup_on"):
+            on = key == "startup_on"
             apps = env.read_startup()
             app = next((a for a in apps if a.key == step.args.get("key")), None)
             if app is None:
                 return _mark(step, "skipped", f"{step.args.get('name', 'That app')} is no longer in the startup list.")
-            if not app.enabled:
-                return _mark(step, "skipped", "Already switched off.")
-            env.set_startup(app, False)
+            if app.enabled == on:
+                return _mark(step, "skipped", "Already switched " + ("on." if on else "off."))
+            env.set_startup(app, on)
+            if on:
+                text = f"{app.title} will start with Windows again."
+                env.log(text, "Startup on")
+                return _mark(step, "done", text)
             text = f"{app.title} will no longer start with Windows. Turn it back on in Hardware > Drivers & Startup."
             env.log(text, "Startup off")
             return _mark(step, "done", text)

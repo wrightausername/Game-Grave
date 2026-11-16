@@ -238,7 +238,7 @@ TOOL_RULES = (
 )
 
 
-def build_messages(question, answer, facts, history=(), think=False, tools=False, screen=None):
+def build_messages(question, answer, facts, history=(), think=False, tools=False, screen=None, notes=""):
     """Chat messages for llama-server. `history` is the earlier (question, reply) pairs of this conversation; the last
     six are kept. `think` lets Qwen3 reason before answering (Medium and Large). `tools` means the model can call the
     lookups in `local_ai_tools`, so the facts here are shorter and the rules say how to use them."""
@@ -248,6 +248,9 @@ def build_messages(question, answer, facts, history=(), think=False, tools=False
     context += f"\n\nPC facts (what Game Grave has on record):\n{digest}\n\nWhat Game Grave can do (features and " \
                f"where they are):\n{feature_list()}"
     context += "\n\n" + (TOOL_RULES if tools else PLAN_RULE + "; ".join(requests_list()) + ".")
+    if notes:
+        context += ("\n\nThings the user asked you to remember (follow them unless they ask otherwise; never repeat "
+                    "them back unless relevant):\n" + notes[:2500])
     # The system text stays the same from question to question, so llama-server's prompt cache can reuse it; what
     # belongs to this one question (the quick lookup) goes with the question instead.
     messages = [{"role": "system", "content": SYSTEM + "\n\n" + context}]

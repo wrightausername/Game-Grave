@@ -390,8 +390,9 @@ def answer_async(window, question, base_answer, facts, history, deliver):
         if result.get("unchecked") and text:
             text += "\n\n(Double-check: " + "; ".join(result["unchecked"]) + ".)"
         if not text:
-            deliver(_with_note(base_answer, "The local AI's answer broke one of Game Grave's safety rules twice, so "
-                                            "this is the built-in answer. Try asking it another way."))
+            deliver(_with_note(base_answer, "The local AI didn't give an answer, so this is the built-in one." if
+                               result.get("blank") else "The local AI's answer broke one of Game Grave's safety rules "
+                               "twice, so this is the built-in answer. Try asking it another way."))
             return
         # A keyword miss has nothing useful to keep; a real lookup keeps its rows and buttons beside the AI's words.
         keep = base_answer.intent not in prompt.NO_LOOKUP
@@ -465,7 +466,8 @@ def show_card(window):
     return not ai.installed_models() and not window.settings.get("local_ai_card_hidden") and not state_of(window).downloading
 
 
-CARD_LINES = {"small": "Fastest, lightest", "medium": "Recommended for most PCs", "large": "Best answers, 16 GB RAM"}
+CARD_LINES = {"small": "Fastest, lightest", "medium": "Recommended for most PCs", "large": "Best answers, 16 GB RAM",
+              "xl": "Most capable, 12 GB+ graphics card"}
 
 
 def setup_card(window):
@@ -509,7 +511,7 @@ def setup_card(window):
             w.combo.setCurrentIndex(max(0, w.combo.findData(key)))
             w.combo.blockSignals(False)
             sync(window)
-    for choice in ai.MODELS:
+    for choice in [m for m in ai.MODELS if m.key != "xl"]:      # Extra Large is offered in the panel, with its warning
         b = QPushButton(f"{choice.label}  ·  {choice.approx_bytes / ai.GB:.1f} GB\n{CARD_LINES[choice.key]}")
         b.setObjectName("localAISize")
         b.setCheckable(True)

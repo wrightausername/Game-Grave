@@ -55,11 +55,14 @@ MODELS = (
                 "The best balance. Runs on most gaming PCs and answers in a few seconds."),
     ModelChoice("large", "Large", "Qwen/Qwen3-8B-GGUF", "Q4_K_M", int(5.03 * GB), 16,
                 "Best answers. Needs 16 GB of memory and is slower without a strong graphics card."),
+    ModelChoice("xl", "Extra Large", "Qwen/Qwen3-14B-GGUF", "Q4_K_M", int(9.0 * GB), 32,
+                "The most capable. Only for graphics cards with 12 GB or more of video memory and 32 GB of memory; "
+                "it is slow on anything less."),
 )
 BY_KEY = {m.key: m for m in MODELS}
 # How much text each model may hold at once. Bigger lets it see more of the PC and think longer; Small stays light.
-CONTEXT = {"small": 12288, "medium": 12288, "large": 12288}
-THINKS = frozenset({"medium", "large"})       # these reason step by step before answering
+CONTEXT = {"small": 12288, "medium": 12288, "large": 12288, "xl": 12288}
+THINKS = frozenset({"medium", "large", "xl"})       # these reason step by step before answering
 DEFAULT_MODEL = "medium"
 
 # llama.cpp's own Windows builds. Vulkan uses NVIDIA, AMD or Intel graphics; CPU is the fallback that runs anywhere.
@@ -70,7 +73,7 @@ RUNTIMES = {"vulkan": f"llama-{RUNTIME_TAG}-bin-win-vulkan-x64.zip", "cpu": f"ll
 PINNED_SHA256 = {RUNTIMES["vulkan"]: "10393a8ac9e891b86975d5e8ae4393eaa02700fcb48266b87cf9b778cb5190e3"}
 
 ALLOWED_HOSTS = ("huggingface.co", "hf.co", "github.com", "githubusercontent.com")
-MAX_DOWNLOAD = 8 * GB
+MAX_DOWNLOAD = 11 * GB
 SPARE_BYTES = 1 * GB
 
 
