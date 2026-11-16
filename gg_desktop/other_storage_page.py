@@ -223,6 +223,10 @@ def build(window):
         button.setStyleSheet("font-size:11px; padding:4px 3px;")
         button.setIconSize(QSize(15, 15))
     page.content.addWidget(self.storage_tabs)
+    clear_tab = self.storage_tabs.buttons["Cleanup Assistant"]
+    clear_tab.setText("Can clear here")
+    clear_tab.setToolTip("The only items Game Grave can move to the Recycle Bin here: small launcher cache and log "
+                         "folders, after you confirm and each file is checked again.")
 
     # --- Storage Overview
     filters, scan = panel(kind="fileFilterPanel", padding=9, spacing=6)
@@ -281,6 +285,13 @@ def build(window):
     self.storage_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
     self.storage_table.setSelectionMode(QAbstractItemView.SingleSelection)
     contents.addWidget(self.storage_table, 1)
+    from gg_desktop import narrow_fit      # whole words and no sideways scroll in a narrow window
+    narrow_fit.install(page, self.storage_metrics, self.storage_tabs,
+                       captions={"Total Other Storage": "Total", "Shader Cache": "Shaders", "Config / Settings": "Configs",
+                                 "Logs / Reports": "Logs", "Temporary Files": "Temp"},
+                       tab_names={"Storage Breakdown": "Breakdown", "Shader Cache": "Shaders",
+                                  "Cleanup Assistant": "Can clear"},
+                       table=self.storage_table, hide=(4, 5), narrow=1100)
     self.storage_pager = InventoryPager()
     self.storage_pager.changed.connect(lambda number: self._fill_storage(requested_page=number))
     contents.addWidget(self.storage_pager)
@@ -301,9 +312,9 @@ def build(window):
     footer.addWidget(self.storage_selection)
     footer.addWidget(tool("Protect", "shield", lambda: self._protect_paths([r.path for r in self._selected_storage()], self._fill_storage),
                           tip="Adds Never Touch rules for the checked items"))
-    footer.addWidget(tool("Add to Graveyard", "grave", self._watch_storage,
-                          tip="Adds checked loose files to protected Graveyard review. Nothing is moved."))
-    self.storage_delete = tool("Delete…", "trash", self._review_storage, kind="danger")
+    footer.addWidget(tool("Review later in Graveyard", "grave", self._watch_storage,
+                          tip="Adds the checked loose files to Graveyard's review list. Nothing is moved."))
+    self.storage_delete = tool("Move to Recycle Bin…", "trash", self._review_storage, kind="danger")
     footer.addWidget(self.storage_delete)
     tools_button = tool("Windows Tools", "settings", None,
                         tip="Open Windows' own storage tools. Game Grave does not schedule or run unattended cleanup.")
@@ -574,7 +585,12 @@ def scan(window):
             scan_cache.keep_async("storage", report)
             window._sync_scan_time()
             from gg_desktop import comfort
-            comfort.notify(window, "Other Storage scan finished", report.summary() + '.', "good", "Other Storage")
+            n = len(report.entries)
+            comfort.notify(window, "Other Storage scan finished",
+                           f"Found {n:,} item{'s' if n != 1 else ''} ({human_size(sum(e.size for e in report.entries))}) "
+                           f"in the {report.checked} places Game Grave checks."
+                           + (" Some very large folders were only partly measured." if report.partial else ""),
+                           "good", "Other Storage")
             window.status.setText(report.summary() + ". Nothing was changed.")
         if live(window):
             window.storage_scan.setText("Scan Other Storage")

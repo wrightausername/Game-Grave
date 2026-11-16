@@ -300,7 +300,7 @@ def discover(*, env=None, home=None, steam_roots=(), libraries=(), games=(), can
                     related, title, app_id = game.name, game.name + " Shader Cache", name
                     evidence = f"Steam shader cache for {game.name} (app ID {name}), a game installed in this Steam library."
                 else:
-                    related, title = "No installed game", f"Steam app {name} Shader Cache"
+                    related, title = "No installed game", f"Shader cache of an uninstalled Steam game (app {name})"
                     evidence = (f"Steam shader cache for app ID {name}. No installed game with this ID was found "
                                 "in the scanned Steam libraries.")
             report.entries.append(StorageEntry(

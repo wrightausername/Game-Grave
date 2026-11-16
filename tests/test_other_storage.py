@@ -88,7 +88,7 @@ class DiscoveryTests(Fixture):
         known = by_name["Cyberpunk 2077 Shader Cache"]
         self.assertEqual((known.related, known.app_id, known.kind, known.badge), ("Cyberpunk 2077", "1091500", "steam-shader", "Review only"))
         self.assertFalse(known.cleanable, "steamapps is protected by Game Grave's core rules")
-        orphan = by_name["Steam app 999999 Shader Cache"]
+        orphan = by_name["Shader cache of an uninstalled Steam game (app 999999)"]
         self.assertEqual((orphan.related, orphan.app_id, orphan.kind), ("No installed game", "", "steam-shader"))
         self.assertFalse(orphan.cleanable)
         self.assertIn("No installed game", orphan.evidence)

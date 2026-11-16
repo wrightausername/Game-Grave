@@ -1026,3 +1026,8 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   text; the finished pop-up says "Found N files not changed in 6+ months. Age alone doesn't prove a file is unused."
   (`old_files.short_summary`; the protected `old_files_data.py` is unchanged and its `summary` keeps the detailed numbers); the details picture is the type's icon in the
   type's colour instead of initials. Covered by `tools/old_files_page_smoke.py`.
+- Other Storage (all five approved): "Move to Recycle Bin…" and "Review later in Graveyard"; in a narrow window the cards and
+  tabs use whole short words (full words on hover) and the Items and Type columns step aside below 1100 px
+  (`gg_desktop/narrow_fit.py`, display only, reusable by other tabs); "Shader cache of an uninstalled Steam game (app N)"
+  (still review only); the finished pop-up says "Found N items (size) in the N places Game Grave checks"; the "Cleanup
+  Assistant" tab reads "Can clear here" with its rule on hover (key unchanged). Covered by `tools/other_storage_page_smoke.py`.

@@ -130,7 +130,7 @@ def main():
             wait_for(lambda: not state.busy and not window.workers)
             found = set(names(window))
             expected = {"DirectX Shader Cache", "NVIDIA DirectX Cache", "Battle.net Cache", "Battle.net Logs",
-                        "Windows Crash Dumps", "Skyrim", "Cyberpunk 2077 Shader Cache", "Steam app 999999 Shader Cache",
+                        "Windows Crash Dumps", "Skyrim", "Cyberpunk 2077 Shader Cache", "Shader cache of an uninstalled Steam game (app 999999)",
                         "Steam Temp"}
             assert expected <= found, expected - found
             assert window.storage_table.rowCount() == len(found) == 9, names(window)  # two Steam shader folders
@@ -257,6 +257,17 @@ def main():
             for width, height in ((1280, 720), (1440, 900), (960, 650)):
                 window.resize(width, height)
                 settle()
+                QTest.qWait(30)
+                settle()
+                if width == 960:      # narrow: whole short words, and Items and Type step aside
+                    caps = [c.text() for c in window.storage_metrics.captions]
+                    shorts = {"Total", "Caches", "Shaders", "Configs", "Logs", "Temp"}
+                    assert all(c.text() in shorts or c.fontMetrics().horizontalAdvance(c.text()) <= c.width() + 2
+                               for c in window.storage_metrics.captions), caps
+                    assert window.storage_table.isColumnHidden(4) and window.storage_table.isColumnHidden(5)
+                    window.grab().save(str(args.output / "other-storage-page-960.png"))
+                elif width == 1440:
+                    assert not window.storage_table.isColumnHidden(4)
                 if height >= 720:
                     from PySide6.QtCore import QPoint
                     bottom = window.storage_scan.mapTo(window, QPoint(0, window.storage_scan.height())).y()
