@@ -608,14 +608,14 @@ def _saves(facts, game, question):
         if not mine:
             return Answer("saves", f"The save scan didn't label a save folder for {game.name}. Game Grave only names a "
                           "save folder when the folder itself proves which game it belongs to, so it doesn't guess. "
-                          "If you know where it is, link it to the game in Game DNA and Save Vault can back it up.",
+                          "If you know where it is, link it to the game in Game DNA and Back up a Folder (Toolbox) can back it up.",
                           sources=_source_names("storage"),
-                          handoffs=(("Open Game DNA", "Game DNA"), ("Open More Tools", "More Tools")))
+                          handoffs=(("Open Game DNA", "Game DNA"), ("Open Toolbox", "More Tools")))
         rows = tuple(Row(s.path, s.kind, None, "Game DNA", s.reason) for s in mine[:TOP])
         return Answer("saves", f"{game.name}'s saves are here:", rows,
-                      "Saves are never removable in Game Grave. Save Vault (More Tools) copies a save folder into a "
+                      "Saves are never removable in Game Grave. Back up a Folder (Toolbox) copies a save folder into a "
                       "verified ZIP.", _source_names("storage"),
-                      (("Open Game DNA", "Game DNA"), ("Open More Tools", "More Tools")))
+                      (("Open Game DNA", "Game DNA"), ("Open Toolbox", "More Tools")))
     if not saves:
         return Answer("saves", "The last scan didn't find any save folders it could tie to a game. Run Scan PC, or "
                       "link a save folder to its game in Game DNA.", sources=_source_names("storage"),
@@ -627,9 +627,9 @@ def _saves(facts, game, question):
     rows = tuple(Row(name, f"{count:,} folder{'s' if count != 1 else ''}", None, "Game DNA") for name, count in ordered[:TOP])
     return Answer("saves", f"The save scan found {len(saves):,} save folders for {len(counts):,} games. Ask about one game "
                   "by name to see its folders. The most found:", rows,
-                  "Saves are never removable in Game Grave. Save Vault (More Tools) backs a save folder up into a "
+                  "Saves are never removable in Game Grave. Back up a Folder (Toolbox) backs a save folder up into a "
                   "verified ZIP.", _source_names("storage"),
-                  (("Open Game DNA", "Game DNA"), ("Open More Tools", "More Tools")))
+                  (("Open Game DNA", "Game DNA"), ("Open Toolbox", "More Tools")))
 
 
 def _drive_rows(specs, need=None, skip=""):
@@ -746,7 +746,7 @@ def _candidates(facts, game, question):
                       "Whether to uninstall it is your call: Game Grave can't know if you'll play it again. If you "
                       "might, a Resurrection Kit keeps the whole install and saves in one ZIP so you can put it back "
                       "without downloading.", note=SAFETY_TEXT, sources=_source_names("library"),
-                      handoffs=(("Open Games", "Games"), ("Open More Tools", "More Tools")))
+                      handoffs=(("Open Games", "Games"), ("Open Toolbox", "More Tools")))
     rows, used = [], []
     if facts.on("library") and facts.games:
         idle = sorted((g for g in facts.games if g.last_played_at and g.size_bytes
@@ -862,7 +862,7 @@ def _trust():
     return Answer("trust", "Here is exactly what Game Grave can change on your PC, and nothing else:\n"
                   "• Files you pick in Old Files, Other Storage, Captures or Graveyard go to the Recycle Bin, never "
                   "straight to deletion, after you confirm and a fresh re-check. Undo Center lists every one.\n"
-                  "• Kits, Save Vault backups and Black Box reports are new files it writes where you choose.\n"
+                  "• Kits, folder backups and Black Box reports are new files it writes where you choose.\n"
                   "• Soulbind changes one setting in a game's settings file, after saving a dated backup.\n"
                   "• Drivers & Startup installs driver updates Windows Update offers, and switches startup apps the "
                   "same way Task Manager does. Both ask first; the driver install goes through the Windows prompt.\n"
@@ -883,8 +883,8 @@ def _mod_install():
 
 
 def _backup():
-    return _feature_key("resurrection_kit", note="For just one folder, such as a save or a settings folder, Save Vault "
-                        "in More Tools makes a verified ZIP of that folder alone.")
+    return _feature_key("resurrection_kit", note="For just one folder, such as a save or a settings folder, Back up "
+                        "a Folder in Toolbox makes a verified ZIP of that folder alone.")
 
 
 def _performance(facts, game, question):
@@ -913,5 +913,5 @@ def _verify(facts, game, question):
                   "check them: in Games, select the game and press Verify (for Steam it starts Steam's own verify; for "
                   "other launchers it opens the launcher). Steam: Properties > Installed Files > Verify integrity. Other launchers have a Repair or "
                   "Verify option on the game.",
-                  note="To check one file you downloaded against a published checksum, use Hash Checker in More Tools.",
-                  handoffs=(("Open Games", "Games"), ("Open More Tools", "More Tools")))
+                  note="To check one file you downloaded against a published checksum, use Hash Checker in Toolbox.",
+                  handoffs=(("Open Games", "Games"), ("Open Toolbox", "More Tools")))

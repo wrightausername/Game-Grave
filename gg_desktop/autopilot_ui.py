@@ -142,14 +142,20 @@ class PlanCard(QFrame):
         check = QCheckBox(step.title)
         check.setChecked(step.ticked)
         check.setAccessibleName(step.title)
-        check.setEnabled(changeable and step.kind == core.CHANGE and step.status == "waiting")
+        tickable = changeable and step.kind == core.CHANGE and step.status == "waiting"
+        check.setEnabled(tickable)
+        if not tickable:
+            # Only a change still waiting for your OK gets a tick box; anything else would look clickable and isn't.
+            check.setFocusPolicy(Qt.NoFocus)
+            check.setStyleSheet("QCheckBox{spacing:0px;color:#e8eef5;}"
+                                "QCheckBox::indicator{width:0px;height:0px;border:none;margin:0px;}")
         check.toggled.connect(lambda on, s=step: self._tick(s, on))
         left.addWidget(check)
         caption = step.result or step.detail or step.action.plain
         if step.kind == core.CHANGE and step.status == "waiting" and step.action.undo:
             caption += "  " + step.action.undo
         note = shell.text(caption)
-        note.setContentsMargins(28, 0, 0, 0)
+        note.setContentsMargins(28 if tickable else 0, 0, 0, 0)
         left.addWidget(note)
         line.addLayout(left, 1)
         side = column(spacing=3)
@@ -157,6 +163,8 @@ class PlanCard(QFrame):
         kind.setAlignment(Qt.AlignRight)
         side.addWidget(kind, 0, Qt.AlignRight)
         word, tone = STATUS.get(step.status, STATUS["waiting"])
+        if step.status == "waiting" and not self.live:
+            word = "Off" if self.off else "Not run"
         side.addWidget(shell.pill(word, tone), 0, Qt.AlignRight)
         line.addLayout(side)
         frame.check = check
@@ -272,8 +280,7 @@ def handle(window, text, shown=None):
             return False
         from gg_desktop import assistant_engine as engine, assistant_features as features
         buttons = tuple(b for b in engine.guide_buttons(feature) if not b[0].startswith("Open "))
-        answer = engine.Answer("feature", f"Opening {feature.title} for you. Here's how it works.\n\n" +
-                               features.explain(feature), handoffs=buttons + (("Open it again", feature.opens or
+        answer = engine.Answer("feature", features.explain(feature) + "\n\nI've opened it for you.", handoffs=buttons + (("Open it again", feature.opens or
                                                                                feature.tab),))
         _post(window, text, answer, None)
         open_target(window, feature.opens or feature.tab)

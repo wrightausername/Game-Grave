@@ -78,6 +78,26 @@ class Bar(QWidget):
         painter.drawRoundedRect(QRectF(0, 0, max(3.0, self.width() * max(0.0, min(1.0, self.share))), 4), 2, 2)
 
 
+def row_game(window, item):
+    """The installed game a Games row is about, so its button can show that game instead of the whole tab."""
+    if item.tab != "Games":
+        return ""
+    inventory = getattr(window, "inventory", None)
+    names = {g.name for g in getattr(inventory, "games", ()) or ()}
+    for candidate in (item.label, item.label.split(" (")[0]):
+        if candidate in names:
+            return candidate
+    return ""
+
+
+def show_in_games(window, name):
+    """Open Games filtered to one game by its search box. Nothing is launched or changed."""
+    window.navigate("Games")
+    search = getattr(window, "game_search", None)
+    if search is not None and isValid(search):
+        search.setText(name)
+
+
 class AnswerRow(QFrame):
     def __init__(self, window, item, color):
         super().__init__()
@@ -101,9 +121,13 @@ class AnswerRow(QFrame):
         if item.share is not None:
             words.addWidget(Bar(item.share, color))
         line.addLayout(words, 1)
-        if item.tab:
+        game = row_game(window, item)
+        if game:
+            go = tool("Show", "next", lambda _=False, g=game: show_in_games(window, g), tip=f"Show {game} in Games")
+        elif item.tab:
             go = tool("Open", "next", lambda _=False, tab=item.tab: window.navigate(tab), tip="Open " + display_name(item.tab))
             go.setText("Open " + display_name(item.tab))
+        if game or item.tab:
             go.setIcon(icon("next", "#e8eef5", 12))
             go.setFixedHeight(26)
             go.setStyleSheet("font-size:11px;padding:0 9px;")
@@ -271,14 +295,16 @@ def build(window):
     self.assistant_title.setMinimumWidth(0)
     self.assistant_title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
     top.addWidget(self.assistant_title, 1)
-    self.assistant_mode = QLabel("Read only")
+    self.assistant_mode = QPushButton("Tools: Off")
     self.assistant_mode.setAccessibleName("Assistant mode")
+    self.assistant_mode.setCursor(Qt.PointingHandCursor)
+    self.assistant_mode.clicked.connect(lambda: show_tools_setting(self))
     top.addWidget(self.assistant_mode)
     self.assistant_scope = tool("All Games", "game", lambda: choose_scope(self),
                                 tip="Limit answers to one game, or all games")
     self.assistant_scope.setFixedHeight(28)
     top.addWidget(self.assistant_scope)
-    clear_button = tool("", "refresh", lambda: clear(self), tip="Clear this chat (removes its saved messages)")
+    clear_button = tool("", "eraser", lambda: clear(self), tip="Clear this chat (asks first, removes its saved messages)")
     clear_button.setAccessibleName("Clear Chat")
     clear_button.setFixedSize(30, 28)
     top.addWidget(clear_button)
@@ -373,6 +399,7 @@ def build(window):
     can = local_ai_ui.build_panel(self, accent)
     from gg_desktop import autopilot_ui
     auto = autopilot_ui.build_panel(self, accent)
+    self.assistant_auto = auto
     right = QWidget()
     right_lay = column(spacing=8)
     right.setLayout(right_lay)
@@ -396,6 +423,16 @@ def show_side(window, on):
     window.assistant_side.setVisible(on)
     window.assistant_side_button.setChecked(on)
     window.assistant_side_button.setText("Hide settings" if on else "Settings")
+
+
+def show_tools_setting(window):
+    """The Tools badge opens the settings panel at "Let the assistant run tools"; the switch itself still decides."""
+    if not window.assistant_side.isVisible():
+        show_side(window, True)
+        save(window, dict(window.settings, **{SIDE_KEY: True}))
+    auto = getattr(window, "assistant_auto", None)
+    if auto is not None and hasattr(window.assistant_side, "ensureWidgetVisible"):
+        window.assistant_side.ensureWidgetVisible(auto)
 
 
 def toggle_side(window):
@@ -424,10 +461,11 @@ def refresh(window):
     from gg_desktop import autopilot_ui
     strip.set_value(4, "Runs Tools" if autopilot_ui.enabled(window) else "Read Only")
     runs = autopilot_ui.enabled(window)
-    window.assistant_mode.setText("Runs tools (asks first)" if runs else "Read only")
-    window.assistant_mode.setToolTip("The assistant can run Game Grave's own tools; nothing changes until you press Run all."
-                                     if runs else "The assistant only answers. Turn on running tools in Automation.")
-    window.assistant_mode.setStyleSheet(PILL.format("#32d67a" if runs else "#9fb0c2", "#0b1a12" if runs else "#0f161e"))
+    window.assistant_mode.setText("Tools: Ask first" if runs else "Tools: Off")
+    window.assistant_mode.setToolTip("The assistant can run Game Grave's own tools; nothing changes until you press Run all. "
+                                     "Click to change." if runs else
+                                     "The assistant only answers. Click to switch on running tools.")
+    window.assistant_mode.setStyleSheet(PILL.replace("QLabel", "QPushButton").format("#32d67a" if runs else "#9fb0c2", "#0b1a12" if runs else "#0f161e"))
     strip.set_value(5, f"{metrics['sources_on']} of {metrics['sources_total']}")
     for source in data.source_states(facts):
         check, detail = window.assistant_source_rows[source.key]
@@ -588,7 +626,14 @@ def add_answer(window, question, answer, plan=None, layout=None):
     holder.setLayout(line)
     line.addWidget(Avatar(), 0, Qt.AlignTop)
     stack = column(spacing=7)
-    text = label(answer.text, "subtle", wrap=True)
+    body = answer.text
+    if answer.intent == "feature" and "\n" in body:
+        heading, body = body.split("\n", 1)
+        title = label(heading, "subtle")
+        title.setTextFormat(Qt.PlainText)
+        title.setStyleSheet("color:#ffffff;font-size:14px;font-weight:700;")
+        stack.addWidget(title)
+    text = label(body, "subtle", wrap=True)
     text.setTextFormat(Qt.PlainText)
     text.setTextInteractionFlags(Qt.TextSelectableByMouse)
     text.setStyleSheet("color:#e8eef5;font-size:13px;")

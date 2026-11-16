@@ -1065,3 +1065,11 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   hidden; Windows has a Registry Cleanup tile that opens Hardware > Registry Cleanup; the leftover "TOOLKIT" chip is gone;
   System Health shows "Measuring…" until the first CPU reading; the Captures tile is called "Captures". Covered by
   `tests/test_tools.py` and `tools/tools_page_smoke.py`.
+- AI Assistant (all six approved): answers say "Open Toolbox" and "Back up a Folder (Toolbox)" (were "Open More Tools" and
+  "Save Vault"); help answers put the tool name on its own bold line instead of "Windows Cleanup: Windows Cleanup…"
+  (`assistant_features.explain`); the mode badge reads "Tools: Off" or "Tools: Ask first" and clicking it opens the
+  settings panel at "Let the assistant run tools" (the switch still decides; the badge changes nothing itself); Clear chat
+  uses an eraser icon instead of the refresh arrow and still asks first; a game row's button is "Show", which opens Games
+  filtered to that game (nothing is launched); plan cards show a tick box only on a change still waiting for your OK, and
+  steps of a plan made while tools are off read "Off" instead of "Waiting". Covered by `tests/test_assistant.py` and
+  `tools/assistant_page_smoke.py`.

@@ -44,6 +44,7 @@ PATHS = {
     "folder": '<path d="M2 6h8l2 3h10l-3 12H2V6Zm0 3V4h8l2 2h8v3"/>',
     "download": '<path d="M12 2v13m-6-6 6 6 6-6M3 17v5h18v-5"/>',
     "refresh": '<path d="M21 3v6h-6M3 21v-6h6M4 9a8 8 0 0 1 14-5l3 5M3 15l3 5a8 8 0 0 0 14-5"/>',
+    "eraser": '<path d="M7 21l-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21M22 21H7M5 11l9 9"/>',
     "star": '<path d="m12 2 3 6.5 7 1-5 5 1 7-6-3.5L6 21l1-7-5-5 7-1Z"/>',
     "clock": '<circle cx="12" cy="12" r="10"/><path d="M12 5v7l4 3"/>',
     "check": '<circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/>',

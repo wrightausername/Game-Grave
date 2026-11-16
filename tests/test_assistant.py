@@ -257,7 +257,7 @@ class FeatureQuestions(unittest.TestCase):
             self.assertEqual(a.handoffs, (("Open Resurrection Kit", "kit:easy"), ("Open Fix Kit", "Fix Kit")))
 
     def test_other_features(self):
-        for q, title in (("how does save vault work", "Save Vault"), ("what does black box do", "Black Box"),
+        for q, title in (("how does save vault work", "Back up a Folder"), ("what does black box do", "Black Box"),
                          ("explain soulbind", "Soulbind"), ("what is exhume", "Exhume"),
                          ("what is game dna", "Game DNA"), ("what does the undo center do", "Undo Center")):
             a = engine.answer(q, facts())
@@ -305,4 +305,4 @@ class FeatureQuestions(unittest.TestCase):
             a = engine.answer(q, facts())
             self.assertEqual(a.intent, "feature", q)
             self.assertTrue(a.text.startswith("Drivers & Startup"), (q, a.text[:40]))
-        self.assertEqual(engine.answer("check for updates", facts()).text.split(":")[0], "Check for Updates")
+        self.assertEqual(engine.answer("check for updates", facts()).text.split("\n")[0], "Check for Updates")

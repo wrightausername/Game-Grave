@@ -128,6 +128,8 @@ def main():
             assert "What are my largest games by size?" in text and "Starfield" in text and "Cyberpunk 2077" in text, text
             assert "not measured disk use" in text and "Game library" in text, text
             assert "Open Games" in buttons(window) and "Copy" in buttons(window), buttons(window)
+            assert buttons(window).count("Open Games") == 1 and "Show" in buttons(window), buttons(window)
+            assert window.assistant_mode.text() in ("Tools: Off", "Tools: Ask first"), window.assistant_mode.text()
             assert window.assistant_input.text() == ""
             assert saved and "assistant_chats" in saved[-1] and saved[-1]["assistant_chats"][0]["messages"], saved[-1:]
             assert [v.text() for v in window.assistant_metrics.values][0] == "1"
@@ -246,6 +248,13 @@ def main():
             next(b for b in window.assistant_scroll.widget().findChildren(QPushButton) if b.text() == "Open Games").click()
             settle()
             assert window.current_route == "Games", window.current_route
+            window.navigate("AI Assistant")
+            settle()
+            # A game row's Show button opens Games filtered to that game.
+            next(b for b in window.assistant_scroll.widget().findChildren(QPushButton) if b.text() == "Show").click()
+            settle()
+            assert window.current_route == "Games" and window.game_search.text() == "Starfield", window.game_search.text()
+            window.game_search.clear()
             window.navigate("AI Assistant")
             settle()
             assert "Starfield" in transcript(window), "The conversation was saved and comes back"

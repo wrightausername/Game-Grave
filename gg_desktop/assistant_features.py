@@ -49,10 +49,10 @@ FEATURES = (
         "Saves a game's whole install, saves, load order and mods into one verified ZIP you can restore later. Opens "
         "a menu to set up, restore, inspect, rehearse, compare or transfer kits. Nothing changes until you confirm."),
     Feature(
-        "save_vault", "Save Vault",
-        ("save vault", "savevault", "game backup", "save backup", "mod backup", "back up my saves", "backup my saves"),
-        "Save Vault copies one folder you choose, such as a save or profile folder, into a new ZIP and verifies the "
-        "ZIP afterwards. Game Backup, Save Backup and Mod Backup in Toolbox all use it.",
+        "save_vault", "Back up a Folder",
+        ("back up a folder", "backup a folder", "folder backup", "save vault", "savevault", "game backup", "save backup", "mod backup", "back up my saves", "backup my saves"),
+        "Back up a Folder copies one folder you choose, such as a save, mod or settings folder, into a new ZIP and "
+        "verifies the ZIP afterwards. Back Up My Saves in Toolbox uses it too.",
         ("Choose the folder, choose a new ZIP name, confirm, and it runs in the background.",),
         "It never deletes or overwrites your source files and refuses to write over an existing ZIP. Close the game "
         "first so the files are consistent.",
@@ -562,7 +562,7 @@ def find_feature(question, game_name=""):
 
 def explain(feature):
     """Plain text for the assistant: what it is, what you can do, what it never does, where to find it."""
-    parts = [f"{feature.title}: {feature.what}"]
+    parts = [f"{feature.title}\n{feature.what}"]
     if feature.steps:
         parts.append("\n".join("• " + s for s in feature.steps))
     if feature.never:
