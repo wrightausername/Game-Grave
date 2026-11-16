@@ -248,7 +248,7 @@ def main():
             # "Open the hash checker" opens the tool itself.
             ask(window, "open the hash checker")
             wait_for(lambda: opened[-1] == "hash", "the hash checker to open")
-            assert "Opening Hash Checker for you" in transcript(window)
+            assert "Hash Checker" in transcript(window) and "opened it for you" in transcript(window)
 
             # Turn a mod off by name: found in the Mod Organizer 2 profile, switched after Run all, never the wrong mod.
             ask(window, "turn off skyui")
