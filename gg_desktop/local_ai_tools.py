@@ -321,6 +321,8 @@ JOBS = {
     "check_game_grave_update": "Ask GitHub for a newer Game Grave",
 }
 NEEDS_TARGET = {"close_app", "stop_startup_app", "mod_off", "mod_on", "fix_game"}
+VAGUE = {"mod", "mods", "organizer", "2", "the", "a", "an", "my", "all", "any", "every", "game", "games", "app", "apps",
+         "it", "them", "this", "that", "one", "program", "crashing", "broken", "bad", "some"}
 
 
 def plan_steps(jobs):
@@ -344,8 +346,8 @@ def plan_steps(jobs):
         if name not in JOBS:
             dropped.append(name or "?")
             continue
-        if name in NEEDS_TARGET and not target:
-            dropped.append(name + " (no target)")
+        if name in NEEDS_TARGET and (not target or set(re.findall(r"[a-z0-9]+", target.casefold())) <= VAGUE):
+            dropped.append(name + " (no target)")      # "turn off Mod Organizer 2 mod" names nothing real
             continue
         if name == "scan_games":
             add("scan_library")
@@ -547,6 +549,10 @@ def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS, question=None):
     messages, results, checked = with_prefetch(messages, ctx, first)
     looked = [fn for fn, _args in first]
     tools = tool_specs()
+    if question is not None:
+        from gg_desktop import autopilot_core as core
+        if not core.is_request(question):          # a question ("how do I...") is answered, never turned into a plan
+            tools = [s for s in tools if s["function"]["name"] != "make_plan"]
     for round_no in range(max_rounds + 1):
         offer = tools if round_no < max_rounds else None       # the last round must answer in words
         reply = chat_fn(messages, offer) or {}

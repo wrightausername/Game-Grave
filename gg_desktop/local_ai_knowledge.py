@@ -172,7 +172,8 @@ def known_fixes(problem="", game=""):
     found = []
     for key, (words, steps) in PROBLEMS.items():
         if any(w in text for w in words):
-            found.append({"problem": key.replace("_", " "), "usual_fixes": steps})
+            found.append({"problem": key.replace("_", " "),
+                          "usual_fixes": [s.replace("GG: ", "In Game Grave: ") for s in steps]})
     for name, notes in KNOWN_GAMES.items():
         if name in str(game).casefold() or name in text:
             found.append({"game": name, "known_notes": notes})
@@ -187,7 +188,7 @@ def explain_error(text=""):
     hits = []
     for pattern, means, next_step in ERRORS:
         if re.search(pattern, low):
-            hits.append({"usually_means": means, "next_step": next_step})
+            hits.append({"usually_means": means, "next_step": next_step.replace("GG: ", "In Game Grave: ")})
     files = sorted(set(re.findall(r"[a-z0-9_\-]+\.(?:dll|exe|sys)", low)))[:8]
     codes = sorted(set(re.findall(r"0x[0-9a-f]{8}", low)))[:5]
     if not hits:

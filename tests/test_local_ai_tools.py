@@ -72,6 +72,19 @@ class Plans(unittest.TestCase):
         self.assertEqual(keys, ["check_temp", "clear_temp", "check_mods", "game_mode_on"])
         self.assertEqual(steps[2].args["mentioned"], "turn off SkyUI")
         self.assertEqual(dropped, ["close_app (no target)", "format_drive"])
+        _steps, vague = t.plan_steps([{"job": "mod_off", "target": "Mod Organizer 2 mod"}])
+        self.assertEqual(vague, ["mod_off (no target)"], "a target that names nothing real is dropped")
+
+    def test_questions_never_become_plans(self):
+        offered = []
+
+        def chat(messages, tools):
+            offered.append([s["function"]["name"] for s in tools or []])
+            return {"content": "Here's how."}
+        t.converse(chat, [], ctx(), question="how do i find which mod is crashing my game")
+        self.assertNotIn("make_plan", offered[0])
+        t.converse(chat, [], ctx(), question="turn off skyui for me")
+        self.assertIn("make_plan", offered[-1])
 
     def test_every_job_maps_to_real_actions(self):
         from gg_desktop import autopilot_core as core

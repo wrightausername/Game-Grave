@@ -1199,3 +1199,7 @@ and its answers; layout unchanged except one "Not helpful" button under each ans
   captures, drives) runs first for "what's eating my storage"; the problem prefetch also catches "aren't loading", "not
   detected", "goes black", lost saves and slow downloads; how-to questions always get the manual. The bench accepts either
   a lookup or the fix plan for crash questions.
+- Fourth bench run: 16 of 17 (94%) on questions 16 to 32. Last fixes: known fixes and the error guide say "In Game Grave:"
+  instead of the internal "GG:" mark; a plan job whose target names nothing real ("Mod Organizer 2 mod", "all") is dropped
+  (`VAGUE`); a question ("how do I find which mod is crashing my game") is never offered make_plan, only a request is
+  (`autopilot_core.is_request`).

@@ -37,7 +37,7 @@ CASES = (
     ("what graphics card do i have", {"tool": ("pc_status",), "says": ("RTX", "NVIDIA", "GeForce")}),
     ("how much ram do i have", {"tool": ("pc_status",), "says": ("32", "16")}),
     ("is my ram running at full speed", {"tool": ("pc_status",)}),
-    ("how much space is left on my c drive", {"tool": ("pc_status",), "says": ("GB",)}),
+    ("how much space is left on my c drive", {"tool": ("pc_status", "space_use"), "says": ("180",)}),
     ("can i fit a 100 gb game", {"tool": ("pc_status",)}),
     ("what's eating my storage", {"tool": ("space_use",), "says": ("Starfield",)}),
     ("what starts with windows on my pc", {"tool": ("startup_apps",), "says": ("Spotify",)}),
