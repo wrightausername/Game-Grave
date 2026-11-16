@@ -203,7 +203,7 @@ def main():
             settle()
             w = local_ai_ui.state_of(window).widgets
             assert w is not None and w.get.isVisible() and not w.switch.isEnabled(), "Local AI panel"
-            assert "Not downloaded" in w.status.text() and w.combo.count() == 3, w.status.text()
+            assert "Not downloaded" in w.status.text() and w.combo.count() == 4, w.status.text()
             assert w.combo.currentData() == "medium"
             # Pretend the Medium model and engine are on disk, then answer through the real background path with a
             # stand-in server: the model's text replaces the built-in text and its source is named.
