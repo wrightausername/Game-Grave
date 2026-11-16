@@ -1031,3 +1031,9 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   (`gg_desktop/narrow_fit.py`, display only, reusable by other tabs); "Shader cache of an uninstalled Steam game (app N)"
   (still review only); the finished pop-up says "Found N items (size) in the N places Game Grave checks"; the "Cleanup
   Assistant" tab reads "Can clear here" with its rule on hover (key unchanged). Covered by `tools/other_storage_page_smoke.py`.
+- Graveyard (all six approved): "Move to Recycle Bin…" (same choices menu, Recycle Bin only) and "Restore from Recycle Bin"
+  (opens Undo Center as before); the leftover-scan pop-up says "Found N leftovers (size) in the places Game Grave checks"
+  instead of Other Storage's message; the Related column and details show plain words for the scanner's wording
+  (`grave_page.PLAIN_RELATED`; `graveyard.py` and `core.py` are protected and unchanged; the original is on hover); in a
+  narrow window the cards use whole short words and Last Touched and Evidence step aside (`narrow_fit`, tabs keep their
+  counts); an item with no game shows its type icon instead of the "GG" placeholder. Covered by `tools/grave_page_smoke.py`.

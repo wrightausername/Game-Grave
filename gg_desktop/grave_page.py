@@ -366,6 +366,12 @@ def build(window):
     self.grave_table.setItemDelegateForColumn(1, NameDelegate(self.grave_table))
     self.grave_table.setItemDelegateForColumn(5, PillDelegate(self.grave_table))
     contents.addWidget(self.grave_table, 1)
+    from gg_desktop import narrow_fit      # whole words and no sideways scroll in a narrow window
+    narrow_fit.install(page, self.grave_metrics, None,          # the tabs carry live counts; leave their words alone
+                       captions={"Items Found": "Items", "Total Size": "Size", "Over 6 Months": "6+ months",
+                                 "Related Games": "Games", "Mods / Addons": "Mods", "Downloads": "Downl.",
+                                 "Reviewable": "Review"},
+                       table=self.grave_table, hide=(3, 5), narrow=1100)
     from gg_desktop import ask_about
     ask_about.install_table(self, self.grave_table, "grave",
                             lambda r: self._shown_graves[r] if 0 <= r < len(getattr(self, "_shown_graves", [])) else None)
@@ -387,9 +393,10 @@ def build(window):
     footer.addWidget(self.grave_select_button)
     footer.addWidget(tool("Protect", "shield", lambda: protect(self), tip="Adds Never Touch rules for the checked items"))
     footer.addWidget(tool("Unprotect", "shield", lambda: unprotect(self), tip="Removes your own rule for one checked item"))
-    footer.addWidget(tool("Restore", "undo", lambda: self.navigate("Undo Center"),
+    footer.addWidget(tool("Restore from Recycle Bin", "undo", lambda: self.navigate("Undo Center"),
                           tip="Opens Undo Center, where everything moved to the Recycle Bin can be restored"))
-    self.grave_delete = tool("Delete…", "trash", None, kind="danger", tip="Removal choices for the checked items")
+    self.grave_delete = tool("Move to Recycle Bin…", "trash", None, kind="danger",
+                             tip="Removal choices for the checked items. Everything goes to the Recycle Bin.")
     self.grave_delete_menu = QMenu(self.grave_delete)
     self.grave_delete_menu.aboutToShow.connect(lambda: build_delete_menu(self))
     self.grave_delete.setMenu(self.grave_delete_menu)
@@ -567,7 +574,8 @@ def fill_table(window, previous, pending=None):
             name = _text(table, n, 1, item.name, KIND_ICONS.get(item.kind, "file"), "#e5b72e")
             name.setData(Qt.UserRole, "" if state.compact else item.subtitle + (" · Protected" if protected else ""))
             name.setToolTip(f"{item.name}\n{item.path}")
-            _text(table, n, 2, item.related)
+            _text(table, n, 2, plain_related(item.related))
+            table.item(n, 2).setToolTip(item.related)
             _text(table, n, 3, insight.date_text(item))
             _text(table, n, 4, human_size(item.size))
             _text(table, n, 5, item.evidence).setToolTip(data.EVIDENCE_TEXT[item.evidence])
@@ -754,7 +762,11 @@ def details(window):
     header.addWidget(pill(text, color))
     contents.addWidget(_widget(header))
     contents.addWidget(label(f"{human_size(item.size)} · {insight.items_text(item)}", "caption"))
-    contents.addWidget(CoverArt(item.game or "Game Grave", height=83))
+    if item.game:
+        contents.addWidget(CoverArt(item.game, height=83))
+    else:                       # no game behind it: its type's icon, not a "GG" placeholder
+        from gg_desktop.old_files_page import type_tile
+        contents.addWidget(type_tile(KIND_ICONS.get(item.kind, "file"), "#f1c232"))
     refs = references_for(window, item)
     chips = TabStrip([("Details", "file"), (f"Contents ({item.items:,})" if item.items else "Contents", "box"),
                       (f"References ({len(refs)})" if refs else "References", "shield")], framed=False)
@@ -774,7 +786,7 @@ def details(window):
 
 def item_details(window, item, rules, contents):
     for symbol, name, value in (
-        ("game", "Related Game", item.related), ("folder", "Location", item.path),
+        ("game", "Related Game", plain_related(item.related)), ("folder", "Location", item.path),
         ("clock", "Last Touched", insight.age_phrase(item)),
         ("storage", "Size", human_size(item.size) + (" (partly measured)" if item.partial else "")),
         ("box", "Type", item.kind), ("file", "Items", insight.items_text(item)),
@@ -948,7 +960,11 @@ def scan(window, automatic=False):
             scan_cache.keep_async("grave", report)
             window._sync_scan_time()
             from gg_desktop import comfort
-            comfort.notify(window, "Leftover scan finished", report.summary() + '.', "good", "Graveyard")
+            n = len(report.entries)
+            comfort.notify(window, "Leftover scan finished",
+                           f"Found {n:,} leftover{'s' if n != 1 else ''} "
+                           f"({human_size(sum(e.size for e in report.entries))}) in the places Game Grave checks.",
+                           "good", "Graveyard")
             invalidate(window)
             window.status.setText(report.summary() + ". Nothing was changed.")
         if live(window):
@@ -1023,3 +1039,15 @@ def steam_uninstall(window):
         os.startfile(url)
     except OSError as exc:
         window.error("Steam unavailable", str(exc))
+
+
+# Scanner wording (graveyard.py is protected) shown in plain words; the original stays in the hover text.
+PLAIN_RELATED = {"Installed: possible mods": "Maybe mods for an installed game",
+                 "Game association unverified": "Not linked to a game",
+                 "Possible capture; not content-verified": "Maybe a game capture",
+                 "Possible game capture; contents not verified": "Maybe a game capture",
+                 "Steam game is still installed": "The game is still installed"}
+
+
+def plain_related(text):
+    return PLAIN_RELATED.get(text, text)
