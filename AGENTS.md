@@ -1191,3 +1191,11 @@ and its answers; layout unchanged except one "Not helpful" button under each ans
   ("your settings have been restored") and tell the model to answer general questions about games that aren't installed;
   "fix <game>" and "put my Windows settings back" are planned by Game Grave's own request reading before the model is asked
   (as the app does), and the bench follows the same order.
+- Third bench run: crash questions are planned by Game Grave's fix-my-game plan before the model (as in the app), hardware,
+  mods, errors and Game Grave state answered correctly; misses were how-to answers naming the wrong feature and problems the
+  prefetch didn't catch. Fixes: app_help ranks with the built-in walkthrough routing first (`assistant_engine` feature
+  answer, then `find_feature`) and returns `best_match`; lookups say where to act (startup apps: Hardware > Drivers &
+  Startup; mods: Mods > My Mods; crashes: Fix Kit > Black Box); a new space_use lookup (biggest games, caches, old files,
+  captures, drives) runs first for "what's eating my storage"; the problem prefetch also catches "aren't loading", "not
+  detected", "goes black", lost saves and slow downloads; how-to questions always get the manual. The bench accepts either
+  a lookup or the fix plan for crash questions.

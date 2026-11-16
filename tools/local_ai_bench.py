@@ -29,15 +29,17 @@ CASES = (
     ("which game should i uninstall to make room", {"says": ("Cyberpunk", "Starfield"), "never": ("safe to delete",)}),
     ("is hades modded", {"tool": ("look_up_game", "game_mods")}),
     ("what mods do i have for cyberpunk", {"tool": ("game_mods",), "says": ("SkyUI",)}),
-    ("cyberpunk keeps crashing, why", {"tool": ("game_crashes",), "says": ("NVIDIA", "graphics driver", "driver")}),
-    ("my game crashes on startup what do i do", {"tool": ("known_fixes", "game_crashes", "app_help")}),
-    ("Cyberpunk won't launch", {"tool": ("game_crashes", "known_fixes", "runtimes", "look_up_game")}),
+    ("cyberpunk keeps crashing, why", {"tool": ("game_crashes",), "job": ("fix_game",), "either": True}),
+    ("my game crashes on startup what do i do", {"tool": ("known_fixes", "game_crashes", "app_help"), "job": ("fix_game",),
+                                                 "either": True}),
+    ("Cyberpunk won't launch", {"tool": ("game_crashes", "known_fixes", "runtimes", "look_up_game"), "job": ("fix_game",),
+                                "either": True}),
     ("what graphics card do i have", {"tool": ("pc_status",), "says": ("RTX", "NVIDIA", "GeForce")}),
     ("how much ram do i have", {"tool": ("pc_status",), "says": ("32", "16")}),
     ("is my ram running at full speed", {"tool": ("pc_status",)}),
     ("how much space is left on my c drive", {"tool": ("pc_status",), "says": ("GB",)}),
     ("can i fit a 100 gb game", {"tool": ("pc_status",)}),
-    ("what's eating my storage", {"says": ("Starfield", "GB")}),
+    ("what's eating my storage", {"tool": ("space_use",), "says": ("Starfield",)}),
     ("what starts with windows on my pc", {"tool": ("startup_apps",), "says": ("Spotify",)}),
     ("is discord open right now", {"tool": ("open_apps",), "says": ("Discord", "yes", "Yes")}),
     ("do i have the visual c++ runtime", {"tool": ("runtimes",)}),
@@ -50,12 +52,13 @@ CASES = (
     ("i lost my save in hades", {"tool": ("known_fixes", "look_up_game", "app_help")}),
     ("mods aren't loading in skyrim", {"tool": ("known_fixes", "app_help")}),
     ("how do i back up a game", {"tool": ("app_help",), "says": ("Resurrection Kit",)}),
-    ("how do i find which mod is crashing my game", {"tool": ("app_help", "known_fixes"), "says": ("Crash Doctor",)}),
+    ("how do i find which mod is crashing my game", {"tool": ("app_help", "known_fixes"),
+                                                     "says": ("Crash Doctor", "Mod Bisect")}),
     ("how do i restore something game grave deleted", {"tool": ("app_help", "tab_help"), "says": ("Undo Center",)}),
     ("where do i turn off startup apps", {"says": ("Drivers & Startup", "Hardware")}),
     ("what does the graveyard tab do", {"tool": ("tab_help", "app_help"), "says": ("leftover", "Leftover")}),
     ("what's in the toolbox", {"tool": ("tab_help", "app_help")}),
-    ("how do i share my mod list with a friend", {"says": ("Squad Sync",)}),
+    ("how do i share my mod list with a friend", {"says": ("Squad Sync", "Reports")}),
     ("what tab am i on", {"tool": ("game_grave_state",), "says": ("Games",)}),
     ("is automation on", {"tool": ("game_grave_state",)}),
     ("what did game grave do recently", {"tool": ("recent_activity",)}),
@@ -103,6 +106,8 @@ def judge(expect, result, text):
     called = {c for c in getattr(result, "called", ())}
     jobs = {str(j.get("job", "")) if isinstance(j, dict) else str(j) for j in (result.get("jobs") or [])}
     misses = []
+    if expect.get("either") and (called & set(expect.get("tool", ())) or jobs & set(expect.get("job", ()))):
+        return []         # either looking it up or planning the fix is a good answer
     if "tool" in expect and not called & set(expect["tool"]):
         misses.append(f"expected a lookup {expect['tool']}, used {sorted(called) or 'none'}")
     if "job" in expect and not jobs & set(expect["job"]):

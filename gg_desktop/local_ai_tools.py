@@ -89,7 +89,8 @@ def game_mods(ctx, name=""):
     g = find_game(f, name)
     if g is None:
         return _no_game(f, name)
-    out = {"game": g.name, "mod_organizer_2": [], "mod_folders_inside_install": []}
+    out = {"game": g.name, "mod_organizer_2": [], "mod_folders_inside_install": [],
+           "where": "Mods > My Mods (switch mods on or off, Undo, Mod Doctor, Find the crashing mod)"}
     try:
         profiles = ctx.mo2_profiles() or []
     except Exception as exc:
@@ -124,6 +125,7 @@ def game_crashes(ctx, name=""):
             "newest": max(crashes, key=lambda c: c.when).when.strftime("%Y-%m-%d %H:%M") if crashes else None,
             "crash_location_files": [{"file": m, "times": n, "what_it_is": fx.KNOWN_MODULES.get(m.casefold(), "")}
                                      for m, n in sorted(modules.items(), key=lambda kv: -kv[1])[:6]],
+            "where": "Fix Kit > Black Box (full crash report) and Check the usual fixes",
             "note": "Windows only records crashes that close the game with an error; freezes and silent exits may not be "
                     "here."}
 
@@ -150,6 +152,27 @@ def pc_status(ctx):
     return out
 
 
+def space_use(ctx):
+    """What takes the space: biggest games, Other Storage, old files, captures, and each drive's free space."""
+    f = ctx.facts
+    out = {}
+    if f.on("library"):
+        games = sorted((g for g in f.games if g.size_bytes), key=lambda g: -g.size_bytes)
+        out["biggest_games"] = [{"name": g.name, "size": _size(g.size_bytes),
+                                 "last_played_days_ago": _days(g.last_played_at, f.now)} for g in games[:8]]
+        out["all_games_total"] = _size(sum(g.size_bytes for g in games))
+    if f.on("storage"):
+        out["other_storage_total"] = _size(sum(max(0, i.size) for i in f.storage))
+        out["old_files_total"] = _size(sum(max(0, o.size) for o in f.old_files))
+    if f.on("captures"):
+        out["captures_total"] = _size(sum(getattr(c.record, "size", 0) or 0 for c in f.captures))
+    if f.hardware is not None:
+        out["drives"] = [{"drive": d.letter, "free": _size(d.free), "total": _size(d.total)} for d in f.hardware.drives]
+    out["where"] = ("Graveyard (games not played lately), Other Storage > Can clear here, Old Files, Captures; everything "
+                    "goes to the Recycle Bin only after you confirm")
+    return out
+
+
 def startup_apps(ctx):
     try:
         apps = list(ctx.read_startup() or [])
@@ -157,6 +180,7 @@ def startup_apps(ctx):
         return {"note": f"The startup list couldn't be read: {exc}"}
     return {"apps": [{"name": a.name, "on": a.enabled, "maker": a.company, "for": "everyone" if a.scope == "machine"
                       else "you", "program_missing": a.exists is False} for a in apps][:40],
+            "where": "Hardware > Drivers & Startup (the Starts with Windows list)",
             "note": "Switching one off uses the same switch as Task Manager; the app is not removed."}
 
 
@@ -205,6 +229,18 @@ def app_help(ctx, topic=""):
     from gg_desktop import assistant_features as features
     words = set(re.findall(r"[a-z0-9]+", str(topic).casefold()))
     scored = []
+    best = None
+    try:                                          # the built-in walkthrough routing, tuned on real how-to questions
+        from gg_desktop import assistant_engine as engine
+        guide = engine.answer(str(topic), ctx.facts)
+        if guide.intent == "feature":
+            title = guide.text.split("\n", 1)[0].strip()
+            best = next((f for f in features.FEATURES if f.title == title), None)
+    except Exception:
+        best = None
+    best = best or features.find_feature(str(topic))
+    if best is not None:
+        scored.append((-1000, best.title, best))
     for f in features.FEATURES:
         text = " ".join((f.title, f.what, " ".join(f.keywords), " ".join(f.steps), f.tab)).casefold()
         hits = sum(1 for w in words if len(w) > 2 and re.search(r"\b" + re.escape(w), text))
@@ -212,11 +248,16 @@ def app_help(ctx, topic=""):
         if hits or title_hits:
             scored.append((-(hits + title_hits), f.title, f))
     scored.sort(key=lambda t: (t[0], t[1]))
-    picks = [f for _s, _t, f in scored[:3]]
+    picks = []
+    for _s, _t, f in scored:
+        if f not in picks:
+            picks.append(f)
+    picks = picks[:3]
     if not picks:
         return {"note": "No feature matches that. Main tabs: Overview, Ready Room, Games, Mods, Old Files, Other Storage, "
                         "Captures, Graveyard, Fix Kit, Game DNA, Hardware, Undo Center, Toolbox, AI Assistant, Settings."}
-    return {"features": [{"name": f.title, "tab": f.tab, "what": f.what, "steps": list(f.steps), "never": f.never,
+    return {"best_match": picks[0].title,
+            "features": [{"name": f.title, "tab": f.tab, "what": f.what, "steps": list(f.steps), "never": f.never,
                           "where": f.where, "can_plan": f.do} for f in picks]}
 
 
@@ -376,6 +417,8 @@ def tool_specs():
             "DirectX, a mod's file, an overlay).", name=_s("The game's name")),
         _fn("pc_status", "This PC's parts: processor, graphics card and driver version, memory and whether it runs "
             "slower than rated, Windows version, every drive's free space."),
+        _fn("space_use", "What is using the space: biggest games, caches, old files, captures and every drive's free "
+            "space."),
         _fn("open_apps", "Apps open right now by memory use, and overlays that hook into games (Discord, Overwolf, "
             "RivaTuner and others)."),
         _fn("startup_apps", "Apps that start with Windows, on or off."),
@@ -408,13 +451,13 @@ def tool_specs():
 
 
 LOOKUPS = {"look_up_game": look_up_game, "game_mods": game_mods, "game_crashes": game_crashes, "pc_status": pc_status,
-           "open_apps": open_apps, "startup_apps": startup_apps, "runtimes": runtimes, "game_storage": game_storage,
+           "open_apps": open_apps, "startup_apps": startup_apps, "space_use": space_use, "runtimes": runtimes, "game_storage": game_storage,
            "app_help": app_help, "game_grave_state": game_grave_state, "known_fixes": known_fixes,
            "explain_error": explain_error, "tab_help": tab_help, "recent_activity": recent_activity,
            "make_plan": make_plan}
 
 CHECKED_NAMES = {"look_up_game": "Games", "game_mods": "Mods", "game_crashes": "Black Box", "pc_status": "Hardware",
-                 "open_apps": "Open apps", "startup_apps": "Startup", "runtimes": "Runtimes", "game_storage": "Storage",
+                 "open_apps": "Open apps", "startup_apps": "Startup", "space_use": "Storage", "runtimes": "Runtimes", "game_storage": "Storage",
                  "app_help": "Manual", "game_grave_state": "Settings", "recent_activity": "Activity",
                  "known_fixes": "Known fixes", "explain_error": "Error guide", "tab_help": "Manual"}
 
@@ -594,9 +637,12 @@ FIX_NOTE = ("Some of that doesn't match Game Grave's data: {problems}. Check wit
 
 
 # ------------------------------------------------------------------ lookups Game Grave runs first (small models skip them)
-_PROBLEM = re.compile(r"crash|ctd|won'?t (start|launch|open|load|run)|doesn'?t (start|launch|open|load|run)|not (starting|"
-                      r"launching|loading|working)|black screen|freez|stutter|lag|fps|choppy|error|broke|broken|"
-                      r"keeps closing|closes (itself|immediately)|fix")
+_PROBLEM = re.compile(r"crash|ctd|won'?t (start|launch|open|load|run|work)|doesn'?t (start|launch|open|load|run|work)|"
+                      r"(not|aren'?t|isn'?t) (starting|launching|loading|working|detected|showing|saving)|not detected|"
+                      r"black screen|screen (goes|went|turns) black|goes black|freez|stutter|lag|fps|choppy|error|broke|"
+                      r"broken|keeps closing|closes (itself|immediately)|\bfix\b|lost (my )?saves?|save (is )?(gone|missing)|"
+                      r"slow download|download(ing)? slow")
+_SPACE = re.compile(r"\b(space|storage|room|full|eating|hogging|taking up|biggest|largest|free up|disk usage)\b")
 _HARDWARE = re.compile(r"\b(ram|memory|graphics|gpu|video card|cpu|processor|drive|disk|space|storage|free|specs?|"
                        r"windows version|bios|xmp|expo|ssd|hdd|nvme)\b")
 _MODS = re.compile(r"\bmods?\b|modded|load order|plugins?|skse|f4se|nexus|vortex|organizer")
@@ -645,13 +691,15 @@ def prefetch(question, ctx):
         add("game_mods", name=name)
     elif name and not calls:
         add("look_up_game", name=name)
-    if _HARDWARE.search(q) and not _MODS.search(q):
+    if _SPACE.search(q):
+        add("space_use")
+    elif _HARDWARE.search(q) and not _MODS.search(q):
         add("pc_status")
     if _STARTUP.search(q):
         add("startup_apps")
     if _OPEN_APPS.search(q):
         add("open_apps")
-    if _HOWTO.search(q) and not calls:
+    if _HOWTO.search(q):
         add("app_help", topic=str(question)[:200])
     if _RECENT.search(q):
         add("recent_activity")
