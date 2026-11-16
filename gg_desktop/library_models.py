@@ -76,7 +76,7 @@ def old_file_rows(files, *, query="", kinds=(), days=0, sort="Size (Largest)", n
             if (not query or query in str(f.path).casefold())
             and (not kinds or file_kind(f.path) in kinds)
             and (not days or f.modified <= now - days * 86400)]
-    if sort == "Name (A–Z)":
+    if sort == "Name (A to Z)":
         rows.sort(key=lambda f: (Path(f.path).name.casefold(), str(f.path)))
     elif sort == "Oldest Modified":
         rows.sort(key=lambda f: (f.modified, str(f.path)))

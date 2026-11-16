@@ -165,7 +165,7 @@ def make_copy(original: Path, profiles_root: Path | None = None) -> CopyInfo:
             if backup:
                 (target / backup).write_bytes(data)
         marker = {"version": MARKER_VERSION, "source": original.name, "created": time.time(),
-                  "note": "Made by Game Grave Mod Bisect. Safe to remove in Mod Organizer 2 when you are done."}
+                  "note": "Made by Game Grave Mod Bisect for testing. You can delete this profile in Mod Organizer 2 when you're done."}
         (target / MARKER).write_text(json.dumps(marker, indent=2), encoding="utf-8")
     except OSError as exc:
         raise ApplyError(f"The test profile could not be created: {exc}") from exc

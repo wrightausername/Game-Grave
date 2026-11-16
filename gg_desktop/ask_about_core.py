@@ -72,7 +72,7 @@ def answer(info, protected=False):
     elif kind in ("old_file", "storage", "capture", "grave"):
         lines.append("Game Grave cannot tell whether you still need it. Open the folder to look first. If you want it "
                      "gone, Delete moves it to the Windows Recycle Bin after you confirm, and Undo puts it back. "
-                     "Protect adds a Never Touch rule, and Add to Graveyard keeps it for review without moving it.")
+                     "Protect adds a Never Touch rule, and Review later in Graveyard keeps it for review without moving it.")
     elif kind == "mod":
         lines.append("Turning a mod off in My Mods does not delete it. Mod Organizer keeps the files.")
     return Answer("about_item", "\n\n".join(lines), sources=(tab,), handoffs=(("Open " + tab, tab),))

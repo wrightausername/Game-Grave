@@ -219,7 +219,7 @@ class GamesController(QObject):
         self.paging.setVisible(len(rows) > PAGE_SIZE)
         self.previous.setEnabled(self.index > 0)
         self.next.setEnabled(start + PAGE_SIZE < len(rows))
-        self.page_count.setText(f"{start + 1 if rows else 0}–{start + len(shown)} of {len(rows)} matching games")
+        self.page_count.setText(f"{start + 1 if rows else 0}-{start + len(shown)} of {len(rows)} matching games")
         if not shown:
             self.selected_key = None
         self.details()

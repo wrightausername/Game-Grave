@@ -169,12 +169,12 @@ def main():
                 expected = [v.name for v in mods_sort.sort_views(kept, option)]
                 shown = library_names()
                 assert shown == expected[:len(shown)], (option, shown, expected)
-            window.mod_sort.setCurrentText("Name (A–Z)")
+            window.mod_sort.setCurrentText("Name (A to Z)")
             settle()
             first_az = library_names()
             window.mod_table.horizontalHeader().sectionClicked.emit(1)
             settle()
-            assert window.mod_sort.currentText() == "Name (Z–A)" and library_names() == sorted(first_az, key=str.casefold, reverse=True)
+            assert window.mod_sort.currentText() == "Name (Z to A)" and library_names() == sorted(first_az, key=str.casefold, reverse=True)
             window.mod_table.horizontalHeader().sectionClicked.emit(4)
             settle()
             assert window.mod_sort.currentText() == "Size (Largest)"
@@ -182,7 +182,7 @@ def main():
             settle()
             assert window.mod_sort.currentText() == "Date (Newest)"
             assert window.grab().save(str(args.output / "mods-page-sorted-1280.png"))
-            window.mod_sort.setCurrentText("Name (A–Z)")
+            window.mod_sort.setCurrentText("Name (A to Z)")
             settle()
 
             # Every in-page tab fills from real data.

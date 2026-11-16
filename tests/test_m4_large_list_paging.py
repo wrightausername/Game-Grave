@@ -41,7 +41,7 @@ class InventoryPaginationTests(unittest.TestCase):
         first=page_window(records,0)
         self.assertEqual(len(first.items),DEFAULT_PAGE_SIZE)
         self.assertEqual(first.items[0],0)
-        self.assertIn("1–160 of 50001",first.label)
+        self.assertIn("1-160 of 50001",first.label)
         last=page_window(records,999999)
         self.assertEqual(last.items[-1],50000)
         self.assertEqual(last.total,len(records))

@@ -185,7 +185,7 @@ def main():
             window.global_search.setText("crash")
             assert names(window) == ["crash_dump.log"]
             window.global_search.clear()
-            window.old_sort.setCurrentText("Name (A–Z)")
+            window.old_sort.setCurrentText("Name (A to Z)")
             settle()
             assert names(window) == sorted(names(window), key=str.casefold)
             window.old_sort.setCurrentText("Size (Largest)")

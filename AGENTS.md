@@ -1091,3 +1091,10 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
     Language & Region is only on Appearance (no longer repeated on General).
   - Scanning: "Files idle after" is "Old Files: unused for", "Graveyard age signal" is "Graveyard: flag as old after".
   Covered by `tests/test_settings.py` (old tray entry) and `tools/settings_page_smoke.py` (notice switch round trip).
+- Wording sweep across all tabs (approved): the Mod Bisect test profile note no longer says "Safe to remove" (now "You can
+  delete this profile in Mod Organizer 2 when you're done"); the last two "Add to Graveyard" buttons (library and storage
+  screens) and the Old Files help text say "Review later in Graveyard"; dashes in on-screen text are gone: sorts read
+  "Name (A to Z)", page counts "1-50 of 200" (including `ui_paging`), size filters "100 MB to 1 GB", joins use a colon or
+  a dot, and the Ready Room sample patch notes use colons. A lone "—" that stands for "not known" stays, as approved.
+  One dash remains in the protected `gg_desktop/mod_conflicts.py` ("File overlap — review load order"); it is not edited
+  because the photo reference guard locks that file.

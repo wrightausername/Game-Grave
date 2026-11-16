@@ -161,7 +161,7 @@ def filter_entries(entries, *, groups, query="", min_days=0, now=None, sort="Siz
         if tokens and not all(t in (f.path + " " + info.pill + " " + info.subtitle).casefold() for t in tokens):
             continue
         rows.append((f, info))
-    if sort == "Name (A–Z)":
+    if sort == "Name (A to Z)":
         rows.sort(key=lambda e: (PurePath(e[0].path).name.casefold(), e[0].path))
     elif sort == "Oldest Modified":
         rows.sort(key=lambda e: (e[0].modified, e[0].path))

@@ -388,7 +388,7 @@ class OverviewStorageController(QObject):
             table.setColumnWidth(3, 100)
             table.setColumnWidth(4, 105)
             total = human_size(s.total) if s else "Not measured"
-            page_line.setText(f"{total} counted once · {len(rows):,} locations · showing {offset[0]+1 if shown else 0}–{offset[0]+len(shown)}")
+            page_line.setText(f"{total} counted once · {len(rows):,} locations · showing {offset[0]+1 if shown else 0}-{offset[0]+len(shown)}")
             volumes.setText("\n".join(f"Drive {v.path}: " + (v.error or
                 f"{human_size(v.used)} used · {human_size(v.free)} free · {human_size(v.total)} capacity") for v in s.volumes) if s else "")
             refresh.setEnabled(not self.storage_busy and bool(self.window.inventory.scanned_at))

@@ -8,7 +8,7 @@ PILLS = {"Caches": "Cache", "Shader Cache": "Shader", "Config / Settings": "Conf
          "Temporary Files": "Temp", "Other": "Other"}
 TAB_CATEGORY = {"Caches": "Caches", "Shader Cache": "Shader Cache", "Configs": "Config / Settings",
                 "Logs": "Logs / Reports", "Temporary": "Temporary Files"}
-SORTS = ("Size (Largest)", "Name (A–Z)", "Type")
+SORTS = ("Size (Largest)", "Name (A to Z)", "Type")
 CLEANUP_NOTICE = (f"Only launcher cache and log folders with {MAX_FILES} files or fewer appear here, because Game Grave "
                   "can re-check them file by file. Driver caches, Steam library folders and settings are review only.")
 BY_GAME_NOTICE = ("Ownership is shown only where the source proves it, such as a Steam app ID for an installed game. "
@@ -49,7 +49,7 @@ def filter_rows(rows, *, category="All Other Storage", query="", sort="Size (Lar
         if tokens and not all(t in text for t in tokens):
             continue
         output.append(e)
-    if sort == "Name (A–Z)":
+    if sort == "Name (A to Z)":
         output.sort(key=lambda e: e.name.casefold())
     elif sort == "Type":
         output.sort(key=lambda e: (STORAGE_TYPES.index(e.category) if e.category in STORAGE_TYPES else 99, -e.size))

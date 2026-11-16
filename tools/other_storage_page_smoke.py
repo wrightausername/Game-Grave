@@ -183,7 +183,7 @@ def main():
             settle()
             assert names(window) == ["NVIDIA DirectX Cache"], names(window)
             window.global_search.clear()
-            window.storage_sort.setCurrentText("Name (A–Z)")
+            window.storage_sort.setCurrentText("Name (A to Z)")
             settle()
             assert names(window) == sorted(names(window), key=str.casefold)
             window.storage_sort.setCurrentText("Size (Largest)")

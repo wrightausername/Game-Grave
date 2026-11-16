@@ -25,7 +25,7 @@ class PageWindow(Generic[T]):
     def label(self) -> str:
         if self.total == 0:
             return "0 of 0 findings"
-        return (f"{self.start + 1}–{self.end} of {self.total} findings "
+        return (f"{self.start + 1}-{self.end} of {self.total} findings "
                 f"· page {self.page + 1}/{self.pages}")
 
 

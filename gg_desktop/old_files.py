@@ -320,7 +320,7 @@ class OldFilesController(QObject):
                 self.table.setItem(index, column, cell)
         self.previous.setEnabled(self.index > 0)
         self.next.setEnabled(start + PAGE_SIZE < len(rows))
-        self.count.setText(f"{start + 1 if rows else 0}–{start + len(self.shown)} of {len(rows):,}")
+        self.count.setText(f"{start + 1 if rows else 0}-{start + len(self.shown)} of {len(rows):,}")
         self.paging.setVisible(len(rows) > PAGE_SIZE)
 
     def details(self, *_):

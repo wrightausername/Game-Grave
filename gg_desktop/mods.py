@@ -182,7 +182,7 @@ class ModsController(QObject):
         self.shown = self.catalog.entries[start:start + PAGE_SIZE]
         self.table.setRowCount(len(self.shown))
         for i, entry in enumerate(self.shown):
-            location = entry.path if entry.kind == "location" else entry.name + " — " + entry.path
+            location = entry.path if entry.kind == "location" else entry.name + " · " + entry.path
             for col, value in enumerate((location, entry.source, entry.state, readable_bytes(entry.apparent_bytes))):
                 cell = QTableWidgetItem(value)
                 cell.setToolTip(self.tooltip(entry))
@@ -194,7 +194,7 @@ class ModsController(QObject):
         self.paging.setVisible(count > PAGE_SIZE)
         self.previous.setEnabled(self.index > 0)
         self.next.setEnabled(start + PAGE_SIZE < count)
-        self.count.setText(f"{start + 1 if count else 0}–{start + len(self.shown)} of {count} locations and mods")
+        self.count.setText(f"{start + 1 if count else 0}-{start + len(self.shown)} of {count} locations and mods")
 
     def change_page(self, direction):
         if not self.valid():
@@ -332,7 +332,7 @@ class ModDetails(QDialog):
         self.setObjectName("modsDialog")
         self.setStyleSheet(DIALOG_STYLE)
         self.setAttribute(Qt.WA_DeleteOnClose)
-        self.setWindowTitle("Mod Radar — source and compatibility details")
+        self.setWindowTitle("Mod Radar: source and compatibility details")
         self.resize(min(820, control.window.width() - 60), min(680, control.window.height() - 80))
         layout = column(margins=(18, 18, 18, 18))
         self.setLayout(layout)
@@ -388,7 +388,7 @@ class ModDetails(QDialog):
             for finding in control.findings(entry):
                 profile = profiles.get(finding.profile)
                 names = [e.name for e in control.catalog.entries if e.key in finding.mods]
-                text += ["", finding.kind + " — " + (profile.name if profile else "Unknown profile"),
+                text += ["", finding.kind + ": " + (profile.name if profile else "Unknown profile"),
                          " / ".join(names), finding.detail, *finding.paths]
             if not control.findings(entry):
                 text.append("No findings involve this entry in the completed checks. This is not a runtime compatibility verdict.")
@@ -512,7 +512,7 @@ class ModTools(QDialog):
         self.folder.setEnabled(bool(selected) and ordinary(selected.path, True))
         self.previous.setEnabled(self.index > 0)
         self.next.setEnabled(start + PAGE_SIZE < len(rows))
-        self.count.setText(f"{start + 1 if rows else 0}–{start + len(self.shown)} of {len(rows)}")
+        self.count.setText(f"{start + 1 if rows else 0}-{start + len(self.shown)} of {len(rows)}")
 
     def refresh(self):
         control = self.control

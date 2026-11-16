@@ -61,7 +61,7 @@ class StorageScreens:
         results, contents = panel(kind="fileResults", padding=8, spacing=7)
         header = row(spacing=5)
         header.addWidget(label("Storage Items", "sectionTitle"), 1)
-        self.storage_sort = _combo(["Size (Largest)", "Name (A–Z)", "Type"], "Sort other storage")
+        self.storage_sort = _combo(["Size (Largest)", "Name (A to Z)", "Type"], "Sort other storage")
         self.storage_sort.setFixedWidth(120)
         header.addWidget(self.storage_sort)
         contents.addWidget(_widget(header))
@@ -85,7 +85,7 @@ class StorageScreens:
         self.storage_selection = label("0 selected", "caption")
         footer.addWidget(self.storage_selection)
         footer.addWidget(tool("Protect", "shield", lambda: self._protect_paths([r.path for r in self._selected_storage()], self._fill_storage)))
-        footer.addWidget(tool("Add to Graveyard", "grave", self._watch_storage))
+        footer.addWidget(tool("Review later in Graveyard", "grave", self._watch_storage))
         footer.addWidget(tool("Review && Clean…", "trash", self._review_storage, kind="danger"))
         footer.addWidget(tool("Cleanup Tools", "settings", self._launch_classic_tools))
         bar.addWidget(_widget(footer))
@@ -114,7 +114,7 @@ class StorageScreens:
                 and (not tab_kind or r.category == tab_kind)
                 and (not query or query in (r.name + " " + r.path + " " + r.category + " " + r.source).casefold())]
         sort = self.storage_sort.currentText()
-        rows.sort(key=(lambda r: r.name.casefold()) if sort == "Name (A–Z)" else
+        rows.sort(key=(lambda r: r.name.casefold()) if sort == "Name (A to Z)" else
                   (lambda r: (r.category, -r.size)) if sort == "Type" else (lambda r: (-r.size, r.name.casefold())))
         window = page_window(rows, requested_page)
         self.storage_pager.update_window(window)
@@ -262,7 +262,7 @@ class StorageScreens:
         self.capture_heading = label("Screenshots", "sectionTitle")
         self.capture_heading.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         header.addWidget(self.capture_heading, 1)
-        self.capture_sort = _combo(["Date (Newest)", "Date (Oldest)", "Size (Largest)", "Name (A–Z)"], "Sort captures")
+        self.capture_sort = _combo(["Date (Newest)", "Date (Oldest)", "Size (Largest)", "Name (A to Z)"], "Sort captures")
         self.capture_sort.setFixedWidth(118)
         header.addWidget(self.capture_sort)
         self.capture_grid = CaptureGrid()
@@ -343,7 +343,7 @@ class StorageScreens:
         sort = self.capture_sort.currentText()
         rows.sort(key=(lambda r: r.record.modified) if sort == "Date (Oldest)" else
                   (lambda r: -r.record.size) if sort == "Size (Largest)" else
-                  (lambda r: Path(r.record.path).name.casefold()) if sort == "Name (A–Z)" else
+                  (lambda r: Path(r.record.path).name.casefold()) if sort == "Name (A to Z)" else
                   (lambda r: -r.record.modified))
         notice = {"Duplicates": "Content comparison has not run; duplicate status is unknown.",
                   "Similar": "Visual similarity has not been analyzed. Preview images individually.",

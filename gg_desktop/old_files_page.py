@@ -32,7 +32,7 @@ from ui_paging import page_window
 
 TABS = [("File Scan", "search"), ("Results", "list"), ("By Game", "game"), ("Downloads", "download"),
         ("Archives", "file"), ("Unused Installers", "box"), ("Large Files", "storage"), ("Settings", "settings")]
-SORTS = ["Size (Largest)", "Name (A–Z)", "Oldest Modified", "Newest Modified"]
+SORTS = ["Size (Largest)", "Name (A to Z)", "Oldest Modified", "Newest Modified"]
 AGES = (("30+ Days", 30), ("3+ Months", 90), ("6+ Months", 180), ("12+ Months", 365))
 PILL_COLORS = {"Game": "#ff4d5a", "Cache": "#2ec4ff", "Downloads": "#a779ff", "Installer": "#ffb020",
                "Archive": "#c26cff", "Logs": "#36c5ff", "Media": "#4be36b", "Other": "#9ca8bd"}

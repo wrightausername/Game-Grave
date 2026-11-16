@@ -185,7 +185,7 @@ class InsightTests(Fixture):
         self.assertEqual([e.size for e in rows], sorted((e.size for e in rows), reverse=True))
         self.assertEqual([e.name for e in insight.filter_rows(entries, query="nvidia")], ["NVIDIA DirectX Cache"])
         self.assertEqual([e.name for e in insight.filter_rows(entries, query="game one")], ["Game One Shader Cache"])
-        names = [e.name for e in insight.filter_rows(entries, sort="Name (A–Z)")]
+        names = [e.name for e in insight.filter_rows(entries, sort="Name (A to Z)")]
         self.assertEqual(names, sorted(names, key=str.casefold))
 
     def test_delete_is_enabled_only_for_verified_shader_caches(self):

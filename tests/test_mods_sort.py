@@ -22,8 +22,8 @@ class SortTests(unittest.TestCase):
 
     def test_name_both_directions_ignores_case(self):
         rows = [view("beta"), view("Alpha"), view("gamma")]
-        self.assertEqual(self.names(sort_views(rows, "Name (A–Z)")), ["Alpha", "beta", "gamma"])
-        self.assertEqual(self.names(sort_views(rows, "Name (Z–A)")), ["gamma", "beta", "Alpha"])
+        self.assertEqual(self.names(sort_views(rows, "Name (A to Z)")), ["Alpha", "beta", "gamma"])
+        self.assertEqual(self.names(sort_views(rows, "Name (Z to A)")), ["gamma", "beta", "Alpha"])
 
     def test_size_both_directions_with_unknown_always_last(self):
         rows = [view("a", size=5), view("b", size=None), view("c", size=50), view("d", size=0)]
@@ -33,10 +33,10 @@ class SortTests(unittest.TestCase):
     def test_game_and_manager_both_directions_with_ties_by_name(self):
         rows = [view("z", game="Fallout 4", manager="MO2"), view("a", game="Skyrim", manager="MO2"),
                 view("m", game="Fallout 4", manager="Vortex")]
-        self.assertEqual(self.names(sort_views(rows, "Game (A–Z)")), ["m", "z", "a"])
-        self.assertEqual(self.names(sort_views(rows, "Game (Z–A)")), ["a", "m", "z"])
-        self.assertEqual(self.names(sort_views(rows, "Manager (A–Z)")), ["a", "z", "m"])
-        self.assertEqual(self.names(sort_views(rows, "Manager (Z–A)")), ["m", "a", "z"])
+        self.assertEqual(self.names(sort_views(rows, "Game (A to Z)")), ["m", "z", "a"])
+        self.assertEqual(self.names(sort_views(rows, "Game (Z to A)")), ["a", "m", "z"])
+        self.assertEqual(self.names(sort_views(rows, "Manager (A to Z)")), ["a", "z", "m"])
+        self.assertEqual(self.names(sort_views(rows, "Manager (Z to A)")), ["m", "a", "z"])
 
     def test_date_uses_the_folder_modified_time_and_unreadable_goes_last(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -53,12 +53,12 @@ class SortTests(unittest.TestCase):
         self.assertEqual(self.names(sort_views([view("b"), view("a")], "Nonsense")), ["a", "b"])
 
     def test_header_clicks_toggle_direction(self):
-        self.assertEqual(header_option(1, "Size (Largest)"), "Name (A–Z)")
-        self.assertEqual(header_option(1, "Name (A–Z)"), "Name (Z–A)")
-        self.assertEqual(header_option(4, "Name (A–Z)"), "Size (Largest)")
+        self.assertEqual(header_option(1, "Size (Largest)"), "Name (A to Z)")
+        self.assertEqual(header_option(1, "Name (A to Z)"), "Name (Z to A)")
+        self.assertEqual(header_option(4, "Name (A to Z)"), "Size (Largest)")
         self.assertEqual(header_option(4, "Size (Largest)"), "Size (Smallest)")
         self.assertEqual(header_option(6, "Date (Newest)"), "Date (Oldest)")
-        self.assertIsNone(header_option(5, "Name (A–Z)"))
+        self.assertIsNone(header_option(5, "Name (A to Z)"))
         self.assertTrue(all(o in OPTIONS for pair in HEADERS.values() for o in pair))
 
     def test_text_helpers(self):

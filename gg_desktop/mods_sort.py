@@ -9,12 +9,12 @@ from datetime import datetime
 from functools import lru_cache
 import os
 
-OPTIONS = ("Name (A–Z)", "Name (Z–A)", "Size (Largest)", "Size (Smallest)", "Date (Newest)", "Date (Oldest)",
-           "Game (A–Z)", "Game (Z–A)", "Manager (A–Z)", "Manager (Z–A)")
+OPTIONS = ("Name (A to Z)", "Name (Z to A)", "Size (Largest)", "Size (Smallest)", "Date (Newest)", "Date (Oldest)",
+           "Game (A to Z)", "Game (Z to A)", "Manager (A to Z)", "Manager (Z to A)")
 DEFAULT = OPTIONS[0]
 
 # Library table column -> (first click, second click). Clicking a header toggles between the two.
-HEADERS = {1: ("Name (A–Z)", "Name (Z–A)"), 2: ("Game (A–Z)", "Game (Z–A)"), 3: ("Manager (A–Z)", "Manager (Z–A)"),
+HEADERS = {1: ("Name (A to Z)", "Name (Z to A)"), 2: ("Game (A to Z)", "Game (Z to A)"), 3: ("Manager (A to Z)", "Manager (Z to A)"),
            4: ("Size (Largest)", "Size (Smallest)"), 6: ("Date (Newest)", "Date (Oldest)")}
 
 
@@ -56,7 +56,7 @@ def sort_views(views, option):
     if option not in OPTIONS:
         option = DEFAULT
     ordered = sorted(views, key=lambda v: v.name.casefold())
-    reverse = option in ("Name (Z–A)", "Size (Largest)", "Date (Newest)", "Game (Z–A)", "Manager (Z–A)")
+    reverse = option in ("Name (Z to A)", "Size (Largest)", "Date (Newest)", "Game (Z to A)", "Manager (Z to A)")
     known = [v for v in ordered if _value(option, v) is not None]
     unknown = [v for v in ordered if _value(option, v) is None]
     known.sort(key=lambda v: _value(option, v), reverse=reverse)

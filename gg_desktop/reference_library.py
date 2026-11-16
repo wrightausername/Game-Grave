@@ -307,7 +307,7 @@ class LibraryScreens:
         missing = sum((app_id, "cover") in self.artwork.failed for app_id in ids)
         pending = sum((app_id, "cover") in self.artwork.pending for app_id in ids)
         self.game_artwork_status.setText(f"Steam artwork: {ready} ready · {pending} loading" +
-            (f" · {missing} unavailable — Reload Artwork to retry" if missing else "") if ids else "Steam artwork loads automatically for detected Steam games.")
+            (f" · {missing} unavailable. Reload Artwork to retry" if missing else "") if ids else "Steam artwork loads automatically for detected Steam games.")
 
     def _current_game(self):
         index = self.game_grid.currentRow() if hasattr(self, "game_grid") else -1
@@ -697,7 +697,7 @@ class LibraryScreens:
         heading.addWidget(self.old_result_count)
         toolbar.addLayout(heading, 1)
         toolbar.addWidget(label("Sort By:", "caption"))
-        self.old_sort = _combo(["Size (Largest)", "Name (A–Z)", "Oldest Modified", "Newest Modified"], "Sort old files")
+        self.old_sort = _combo(["Size (Largest)", "Name (A to Z)", "Oldest Modified", "Newest Modified"], "Sort old files")
         self.old_sort.setFixedWidth(110)
         toolbar.addWidget(self.old_sort)
         contents.addWidget(_widget(toolbar))
@@ -723,7 +723,7 @@ class LibraryScreens:
         self.old_selection.setMinimumWidth(0)
         self.old_selection.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         footer.addWidget(self.old_selection, 1)
-        footer.addWidget(tool("Add to Graveyard", "grave", self._add_old_to_graveyard))
+        footer.addWidget(tool("Review later in Graveyard", "grave", self._add_old_to_graveyard))
         footer.addWidget(tool("Protect", "shield", self._protect_old_selected))
         self.old_delete = tool("Recycle…", "trash", self._recycle_old_selected, kind="danger",
                                tip="Review selected individual files before moving to Windows Recycle Bin")

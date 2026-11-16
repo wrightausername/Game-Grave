@@ -227,7 +227,7 @@ class InsightTests(Fixture):
         self.assertEqual(names(tab="Recordings", size=2), ["clip.mp4"])
         self.assertEqual(names(tab="Recordings", size=3), [])
         self.assertEqual(names(tab="Screenshots", game="Cyberpunk 2077", query="NEW"), ["new.png"])
-        self.assertEqual(names(tab="Screenshots", sort="Name (A–Z)"), ["new.png", "old.png"])
+        self.assertEqual(names(tab="Screenshots", sort="Name (A to Z)"), ["new.png", "old.png"])
         self.assertEqual(names(tab="Screenshots", resolution=5), [])
         self.assertEqual(names(tab="Screenshots", kinds=("Recordings",)), [])
 

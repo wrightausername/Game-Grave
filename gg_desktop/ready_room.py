@@ -512,7 +512,7 @@ class ReadyRoomContent(ScrollPage):
         self.patches = ReadyPanel("Patch Watch", "Official updates, hotfixes, and maintenance for your games.",
                                  "layers", trailing=button("View All Updates  →",
                                   window.ready_updates, kind="readyLink"))
-        self.games = ReadyPanel("Your Games – At a Glance", "Your top played games and what’s happening with them.",
+        self.games = ReadyPanel("Your Games at a Glance", "Your top played games and what’s happening with them.",
                                "gamepad")
         self.patches.setMinimumHeight(269)
         self.games.setMinimumHeight(269)

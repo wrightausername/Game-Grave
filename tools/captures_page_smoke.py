@@ -217,7 +217,7 @@ def main():
             settle()
             assert set(every(window)) == {"similar_a.png", "similar_b.png"}, every(window)
             window.global_search.clear()
-            window.capture_sort.setCurrentText("Name (A–Z)")
+            window.capture_sort.setCurrentText("Name (A to Z)")
             settle()
             assert every(window) == sorted(every(window), key=str.casefold)
             window.capture_sort.setCurrentText("Size (Largest)")

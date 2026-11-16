@@ -176,15 +176,15 @@ def reference_ready_room() -> ReadyRoomData:
     return ReadyRoomData(
         counts=("17", "6", "3", "2", "5"),
         patches=(
-            PatchNotice("Cyberpunk 2077", "Patch 2.21 – Performance, fixes, and new content.",
+            PatchNotice("Cyberpunk 2077", "Patch 2.21: Performance, fixes, and new content.",
                         "Today", "Major Update", "red", "download", "cyberpunk"),
-            PatchNotice("Baldur’s Gate 3", "Hotfix #32 – Crash fixes and stability improvements.",
+            PatchNotice("Baldur’s Gate 3", "Hotfix #32: Crash fixes and stability improvements.",
                         "Yesterday", "Hotfix", "amber", "wrench", "baldurs_gate"),
-            PatchNotice("The Witcher 3: Wild Hunt", "Update 4.04 – Quest fixes and mod compatibility.",
+            PatchNotice("The Witcher 3: Wild Hunt", "Update 4.04: Quest fixes and mod compatibility.",
                         "2 days ago", "Update", "cyan", "sync", "witcher"),
-            PatchNotice("Starfield", "Patch 1.12.36 – General fixes and performance.",
+            PatchNotice("Starfield", "Patch 1.12.36: General fixes and performance.",
                         "3 days ago", "Update", "cyan", "sync", "starfield"),
-            PatchNotice("Skyrim Special Edition", "Creation Kit – Additional fixes and mod stability.",
+            PatchNotice("Skyrim Special Edition", "Creation Kit: Additional fixes and mod stability.",
                         "4 days ago", "Mod Impact", "purple", "puzzle", "skyrim"),
         ),
         games=(

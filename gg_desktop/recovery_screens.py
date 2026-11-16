@@ -55,7 +55,7 @@ class RecoveryScreens:
         scan.addWidget(self.grave_age)
         scan.addWidget(label("File age uses modification time; installed games use known last-play records.", "caption", wrap=True))
         detail_section(scan, "Size")
-        self.grave_size = _combo(["Any Size", "Under 100 MB", "100 MB – 1 GB", "1 GB – 10 GB", "Over 10 GB"], "Filter Graveyard size")
+        self.grave_size = _combo(["Any Size", "Under 100 MB", "100 MB to 1 GB", "1 GB to 10 GB", "Over 10 GB"], "Filter Graveyard size")
         scan.addWidget(self.grave_size)
         detail_section(scan, "Type")
         self.grave_type = _combo(["All types"] + sorted({e.category for e in entries}), "Filter Graveyard category")
@@ -71,7 +71,7 @@ class RecoveryScreens:
         title = label("Graveyard Items", "sectionTitle")
         title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         heading.addWidget(title, 1)
-        self.grave_sort = _combo(["Size (Largest)", "Age Signal (Oldest)", "Name (A–Z)"], "Sort Graveyard findings")
+        self.grave_sort = _combo(["Size (Largest)", "Age Signal (Oldest)", "Name (A to Z)"], "Sort Graveyard findings")
         self.grave_sort.setFixedWidth(140)
         heading.addWidget(self.grave_sort)
         contents.addWidget(_widget(heading))
@@ -142,7 +142,7 @@ class RecoveryScreens:
         sort = self.grave_sort.currentText()
         rows.sort(key=(lambda e: (e.age_days is None, -(e.age_days or 0), e.name.casefold()))
                   if sort == "Age Signal (Oldest)" else (lambda e: e.name.casefold())
-                  if sort == "Name (A–Z)" else (lambda e: (-e.apparent_bytes, e.name.casefold())))
+                  if sort == "Name (A to Z)" else (lambda e: (-e.apparent_bytes, e.name.casefold())))
         pending = getattr(self, "_pending_grave_key", None)
         if pending:
             requested_page = next((i // 160 for i, e in enumerate(rows) if e.key == pending), 0)
@@ -302,7 +302,7 @@ class RecoveryScreens:
         title = label("Cleanup History", "sectionTitle")
         title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         heading.addWidget(title, 1)
-        self.undo_sort = _combo(["Date (Newest)", "Date (Oldest)", "Size (Largest)", "Name (A–Z)"], "Sort cleanup history")
+        self.undo_sort = _combo(["Date (Newest)", "Date (Oldest)", "Size (Largest)", "Name (A to Z)"], "Sort cleanup history")
         self.undo_sort.setFixedWidth(130)
         heading.addWidget(self.undo_sort)
         contents.addWidget(_widget(heading))
@@ -353,7 +353,7 @@ class RecoveryScreens:
         sort = self.undo_sort.currentText()
         rows.sort(key=(lambda r: timestamp(r.recorded) or 0) if sort == "Date (Oldest)" else
                   (lambda r: (r.size is None, -(r.size or 0))) if sort == "Size (Largest)" else
-                  (lambda r: r.path.casefold()) if sort == "Name (A–Z)" else
+                  (lambda r: r.path.casefold()) if sort == "Name (A to Z)" else
                   (lambda r: -(timestamp(r.recorded) or 0)))
         window = page_window(rows, requested_page)
         self.undo_pager.update_window(window)
