@@ -294,7 +294,7 @@ def main():
             window.grave_action.click()
             idle(window)
             expected = names | {"DirectX Shader Cache", "Battle.net Cache", "Battle.net Logs", "Skyrim",
-                                "Cyberpunk 2077 Shader Cache", "Steam app 999999 Shader Cache", "Steam Temp"}
+                                "Cyberpunk 2077 Shader Cache", "Shader cache of an uninstalled Steam game (app 999999)", "Steam Temp"}
             assert set(every(window)) == expected, set(every(window)) ^ expected
             labels = {n: b.text() for n, b in window.grave_tabs.buttons.items()}
             assert labels["All Items"] == "All Items (12)" and labels["Configs"] == "Configs (1)" and labels["Orphans"] == "Orphans (1)", labels
@@ -304,9 +304,9 @@ def main():
             assert not window.grave_action.isVisible()
             assert window.grab().save(str(args.output / "graveyard-scanned-1280.png"))
             open_tab(window, "Orphans")
-            assert every(window) == ["Steam app 999999 Shader Cache"], every(window)
+            assert every(window) == ["Shader cache of an uninstalled Steam game (app 999999)"], every(window)
             assert window.grave_notice.text().startswith("Orphan means"), window.grave_notice.text()
-            pick(window, "Steam app 999999 Shader Cache")
+            pick(window, "Shader cache of an uninstalled Steam game (app 999999)")
             assert "Direct" in detail_text(window) and "No installed game" in detail_text(window)
             assert window.grab().save(str(args.output / "graveyard-orphans-1280.png"))
             open_tab(window, "Configs")
