@@ -285,6 +285,11 @@ def handle(window, text, shown=None):
         _post(window, text, answer, None)
         open_target(window, feature.opens or feature.tab)
         return True
+    return post_plan(window, plan, shown or text)
+
+
+def post_plan(window, plan, shown):
+    """Show a plan in the chat: a preview when running tools is off, the card with Run all when it is on."""
     from gg_desktop import assistant_engine as engine
     on = enabled(window)
     tabs = []
@@ -296,7 +301,7 @@ def handle(window, text, shown=None):
     tab_names = {"More Tools": "Toolbox"}
     answer = engine.Answer("autopilot" if on else "autopilot_off", core.intro(plan, on), sources=("Game Grave tools",),
                            handoffs=tuple(("Open " + tab_names.get(t, t), t) for t in tabs[:3]))
-    _post(window, shown or text, answer, plan if on else None, off_plan=None if on else plan)
+    _post(window, shown, answer, plan if on else None, off_plan=None if on else plan)
     return True
 
 

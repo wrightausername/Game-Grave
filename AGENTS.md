@@ -1136,3 +1136,43 @@ sizes stay reported, nothing is changed without the plan's one OK.
   - Loosely worded requests also become plans ("nuke my temp files" plans the temp clean-up), through the same automation.
 - Covered by `tests/test_assistant_understand.py`, `tests/test_local_ai.py` and `tools/assistant_page_smoke.py` (best-guess
   buttons, the retry, the twice-broken note).
+
+AI Assistant, knows the app and checks the PC (owner instruction, 2026-11-16: "how can we polish it even more so that it
+knows everything about the app and can accurately determine what to do on a users system?", "yes" to the six-part plan, and
+"needs to be extensive so users can solve problems without having to email us"). AI Assistant is reopened for the local AI
+and its answers; layout unchanged except one "Not helpful" button under each answer. Honesty rules unchanged.
+- Lookups (`gg_desktop/local_ai_tools.py`, pure; reads injected through `local_ai_ui.lookup_context`): the model asks Game
+  Grave before answering, through llama-server's tool calls (`--jinja`; Qwen's written `<tool_call>` form is read too), at
+  most 6 per question, the last round must answer in words. All read only: look_up_game, game_mods (Mod Organizer 2 profile
+  mods on and off, mod folders in the install), game_crashes (Black Box records and the file each crash was in), pc_status
+  (parts, memory speed against rated, drives), open_apps (and game overlays), startup_apps, runtimes (Visual C++ and DirectX
+  9 files), game_storage, app_help (the full feature steps), tab_help, known_fixes, explain_error, game_grave_state (the tab
+  open and the game selected on Games, automation, routines, protection rules), recent_activity. A failing read becomes a
+  note to the model, never a crash. Answers show "Checked: <what>" chips.
+- Plans with targets: the model's make_plan picks jobs from a fixed list (`JOBS`) with a target where needed (close an app,
+  stop a startup app, a mod on or off, fix a game); `plan_steps` turns them into the existing automation steps and drops
+  anything else (named in the reply as "left out"). The plan is the same card (`autopilot_ui.post_plan`): preview when
+  running tools is off, Run all and its one confirmation when on.
+- Self-help knowledge (`gg_desktop/local_ai_knowledge.py`, pure): what every tab has, the usual fixes in order for common
+  problems (won't start, crashes while playing, stutter, mods not loading, out of space, black screen, controller, slow
+  downloads, lost saves, broken after an update; Game Grave steps first, marked with where), notes for popular modded games,
+  and what common errors mean (Visual C++ and DirectX DLLs, steam_api, 0xc0000005, 0xc000007b, 0xc0000142, 0xc0000409,
+  device hung or removed, Vulkan, out of video memory, anti-cheat, graphics driver files, script extenders, .NET). All
+  labelled general known fixes, never "your PC" and never "safe". The built-in assistant uses it too: pasted error text gets
+  "what that usually means", a described problem gets the usual fixes, before the best-guess buttons.
+- Prompt: today's date, the tab open and the selected game, shorter facts (lookups fetch the rest), rules to check the likely
+  causes of a problem before advising, never call a cause certain, solve it step by step in the chat, and say exactly what to
+  click.
+- Answer check (`problems`): sizes in a reply must match a size Game Grave has (any item, a pair of items, the games total,
+  drives, memory or a lookup result, within about 6%), and "you have X installed" must name an installed game. A mismatch
+  is sent back once for correction; if it still doesn't match, the answer shows with "(Double-check: …)".
+- Speed: the same system text is reused with llama-server's prompt cache (`cache_prompt`); the model stays loaded 20 minutes
+  while the assistant tab or pop-out is open (5 otherwise, and still stops when a game runs).
+- Not helpful: keeps the question and answer in this PC's settings (`assistant_feedback`, newest 50) and copies a report
+  (version, model, question, answer, sources) to paste if the user wants to send it. Nothing is sent by itself.
+- Question bench (`tools/local_ai_bench.py`): 60 real questions with expected lookups, plan jobs, facts and forbidden words,
+  run through the REAL Small model by `tools/local_ai_real_check.py` on the Windows CI machine (20-minute budget,
+  `GG_BENCH_MINUTES`), every miss printed for tuning; it fails under 50% so regressions are caught.
+- Covered by `tests/test_local_ai_tools.py` (lookups, failing reads, plans, the loop, text-written calls, the answer check,
+  knowledge), `tests/test_local_ai.py`, `tests/test_assistant_understand.py` and `tools/assistant_page_smoke.py` (a lookup
+  then an answer with "Checked: Games", a wrong size corrected, a model plan with a dropped job, Not helpful).

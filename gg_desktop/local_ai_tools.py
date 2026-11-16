@@ -1,0 +1,570 @@
+"""Lookups the local AI can ask for before it answers, and the plans it may propose. No Qt.
+
+Every lookup reads only. The outside reads (crash records, open apps, startup list, runtimes, Mod Organizer 2 profiles)
+come through `ctx`, so tests use stand-ins and nothing here touches the PC by itself. The one thing the model can ask for
+that is not a read is `make_plan`, and that only builds a plan from Game Grave's own automation jobs: it still waits for
+the owner's one OK (Run all), exactly like a plan typed in the chat.
+"""
+from __future__ import annotations
+
+import difflib
+import json
+import re
+from datetime import datetime
+
+MAX_RESULT = 3500          # characters of one lookup result handed back to the model
+MAX_CALLS = 6              # lookups per question before the model must answer
+
+
+def _size(n):
+    from core import human_size
+    return human_size(max(0, int(n or 0)))
+
+
+def _days(when, now):
+    if not when:
+        return None
+    try:
+        return max(0, int((now - when).total_seconds() // 86400))
+    except Exception:
+        return None
+
+
+def _within(path, root):
+    path, root = str(path).replace("/", "\\").casefold().rstrip("\\"), str(root).replace("/", "\\").casefold().rstrip("\\")
+    return bool(root) and (path == root or path.startswith(root + "\\"))
+
+
+def find_game(facts, name):
+    """The installed game a name means: exact, then contained, then a close spelling. None rather than a wrong guess."""
+    games = list(getattr(facts, "games", ()) or ())
+    want = re.sub(r"[^a-z0-9]+", " ", str(name or "").casefold()).strip()
+    if not want or not games:
+        return None
+    flat = want.replace(" ", "")
+    for g in games:
+        if re.sub(r"[^a-z0-9]+", "", g.name.casefold()) == flat:
+            return g
+    contained = [g for g in games if flat and (flat in re.sub(r"[^a-z0-9]+", "", g.name.casefold()) or
+                                               re.sub(r"[^a-z0-9]+", "", g.name.casefold()) in flat)]
+    if len(contained) == 1:
+        return contained[0]
+    scored = sorted(((difflib.SequenceMatcher(None, flat, re.sub(r"[^a-z0-9]+", "", g.name.casefold())).ratio(), g)
+                     for g in games), key=lambda t: -t[0])
+    if scored and scored[0][0] >= 0.8:
+        return scored[0][1]
+    return None
+
+
+def _no_game(facts, name):
+    names = [g.name for g in getattr(facts, "games", ())][:40]
+    return {"found": False, "note": f"No installed game matches '{name}'.", "installed_games": names}
+
+
+# ------------------------------------------------------------------ the lookups
+def look_up_game(ctx, name=""):
+    f = ctx.facts
+    g = find_game(f, name)
+    if g is None:
+        return _no_game(f, name)
+    out = {"found": True, "name": g.name, "launcher": g.launcher, "install_folder": str(g.install_path),
+           "drive": str(g.install_path)[:2].upper() if len(str(g.install_path)) > 1 and str(g.install_path)[1] == ":" else "",
+           "reported_size": _size(g.size_bytes) if g.size_bytes is not None else "unknown",
+           "last_played_days_ago": _days(g.last_played_at, f.now)}
+    if getattr(g, "app_id", ""):
+        out["steam_app_id"] = str(g.app_id)
+    if f.on("mods"):
+        mods = [m for m in f.mods if _within(m.path, g.install_path)]
+        out["mod_folders_inside_install"] = [m.name for m in mods][:25]
+    if f.on("storage"):
+        out["save_folders"] = [str(s.path) for s in f.saves if str(getattr(s, "game", "")).casefold() == g.name.casefold()][:5]
+    if f.on("captures"):
+        out["captures"] = sum(1 for c in f.captures if (c.game or "").casefold() == g.name.casefold())
+    return out
+
+
+def game_mods(ctx, name=""):
+    """The game's mods: Mod Organizer 2's selected profile (on/off, in priority order) and mod folders in the install."""
+    f = ctx.facts
+    g = find_game(f, name)
+    if g is None:
+        return _no_game(f, name)
+    out = {"game": g.name, "mod_organizer_2": [], "mod_folders_inside_install": []}
+    try:
+        profiles = ctx.mo2_profiles() or []
+    except Exception as exc:
+        profiles, out["note"] = [], f"Mod Organizer 2 profiles couldn't be read: {exc}"
+    for game, profile, _folder, mods in profiles:
+        if find_game(f, game) is g or str(game).casefold() in g.name.casefold() or g.name.casefold() in str(game).casefold():
+            out["mod_organizer_2"].append({"profile": profile, "on": [label for _n, on, label in mods if on][:60],
+                                           "off": [label for _n, on, label in mods if not on][:40],
+                                           "count": len(mods)})
+    if f.on("mods"):
+        out["mod_folders_inside_install"] = [m.name for m in f.mods if _within(m.path, g.install_path)][:40]
+    if not out["mod_organizer_2"] and not out["mod_folders_inside_install"]:
+        out["note"] = (out.get("note", "") + " No Mod Organizer 2 profile or mod folder was found for this game. Vortex "
+                       "and other mod folders show in Mods > My Mods.").strip()
+    return out
+
+
+def game_crashes(ctx, name=""):
+    f = ctx.facts
+    g = find_game(f, name)
+    if g is None:
+        return _no_game(f, name)
+    from gg_desktop import fixgame_core as fx
+    try:
+        crashes = list(ctx.game_crashes(g) or [])
+    except Exception as exc:
+        return {"game": g.name, "note": f"Windows' crash records couldn't be read: {exc}"}
+    modules = {}
+    for c in crashes:
+        modules[c.module] = modules.get(c.module, 0) + 1
+    return {"game": g.name, "crashes_recorded": len(crashes), "summary": fx.crash_summary(crashes),
+            "newest": max(crashes, key=lambda c: c.when).when.strftime("%Y-%m-%d %H:%M") if crashes else None,
+            "crash_location_files": [{"file": m, "times": n, "what_it_is": fx.KNOWN_MODULES.get(m.casefold(), "")}
+                                     for m, n in sorted(modules.items(), key=lambda kv: -kv[1])[:6]],
+            "note": "Windows only records crashes that close the game with an error; freezes and silent exits may not be "
+                    "here."}
+
+
+def pc_status(ctx):
+    f = ctx.facts
+    specs = f.hardware
+    out = {}
+    if specs is None:
+        return {"note": "Windows hasn't been asked for the PC's parts yet; Hardware > Your PC reads them."}
+    if specs.cpu:
+        out["processor"] = f"{specs.cpu.name}, {specs.cpu.cores} cores / {specs.cpu.threads} threads"
+    out["graphics"] = [{"name": g.name, "driver_version": g.driver} for g in specs.gpus]
+    if specs.memory:
+        m = specs.memory
+        out["memory"] = {"total_gb": round(m.total_gb), "type": m.kind, "sticks": f"{m.sticks} of {m.slots} slots",
+                         "rated_mts": m.rated_mts, "running_mts": m.running_mts,
+                         "running_slower_than_rated": bool(m.rated_mts and m.running_mts and
+                                                           m.running_mts < 0.95 * m.rated_mts)}
+    out["windows"] = f"{specs.os_name} {specs.os_version}".strip()
+    out["drives"] = [{"drive": d.letter, "type": d.kind, "free": _size(d.free), "total": _size(d.total),
+                      "free_percent": round(100 * d.free / d.total) if d.total else None} for d in specs.drives]
+    out["board"], out["bios"] = specs.board, specs.bios
+    return out
+
+
+def startup_apps(ctx):
+    try:
+        apps = list(ctx.read_startup() or [])
+    except Exception as exc:
+        return {"note": f"The startup list couldn't be read: {exc}"}
+    return {"apps": [{"name": a.name, "on": a.enabled, "maker": a.company, "for": "everyone" if a.scope == "machine"
+                      else "you", "program_missing": a.exists is False} for a in apps][:40],
+            "note": "Switching one off uses the same switch as Task Manager; the app is not removed."}
+
+
+def open_apps(ctx):
+    from gg_desktop import fixgame_core as fx
+    try:
+        procs = list(ctx.list_processes() or [])
+    except Exception as exc:
+        return {"note": f"The open apps couldn't be read: {exc}"}
+    return {"apps": [{"name": p.name, "memory": _size(p.kb * 1024)} for p in procs[:15]],
+            "overlays_open": fx.overlay_findings(p.name for p in procs)}
+
+
+def runtimes(ctx):
+    try:
+        x64, x86, d3dx = ctx.read_runtimes()
+    except Exception as exc:
+        return {"note": f"Couldn't read the runtimes: {exc}"}
+    return {"visual_cpp_2015_2022_x64": x64, "visual_cpp_2015_2022_x86": x86, "directx_9_extra_files": d3dx}
+
+
+def game_storage(ctx, name=""):
+    f = ctx.facts
+    g = find_game(f, name)
+    if g is None:
+        return _no_game(f, name)
+    key = g.name.casefold()
+    app = str(getattr(g, "app_id", "") or "")
+    out = {"game": g.name}
+    if f.on("storage"):
+        related = [i for i in f.storage if key in str(i.name).casefold() or key in str(i.path).casefold() or
+                   (app and re.search(r"(^|[\\/_ ])" + re.escape(app) + r"($|[\\/_ ])", str(i.path)))]
+        out["other_storage"] = [{"what": i.name, "type": i.category, "size": _size(i.size), "where": str(i.path)}
+                                for i in related][:10]
+        old = [o for o in f.old_files if key in str(o.path).casefold()]
+        out["old_files"] = [{"file": str(o.path), "size": _size(o.size)} for o in old][:8]
+    if f.on("captures"):
+        shots = [c for c in f.captures if (c.game or "").casefold() == key]
+        out["captures"] = {"count": len(shots), "size": _size(sum(getattr(c.record, "size", 0) or 0 for c in shots))}
+    out["note"] = "Each list is reviewed in its own tab; anything removed goes to the Recycle Bin after you confirm."
+    return out
+
+
+def app_help(ctx, topic=""):
+    """The manual: Game Grave's features that match the topic, with their full steps and where they are."""
+    from gg_desktop import assistant_features as features
+    words = set(re.findall(r"[a-z0-9]+", str(topic).casefold()))
+    scored = []
+    for f in features.FEATURES:
+        text = " ".join((f.title, f.what, " ".join(f.keywords), " ".join(f.steps), f.tab)).casefold()
+        hits = sum(1 for w in words if len(w) > 2 and re.search(r"\b" + re.escape(w), text))
+        title_hits = sum(2 for w in words if len(w) > 2 and w in f.title.casefold())
+        if hits or title_hits:
+            scored.append((-(hits + title_hits), f.title, f))
+    scored.sort(key=lambda t: (t[0], t[1]))
+    picks = [f for _s, _t, f in scored[:3]]
+    if not picks:
+        return {"note": "No feature matches that. Main tabs: Overview, Ready Room, Games, Mods, Old Files, Other Storage, "
+                        "Captures, Graveyard, Fix Kit, Game DNA, Hardware, Undo Center, Toolbox, AI Assistant, Settings."}
+    return {"features": [{"name": f.title, "tab": f.tab, "what": f.what, "steps": list(f.steps), "never": f.never,
+                          "where": f.where, "can_plan": f.do} for f in picks]}
+
+
+def known_fixes(ctx, problem="", game=""):
+    from gg_desktop import local_ai_knowledge as kb
+    return kb.known_fixes(problem, game)
+
+
+def explain_error(ctx, text=""):
+    from gg_desktop import local_ai_knowledge as kb
+    return kb.explain_error(text)
+
+
+def tab_help(ctx, tab=""):
+    from gg_desktop import local_ai_knowledge as kb
+    return kb.tab_help(tab)
+
+
+def game_grave_state(ctx):
+    s = ctx.settings or {}
+    from gg_desktop import autopilot_core as core
+    routines = s.get(core.ROUTINES_KEY) or []
+    return {"tab_open_now": ctx.screen.get("tab", ""), "selected_now": ctx.screen.get("selected", ""),
+            "automation_on": bool(s.get(core.SETTING)), "routines": [r.get("request", "") for r in routines][:12],
+            "never_touch_rules": len(s.get("never_touch") or []), "last_scan": str(getattr(ctx.facts, "scanned_at", "")),
+            "popup_notices": s.get("popup_notices", True) is not False,
+            "crash_notice": s.get("crash_notice", True) is not False}
+
+
+def recent_activity(ctx):
+    f = ctx.facts
+    if not f.on("history"):
+        return {"note": "Cleanup history is turned off as a source."}
+    return {"records": [{"when": str(e.recorded), "what": e.action, "item": e.name, "result": e.status}
+                        for e in list(f.history)[:15]]}
+
+
+# ------------------------------------------------------------------ plans the model may propose
+# Each job maps onto steps of the existing automation (`autopilot_core.ACTIONS`). A job that needs a target finds it the
+# same way a typed request does: its check step reads the PC and only then fills in the change.
+JOBS = {
+    "scan_games": "Scan the PC for games, mods, saves and leftovers",
+    "scan_leftovers": "Scan for leftovers of removed games",
+    "scan_other_storage": "Scan caches, logs and other game data",
+    "scan_captures": "Scan screenshots and recordings",
+    "clean_temp_files": "Delete Windows temp files older than 2 days (permanent)",
+    "check_drivers": "Ask Windows Update for driver updates",
+    "install_driver_updates": "Check, then install the driver updates Windows offers",
+    "game_mode_on": "Turn on Windows Game Mode",
+    "background_recording_off": "Turn off Windows background recording",
+    "high_performance_power": "Switch to the High performance power plan",
+    "undo_windows_settings": "Put Game Mode, recording and power plan back",
+    "get_ready_to_play": "Close big apps, Game Mode on, background recording off",
+    "close_app": "Close one open app (target: its name)",
+    "see_memory_use": "List open apps by memory",
+    "stop_startup_app": "Stop one app starting with Windows (target: its name)",
+    "see_startup_apps": "List the apps that start with Windows",
+    "mod_off": "Turn off one Mod Organizer 2 mod (target: the mod's name)",
+    "mod_on": "Turn on one Mod Organizer 2 mod (target: the mod's name)",
+    "fix_game": "Check why a game won't run, then offer the launcher's verify and runtime fixes (target: the game)",
+    "check_game_grave_update": "Ask GitHub for a newer Game Grave",
+}
+NEEDS_TARGET = {"close_app", "stop_startup_app", "mod_off", "mod_on", "fix_game"}
+
+
+def plan_steps(jobs):
+    """Validated automation steps for the jobs the model asked for. Unknown jobs and jobs missing a target are dropped,
+    never guessed. Returns (steps, dropped words)."""
+    from gg_desktop import autopilot_core as core
+    steps, dropped = [], []
+
+    def add(key, ticked=True, **args):
+        if key in core.ACTIONS and not any(s.key == key and s.args == args for s in steps) and len(steps) < core.MAX_STEPS:
+            step = core.Step(key, dict(args))
+            step.ticked = ticked
+            steps.append(step)
+    for job in list(jobs or [])[:8]:
+        if isinstance(job, str):
+            job = {"job": job}
+        if not isinstance(job, dict):
+            continue
+        name = str(job.get("job", "")).strip().casefold()
+        target = " ".join(str(job.get("target", "") or "").split())[:80]
+        if name not in JOBS:
+            dropped.append(name or "?")
+            continue
+        if name in NEEDS_TARGET and not target:
+            dropped.append(name + " (no target)")
+            continue
+        if name == "scan_games":
+            add("scan_library")
+        elif name == "scan_leftovers":
+            add("scan_leftovers")
+        elif name == "scan_other_storage":
+            add("scan_storage")
+        elif name == "scan_captures":
+            add("scan_captures")
+        elif name == "clean_temp_files":
+            add("check_temp"), add("clear_temp")
+        elif name == "check_drivers":
+            add("check_drivers")
+        elif name == "install_driver_updates":
+            add("check_drivers"), add("install_drivers")
+        elif name == "game_mode_on":
+            add("game_mode_on")
+        elif name == "background_recording_off":
+            add("recording_off")
+        elif name == "high_performance_power":
+            add("power_high")
+        elif name == "undo_windows_settings":
+            add("undo_optimizer")
+        elif name == "get_ready_to_play":
+            add("check_memory", mentioned="")
+            add("game_mode_on"), add("recording_off"), add("power_high", ticked=False)
+        elif name == "close_app":
+            add("check_memory", mentioned="close " + target)
+        elif name == "see_memory_use":
+            add("check_memory", mentioned="")
+        elif name == "stop_startup_app":
+            add("check_startup", mentioned="stop " + target + " starting with windows", off=True)
+        elif name == "see_startup_apps":
+            add("check_startup", mentioned="", off=False)
+        elif name in ("mod_off", "mod_on"):
+            add("check_mods", mentioned=("turn off " if name == "mod_off" else "turn on ") + target, on=name == "mod_on")
+        elif name == "fix_game":
+            add("check_game_fix", mentioned="fix " + target)
+            add("check_drivers")
+        elif name == "check_game_grave_update":
+            add("check_app_update")
+    return steps, dropped
+
+
+def make_plan(ctx, jobs=(), summary=""):
+    """Handled by the caller (it ends the lookups); this only validates so the model hears what was kept."""
+    steps, dropped = plan_steps(jobs)
+    return {"planned": [s.title for s in steps], "dropped": dropped}
+
+
+# ------------------------------------------------------------------ the tool list the model sees
+def _fn(fname, description, **params):
+    required = [k for k, v in params.items() if not v.pop("optional", False)]
+    return {"type": "function", "function": {"name": fname, "description": description,
+                                             "parameters": {"type": "object", "properties": params, "required": required}}}
+
+
+def _s(description, optional=False):
+    return {"type": "string", "description": description, "optional": optional}
+
+
+def tool_specs():
+    return [
+        _fn("look_up_game", "One installed game: size, drive, folder, last played, its mod folders, save folders and "
+            "captures.", name=_s("The game's name as the user wrote it")),
+        _fn("game_mods", "A game's mods: the Mod Organizer 2 profile's mods that are on and off, and mod folders in its "
+            "install folder.", name=_s("The game's name")),
+        _fn("game_crashes", "Crashes Windows recorded for a game and which file each crash was in (graphics driver, "
+            "DirectX, a mod's file, an overlay).", name=_s("The game's name")),
+        _fn("pc_status", "This PC's parts: processor, graphics card and driver version, memory and whether it runs "
+            "slower than rated, Windows version, every drive's free space."),
+        _fn("open_apps", "Apps open right now by memory use, and overlays that hook into games (Discord, Overwolf, "
+            "RivaTuner and others)."),
+        _fn("startup_apps", "Apps that start with Windows, on or off."),
+        _fn("runtimes", "Whether Microsoft's Visual C++ 2015-2022 runtimes and the older DirectX 9 files are installed."),
+        _fn("game_storage", "Caches, logs, old files and captures that belong to one game.", name=_s("The game's name")),
+        _fn("app_help", "Game Grave's own manual: which feature does something, its steps and where it is.",
+            topic=_s("What the user wants to do or the feature's name")),
+        _fn("known_fixes", "Well-known fixes for a PC gaming problem (crashing, won't start, stutter, mods not loading, "
+            "out of space, black screen, controller, lost saves, broken after an update), and notes for popular modded "
+            "games.", problem=_s("The problem in the user's words"), game=_s("The game, if any", optional=True)),
+        _fn("explain_error", "What an error message, error code or DLL name usually means and the usual next step.",
+            text=_s("The error text exactly as the user pasted it")),
+        _fn("tab_help", "What a Game Grave tab has and which buttons are on it.", tab=_s("The tab's name")),
+        _fn("game_grave_state", "Game Grave's own state: the tab open now and what is selected, automation on or off, "
+            "routines, protection rules, last scan."),
+        _fn("recent_activity", "Game Grave's recent cleanup and activity records."),
+        {"type": "function", "function": {
+            "name": "make_plan",
+            "description": "When the user asks you to DO something Game Grave can do, propose a plan of these jobs. "
+                           "Nothing runs until the user presses OK. Jobs: " +
+                           "; ".join(f"{k}: {v}" for k, v in JOBS.items()),
+            "parameters": {"type": "object", "properties": {
+                "summary": {"type": "string", "description": "One plain sentence saying what the plan does"},
+                "jobs": {"type": "array", "items": {"type": "object", "properties": {
+                    "job": {"type": "string", "enum": list(JOBS)},
+                    "target": {"type": "string", "description": "The app, mod or game, for jobs that need one"}},
+                    "required": ["job"]}}},
+                "required": ["jobs"]}}},
+    ]
+
+
+LOOKUPS = {"look_up_game": look_up_game, "game_mods": game_mods, "game_crashes": game_crashes, "pc_status": pc_status,
+           "open_apps": open_apps, "startup_apps": startup_apps, "runtimes": runtimes, "game_storage": game_storage,
+           "app_help": app_help, "game_grave_state": game_grave_state, "known_fixes": known_fixes,
+           "explain_error": explain_error, "tab_help": tab_help, "recent_activity": recent_activity,
+           "make_plan": make_plan}
+
+CHECKED_NAMES = {"look_up_game": "Games", "game_mods": "Mods", "game_crashes": "Black Box", "pc_status": "Hardware",
+                 "open_apps": "Open apps", "startup_apps": "Startup", "runtimes": "Runtimes", "game_storage": "Storage",
+                 "app_help": "Manual", "game_grave_state": "Settings", "recent_activity": "Activity",
+                 "known_fixes": "Known fixes", "explain_error": "Error guide", "tab_help": "Manual"}
+
+
+def run(ctx, name, arguments):
+    """One lookup, as text for the model. Never raises: a failure is reported to the model as a note."""
+    func = LOOKUPS.get(name)
+    if func is None:
+        return json.dumps({"error": f"There is no lookup called {name}."})
+    if isinstance(arguments, str):
+        try:
+            arguments = json.loads(arguments or "{}")
+        except ValueError:
+            arguments = {}
+    if not isinstance(arguments, dict):
+        arguments = {}
+    allowed = func.__code__.co_varnames[1:func.__code__.co_argcount]
+    kwargs = {k: v for k, v in arguments.items() if k in allowed}
+    try:
+        result = func(ctx, **kwargs)
+    except Exception as exc:        # a lookup that fails must not end the answer
+        result = {"error": f"That lookup failed: {exc}"}
+    text = json.dumps(result, default=str, ensure_ascii=False)
+    if len(text) > MAX_RESULT:
+        text = text[:MAX_RESULT] + '..."(cut short)"'
+    return text
+
+
+# ------------------------------------------------------------------ calls written as text
+_TEXT_CALL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
+
+
+def calls_in(message):
+    """Tool calls from a chat reply: the structured ones, or Qwen's <tool_call>{...}</tool_call> written in the text."""
+    calls = []
+    for i, call in enumerate((message or {}).get("tool_calls") or []):
+        fn = call.get("function") or {}
+        calls.append((call.get("id") or f"call{i}", fn.get("name", ""), fn.get("arguments") or "{}"))
+    if not calls:
+        for i, raw in enumerate(_TEXT_CALL.findall(str((message or {}).get("content") or ""))):
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                continue
+            calls.append((f"text{i}", str(data.get("name", "")), data.get("arguments") or {}))
+    return calls
+
+
+def screen_line(screen):
+    tab = (screen or {}).get("tab") or ""
+    selected = (screen or {}).get("selected") or ""
+    if not tab:
+        return ""
+    return f"Right now the user has the {tab} tab open" + (f" with {selected} selected." if selected else ".")
+
+
+def today():
+    return datetime.now().strftime("%A %d %B %Y")
+
+
+# ------------------------------------------------------------------ the conversation loop (pure: chat_fn is injected)
+def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS):
+    """Let the model look things up, then answer. chat_fn(messages, tools) returns the reply message dict.
+    Returns dict(text, jobs, summary, checked, results): `jobs` is set when the model proposed a plan."""
+    messages = list(messages)
+    checked, results = [], []
+    tools = tool_specs()
+    for round_no in range(max_rounds + 1):
+        offer = tools if round_no < max_rounds else None       # the last round must answer in words
+        reply = chat_fn(messages, offer) or {}
+        calls = calls_in(reply)
+        if not calls or offer is None:
+            text = _TEXT_CALL.sub("", str(reply.get("content") or "")).strip()
+            return {"text": text, "jobs": None, "summary": "", "checked": checked, "results": results}
+        messages.append({"role": "assistant", "content": reply.get("content") or "",
+                         "tool_calls": [{"id": cid, "type": "function",
+                                         "function": {"name": name, "arguments": args if isinstance(args, str)
+                                                      else json.dumps(args)}} for cid, name, args in calls]})
+        for cid, name, args in calls:
+            if name == "make_plan":
+                data = args if isinstance(args, dict) else _json(args)
+                return {"text": "", "jobs": data.get("jobs") or [], "summary": str(data.get("summary") or "")[:300],
+                        "checked": checked, "results": results}
+            result = run(ctx, name, args)
+            results.append(result)
+            label = CHECKED_NAMES.get(name)
+            if label and label not in checked:
+                checked.append(label)
+            messages.append({"role": "tool", "tool_call_id": cid, "name": name, "content": result})
+    return {"text": "", "jobs": None, "summary": "", "checked": checked, "results": results}
+
+
+def _json(text):
+    try:
+        data = json.loads(text or "{}")
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+# ------------------------------------------------------------------ checking the answer against the data
+_SIZE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(TB|GB|MB)\b", re.I)
+_UNIT = {"tb": 1024 ** 4, "gb": 1024 ** 3, "mb": 1024 ** 2}
+_HAS_INSTALLED = re.compile(r"\b(?i:you (?:have|'ve got|also have)) ([A-Z][A-Za-z0-9:'&\- ]{2,40}?) installed\b")
+
+
+def known_sizes(facts, results=()):
+    sizes = []
+    for g in getattr(facts, "games", ()):
+        if g.size_bytes:
+            sizes.append(float(g.size_bytes))
+    for group in ("mods", "storage", "old_files", "captures"):
+        for item in getattr(facts, group, ()) or ():
+            for attr in ("apparent_bytes", "size"):
+                value = getattr(item, attr, None) or getattr(getattr(item, "record", None), attr, None)
+                if isinstance(value, (int, float)) and value > 0:
+                    sizes.append(float(value))
+                    break
+    specs = getattr(facts, "hardware", None)
+    for d in getattr(specs, "drives", ()) or ():
+        sizes += [float(d.free), float(d.total), float(d.total - d.free)]
+    if specs is not None and getattr(specs, "memory", None):
+        sizes.append(specs.memory.total_gb * 1024 ** 3)
+    for text in results:
+        for number, unit in _SIZE.findall(str(text)):
+            sizes.append(float(number.replace(",", ".")) * _UNIT[unit.casefold()])
+    return sizes
+
+
+def problems(text, facts, results=()):
+    """Sizes and installed games in a reply that Game Grave's data doesn't back up. Empty when it all checks out."""
+    found = []
+    sizes = known_sizes(facts, results)
+    biggest = sorted(sizes, reverse=True)[:40]
+    sums = {a + b for i, a in enumerate(biggest) for b in biggest[i + 1:]}
+    total_games = sum(float(g.size_bytes) for g in getattr(facts, "games", ()) if g.size_bytes)
+    pool = sizes + list(sums) + ([total_games] if total_games else [])
+    for number, unit in _SIZE.findall(text or ""):
+        value = float(number.replace(",", ".")) * _UNIT[unit.casefold()]
+        if value < 1024 ** 3 * 0.5:          # small figures are often general advice ("a few hundred MB")
+            continue
+        if not any(abs(value - k) <= max(0.06 * k, 0.11 * 1024 ** 3) for k in pool):
+            found.append(f"{number} {unit.upper()} doesn't match any size Game Grave has on record")
+    names = [g.name.casefold() for g in getattr(facts, "games", ())]
+    for title in _HAS_INSTALLED.findall(text or ""):
+        t = title.strip().casefold()
+        if names and not any(t in n or n in t for n in names):
+            found.append(f"'{title.strip()}' isn't one of the installed games")
+    return found[:5]
+
+
+FIX_NOTE = ("Some of that doesn't match Game Grave's data: {problems}. Check with the lookups and answer again using only "
+            "figures and games from the data. Keep the rest of your answer.")

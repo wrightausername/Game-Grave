@@ -81,7 +81,7 @@ def _within(path, root):
     return bool(root) and (path == root or path.startswith(root + "\\"))
 
 
-def facts_digest(facts, limit=80):
+def facts_digest(facts, limit=80, cap=None):
     """What Game Grave has on record, in plain text for the model: every enabled source, with per-game links (saves,
     mods, captures) worked out so the model can answer about one game. Kept under CONTEXT_CHARS."""
     lines = []
@@ -174,8 +174,9 @@ def facts_digest(facts, limit=80):
     if off:
         lines.append("\nTurned off by the user (don't use): " + ", ".join(off) + ".")
     text = "\n".join(lines).strip() or "Nothing has been scanned yet. Suggest Scan PC on the Overview tab."
-    if len(text) > CONTEXT_CHARS:
-        text = text[:CONTEXT_CHARS].rsplit("\n", 1)[0] + "\n(More items exist than fit here.)"
+    cap = cap or CONTEXT_CHARS
+    if len(text) > cap:
+        text = text[:cap].rsplit("\n", 1)[0] + "\n(More items exist than fit here; use the lookups for the rest.)"
     return text
 
 
@@ -208,12 +209,36 @@ def plan_request(text):
     return wanted if wanted in requests_list() else ""
 
 
-def build_messages(question, answer, facts, history=(), think=False):
+TOOL_RULES = (
+    "You have lookups. Use them instead of guessing:\n"
+    "- Before answering anything about a specific game, a problem, or this PC, look it up (look_up_game, game_mods, "
+    "game_crashes, pc_status, open_apps, startup_apps, runtimes, game_storage). For a problem such as crashing, "
+    "stutter or a game that won't start, check the likely causes first (its crash records, its mods, open overlays, "
+    "runtimes, drivers and drive space), then say what you found, what it most likely means, and the next step. Never "
+    "say a cause is certain.\n"
+    "- For how to do something in Game Grave, look it up with app_help (features) or tab_help (what a tab has) and give "
+    "its real steps and where it is.\n"
+    "- For a problem, also use known_fixes; for pasted error text, a code like 0xc0000005 or a DLL name, use "
+    "explain_error. Give the fixes in order, starting with the ones Game Grave can do for them, and say which are "
+    "general known fixes rather than something read from this PC.\n"
+    "- Aim to solve the problem completely in the chat, step by step, so the user doesn't need outside help. If a "
+    "step needs the user, say exactly what to click.\n"
+    "- When the user asks you to DO something Game Grave can do, call make_plan with the right jobs and targets. "
+    "Nothing runs until they press OK. If Game Grave can't do it, say how they can do it themselves.\n"
+    "- Look up only what you need (a few lookups at most), then answer."
+)
+
+
+def build_messages(question, answer, facts, history=(), think=False, tools=False, screen=None):
     """Chat messages for llama-server. `history` is the earlier (question, reply) pairs of this conversation; the last
-    six are kept. `think` lets Qwen3 reason before answering (Medium and Large)."""
-    context = f"PC facts (what Game Grave has on record):\n{facts_digest(facts)}\n\nWhat Game Grave can do (features and " \
-              f"where they are):\n{feature_list()}"
-    context += "\n\n" + PLAN_RULE + "; ".join(requests_list()) + "."
+    six are kept. `think` lets Qwen3 reason before answering (Medium and Large). `tools` means the model can call the
+    lookups in `local_ai_tools`, so the facts here are shorter and the rules say how to use them."""
+    from gg_desktop import local_ai_tools as lookups
+    digest = facts_digest(facts, limit=40 if tools else 80, cap=12000 if tools else None)
+    context = f"Today is {lookups.today()}. " + lookups.screen_line(screen)
+    context += f"\n\nPC facts (what Game Grave has on record):\n{digest}\n\nWhat Game Grave can do (features and " \
+               f"where they are):\n{feature_list()}"
+    context += "\n\n" + (TOOL_RULES if tools else PLAN_RULE + "; ".join(requests_list()) + ".")
     if answer is not None and answer.intent not in NO_LOOKUP:
         context += f"\n\nGame Grave's own quick lookup for this question (use its numbers if they fit):\n{lookup_text(answer)}"
     messages = [{"role": "system", "content": SYSTEM + "\n\n" + context}]

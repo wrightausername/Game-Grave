@@ -57,6 +57,17 @@ def main():
             print(f"\nQ: {q}  ({time.monotonic() - t:.0f}s)\nA: {text or '[rejected by the rules; built-in answer shown] ' + raw[:300]}")
             if text:
                 good += 1
+        # The question bench: real questions through lookups, plans and the answer check, as the app runs them.
+        sys.path.insert(0, str(ROOT / "tools"))
+        import local_ai_bench as bench
+        print(f"\nQuestion bench ({len(bench.CASES)} questions, Small model, lookups on):", flush=True)
+        import os
+        minutes = float(os.environ.get("GG_BENCH_MINUTES", "20"))
+        passed, asked, misses = bench.run(server, think=False, budget_s=minutes * 60, log=lambda line: print(line, flush=True))
+        score = passed / asked if asked else 0
+        print(f"\nBench: {passed} of {asked} passed ({score:.0%}).")
+        for question, why in misses:
+            print(f"  miss: {question}: {'; '.join(why)}")
     finally:
         server.stop()
     assert not server.running
@@ -64,6 +75,8 @@ def main():
     assert not base.exists()
     print(f"\nRemoved {removed / ai.GB:.2f} GB.")
     assert good >= 3, "The local model should answer most questions within the rules"
+    assert asked >= 10, "the bench should get through at least 10 questions in its time budget"
+    assert score >= 0.5, f"The Small model passed only {score:.0%} of the bench; see the misses above"
     print("PASS: the local AI model downloads verified, runs on this PC, answers within the rules and removes cleanly.")
     return 0
 

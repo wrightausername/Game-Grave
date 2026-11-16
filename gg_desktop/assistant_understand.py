@@ -319,6 +319,39 @@ def answer(question, facts, previous_question="", previous_answer=None, local_ai
         if len(known) == 1 and engine.answer(text, facts).intent in ("unknown", "help"):
             return known[0]
     result = engine.answer(text, facts)
+    if result.intent in ("unknown", "help") or re.search(r"0x[0-9a-f]{8}|\.dll\b", text):
+        explained = error_answer(question)
+        if explained is not None:
+            return explained
     if result.intent == "unknown":
+        fixes = problem_answer(text)
+        if fixes is not None:
+            return fixes
         return not_sure(text, facts, local_ai_on)
     return result
+
+
+def error_answer(question):
+    """Pasted error text, a code or a DLL name: what it usually means and the next step (general knowledge)."""
+    from gg_desktop import local_ai_knowledge as kb
+    found = kb.explain_error(question)
+    if not found.get("matches"):
+        return None
+    lines = [f"{m['usually_means']} {m['next_step']}".replace("GG: ", "In Game Grave: ") for m in found["matches"]]
+    return engine.Answer("error", "Here's what that usually means:\n\n" + "\n\n".join(lines),
+                         note="General knowledge about this error, not read from your PC.",
+                         sources=("Error guide",), handoffs=(("Open Fix Kit", "Fix Kit"),))
+
+
+def problem_answer(text):
+    """A described problem ("my game won't start", "black screen"): the usual fixes in order."""
+    from gg_desktop import local_ai_knowledge as kb
+    found = kb.known_fixes(text)
+    fixes = [f for f in found.get("known_fixes", []) if "usual_fixes" in f]
+    if not fixes:
+        return None
+    first = fixes[0]
+    steps = "\n".join(f"{i}. {s.replace('GG: ', 'In Game Grave: ')}" for i, s in enumerate(first["usual_fixes"], 1))
+    return engine.Answer("fixes", f"The usual fixes for {first['problem']}, in order:\n\n{steps}",
+                         note="General known fixes, not read from your PC.", sources=("Known fixes",),
+                         handoffs=(("Open Fix Kit", "Fix Kit"),))

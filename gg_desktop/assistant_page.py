@@ -664,6 +664,11 @@ def add_answer(window, question, answer, plan=None, layout=None):
         actions_row.addWidget(tool(caption, "next", lambda _=False, t=tab: window.navigate(t), tip=f"Open the {tab} tab"))
     actions_row.addWidget(tool("Copy", "file", lambda _=False, q=question, a=answer: copy_answer(window, q, a),
                                tip="Copy this question and answer"))
+    if question:
+        bad = tool("Not helpful", "warning", lambda _=False, q=question, a=answer: not_helpful(window, q, a),
+                   tip="Keeps this question and answer on this PC so they can be looked at later, and copies a report "
+                       "you can send if you want. Nothing is sent by itself.")
+        actions_row.addWidget(bad)
     stack.addWidget(_widget(actions_row))
     if answer.sources:
         sources = row(spacing=5)
@@ -1021,6 +1026,31 @@ def choose_scope(window):
         return
     make_facts(window)
     refresh(window)
+
+
+FEEDBACK_KEY = "assistant_feedback"
+MAX_FEEDBACK = 50
+
+
+def review_text(window, question, answer):
+    """A report of one exchange for whoever helps the user: the question, the answer, where it came from, the version."""
+    from gg_desktop import local_ai_ui
+    from gg_desktop import __version__ as version
+    model = local_ai_ui.chosen(window) if local_ai_ui.enabled(window) else "built-in"
+    return (f"Game Grave {version} · assistant: {model}\n\nQuestion: {question}\n\n"
+            f"{actions.answer_text(question, answer)}\n\nSources: {', '.join(answer.sources) or 'none'}")
+
+
+def not_helpful(window, question, answer):
+    """Saves the exchange in this PC's settings (newest 50) and copies a report; nothing leaves the PC by itself."""
+    from datetime import datetime
+    kept = list(window.settings.get(FEEDBACK_KEY) or [])[-(MAX_FEEDBACK - 1):]
+    kept.append({"when": datetime.now().isoformat(timespec="seconds"), "question": question[:600],
+                 "answer": answer.text[:2000], "intent": answer.intent, "sources": list(answer.sources)})
+    save(window, dict(window.settings, **{FEEDBACK_KEY: kept}))
+    QGuiApplication.clipboard().setText(review_text(window, question, answer))
+    window.status.setText("Thanks. Kept on this PC, and a report is copied if you want to send it. Try asking it another "
+                          "way, or with more detail.")
 
 
 def copy_answer(window, question, answer):

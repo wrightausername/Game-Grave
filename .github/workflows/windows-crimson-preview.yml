@@ -126,6 +126,7 @@ on:
       - 'tests/test_nav_groups.py'
       - 'tools/upkeep_real_check.py'
       - 'tools/local_ai_real_check.py'
+      - 'tools/local_ai_bench.py'
       - 'gg_desktop/upkeep_vendor.py'
       - 'gg_desktop/mymods_core.py'
       - 'gg_desktop/mymods_doctor.py'

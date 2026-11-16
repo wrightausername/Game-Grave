@@ -16,11 +16,13 @@ from PySide6.QtWidgets import QComboBox, QLabel, QProgressBar, QWidget
 from core import human_size, log_event
 from gg_desktop import local_ai_core as ai
 from gg_desktop import local_ai_prompt as prompt
+from gg_desktop import local_ai_tools as lookups
 from gg_desktop.reference_widgets import icon
 from gg_desktop.settings_page import Switch
 from gg_desktop.widgets import button, column, label, panel, row
 
 IDLE_STOP_MS = 5 * 60 * 1000
+KEEP_WHILE_OPEN_MS = 20 * 60 * 1000
 GAME_CHECK_MS = 30 * 1000
 
 
@@ -305,6 +307,39 @@ def thinks(window):
         return False
 
 
+def lookup_context(window, facts):
+    """What the local AI's lookups read from. Built on the main thread; the reads themselves run in the worker."""
+    from types import SimpleNamespace
+    from gg_desktop import autopilot_run
+
+    def selected():
+        if getattr(window, "current_route", "") != "Games":
+            return ""
+        try:
+            game = window._current_game()          # the game picked on the Games tab, if any
+        except Exception:
+            return ""
+        return getattr(game, "name", "") or ""
+
+    def mo2():
+        inventory = getattr(window, "inventory", None)
+        return autopilot_run.mo2_profiles(getattr(inventory, "mods", []) if inventory is not None else [])
+
+    def processes():
+        from gg_desktop import winpc
+        return winpc.list_processes(winpc.Runner())
+
+    def startup():
+        from gg_desktop import upkeep_core
+        return upkeep_core.read_startup()
+    route = getattr(window, "current_route", "") or ""
+    from gg_desktop import nav_groups
+    return SimpleNamespace(facts=facts, settings=dict(window.settings), mo2_profiles=mo2,
+                           game_crashes=autopilot_run._game_crashes, list_processes=processes, read_startup=startup,
+                           read_runtimes=autopilot_run._read_runtimes,
+                           screen={"tab": nav_groups.display_name(route) if route else "", "selected": selected()})
+
+
 def answer_async(window, question, base_answer, facts, history, deliver):
     """Ask the local model in the background, then call deliver(answer). Always delivers exactly once."""
     from gg_desktop import assistant_engine as engine
@@ -319,6 +354,8 @@ def answer_async(window, question, base_answer, facts, history, deliver):
     st.busy = True
 
     think = key in ai.THINKS
+    ctx = lookup_context(window, facts)
+    screen = ctx.screen
 
     def work(_progress):
         with st.lock:
@@ -328,30 +365,58 @@ def answer_async(window, question, base_answer, facts, history, deliver):
                     server.stop()
                 server = st.server = ai.LocalServer(key)
                 ai.start_best(server)
-            messages = prompt.build_messages(question, base_answer, facts, history, think=think)
-            budget = dict(max_tokens=2600, timeout=420) if think else dict(max_tokens=800, timeout=240)
-            raw = server.chat(messages, **budget)
+            messages = prompt.build_messages(question, base_answer, facts, history, think=think, tools=True,
+                                             screen=screen)
+            budget = dict(max_tokens=2600, timeout=420) if think else dict(max_tokens=900, timeout=240)
+            chat_fn = lambda msgs, tools: server.chat_message(msgs, tools, **budget)
+            result = lookups.converse(chat_fn, messages, ctx)
+            if result["jobs"] is not None:
+                return result
+            raw = result["text"]
             planned = prompt.plan_request(prompt.clean_reply(raw))
             if planned:
-                return "PLAN:" + planned
+                return dict(result, jobs=[], request=planned)
             text = prompt.clean_reply(raw)
             if not text and raw.strip():
                 # Broke a rule or ran out of room while thinking: ask once more, shorter, before giving up.
                 retry = messages + [{"role": "assistant", "content": prompt.clean_reply(raw.replace("<think>", "")) or "…"},
                                     {"role": "user", "content": prompt.RETRY_NOTE + " /no_think"}]
-                text = prompt.clean_reply(server.chat(retry, max_tokens=800, timeout=240))
-            return text
+                text = prompt.clean_reply(server.chat(retry, max_tokens=900, timeout=240))
+            wrong = lookups.problems(text, facts, result["results"]) if text else []
+            if wrong:
+                # Says something the data doesn't back up: show the model what and let it correct itself once.
+                fix = messages + [{"role": "assistant", "content": text},
+                                  {"role": "user", "content": lookups.FIX_NOTE.format(problems="; ".join(wrong)) +
+                                   " /no_think"}]
+                again = prompt.clean_reply(server.chat(fix, max_tokens=900, timeout=240))
+                still = lookups.problems(again, facts, result["results"]) if again else wrong
+                text = again if again and len(still) < len(wrong) else text
+                result["unchecked"] = still if again else wrong
+            result["text"] = text
+            return result
 
-    def done(text):
+    def done(result):
         st.busy = False
         _arm_idle(window)
-        if text.startswith("PLAN:"):
-            request = text[5:]
-            deliver(engine.Answer("local_ai", f"I read that as \"{request}\". Here's the plan; nothing changes until you "
-                                  "say OK.", (), "", (f"Local AI: {ai.BY_KEY[key].label}",)))
-            from gg_desktop import autopilot_ui
-            QTimer.singleShot(0, lambda: autopilot_ui.handle(window, request))
+        text = result.get("text", "")
+        checked = tuple("Checked: " + c for c in result.get("checked", ()))
+        model = (f"Local AI: {ai.BY_KEY[key].label}",)
+        if result.get("jobs") is not None:
+            steps, dropped = lookups.plan_steps(result["jobs"]) if not result.get("request") else ([], [])
+            request = result.get("request") or result.get("summary") or question
+            from gg_desktop import autopilot_core as core, autopilot_ui
+            plan = core.Plan(" ".join(str(request).split())[:300], steps) if steps else core.plan_for(request)
+            if plan is None or not plan.steps:
+                deliver(_with_note(base_answer, "The local AI wanted to make a plan, but none of the jobs it picked are "
+                                                "ones Game Grave can run, so this is the built-in answer."))
+                return
+            note = (" (left out: " + ", ".join(dropped) + ")") if dropped else ""
+            deliver(engine.Answer("local_ai", (result.get("summary") or f"I read that as \"{request}\".") +
+                                  " Here's the plan; nothing changes until you say OK." + note, (), "", checked + model))
+            QTimer.singleShot(0, lambda: autopilot_ui.post_plan(window, plan, question))
             return
+        if result.get("unchecked") and text:
+            text += "\n\n(Double-check: " + "; ".join(result["unchecked"]) + ".)"
         if not text:
             deliver(_with_note(base_answer, "The local AI's answer broke one of Game Grave's safety rules twice, so "
                                             "this is the built-in answer. Try asking it another way."))
@@ -360,7 +425,7 @@ def answer_async(window, question, base_answer, facts, history, deliver):
         keep = base_answer.intent not in prompt.NO_LOOKUP
         deliver(engine.Answer("local_ai" if not keep else base_answer.intent, text,
                               base_answer.rows if keep else (), base_answer.note if keep else "",
-                              (tuple(base_answer.sources) if keep else ()) + (f"Local AI: {ai.BY_KEY[key].label}",),
+                              (tuple(base_answer.sources) if keep else ()) + checked + model,
                               base_answer.handoffs if keep else ()))
 
     def failed(message):
@@ -396,7 +461,11 @@ def _tick(window):
     import time
     if st.busy:
         return
-    if game_running(window) or time.monotonic() - server.last_used > IDLE_STOP_MS / 1000:
+    # While the assistant is on screen (its tab or the pop-out) the model stays ready for 20 minutes, else 5.
+    popout = getattr(window, "assistant_popout", None)
+    watching = getattr(window, "current_route", "") == "AI Assistant" or bool(popout is not None and popout.isVisible())
+    limit = (KEEP_WHILE_OPEN_MS if watching else IDLE_STOP_MS) / 1000
+    if game_running(window) or time.monotonic() - server.last_used > limit:
         stop(window)
 
 

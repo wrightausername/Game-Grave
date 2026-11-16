@@ -216,37 +216,78 @@ def main():
             w.switch.click()
             settle()
             assert window.settings.get("local_ai_enabled") is True
-            with patch.object(ai, "start_best", return_value="cpu"), \
-                    patch.object(ai.LocalServer, "chat", return_value="<think></think>You have 2 games, from Steam."), \
-                    patch.object(ai.LocalServer, "running", new=True):
-                ask(window, "how many games have i got")
-                deadline = time.time() + 10
-                while "You have 2 games, from Steam." not in transcript(window) and time.time() < deadline:
+            def said(text):
+                return {"content": text}
+
+            def wait_for(words, seconds=10):
+                deadline = time.time() + seconds
+                while words not in transcript(window) and time.time() < deadline:
                     settle()
                     time.sleep(0.05)
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat_message", return_value=said("<think></think>You have 2 games, from Steam.")), \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "how many games have i got")
+                wait_for("You have 2 games, from Steam.")
             assert "You have 2 games, from Steam." in transcript(window), transcript(window)
             assert "Local AI: Medium" in transcript(window), "the local model is named as a source"
             assert window.assistant_input.isEnabled()
+            # The model looks a game up first, then answers; the answer says what it checked.
+            lookup = {"content": "", "tool_calls": [{"id": "c1", "type": "function", "function": {
+                "name": "look_up_game", "arguments": "{\"name\": \"cyberpunk\"}"}}]}
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat_message", side_effect=[lookup, said(
+                        "Cyberpunk 2077 reports 70.0 GB on drive C:.")]) as asked, \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "tell me about cyber punk")
+                wait_for("reports 70.0 GB on drive C:")
+            sent = asked.call_args_list[1].args[0]
+            assert any(m.get("role") == "tool" and "Cyberpunk 2077" in m.get("content", "") for m in sent), sent[-2:]
+            assert "Checked: Games" in transcript(window), transcript(window)
+            # Not helpful keeps the exchange on this PC and copies a report; nothing is sent.
+            bad = [b for b in window.assistant_scroll.widget().findChildren(QPushButton) if b.text() == "Not helpful"]
+            bad[-1].click()
+            settle()
+            kept = window.settings.get("assistant_feedback") or []
+            assert kept and kept[-1]["question"] == "tell me about cyber punk", kept
+            from PySide6.QtGui import QGuiApplication
+            assert "Question: tell me about cyber punk" in QGuiApplication.clipboard().text()
+            # A size the data doesn't back up is sent back once for correction.
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat_message", return_value=said("Cyberpunk 2077 takes 999 GB.")), \
+                    patch.object(ai.LocalServer, "chat", return_value="Cyberpunk 2077 reports 70.0 GB.") as fixed, \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "how big is cyberpunk really")
+                wait_for("Cyberpunk 2077 reports 70.0 GB.")
+            assert fixed.call_count == 1 and "999 GB" not in transcript(window).split("how big is cyberpunk really")[-1]
+            # A request becomes a plan the model picked from Game Grave's own jobs; nothing runs without OK.
+            planned = {"content": "", "tool_calls": [{"id": "p1", "type": "function", "function": {
+                "name": "make_plan", "arguments": "{\"summary\": \"Clear out old temp files.\", \"jobs\": "
+                "[{\"job\": \"clean_temp_files\"}, {\"job\": \"format_drive\"}]}"}}]}
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat_message", return_value=planned), \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "my pc feels full of junk, sort it out")
+                wait_for("nothing changes until you say OK")
+                for _ in range(10):
+                    settle()
+            text = transcript(window)
+            assert "Clear out old temp files." in text and "left out: format_drive" in text, text[-600:]
             # A reply that breaks the rules is retried once; if the retry keeps the rules, that is what shows.
             with patch.object(ai, "start_best", return_value="cpu"), \
-                    patch.object(ai.LocalServer, "chat", side_effect=["Cyberpunk is safe to delete.",
-                                                                      "Cyberpunk is 70 GB. Review it in Games."]) as asked, \
+                    patch.object(ai.LocalServer, "chat_message", return_value=said("Cyberpunk is safe to delete.")), \
+                    patch.object(ai.LocalServer, "chat", return_value="Cyberpunk is 70 GB. Review it in Games.") as asked, \
                     patch.object(ai.LocalServer, "running", new=True):
                 ask(window, "what about cyberpunk")
-                deadline = time.time() + 10
-                while "Review it in Games." not in transcript(window) and time.time() < deadline:
-                    settle()
-                    time.sleep(0.05)
-            assert asked.call_count == 2 and "Review it in Games." in transcript(window), transcript(window)
+                wait_for("Review it in Games.")
+            assert asked.call_count == 1 and "Review it in Games." in transcript(window), transcript(window)
             # Broken twice: never shown, the built-in answer is, and it says why.
             with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat_message", return_value=said("Cyberpunk is safe to delete.")), \
                     patch.object(ai.LocalServer, "chat", return_value="Cyberpunk is safe to delete."), \
                     patch.object(ai.LocalServer, "running", new=True):
                 ask(window, "and cyberpunk again")
-                deadline = time.time() + 10
-                while "safety rules twice" not in transcript(window) and time.time() < deadline:
-                    settle()
-                    time.sleep(0.05)
+                wait_for("safety rules twice")
             low = transcript(window).lower().replace("is it safe to delete", "")
             assert "safety rules twice" in low and "cyberpunk is safe to delete" not in low, low
             local_ai_ui.stop(window)

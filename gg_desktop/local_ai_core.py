@@ -319,7 +319,7 @@ def threads():
 
 def server_args(exe, model, port, kind, context=4096):
     args = [str(exe), "-m", str(model), "--host", "127.0.0.1", "--port", str(port), "-c", str(context),
-            "-t", str(threads())]
+            "-t", str(threads()), "--jinja"]   # --jinja: the model's own chat template, needed for lookups (tool calls)
     if kind == "vulkan":
         args += ["-ngl", "99"]
     return args
@@ -377,14 +377,24 @@ class LocalServer:
         self.stop()
         raise LocalAIError("The AI engine did not start in time.")
 
-    def chat(self, messages, max_tokens=500, timeout=180):
-        reply = self._http("/v1/chat/completions", {"messages": messages, "max_tokens": max_tokens, "temperature": 0.3,
-                                                    "top_p": 0.9, "stream": False}, timeout=timeout)
+    def chat_message(self, messages, tools=None, max_tokens=500, timeout=180):
+        """The reply message as a dict (content, and tool_calls when the model asked for a lookup). The same system
+        text is sent every time, so the server's prompt cache skips reading it again (cache_prompt)."""
+        body = {"messages": messages, "max_tokens": max_tokens, "temperature": 0.3, "top_p": 0.9, "stream": False,
+                "cache_prompt": True}
+        if tools:
+            body["tools"] = tools
+        reply = self._http("/v1/chat/completions", body, timeout=timeout)
         self.last_used = time.monotonic()
         try:
-            return str(reply["choices"][0]["message"]["content"])
-        except (KeyError, IndexError, TypeError):
+            message = dict(reply["choices"][0]["message"])
+        except (KeyError, IndexError, TypeError, ValueError):
             raise LocalAIError("The AI engine gave an empty answer.")
+        message["content"] = str(message.get("content") or "")
+        return message
+
+    def chat(self, messages, max_tokens=500, timeout=180):
+        return self.chat_message(messages, None, max_tokens, timeout)["content"]
 
     def stop(self):
         process, self.process = self.process, None
