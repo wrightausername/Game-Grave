@@ -25,8 +25,8 @@ class Registry(unittest.TestCase):
     def test_toolbox_lists_every_tool_once_in_five_groups(self):
         self.assertEqual([c.key for c in data.CATEGORIES], ["windows", "backup", "reports", "files", "elsewhere"])
         keys = [t.key for t in data.all_tiles()]
-        self.assertEqual(len(keys), 21)
-        self.assertEqual(len(set(keys)), 21)
+        self.assertEqual(len(keys), 20)
+        self.assertEqual(len(set(keys)), 20)
         titles = [t.title for t in data.all_tiles()]
         self.assertEqual(len(titles), len(set(titles)), "no tool is listed twice")
 
@@ -47,7 +47,7 @@ class Registry(unittest.TestCase):
                 self.assertTrue(t.note)
 
     def test_the_seven_windows_tools_are_real_actions_with_honest_notes(self):
-        keys = {"windows_cleanup", "game_optimizer", "memory_optimizer", "startup_manager",
+        keys = {"windows_cleanup", "game_optimizer", "memory_optimizer", "startup_manager", "registry_cleanup",
                 "command_runner", "file_associations", "junction_manager"}
         tiles = {t.key: t for t in data.all_tiles() if t.key in keys}
         self.assertEqual(set(tiles), keys)

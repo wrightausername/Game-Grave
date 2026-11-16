@@ -1060,3 +1060,8 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   the RAM card adds "Running slower than rated: the memory profile (XMP or EXPO) may be off in your BIOS. Game Grave doesn't
   change the BIOS" only when the running speed is under 95% of the rated one. Covered by `tests/test_hardware.py` and the
   hardware and registry smokes.
+- Toolbox (all six approved): Backups has two tiles, "Back up a Folder" (the Save Vault ZIP of any folder; replaces Game,
+  Save and Mod Backup, which were the same tool) and Resurrection Kit; the Quick Actions column, which repeated the tiles, is
+  hidden; Windows has a Registry Cleanup tile that opens Hardware > Registry Cleanup; the leftover "TOOLKIT" chip is gone;
+  System Health shows "Measuring…" until the first CPU reading; the Captures tile is called "Captures". Covered by
+  `tests/test_tools.py` and `tools/tools_page_smoke.py`.

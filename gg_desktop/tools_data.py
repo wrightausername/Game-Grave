@@ -52,11 +52,10 @@ CATEGORIES = (
         Tile("windows_cleanup", "Windows Cleanup", "settings", RUN, "windows_cleanup", "Delete temporary files older than 2 days from your Windows temp folders after you confirm."),
         Tile("game_optimizer", "Game Optimizer", "play", RUN, "game_optimizer", "Turn on Game Mode, turn off background recording or switch the power plan. Undo restores your values."),
         Tile("memory_optimizer", "Memory Optimizer", "storage", RUN, "memory_optimizer", "Choose open apps to close politely, largest memory first. Windows itself is never listed."),
-        Tile("startup_manager", "Startup Manager", "clock", RUN, "startup_manager", "Opens Hardware, Drivers & Startup: every app that starts with Windows, with Task Manager's own on/off switch."))),
+        Tile("startup_manager", "Startup Manager", "clock", RUN, "startup_manager", "Opens Hardware, Drivers & Startup: every app that starts with Windows, with Task Manager's own on/off switch."),
+        Tile("registry_cleanup", "Registry Cleanup", "trash", RUN, "registry_cleanup", "Opens Hardware, Registry Cleanup: entries that point to programs no longer on this PC, removed only after a backup and your OK, with Undo."))),
     Category("backup", "Backups", "Copies of your saves, mods and whole games, checked after they are written.", "purple", (
-        Tile("game_backup", "Game Backup", "archive", RUN, "save_vault", "Back up a folder you choose into a verified Save Vault ZIP."),
-        Tile("save_backup", "Save Backup", "shield", RUN, "save_vault", "Back up a save folder you choose into a verified Save Vault ZIP."),
-        Tile("mod_backup", "Mod Backup", "mods", RUN, "save_vault", "Back up a mod folder you choose into a verified Save Vault ZIP."),
+        Tile("folder_backup", "Back up a Folder", "archive", RUN, "save_vault", "Back up any folder you choose (saves, a mod folder, settings) into a verified Save Vault ZIP."),
         Tile("resurrection_kit", "Resurrection Kit", "grave", RUN, "kit_menu", "Saves a game's whole install, saves, load order and mods into one verified ZIP you can restore later. Opens a menu: set up a kit, restore a game, inspect, rehearse, compare or transfer. Nothing changes until you confirm."))),
     Category("reports", "Reports", "Save what the last scan found as a file you can keep or share.", "magenta", (
         Tile("game_size_report", "Game Size Report", "game", RUN, "game_report", "Save a CSV of installed games and their reported sizes."),
@@ -70,7 +69,7 @@ CATEGORIES = (
     Category("elsewhere", "Also in Game Grave", "These jobs have their own tab. Click to go there.", "cyan", (
         Tile("disk_cleanup", "Caches and Temp", "trash", GO, "Other Storage", "Opens Other Storage, where caches, logs and temp files the scan found are listed. You review items one at a time; nothing is removed from here."),
         Tile("bulk_files", "Old Files", "folder", GO, "Old Files", "Opens Old Files, which lists older ordinary files in the folder you pick. Age does not prove a file is unused; you choose what to review."),
-        Tile("screenshot_tools", "Screenshots and Clips", "camera", GO, "Captures", "Opens Captures, where screenshots and recordings are grouped by game only when the file path proves the game. Each is previewed before any Recycle Bin move."),
+        Tile("screenshot_tools", "Captures", "camera", GO, "Captures", "Opens Captures, where screenshots and recordings are grouped by game only when the file path proves the game. Each is previewed before any Recycle Bin move."),
         Tile("advanced_cleanup", "Game Leftovers", "grave", GO, "Graveyard", "Opens the Graveyard, where leftovers from removed games are explained and individual Recycle Bin moves are approved one at a time."),
         Tile("shader_cache", "Shader Caches", "dna", GO, "Game DNA", "Opens Game DNA, which lists the shader caches Game Grave can prove belong to a game (by Steam app ID). Display only."),
         Tile("storage_analyzer", "Storage Overview", "storage", GO, "Overview", "Opens Overview, which shows the sizes your last scan reported, grouped by type. They are reported sizes, not measured disk use."))),

@@ -611,6 +611,12 @@ def open_startup_tab(window):
     window.navigate("Hardware")
 
 
-HANDLERS = {"windows_cleanup": windows_cleanup, "game_optimizer": game_optimizer, "memory_optimizer": memory_optimizer,
+def open_registry_tab(window):
+    """Registry Cleanup lives in Hardware next to Drivers & Startup; this tile opens it there."""
+    window.hardware_tab = "Registry Cleanup"
+    window.navigate("Hardware")
+
+
+HANDLERS = {"registry_cleanup": open_registry_tab, "windows_cleanup": windows_cleanup, "game_optimizer": game_optimizer, "memory_optimizer": memory_optimizer,
             "startup_manager": open_startup_tab, "command_runner": command_runner, "file_associations": file_associations,
             "junction_manager": junction_manager}

@@ -241,7 +241,6 @@ def build(window):
         title.setText("Toolbox")   # shown name; the route key stays "More Tools"
         line = row(spacing=10)
         line.addWidget(title)
-        line.addWidget(chip("TOOLKIT", "red"), 0, Qt.AlignVCenter)
         line.addStretch()
         text_column.insertLayout(0, line)
     except (AttributeError, RuntimeError):
@@ -433,14 +432,14 @@ def relayout(window):
         columns = 2
     else:
         window.tools_side.hide()
-        flow = shown + [window.tools_health, window.tools_quick]
+        flow = shown + [window.tools_health]
         columns = 2 if width >= TWO_AT else 1
         for i, frame in enumerate(flow):
             grid.addWidget(frame, i // columns, i % columns)
         for column_index in range(columns):
             grid.setColumnStretch(column_index, 1)
     window.tools_health.setVisible(True)
-    window.tools_quick.setVisible(True)
+    window.tools_quick.setVisible(False)       # its buttons repeated the tiles; System Health and the panels stay
     window.tools_bottom_lay.setDirection(QBoxLayout.LeftToRight if width >= TWO_AT else QBoxLayout.TopToBottom)
     window.tools_bottom_lay.addWidget(window.tools_tasks, 3)
     window.tools_bottom_lay.addWidget(window.tools_log, 2)
@@ -466,7 +465,7 @@ def tick(window, *, full=False):
     for key, value in readings.items():
         window.tools_meters[key].set_value(value)
         waiting = key == "cpu" and value is None and state.cpu.waiting
-        window.tools_values[key].setText("…" if waiting else percent_text(value))
+        window.tools_values[key].setText("Measuring…" if waiting else percent_text(value))
         window.tools_values[key].setToolTip(system.storage_text() if key == "storage" else "")
     refresh_tasks(window)
     if full or state.ticks % 10 == 0:
