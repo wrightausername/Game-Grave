@@ -22,7 +22,7 @@ class NarrowFit(QObject):
         super().__init__(page)
         self.page, self.strip, self.tabs, self.table = page, strip, tabs, table
         self.short_captions, self.short_tabs = captions or {}, tab_names or {}
-        self.hide, self.narrow = tuple(hide), narrow
+        self.hide, self.narrow = (dict(hide) if isinstance(hide, dict) else tuple(hide)), narrow
         self.captions = [(c, c.text()) for c in getattr(strip, "captions", [])]
         self.buttons = [(b, name) for name, b in getattr(tabs, "buttons", {}).items()]
         for button, name in self.buttons:
@@ -55,9 +55,9 @@ class NarrowFit(QObject):
                 if button.text() != shown:
                     button.setText(shown)
             if self.table is not None:
-                tight = self.page.width() < self.narrow
-                for column in self.hide:
-                    self.table.setColumnHidden(column, tight)
+                limits = self.hide if isinstance(self.hide, dict) else {c: self.narrow for c in self.hide}
+                for column, below in limits.items():
+                    self.table.setColumnHidden(column, self.page.width() < below)
         except RuntimeError:
             pass          # the page was rebuilt
 

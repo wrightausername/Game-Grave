@@ -285,7 +285,7 @@ def build(window):
     mark = QLabel()
     mark.setPixmap(icon("undo", "#ff3b57", 18).pixmap(18, 18))
     header.addWidget(mark)
-    self.undo_heading = label("Cleanup History", "sectionTitle")
+    self.undo_heading = label("History", "sectionTitle")
     self.undo_heading.setMinimumWidth(0)
     self.undo_heading.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
     header.addWidget(self.undo_heading, 1)
@@ -311,13 +311,18 @@ def build(window):
     contents.addWidget(self.undo_notice)
     self.undo_table = _table(COLUMNS)
     self.undo_table.setStyleSheet(TABLE_STYLE)
-    for c, width in enumerate((28, 92, 150, 92, 64, 116, 96)):
+    for c, width in enumerate((28, 96, 150, 84, 58, 100, 92)):
         self.undo_table.setColumnWidth(c, width)
     self.undo_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
     self.undo_table.setSelectionMode(QAbstractItemView.SingleSelection)
     self.undo_table.setItemDelegateForColumn(2, ReadableName(self.undo_table))
     self.undo_table.setItemDelegateForColumn(6, StatusDelegate(self.undo_table))
     contents.addWidget(self.undo_table, 1)
+    from gg_desktop import narrow_fit      # the item column keeps its room; Size and Game / Source step aside
+    narrow_fit.install(page, self.undo_metrics, None,
+                       captions={"Total Actions": "Actions", "Recycled Files": "Recycled", "Needs Review": "Review",
+                                 "Recycled Size": "Size", "Restore Available": "Restorable"},
+                       table=self.undo_table, hide={4: 1400, 3: 1100})
     self.undo_pager = InventoryPager()
     self.undo_pager.changed.connect(lambda number: fill(self, requested_page=number))
     contents.addWidget(self.undo_pager)
@@ -549,7 +554,7 @@ def fill(window, *args, requested_page=0, **kwargs):
     window.undo_pager.update_window(page)
     state.shown = window._shown_history = list(page.items)
     fill_table(window, previous)
-    window.undo_heading.setText(f"Cleanup History ({len(rows):,})")
+    window.undo_heading.setText(f"History ({len(rows):,})")
     update_facets(window)
     update_notice(window, rows)
     selection_count(window)
@@ -566,12 +571,13 @@ def fill_table(window, previous):
             _check(table, n)
             if e.key in state.checked:
                 table.item(n, 0).setCheckState(Qt.Checked)
-            _text(table, n, 1, e.action, data.CATEGORY_ICONS[e.category], data.CATEGORY_COLORS[e.category])
+            act = _text(table, n, 1, short_action(e.action), data.CATEGORY_ICONS[e.category], data.CATEGORY_COLORS[e.category])
+            act.setToolTip(e.action)
             name = _text(table, n, 2, e.name, "file" if e.path else "box", "#e5b72e")
             name.setData(Qt.UserRole, "" if state.compact else (e.folder or e.note[:80]))
             name.setToolTip(f"{e.name}\n{e.path or e.note}")
             _text(table, n, 3, e.source)
-            _text(table, n, 4, readable_bytes(e.size))
+            _text(table, n, 4, readable_bytes(e.size) if e.size is not None else "—")
             _text(table, n, 5, data.when_text(e))
             pill = _text(table, n, 6, e.status)
             pill.setData(Qt.UserRole, data.TONES[e.tone])
@@ -876,3 +882,16 @@ def restore_selected(window):
     run_job(window, lambda cancel: actions.restore(usable, check_restore, restore_recycled, cancel),
             lambda results: window.info("Restore Results", actions.summarize(results)), "Restore",
             "Restoring through Windows. Each record is checked first.")
+
+
+# Whole short words for the Action column; the full wording stays on hover.
+SHORT_ACTIONS = {"Cleanup skipped": "Skipped", "Scan completed": "Scanned", "Scan failed": "Scan failed",
+                 "Scan canceled": "Canceled", "Automation enabled": "Turned on", "Automation disabled": "Turned off",
+                 "Steam uninstall opened": "Uninstall", "Mod inventory completed": "Scanned", "Mod folder scan": "Scanned"}
+
+
+def short_action(text):
+    if text in SHORT_ACTIONS:
+        return SHORT_ACTIONS[text]
+    words = str(text).split()
+    return " ".join(words[:2]) if len(" ".join(words[:2])) <= 14 else (words[0] if words else "")

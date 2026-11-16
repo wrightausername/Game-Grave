@@ -167,7 +167,7 @@ def main():
             assert strip[5] == "7.5 KB", strip
             captions = [c.text() for c in window.undo_metrics.captions]
             assert "Recycled Size" in captions and not any("Reversible" in c or "Reclaimed" in c for c in captions), captions
-            assert window.undo_heading.text() == f"Cleanup History ({m['total']})"
+            assert window.undo_heading.text() == f"History ({m['total']})"
             assert set(names(window)) >= {"clip.mp4", "old.zip", "pic.png", "a.bin"}
             assert window.grab().save(str(args.output / "undo-history-1280.png"))
 

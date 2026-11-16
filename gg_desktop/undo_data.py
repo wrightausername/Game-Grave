@@ -53,6 +53,17 @@ FEATURE_EVENTS = {
                       "A new Mod Organizer 2 profile was added. Your own profile was not changed. Remove it in Mod Organizer 2."),
     "squad_install": ("Squad Sync installed mods", "Other",
                       "New, switched-off mod folders were added to Mod Organizer 2. Remove one there if you do not want it."),
+    "registry_fix": ("Registry entries removed", "Settings",
+                     "Every key was backed up first. To put them back: Hardware, Registry Cleanup, Undo last fix."),
+    "registry_undo": ("Registry fix undone", "Restored", "The registry backup from before the fix was imported."),
+    "crash_doctor_start": ("Crash Doctor started testing", "Other",
+                           "Mods were switched for each test and put back at the end."),
+    "crash_doctor_end": ("Crash Doctor finished", "Other", "Every mod it switched for the tests was put back."),
+    "crash_doctor_off": ("Mods turned off by Crash Doctor", "Other",
+                         "Turn them back on in Crash Doctor (Turn them back on), or in Mods for Mod Organizer 2 (Undo)."),
+    "crash_doctor_on": ("Mods turned back on by Crash Doctor", "Restored", "The mods it had turned off were moved back."),
+    "crash_doctor_close": ("Crash Doctor closed programs before testing", "Other",
+                           "It asked Mod Organizer 2, Vortex or the game to close the normal way. Nothing else changed."),
 }
 STATE_STATUS = {
     "Restored": ("Restored", "blue"), "Available": ("Available", "green"), "Not checked": ("Not checked", "grey"),

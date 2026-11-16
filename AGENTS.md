@@ -1050,3 +1050,8 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   Graveyard"; it always opened the game's Graveyard entry); in a narrow window the cards and tabs use whole short words and
   big values shrink instead of being cut (`narrow_fit` now also escapes "&" in tab names and fits values). Covered by
   `tools/dna_page_smoke.py`.
+- Undo Center (all five approved): the Item / Target column keeps its room (Size steps aside below 1400 px and Game / Source
+  below 1100 px, `narrow_fit` now takes a per-column width); the Action column shows whole short words ("Scanned",
+  "Skipped", "Turned on") with the full wording on hover; no size reads "—"; the list is called "History"; Registry Cleanup
+  and Crash Doctor events read in plain words with where to undo them (`undo_data.FEATURE_EVENTS`); narrow cards use whole
+  short words. Restoring is unchanged (`recovery.py` untouched). Covered by `tools/undo_page_smoke.py`.
