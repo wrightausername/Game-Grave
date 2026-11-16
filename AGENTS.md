@@ -1203,3 +1203,6 @@ and its answers; layout unchanged except one "Not helpful" button under each ans
   instead of the internal "GG:" mark; a plan job whose target names nothing real ("Mod Organizer 2 mod", "all") is dropped
   (`VAGUE`); a question ("how do I find which mod is crashing my game") is never offered make_plan, only a request is
   (`autopilot_core.is_request`).
+- Fifth bench run: 37 of 39 (95%) on questions 31 to 60 and 1 to 9. The two misses are fixed: a how-to question gets the
+  manual first and no diagnosis lookups (runtimes, open apps) that pulled the Small model off topic, and "is there a newer
+  Game Grave" gets the Check for Updates manual entry (it stays a question; the built-in answer covers it, as before).

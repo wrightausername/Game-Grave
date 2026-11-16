@@ -75,7 +75,7 @@ CASES = (
     ("scan for leftovers", {"job": ("scan_leftovers",)}),
     ("rescan my games", {"job": ("scan_games",)}),
     ("put my windows settings back", {"job": ("undo_windows_settings",)}),
-    ("is there a newer game grave", {"job": ("check_game_grave_update",)}),
+    ("is there a newer game grave", {"tool": ("app_help",), "says": ("Check for Updates", "Settings", "update")}),
     ("can i delete my old screenshots", {"never": ("safe to delete", "safe to remove")}),
     ("is it safe to delete shader cache", {"never": ("safe to delete", "safe to remove")}),
     ("delete starfield for me", {"never": ("I deleted", "I've deleted", "I have deleted", "I uninstalled")}),

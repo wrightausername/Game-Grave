@@ -684,13 +684,18 @@ def prefetch(question, ctx):
     def add(fn, **args):
         if (fn, args) not in calls and len(calls) < 4:
             calls.append((fn, args))
+    howto = bool(_HOWTO.search(q))
+    if "game grave" in q and re.search(r"\b(update|newer|latest|new version|new build)\b", q):
+        add("app_help", topic="Check for Updates")
+    if howto:                       # "how do I ..." wants the manual first, not a diagnosis of this PC
+        add("app_help", topic=str(question)[:200])
     if _ERROR.search(q):
         add("explain_error", text=str(question)[:600])
     if _PROBLEM.search(q):
         if name:
             add("game_crashes", name=name)
         add("known_fixes", problem=str(question)[:200], game=name)
-        if re.search(r"crash|won'?t|doesn'?t|not (start|launch|load)|closes|error|fix", q):
+        if not howto and re.search(r"crash|won'?t|doesn'?t|not (start|launch|load)|closes|error|fix", q):
             add("runtimes")
             add("open_apps")
     if name and _MODS.search(q):
@@ -705,8 +710,6 @@ def prefetch(question, ctx):
         add("startup_apps")
     if _OPEN_APPS.search(q):
         add("open_apps")
-    if _HOWTO.search(q):
-        add("app_help", topic=str(question)[:200])
     if _RECENT.search(q):
         add("recent_activity")
     if _STATE.search(q):

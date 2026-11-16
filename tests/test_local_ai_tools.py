@@ -140,6 +140,9 @@ class Prefetch(unittest.TestCase):
         self.assertIn("startup_apps", names("what starts with windows"))
         self.assertIn("app_help", names("how do i back up a game"))
         self.assertEqual(names("hi"), [])
+        self.assertEqual(names("how do i find which mod is crashing my game")[0], "app_help",
+                         "a how-to question gets the manual first, not a diagnosis")
+        self.assertIn("app_help", names("is there a newer game grave"))
 
     def test_prefetched_results_reach_the_model_before_it_answers(self):
         seen = []
