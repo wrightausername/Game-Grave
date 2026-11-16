@@ -17,7 +17,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QV
 from core import log_event
 from gg_desktop import crashdoctor_core as cd
 from gg_desktop.tools_shell import ToolDialog
-from gg_desktop.widgets import button, label
+from gg_desktop.widgets import button, label, row
 
 ACTIVE_KEY = "crash_doctor_active"     # holding folders in use, so a closed app can put mods back next start
 STEPS = ("Check what Game Grave found", "Start", "Tests run by themselves", "See the answer")
@@ -95,7 +95,8 @@ class DoctorDialog(ToolDialog):
         self.when_box.setAccessibleName("When does it crash?")
         for key, words, *_rest in cd.WHEN:
             self.when_box.addItem(words, key)
-        self.body.addWidget(label("When does it crash?", "caption"))
+        self.when_label = label("When does it crash?", "caption")
+        self.body.addWidget(self.when_label)
         self.body.addWidget(self.when_box)
         self.when_note = label("", "caption", wrap=True)
         self.body.addWidget(self.when_note)
@@ -122,8 +123,13 @@ class DoctorDialog(ToolDialog):
         for extra in (self.off_button, self.look_button, self.leave_button, self.on_button):
             extra.hide()
         self.stop_button.hide()
-        self.add_actions(self.on_button, self.stop_button, self.leave_button, self.look_button, self.off_button,
-                         self.start_button)
+        answer = row(spacing=8)                # the three answer buttons get a row of their own, full labels
+        answer.addWidget(self.leave_button)
+        answer.addWidget(self.look_button)
+        answer.addStretch(1)
+        answer.addWidget(self.off_button)
+        self.body.addLayout(answer)
+        self.add_actions(self.on_button, self.stop_button, self.start_button)
         self.found = ()                  # mods the finished search named
         self.folder = ""
         self.switcher = self.flow = self.proc = None
@@ -422,6 +428,7 @@ class DoctorDialog(ToolDialog):
         self.stop_button.hide()
         for extra in (self.off_button, self.look_button, self.leave_button):
             extra.setVisible(bool(self.found))
+        self.show_setup(not self.found)
         if self.found:
             self.off_button.setText("Turn it off" if len(self.found) == 1 else f"Turn off these {len(self.found)}")
         else:
@@ -616,10 +623,21 @@ class DoctorDialog(ToolDialog):
         log_event("crash_doctor_off", f"Crash Doctor turned off {names} for {self.plan.game} ({self.plan.method})",
                   source="Mod Bisect")
         self.found, self.switcher = (), None
-        self.off_button.hide()
+        for extra in (self.off_button, self.look_button, self.leave_button):
+            extra.hide()
+        self.show_setup(True)
         self.result(f"Turned off: {names}. Start the game to check it's fixed." + (
             " Couldn't move: " + ", ".join(failed[:6]) if failed else ""), "warn" if failed else "good")
         self.fill_launch()
+
+    def show_setup(self, on):
+        """The question, the Change link and Start are for setting up; with an answer on screen they step aside."""
+        for widget in (self.found_line, self.when_label, self.when_box, self.change_button, self.start_button):
+            widget.setVisible(on)
+        self.when_note.setVisible(on and bool(self.when_note.text()))
+        if not on:
+            self.advanced.hide()
+        self.adjustSize()
 
     def look_up(self):
         mod = self.found[0] if self.found else ""
@@ -630,6 +648,7 @@ class DoctorDialog(ToolDialog):
         for extra in (self.off_button, self.look_button, self.leave_button):
             extra.hide()
         self.result("Left as it is. Every mod is where it was before the tests.", "info")
+        self.show_setup(True)
 
     def _kept_off(self):
         game = self.game()

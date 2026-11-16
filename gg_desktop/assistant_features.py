@@ -418,7 +418,7 @@ FEATURES = FEATURES + (
          "find it while i sleep", "automatic bisect"),
         "Crash Doctor runs Mod Bisect's tests for you: it switches mods, starts the game, watches whether it crashes, and "
         "names the mod or pair causing it. Works with Mod Organizer 2, Vortex or a plain folder of mods.",
-        ("Open Fix Kit and press Crash Doctor (or Mods > Bisect > Let Crash Doctor Run The Tests).",
+        ("Open Fix Kit and press Crash Doctor (or Mods > Bisect > Let Crash Doctor run the tests).",
          "Pick the game, how its mods are switched, how to start it, and how long it must run to count as fine.",
          "Press Start and leave the PC; each test starts and closes the game by itself.",
          "At the end it shows which mods cause the crash, and every mod is put back."),

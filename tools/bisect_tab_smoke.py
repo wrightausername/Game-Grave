@@ -107,7 +107,7 @@ def main():
             statuses = {window.mod_table.item(i, 3).text() for i in range(rows)}
             assert statuses == {"Starts on"}, statuses
             assert "Your own profile is never changed" in details_text(window)
-            assert {"Start Finding", "Read Crash Reports", "Pick A Downloaded Pack…"} <= set(buttons(window))
+            assert {"Start Finding", "Read Crash Reports", "Pick a downloaded pack…"} <= set(buttons(window))
             assert window.grab().save(str(args.output / "bisect-setup-1280.png"))
 
             # Clues: typed dates are kept, a bad date blocks Start and says how to type it, ticked mods become the clue.
@@ -126,7 +126,7 @@ def main():
             assert buttons(window)["Start Finding"].isEnabled()
             snow_row = next(i for i in range(rows) if window.mod_table.item(i, 1).text() == "Snow Textures")
             window.mod_table.item(snow_row, 0).setCheckState(Qt.Checked)
-            press(window, "Use Checked Mods As The New Ones")
+            press(window, "These are the mods I added recently")
             assert len(model.hints) == 1, model.hints
             press(window, "Read Crash Reports")
             assert model.clues is not None and "3 read" in details_text(window), details_text(window)

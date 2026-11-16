@@ -380,15 +380,15 @@ class Model:
         fields = (Field("last", "It last worked", "e.g. 2026-10-30 or 2 weeks ago", self.last_text),
                   Field("started", "Crashes started", "e.g. last week", self.started_text))
         toggles = (Toggle("sometimes", "It only crashes sometimes", self.sometimes),)
-        buttons = (Button("use_checked", "Use Checked Mods As The New Ones", "check",
+        buttons = (Button("use_checked", "These are the mods I added recently", "check",
                           tip="Tick the mods you added just before the crashes began, then press this."),
-                   Button("pick_pack", "Pick A Downloaded Pack…", "download",
+                   Button("pick_pack", "Pick a downloaded pack…", "download",
                           tip="Mods installed together are grouped so you can pick the pack."),
                    Button("always_on", "Keep Checked Mods Always On", "shield",
                           tip="For frameworks other mods need. They stay on in every test."),
                    Button("clear_clues", "Clear Picks", "close", enabled=bool(self.hints or self.always_on)),
                    Button("read_reports", "Read Crash Reports", "scan", enabled=self.reports_state != "reading"),
-                   Button("doctor", "Let Crash Doctor Run The Tests", "play",
+                   Button("doctor", "Let Crash Doctor run the tests", "play",
                           tip="Game Grave switches the mods, starts the game and judges each test itself."),
                    Button("start", "Start Finding", "wand", enabled=self.can_start() and not problem, primary=True))
         return Panel("setup", "Find what is crashing", tuple(lines), fields, toggles, buttons)

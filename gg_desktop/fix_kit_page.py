@@ -25,10 +25,11 @@ QLabel#fixSection { color: #8C9AA9; font-size: 11px; font-weight: 800; letter-sp
 """
 
 CARDS = (
-    ("bisect", "Mod Bisect", "mods",
-     "A game crashes with mods on? Mod Bisect finds the mod causing it. Crash Doctor runs the tests for you, with Mod "
-     "Organizer 2, Vortex or a plain mod folder.",
-     (("Crash Doctor", "doctor", True), ("Open Mod Bisect", "bisect", False))),
+    ("bisect", "Game crashing or won't start?", "warning",
+     "Check the usual causes first (crash records, overlays, Microsoft runtimes, drivers). If mods are behind it, Crash "
+     "Doctor finds the one, with Mod Organizer 2, Vortex or a plain mod folder.",
+     (("Check the usual fixes", "fix", True), ("Find the crashing mod", "doctor", False),
+      ("Mod Bisect, step by step", "bisect", False))),
     ("kit", "Resurrection Kit", "grave",
      "Back up a whole game: the install, your saves and the load order, so you can bring it back later.",
      (("Set up a kit", "kit_setup", True), ("Restore a game", "kit_restore", False), ("More kit tools", "kit_menu", False))),
@@ -51,10 +52,32 @@ def open_bisect(window):
         pass
 
 
+def ask_fix(window):
+    """Pick a game, then the same check as Black Box's "Check the usual fixes" (AI Assistant plan, nothing changes
+    until Run all)."""
+    from PySide6.QtWidgets import QInputDialog
+    games = sorted((g for g in window.inventory.games if getattr(g, "install_path", "")),
+                   key=lambda g: -(getattr(g, "last_played_at", None) or 0))
+    if not games:
+        window.info("Scan your PC first", "Game Grave needs to know your games before it can check them.")
+        return
+    names = [g.name for g in games]
+    name, ok = QInputDialog.getItem(window, "Check the usual fixes", "Which game?", names, 0, False)
+    if not ok:
+        return
+    from gg_desktop import assistant_page, assistant_popout
+    pop = assistant_popout.open_popout(window)        # says how to turn the assistant on when it is off
+    if pop is not None:
+        assistant_page.send(window, f"Fix {name}, it keeps crashing", source=pop.input)
+
+
 def run(window, key):
     if key == "doctor":
         from gg_desktop import crashdoctor_ui
         crashdoctor_ui.open_doctor(window)
+        return
+    if key == "fix":
+        ask_fix(window)
         return
     if key == "bisect":
         open_bisect(window)

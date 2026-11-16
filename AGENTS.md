@@ -1037,3 +1037,10 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   (`grave_page.PLAIN_RELATED`; `graveyard.py` and `core.py` are protected and unchanged; the original is on hover); in a
   narrow window the cards use whole short words and Last Touched and Evidence step aside (`narrow_fit`, tabs keep their
   counts); an item with no game shows its type icon instead of the "GG" placeholder. Covered by `tools/grave_page_smoke.py`.
+- Fix Kit (all five approved): Crash Doctor's answer screen hides the question, Change link and Start while an answer is
+  shown, with Leave everything as it is / Look it up online / Turn it off on their own row (setup comes back after Leave
+  or Turn it off); the first card is "Game crashing or won't start?" with Check the usual fixes (pick a game, then the
+  same AI Assistant plan as Black Box), Find the crashing mod (Crash Doctor) and Mod Bisect, step by step; Black Box shows
+  "Find the crashing mod" for games Crash Doctor can find mods for; Mod Bisect's setup buttons read "These are the mods I
+  added recently", "Pick a downloaded pack…" and "Let Crash Doctor run the tests"; Autopsy's empty line mentions Make it
+  run better. Covered by `tools/crashdoctor_smoke.py` and `tools/bisect_tab_smoke.py`.

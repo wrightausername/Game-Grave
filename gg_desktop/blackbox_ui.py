@@ -51,6 +51,7 @@ class BlackBoxBody(QWidget):
         self.games.setMinimumWidth(300)
         self.games.setAccessibleName("Game for the Black Box report")
         top.addWidget(self.games)
+        self.games.currentIndexChanged.connect(lambda _i: self.sync_mod_button() if hasattr(self, "mod_button") else None)
         self.build_button = button("Build report", self.build, kind="primary",
                                    tip="Reads the Windows Application log and the game folder. Changes nothing.")
         top.addWidget(self.build_button)
@@ -58,6 +59,10 @@ class BlackBoxBody(QWidget):
                                  tip="Asks the AI Assistant to check overlays, Microsoft runtimes, drivers and the game's "
                                      "files for this game, and offer fixes. Nothing changes until you press Run all.")
         top.addWidget(self.fix_button)
+        self.mod_button = button("Find the crashing mod", self.find_mod, kind="actionLink",
+                                 tip="Crash Doctor tests this game's mods for you and names the one crashing it.")
+        self.mod_button.hide()
+        top.addWidget(self.mod_button)
         top.addStretch()
         layout.addLayout(top)
         self.summary = label("", "readyDetail", wrap=True)
@@ -114,6 +119,20 @@ class BlackBoxBody(QWidget):
     def _sync(self):
         for control in (self.copy_button, self.save_button):
             control.setEnabled(bool(self.text))
+
+    def find_mod(self):
+        game = self.games.currentData()
+        if game is not None:
+            from gg_desktop import crashdoctor_ui
+            crashdoctor_ui.open_doctor(self.window_owner, game)
+
+    def sync_mod_button(self):
+        game = self.games.currentData()
+        try:
+            from gg_desktop import crashdoctor_ui
+            self.mod_button.setVisible(game is not None and crashdoctor_ui.has_mods(self.window_owner, game))
+        except Exception:
+            self.mod_button.hide()
 
     def ask_fix(self):
         """Fix my game for the chosen game, in the AI Assistant's pop-out chat (the same plan as asking there)."""

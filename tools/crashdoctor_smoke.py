@@ -103,6 +103,11 @@ def main():
             window.inventory = Inventory(steam=steam, games=merge_games(steam, []), scanned_at="2026-11-15 10:00")
             settle()
 
+            window.navigate("Fix Kit")
+            settle()
+            from PySide6.QtWidgets import QPushButton
+            words = [b.text() for b in window.page.findChildren(QPushButton)]
+            assert {"Check the usual fixes", "Find the crashing mod", "Mod Bisect, step by step"} <= set(words), words
             fix_kit_page.run(window, "doctor")
             settle()
             dialog = window.crash_doctor
@@ -177,6 +182,8 @@ def main():
             assert "Bad Mod" in dialog.details.body.text(), "the full report is folded under the answer"
             assert dialog.off_button.isVisible() and dialog.look_button.isVisible() and dialog.leave_button.isVisible()
             assert dialog.off_button.text() == "Turn it off", dialog.off_button.text()
+            assert not dialog.start_button.isVisible() and not dialog.when_box.isVisible(), "setup steps aside for the answer"
+            assert dialog.leave_button.width() >= dialog.leave_button.sizeHint().width() - 2, "answer buttons fit their words"
             dialog.off_button.click()
             settle()
             assert not (mods / "Bad Mod").exists() and (mods / cd.OFF_NAME / "Bad Mod" / "manifest.json").is_file()

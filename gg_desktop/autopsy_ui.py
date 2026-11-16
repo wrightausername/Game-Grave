@@ -268,7 +268,8 @@ class AutopsyBody(QWidget):
         if not self.entries:
             self.graph.set_data([], [], 40)
             self.summary.setText(INTRO + " Nothing found yet. Save a capture and it will appear here.")
-            self._status("Automatic. Save a capture with PresentMon, CapFrameX or FrameView and it appears here.")
+            self._status("Automatic. Save a capture with PresentMon, CapFrameX or FrameView and it appears here. Or use "
+                         "Make it run better (Games, right-click a game), which records for you.")
         elif before is None or after is None:
             self.graph.set_data([], [], 40)
             self.summary.setText("Pick a Before and an After capture. " + INTRO if len(self.entries) > 1 else
