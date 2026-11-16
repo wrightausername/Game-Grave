@@ -121,6 +121,14 @@ class ScanResult:
     scanned_at: float = field(default_factory=time.time)
     origin: str = "Old Files scan"
 
+    def short_summary(self):
+        """The finished pop-up: one plain line (the detailed numbers stay in summary())."""
+        months = self.plan.days // 30
+        age = f"{months}+ month{'s' if months != 1 else ''}" if self.plan.days >= 60 else f"{self.plan.days}+ days"
+        n = len(self.files)
+        return (("Partly scanned. " if self.limited else "") + f"Found {n:,} file{'s' if n != 1 else ''} not changed in "
+                f"{age}. Age alone doesn't prove a file is unused.")
+
     def summary(self):
         prefix = "Partial scan. " if self.limited else "Scan finished. "
         return (f"{prefix}{len(self.files):,} files at least {self.plan.days} days old; "

@@ -216,7 +216,7 @@ def main():
             from PySide6.QtTest import QTest
             table = window.old_table
             assert table.rowCount() >= 3
-            assert "double-click" in window.old_selection.text(), window.old_selection.text()
+            assert window.old_selection.text() == "0 selected" and "Double-click" in window.old_selection.toolTip(), window.old_selection.text()
 
             def at(row):
                 return table.visualRect(table.model().index(row, 1)).center()

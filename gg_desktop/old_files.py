@@ -100,7 +100,7 @@ class OldFilesSession(QObject):
                 scan_cache.keep_async("old_files", result)
                 window._sync_scan_time()
                 from gg_desktop import comfort
-                comfort.notify(window, "Old Files scan finished", result.summary(), "good", "Old Files")
+                comfort.notify(window, "Old Files scan finished", result.short_summary(), "good", "Old Files")
             window.status.setText(message_text("Old Files: " + self.message))
             self.changed.emit()
         def work(emit):

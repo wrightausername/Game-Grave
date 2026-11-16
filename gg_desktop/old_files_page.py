@@ -24,7 +24,7 @@ from gg_desktop.old_files import OldFilesController
 from gg_desktop.old_files_data import protected_roots
 from gg_desktop.reference_library import (_check, _checked, _combo, _detail_scroll, _search, _split, _table, _text,
                                           _widget, destroy_layout)
-from gg_desktop.reference_widgets import (CoverArt, DetailPanel, InventoryPager, MetricStrip, TabStrip, detail_line,
+from gg_desktop.reference_widgets import (DetailPanel, InventoryPager, MetricStrip, TabStrip, detail_line,
                                           detail_section, icon, tool)
 from gg_desktop.widgets import column, label, panel, row
 from screenshots import looks_like_screenshot
@@ -143,6 +143,9 @@ def build(window):
     ], compact=True)
     page.content.addWidget(self.old_metrics)
     self.old_tabs = TabStrip(TABS)
+    installers = self.old_tabs.buttons["Unused Installers"]
+    installers.setText("Installers")                 # whole word at 1280; the full name stays on hover
+    installers.setToolTip("Unused installers: setup programs and installer packages found by the scan")
     self.old_tabs.setFixedHeight(39)
     page.content.addWidget(self.old_tabs)
 
@@ -159,9 +162,13 @@ def build(window):
     self.old_drive_box = column(spacing=3)
     scan.addWidget(_widget(self.old_drive_box))
     self.old_drive_checks = []
-    self.photo_full = QCheckBox("Full scan (optional)")
-    self.photo_full.setToolTip("Unchecked: Downloads, Documents and your selected folder on this drive. Checked: inspect the whole drive, excluding protected/system locations and linked or offline content.")
+    self.photo_full = QCheckBox("Scan the whole drive (slower)")
+    self.photo_full.setToolTip("Off: Downloads, Documents and your chosen folder on this drive. On: the whole drive, "
+                               "leaving out protected and system places and linked or offline content.")
     scan.addWidget(self.photo_full)
+    full_note = label("Off: only Downloads, Documents and your chosen folder.", "caption", wrap=True)
+    full_note.setStyleSheet("color:#8fa3b8;font-size:11px;")
+    scan.addWidget(full_note)
     scan.addWidget(tool("Change Folder", "folder", self._choose_scan_folder))
     detail_section(scan, "Age (Last Modified)")
     self.old_age_controls = []
@@ -211,6 +218,7 @@ def build(window):
     self.old_notice.setTextFormat(Qt.PlainText)
     contents.addWidget(self.old_notice)
     self.old_table = _table(["", "Name", "Location", "Last Modified", "Size", "Type"])
+    self.old_table.setTextElideMode(Qt.ElideMiddle)     # keep the drive and the folder's own name visible
     self.old_table.setItemDelegateForColumn(1, NameDelegate(self.old_table))
     self.old_table.setItemDelegateForColumn(5, PillDelegate(self.old_table))
     for i, width in enumerate((24, 178, 122, 86, 65, 62)):
@@ -239,11 +247,11 @@ def build(window):
     self.old_selection.setMinimumWidth(0)
     self.old_selection.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
     footer.addWidget(self.old_selection, 1)
-    footer.addWidget(tool("Add to Graveyard", "grave", self._add_old_to_graveyard,
-                          tip="Adds the checked paths to protected Graveyard review. Nothing is moved."))
+    footer.addWidget(tool("Review later in Graveyard", "grave", self._add_old_to_graveyard,
+                          tip="Adds the checked files to Graveyard's review list. Nothing is moved."))
     footer.addWidget(tool("Protect", "shield", self._protect_old_selected,
                           tip="Adds Never Touch rules for the checked rows"))
-    self.old_delete = tool("Delete…", "trash", self._recycle_old_selected, kind="danger",
+    self.old_delete = tool("Move to Recycle Bin…", "trash", self._recycle_old_selected, kind="danger",
                            tip="Moves the reviewed individual files to the Windows Recycle Bin after confirmation. Nothing is permanently deleted.")
     footer.addWidget(self.old_delete)
     contents.addWidget(_widget(footer))
@@ -470,6 +478,7 @@ def fill_file_row(table, i, f, info):
     cell = _text(table, i, 1, Path(f.path).name, symbol, color)
     cell.setData(Qt.UserRole, info.subtitle)
     _text(table, i, 2, str(Path(f.path).parent))
+    table.item(i, 2).setToolTip(str(Path(f.path).parent))
     _text(table, i, 3, datetime.fromtimestamp(f.modified).strftime("%b %d, %Y"))
     _text(table, i, 4, human_size(f.size))
     _text(table, i, 5, info.pill).setToolTip(info.subtitle)
@@ -479,6 +488,7 @@ def fill_group_row(table, i, group):
     cell = _text(table, i, 1, group.name, *FOLDER_ICON)
     cell.setData(Qt.UserRole, group.subtitle)
     _text(table, i, 2, str(Path(group.path).parent))
+    table.item(i, 2).setToolTip(str(Path(group.path).parent))
     _text(table, i, 3, datetime.fromtimestamp(group.newest).strftime("%b %d, %Y"))
     _text(table, i, 4, human_size(group.size))
     _text(table, i, 5, group.pill).setToolTip(group.subtitle)
@@ -524,7 +534,8 @@ def selection_count(window):
     selected = selected_files(window)
     rows = len(_checked(window.old_table))
     size = human_size(sum(f.size for f in selected))
-    window.old_selection.setText("0 selected · double-click a file to tick it, Shift+click for a range" if not rows else
+    window.old_selection.setToolTip("Double-click a file to tick it · Shift+click ticks a range · Ctrl+click adds one")
+    window.old_selection.setText("0 selected" if not rows else
                                  f"{rows} selected ({size})" if window._old_view == "files" else
                                  f"{rows} folders, {len(selected):,} files ({size})")
     with QSignalBlocker(window.old_select_all):
@@ -630,7 +641,7 @@ def details(window):
     header.addLayout(titles, 1)
     header.addWidget(badge("Reviewable" if reviewable else "Protected", reviewable))
     contents.addWidget(_widget(header))
-    contents.addWidget(CoverArt(name, height=83))
+    contents.addWidget(type_tile(symbol, color))
     detail_section(contents, "Details")
     days = oi.age_days(SimpleNamespace(modified=modified))
     possible = (not folders and info.possible_game) or (folders and pill == "Game")
@@ -700,3 +711,15 @@ def protect_selected(window):
     window._old_selection_count()
     window._old_details()
     window.status.setText(f"Protected {len(targets)} selected item(s). Manage personal rules in Settings.")
+
+
+def type_tile(symbol, color, height=83):
+    """The details picture for a file or folder: its type's icon in its type's colour (not initials of its name)."""
+    tile = QLabel()
+    tile.setFixedHeight(height)
+    tile.setAlignment(Qt.AlignCenter)
+    tile.setPixmap(icon(symbol, color, 46).pixmap(46, 46))
+    tile.setStyleSheet("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #141c26,stop:1 #0b1016);"
+                       "border:1px solid #1d2734;border-radius:6px;")
+    tile.setAccessibleName("File type")
+    return tile
