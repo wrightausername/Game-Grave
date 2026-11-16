@@ -56,7 +56,7 @@ PROBLEMS = {
                         "If the game is modded: GG: Mods > My Mods > Game crashing? Find the mod (Crash Doctor).",
                         "Check that the antivirus didn't quarantine a game file, then verify again."]),
     "crash_midgame": (("crash while playing", "crashes randomly", "crashes after", "crash mid", "crashes mid", "ctd",
-                       "crash to desktop", "random crash"),
+                       "crash to desktop", "random crash", "crashing", "keeps crashing", "crashes"),
                       ["GG: Fix Kit > Black Box shows which file each crash happened in.",
                        "A crash in the graphics driver's file usually means a driver problem or an unstable overclock: "
                        "update the driver and remove GPU/CPU overclocks to test.",

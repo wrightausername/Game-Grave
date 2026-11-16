@@ -1209,3 +1209,7 @@ and its answers; layout unchanged except one "Not helpful" button under each ans
 - Sixth bench run: 40 of 45 (89%) on another slice. Fixes: lookups read last-played times as Unix seconds (they showed
   "unknown days ago"); a well-known game that isn't installed ("why does Skyrim need SKSE") gets its general notes first
   instead of "it isn't on your PC"; a model that only says "let me look that up" is told once to go ahead and look.
+- Seventh bench run: 56 of 60 (93%), the whole bench in one run. Last fixes: memory, graphics and processor questions
+  look up PC status before drive space; a tab named in the question gets tab_help; game_grave_state is only offered when the
+  question is about Game Grave itself (the Small model reached for it on unrelated questions); "crashing" finds the
+  crash fixes; a lookup result echoed back as the answer is treated as no answer and retried.

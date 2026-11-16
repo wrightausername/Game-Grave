@@ -266,6 +266,8 @@ def clean_reply(text):
     text = re.sub(r"<think>.*?</think>", "", str(text or ""), flags=re.S | re.I)
     text = re.sub(r"<think>.*", "", text, flags=re.S | re.I)      # thinking that ran out of room never shows
     text = re.sub(r"</?think>", "", text, flags=re.I)
+    if text.strip().startswith(("{", "[")) and text.strip().endswith(("}", "]")):
+        return ""                                   # a lookup result echoed back is not an answer
     text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
     text = re.sub(r"(?m)^#{1,6}\s*", "", text)
     text = text.replace("—", ", ").replace("–", "-").strip()

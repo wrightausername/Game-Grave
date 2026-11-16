@@ -552,6 +552,8 @@ def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS, question=None):
     messages, results, checked = with_prefetch(messages, ctx, first)
     looked = [fn for fn, _args in first]
     tools = tool_specs()
+    if question is not None and not _STATE.search(" ".join(str(question).casefold().split())):
+        tools = [s for s in tools if s["function"]["name"] != "game_grave_state"]   # only when asked about Game Grave itself
     if question is not None:
         from gg_desktop import autopilot_core as core
         if not core.is_request(question):          # a question ("how do I...") is answered, never turned into a plan
@@ -718,7 +720,9 @@ def prefetch(question, ctx):
         add("game_mods", name=name)
     elif name and not calls:
         add("look_up_game", name=name)
-    if _SPACE.search(q):
+    if re.search(r"\b(ram|memory|xmp|expo|gpu|graphics|cpu|processor)\b", q):
+        add("pc_status")
+    elif _SPACE.search(q):
         add("space_use")
     elif _HARDWARE.search(q) and not _MODS.search(q):
         add("pc_status")
@@ -726,6 +730,11 @@ def prefetch(question, ctx):
         add("startup_apps")
     if _OPEN_APPS.search(q):
         add("open_apps")
+    from gg_desktop import local_ai_knowledge as kb_tabs
+    for tab in kb_tabs.TABS:
+        if re.search(r"\b" + re.escape(tab.casefold()) + r"\b", q) and tab.casefold() not in ("games", "mods", "settings"):
+            add("tab_help", tab=tab)
+            break
     if _RECENT.search(q):
         add("recent_activity")
     if _STATE.search(q):
