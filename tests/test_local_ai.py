@@ -233,6 +233,12 @@ class Prompt(unittest.TestCase):
         self.assertEqual(prompt.clean_reply("I deleted the cache for you."), "")
         self.assertEqual(prompt.clean_reply("  "), "")
         self.assertNotIn("\u2014", prompt.clean_reply("Big games \u2014 review them in Games."))
+        # Only real promises are blocked; ordinary uses of "safe" and "free" get through.
+        self.assertTrue(prompt.clean_reply("Your saves are safe: Game Grave never offers them for removal."))
+        self.assertTrue(prompt.clean_reply("You could free up space by reviewing Other Storage."))
+        self.assertEqual(prompt.clean_reply("Recycling these freed up about 12 GB."), "")
+        self.assertEqual(prompt.clean_reply("<think>still working it out"), "", "unfinished thinking never shows")
+        self.assertEqual(prompt.clean_reply("**Starfield** is your biggest game."), "Starfield is your biggest game.")
 
     def test_messages_hold_facts_lookup_and_question(self):
         f = facts()
@@ -240,7 +246,7 @@ class Prompt(unittest.TestCase):
         msgs = prompt.build_messages("what are my biggest games?", base, f, [("hi", "Hi.")])
         self.assertEqual(msgs[0]["role"], "system")
         self.assertIn("Starfield", msgs[0]["content"])
-        self.assertIn("Never say anything is safe", msgs[0]["content"])
+        self.assertIn("Never promise that something is safe", msgs[0]["content"])
         self.assertEqual(msgs[-1]["content"], "what are my biggest games? /no_think")
         self.assertEqual([m["role"] for m in msgs[1:3]], ["user", "assistant"])
 
@@ -251,7 +257,39 @@ class Prompt(unittest.TestCase):
         for name in ("Autopsy (Fix Kit)", "Mod Bisect (Mods)", "Resurrection Kit (Fix Kit)", "Drivers & Startup"):
             self.assertIn(name, system)
         self.assertIn("Never say a feature is missing", system)
-        self.assertLess(len(system), 12000, "the prompt stays well inside the model's context")
+        self.assertLess(len(system), prompt.CONTEXT_CHARS + 12000, "the prompt stays well inside the model's context")
+
+    def test_a_keyword_miss_is_not_handed_to_the_model(self):
+        f = facts()
+        miss = engine.answer("zzqq blorp", f)
+        self.assertEqual(miss.intent, "unknown")
+        system = prompt.build_messages("zzqq blorp", miss, f)[0]["content"]
+        self.assertNotIn("I don't have an answer", system)
+        self.assertNotIn("quick lookup", system)
+        found = prompt.build_messages("biggest games", engine.answer("largest games", f), f)[0]["content"]
+        self.assertIn("quick lookup", found)
+
+    def test_thinking_models_reason_and_keep_more_history(self):
+        f = facts()
+        pairs = [(f"q{i}", f"a{i}") for i in range(10)]
+        msgs = prompt.build_messages("why?", engine.answer("help", f), f, pairs, think=True)
+        self.assertEqual(msgs[-1]["content"], "why?", "no /no_think when the model may think")
+        self.assertEqual(len(msgs), 1 + 12 + 1, "the last six exchanges are kept")
+        self.assertIn("medium", ai.THINKS)
+        self.assertNotIn("small", ai.THINKS)
+
+    def test_a_plain_request_can_become_a_known_plan_only(self):
+        self.assertEqual(prompt.plan_request("PLAN: clean up temp files"), "clean up temp files")
+        self.assertEqual(prompt.plan_request("plan: Fix my game."), "fix my game")
+        self.assertEqual(prompt.plan_request("PLAN: format my drive"), "", "only jobs Game Grave knows")
+        self.assertEqual(prompt.plan_request("Your biggest game is Starfield."), "")
+        self.assertIn("PLAN:", prompt.build_messages("tidy my pc", None, facts())[0]["content"])
+
+    def test_digest_links_saves_mods_and_captures_to_their_game(self):
+        f = facts()
+        digest = prompt.facts_digest(f)
+        self.assertIn("GAMES:", digest)
+        self.assertLessEqual(len(digest), prompt.CONTEXT_CHARS + 60)
 
     def test_turned_off_sources_are_left_out(self):
         f = replace(facts(), enabled=frozenset({"history"}))

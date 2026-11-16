@@ -297,6 +297,14 @@ def _job(window, fn, done, failed, progress=None):
 
 
 # ------------------------------------------------------------------ answering
+def thinks(window):
+    """True when the chosen model reasons before answering (Medium and Large), so the wait is longer."""
+    try:
+        return chosen(window) in ai.THINKS
+    except Exception:
+        return False
+
+
 def answer_async(window, question, base_answer, facts, history, deliver):
     """Ask the local model in the background, then call deliver(answer). Always delivers exactly once."""
     from gg_desktop import assistant_engine as engine
@@ -310,6 +318,8 @@ def answer_async(window, question, base_answer, facts, history, deliver):
     key = chosen(window)
     st.busy = True
 
+    think = key in ai.THINKS
+
     def work(_progress):
         with st.lock:
             server = st.server
@@ -318,18 +328,40 @@ def answer_async(window, question, base_answer, facts, history, deliver):
                     server.stop()
                 server = st.server = ai.LocalServer(key)
                 ai.start_best(server)
-            return server.chat(prompt.build_messages(question, base_answer, facts, history))
+            messages = prompt.build_messages(question, base_answer, facts, history, think=think)
+            budget = dict(max_tokens=2600, timeout=420) if think else dict(max_tokens=800, timeout=240)
+            raw = server.chat(messages, **budget)
+            planned = prompt.plan_request(prompt.clean_reply(raw))
+            if planned:
+                return "PLAN:" + planned
+            text = prompt.clean_reply(raw)
+            if not text and raw.strip():
+                # Broke a rule or ran out of room while thinking: ask once more, shorter, before giving up.
+                retry = messages + [{"role": "assistant", "content": prompt.clean_reply(raw.replace("<think>", "")) or "…"},
+                                    {"role": "user", "content": prompt.RETRY_NOTE + " /no_think"}]
+                text = prompt.clean_reply(server.chat(retry, max_tokens=800, timeout=240))
+            return text
 
-    def done(reply):
+    def done(text):
         st.busy = False
-        text = prompt.clean_reply(reply)
         _arm_idle(window)
-        if not text:
-            deliver(_with_note(base_answer, "The local AI's reply didn't keep Game Grave's rules, so this is the "
-                                            "built-in answer."))
+        if text.startswith("PLAN:"):
+            request = text[5:]
+            deliver(engine.Answer("local_ai", f"I read that as \"{request}\". Here's the plan; nothing changes until you "
+                                  "say OK.", (), "", (f"Local AI: {ai.BY_KEY[key].label}",)))
+            from gg_desktop import autopilot_ui
+            QTimer.singleShot(0, lambda: autopilot_ui.handle(window, request))
             return
-        deliver(engine.Answer(base_answer.intent, text, base_answer.rows, base_answer.note,
-                              tuple(base_answer.sources) + (f"Local AI: {ai.BY_KEY[key].label}",), base_answer.handoffs))
+        if not text:
+            deliver(_with_note(base_answer, "The local AI's answer broke one of Game Grave's safety rules twice, so "
+                                            "this is the built-in answer. Try asking it another way."))
+            return
+        # A keyword miss has nothing useful to keep; a real lookup keeps its rows and buttons beside the AI's words.
+        keep = base_answer.intent not in prompt.NO_LOOKUP
+        deliver(engine.Answer("local_ai" if not keep else base_answer.intent, text,
+                              base_answer.rows if keep else (), base_answer.note if keep else "",
+                              (tuple(base_answer.sources) if keep else ()) + (f"Local AI: {ai.BY_KEY[key].label}",),
+                              base_answer.handoffs if keep else ()))
 
     def failed(message):
         st.busy = False

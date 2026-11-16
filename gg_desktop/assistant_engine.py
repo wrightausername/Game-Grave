@@ -522,7 +522,13 @@ def _profile_lead(facts, game, question):
     if _has(words, text, "where", "drive", "folder", "installed", "location", "path"):
         drive = more.drive_of(game.install_path)
         return f"{game.name} is installed in {game.install_path}" + (f", on drive {drive}:." if drive else ".")
-    if _has(words, text, "big", "size", "large", "space", "gb", "much"):
+    if _has(words, text, "modded", "mods", "mod", "mod folders"):
+        found = sum(1 for m in facts.mods if _within(m.path, game.install_path)) if facts.on("mods") else None
+        if found is None:
+            return f"The mods inventory is turned off, so I can't say whether {game.name} is modded."
+        return (f"{game.name} has {found:,} mod folder{'s' if found != 1 else ''} inside its install folder."
+                if found else f"Game Grave found no mod folders inside {game.name}'s install folder.")
+    if _has(words, text, "big", "size", "large", "space", "gb", "much", "largest", "taking space"):
         if game.size_bytes is None:
             return f"{game.launcher} hasn't reported a size for {game.name}."
         known = sum(g.size_bytes for g in facts.games if g.size_bytes is not None)
@@ -549,6 +555,11 @@ def _profile(facts, game, question):
     if facts.on("mods"):
         rows.append(Row("Mod locations inside it", f"{sum(1 for m in facts.mods if _within(m.path, game.install_path)):,}"))
         used.append("mods")
+    if facts.on("storage"):
+        saves = [s for s in facts.saves if str(getattr(s, "game", "")).casefold() == game.name.casefold()]
+        rows.append(Row("Save folders", f"{len(saves):,}" if saves else "None labeled", None, None,
+                        str(saves[0].path) if saves else ""))
+        used.append("storage")
     if facts.on("captures"):
         rows.append(Row("Captures proven to be its", f"{sum(1 for c in facts.captures if c.game == game.name):,}"))
         used.append("captures")

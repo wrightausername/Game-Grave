@@ -57,6 +57,9 @@ MODELS = (
                 "Best answers. Needs 16 GB of memory and is slower without a strong graphics card."),
 )
 BY_KEY = {m.key: m for m in MODELS}
+# How much text each model may hold at once. Bigger lets it see more of the PC and think longer; Small stays light.
+CONTEXT = {"small": 8192, "medium": 12288, "large": 12288}
+THINKS = frozenset({"medium", "large"})       # these reason step by step before answering
 DEFAULT_MODEL = "medium"
 
 # llama.cpp's own Windows builds. Vulkan uses NVIDIA, AMD or Intel graphics; CPU is the fallback that runs anywhere.
@@ -355,7 +358,8 @@ class LocalServer:
         flags = 0
         if os.name == "nt":
             flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
-        self.process = self.popen(server_args(exe, model, self.port, kind), stdin=subprocess.DEVNULL,
+        self.process = self.popen(server_args(exe, model, self.port, kind, CONTEXT.get(self.model_key, 8192)),
+                                  stdin=subprocess.DEVNULL,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags,
                                   cwd=str(exe.parent))
         deadline = time.monotonic() + wait

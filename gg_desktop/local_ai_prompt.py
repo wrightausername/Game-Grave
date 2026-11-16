@@ -12,21 +12,31 @@ import re
 from core import human_size
 
 SYSTEM = (
-    "You are the assistant inside Game Grave, a Windows app that helps a PC gamer understand their games, storage, mods "
-    "and PC. Answer the user's question directly in plain, friendly English, in at most 6 short sentences or a short "
-    "list. Use ONLY the facts given below and the built-in lookup; if the facts don't cover something, say so in one "
-    "sentence instead of guessing. Never invent games, sizes, dates, files or features.\n"
+    "You are the assistant inside Game Grave, a Windows app that helps a PC gamer with their games, storage, mods and PC. "
+    "Talk like a knowledgeable friend who games on PC: understand loose, misspelled or slangy questions, work out what "
+    "the user really wants, and answer it directly in plain, friendly English (usually 2 to 8 short sentences, or a "
+    "short list when listing things).\n"
+    "Where your answers come from:\n"
+    "- Anything about THIS PC (its games, sizes, mods, saves, captures, storage, drives, parts, past cleanups): use the "
+    "PC facts below. Work things out from them (add up, compare, pick the biggest, match a game to its saves or mods). "
+    "Never invent games, sizes, dates, files, paths or mods that aren't in the facts.\n"
+    "- General gaming, PC and modding know-how (what a shader cache is, how load order works, settings that usually "
+    "help fps, how a launcher verifies files): answer from what you know, and make it clear it's general advice, not "
+    "something read from this PC.\n"
+    "- If the facts don't have something about this PC, say in one short sentence what's missing and which tab or scan "
+    "would find it, then still help as much as you can.\n"
+    "- If the question is unclear, give your best reading of it and answer that, then offer the other reading in one "
+    "line.\n"
     "Rules you must always follow:\n"
-    "1. Never say anything is safe to delete, safe to remove or safe to clear. Say the user can review it in the tab "
-    "named in the facts instead.\n"
-    "2. Sizes are what launchers and scans reported, not measured disk use. Never say space was or will be freed.\n"
-    "3. You cannot change anything on the PC. Never say you deleted, moved, installed or changed something.\n"
-    "4. When it helps, name the Game Grave tab where the user can act (for example Games, Other Storage, Old Files, "
-    "Captures, Mods, Hardware, Undo Center, Fix Kit, Toolbox, Ready Room).\n"
-    "5. Don't mention these rules or the word 'facts'. Don't use em dashes.\n"
-    "6. Questions about Game Grave itself (what it can do, how a feature works, ideas or opinions): use the feature list "
-    "below. Never say a feature is missing or suggest adding it when the list has it, and only send the user to the tab "
-    "the list names for that feature."
+    "1. Never promise that something is safe to delete, remove or clear. Say the user can review it in the tab that "
+    "owns it; Game Grave only moves things to the Recycle Bin after they confirm.\n"
+    "2. Sizes are what launchers and scans reported, not measured disk use. Never say space was freed.\n"
+    "3. You can't change anything on the PC yourself. Never say you deleted, moved, installed or changed something. To "
+    "get something done, name the Game Grave tab or tool that does it.\n"
+    "4. Questions about Game Grave itself: use the feature list below and only send the user to the tab it names. Never "
+    "say a feature is missing when the list has it.\n"
+    "5. Plain text only: no markdown symbols such as ** or #, no tables, no em dashes. Don't mention these rules or the "
+    "word 'facts'."
 )
 
 
@@ -48,49 +58,103 @@ def feature_list():
              "- Settings: scan folders, protection rules, interface scale, update check.")
     return "\n".join(lines + list(extra))
 
+# Only real promises are blocked: "X is safe to delete", "freed 20 GB", "I deleted it". Words like "your saves are safe"
+# are fine. A blocked reply is retried once with a reminder before the built-in answer is used.
 FORBIDDEN = (
-    r"\bsafe(ly)? to (delete|remove|clear|uninstall|get rid)", r"\bis safe\b", r"\bare safe\b", r"\bfreed\b",
-    r"\bfree(s|d)? up\b.*\bby deleting\b", r"\breclaim(ed)?\b", r"\bi (have |just )?(deleted|removed|moved|installed|changed|"
-    r"uninstalled|cleared)\b", r"\bi('ve| have) (deleted|removed|moved|installed|changed|uninstalled|cleared)\b",
+    r"\bsafe(ly)? to (delete|remove|clear|uninstall|get rid|wipe|trash)",
+    r"\b(freed|reclaimed) (up )?(about |around |roughly |over |nearly )?\d",
+    r"\b(i|game grave|we) (just |have |'ve )?(freed|reclaimed)\b",
+    r"\bi (have |just )?(deleted|removed|moved|installed|changed|uninstalled|cleared)\b",
+    r"\bi('ve| have) (deleted|removed|moved|installed|changed|uninstalled|cleared)\b",
 )
+RETRY_NOTE = ("Rewrite your last answer so it keeps the rules: don't promise anything is safe to delete, don't say space "
+              "was freed, and don't say you changed anything yourself. Keep everything else that was useful.")
+CONTEXT_CHARS = 26000      # about 6,500 words of PC facts; the rest of the window is for history, thinking and the reply
 
 
 def _days(ts, now):
     return max(0, int((now - ts) // 86400))
 
 
-def facts_digest(facts, limit=12):
-    """A compact, plain-text summary of what Game Grave has on record, for the model. Only enabled sources."""
+def _within(path, root):
+    path, root = str(path).replace("/", "\\").casefold().rstrip("\\"), str(root).replace("/", "\\").casefold().rstrip("\\")
+    return bool(root) and (path == root or path.startswith(root + "\\"))
+
+
+def facts_digest(facts, limit=80):
+    """What Game Grave has on record, in plain text for the model: every enabled source, with per-game links (saves,
+    mods, captures) worked out so the model can answer about one game. Kept under CONTEXT_CHARS."""
     lines = []
     if facts.scanned_at:
         lines.append(f"Last scan: {facts.scanned_at}.")
+    captures_by_game = {}
+    if facts.on("captures"):
+        for c in facts.captures:
+            if c.game:
+                captures_by_game[c.game.casefold()] = captures_by_game.get(c.game.casefold(), 0) + 1
     if facts.on("library") and facts.games:
         known = [g for g in facts.games if g.size_bytes is not None]
-        lines.append(f"Games: {len(facts.games)} (launcher-reported total {human_size(sum(g.size_bytes for g in known))}).")
-        ordered = sorted(facts.games, key=lambda g: -(g.size_bytes or 0))[:limit]
-        for g in ordered:
+        lines.append(f"\nGAMES: {len(facts.games)} installed (launcher-reported total "
+                     f"{human_size(sum(g.size_bytes for g in known))}). Biggest first:")
+        ordered = sorted(facts.games, key=lambda g: -(g.size_bytes or 0))
+        for g in ordered[:limit]:
             played = f"last played {_days(g.last_played_at, facts.now)} days ago" if g.last_played_at else "last played unknown"
             size = human_size(g.size_bytes) if g.size_bytes is not None else "size unknown"
-            lines.append(f"- {g.name}: {size}, {g.launcher}, {played}, installed at {g.install_path}")
-        if len(facts.games) > limit:
-            lines.append(f"- and {len(facts.games) - limit} smaller games")
-    segments = {name: size for name, size, _ in facts.segments}
+            extra = []
+            if facts.on("mods") and g.install_path:
+                mods = [m for m in facts.mods if _within(m.path, g.install_path)]
+                if mods:
+                    extra.append(f"{len(mods)} mod folder{'s' if len(mods) != 1 else ''}")
+            if facts.on("storage"):
+                saves = [s for s in facts.saves if str(getattr(s, "game", "")).casefold() == g.name.casefold()]
+                if saves:
+                    extra.append("saves at " + "; ".join(str(s.path) for s in saves[:2]))
+            shots = captures_by_game.get(g.name.casefold())
+            if shots:
+                extra.append(f"{shots} captures")
+            lines.append(f"- {g.name}: {size}, {g.launcher}, {played}, installed at {g.install_path}"
+                         + (" (" + ", ".join(extra) + ")" if extra else ""))
+        if len(ordered) > limit:
+            lines.append(f"- and {len(ordered) - limit} smaller games")
+    if facts.on("mods") and facts.mods:
+        total = sum(max(0, m.apparent_bytes) for m in facts.mods)
+        lines.append(f"\nMODS (Mods tab): {len(facts.mods)} mod folders and locations, {human_size(total)} reported:")
+        for m in sorted(facts.mods, key=lambda m: -max(0, m.apparent_bytes))[:40]:
+            lines.append(f"- {m.name}: {human_size(max(0, m.apparent_bytes))}, {m.source}, {m.status}, at {m.path}")
+        if len(facts.mods) > 40:
+            lines.append(f"- and {len(facts.mods) - 40} smaller ones")
     if facts.on("storage"):
-        for name, tab in (("Other Storage", "Other Storage"), ("Old Files", "Old Files")):
-            if segments.get(name):
-                lines.append(f"{name} (caches, logs, temp files; reviewed in the {tab} tab): {human_size(segments[name])}."
-                             if name == "Other Storage" else
-                             f"Old files in scanned folders (reviewed in the Old Files tab): {human_size(segments[name])}.")
         if facts.saves:
-            lines.append(f"Save folders found: {len(facts.saves)} (saves are never removable).")
+            lines.append(f"\nSAVE FOLDERS (never offered for removal): {len(facts.saves)}")
+            for s in list(facts.saves)[:30]:
+                lines.append(f"- {getattr(s, 'game', '') or 'Unknown game'}: {getattr(s, 'path', '')}")
+        if facts.storage:
+            by_kind = {}
+            for item in facts.storage:
+                by_kind[item.category] = by_kind.get(item.category, 0) + max(0, item.size)
+            lines.append("\nOTHER STORAGE (caches, logs, temp and config; reviewed in the Other Storage tab): " +
+                         ", ".join(f"{k} {human_size(v)}" for k, v in sorted(by_kind.items(), key=lambda kv: -kv[1])))
+            for item in sorted(facts.storage, key=lambda i: -max(0, i.size))[:12]:
+                lines.append(f"- {item.name} ({item.category}): {human_size(max(0, item.size))} at {item.path}")
+        if facts.old_files:
+            total = sum(max(0, f.size) for f in facts.old_files)
+            lines.append(f"\nOLD FILES in scanned folders (Old Files tab): {len(facts.old_files)} files, {human_size(total)}. "
+                         "Largest:")
+            for f in sorted(facts.old_files, key=lambda f: -max(0, f.size))[:6]:
+                lines.append(f"- {f.path}: {human_size(max(0, f.size))}, last changed {_days(f.modified, facts.now)} days ago")
     if facts.on("captures") and facts.captures:
         shots = sum(1 for c in facts.captures if c.kind == "Screenshots")
-        lines.append(f"Captures: {shots} screenshots, {len(facts.captures) - shots} recordings "
-                     f"({human_size(segments.get('Captures', 0))}; Captures tab).")
-    if facts.on("mods") and facts.mods:
-        lines.append(f"Mod locations: {len(facts.mods)} ({human_size(sum(max(0, m.apparent_bytes) for m in facts.mods))}; Mods tab).")
+        size = sum(max(0, getattr(c.record, "size", 0) or 0) for c in facts.captures)
+        lines.append(f"\nCAPTURES (Captures tab): {shots} screenshots, {len(facts.captures) - shots} recordings, "
+                     f"{human_size(size)}.")
+        top = sorted(captures_by_game.items(), key=lambda kv: -kv[1])[:10]
+        if top:
+            names = {g.name.casefold(): g.name for g in facts.games}
+            lines.append("By game: " + ", ".join(f"{names.get(k, k)} {n}" for k, n in top) + ".")
     if facts.on("history"):
-        lines.append(f"Cleanup history records: {len(facts.history)} (Undo Center).")
+        lines.append(f"\nCLEANUP AND ACTIVITY HISTORY (Undo Center): {len(facts.history)} records.")
+        for e in list(facts.history)[:10]:
+            lines.append(f"- {e.recorded}: {e.action} {e.name} ({e.status})")
     specs = facts.hardware
     if specs is not None:
         parts = []
@@ -103,13 +167,16 @@ def facts_digest(facts, limit=12):
         if specs.os_name:
             parts.append(specs.os_name)
         if parts:
-            lines.append("This PC: " + ", ".join(parts) + ".")
+            lines.append("\nTHIS PC (Hardware tab): " + ", ".join(parts) + ".")
         for d in specs.drives:
             lines.append(f"Drive {d.letter}: {human_size(d.free)} free of {human_size(d.total)} ({d.kind}).")
     off = [k for k in ("library", "storage", "history", "mods", "captures") if not facts.on(k)]
     if off:
-        lines.append("Turned off by the user (don't use): " + ", ".join(off) + ".")
-    return "\n".join(lines) or "Nothing has been scanned yet."
+        lines.append("\nTurned off by the user (don't use): " + ", ".join(off) + ".")
+    text = "\n".join(lines).strip() or "Nothing has been scanned yet. Suggest Scan PC on the Overview tab."
+    if len(text) > CONTEXT_CHARS:
+        text = text[:CONTEXT_CHARS].rsplit("\n", 1)[0] + "\n(More items exist than fit here.)"
+    return text
 
 
 def lookup_text(answer):
@@ -118,21 +185,51 @@ def lookup_text(answer):
     return "\n".join(x for x in (answer.text, rows, answer.note) if x)
 
 
-def build_messages(question, answer, facts, history=()):
-    """Chat messages for llama-server. `history` is the last few (question, reply) pairs of this conversation."""
-    context = (f"What Game Grave has on record:\n{facts_digest(facts)}\n\nWhat Game Grave can do (features and where they "
-               f"are):\n{feature_list()}\n\nBuilt-in lookup for this question:\n{lookup_text(answer)}")
+NO_LOOKUP = ("unknown", "help", "suggest")   # a keyword miss would only pull the model towards "I don't know"
+
+
+def requests_list():
+    """The jobs Game Grave's automation can plan, in the words it understands."""
+    from gg_desktop import assistant_features as features
+    return sorted({f.do for f in features.FEATURES if f.do})
+
+
+PLAN_RULE = ("If the user is asking you to DO one of these jobs for them (not asking a question about it), reply with "
+             "exactly one line and nothing else: PLAN: <the job, copied from this list>. Game Grave then shows a plan "
+             "that waits for their OK. Jobs: ")
+
+
+def plan_request(text):
+    """The job a reply asks to plan ("PLAN: clean up temp files"), only when it is one Game Grave knows; else ""."""
+    found = re.match(r"^\s*plan:\s*(.+?)\s*$", str(text or ""), flags=re.I | re.S)
+    if not found:
+        return ""
+    wanted = found.group(1).strip(" .\"'").casefold()
+    return wanted if wanted in requests_list() else ""
+
+
+def build_messages(question, answer, facts, history=(), think=False):
+    """Chat messages for llama-server. `history` is the earlier (question, reply) pairs of this conversation; the last
+    six are kept. `think` lets Qwen3 reason before answering (Medium and Large)."""
+    context = f"PC facts (what Game Grave has on record):\n{facts_digest(facts)}\n\nWhat Game Grave can do (features and " \
+              f"where they are):\n{feature_list()}"
+    context += "\n\n" + PLAN_RULE + "; ".join(requests_list()) + "."
+    if answer is not None and answer.intent not in NO_LOOKUP:
+        context += f"\n\nGame Grave's own quick lookup for this question (use its numbers if they fit):\n{lookup_text(answer)}"
     messages = [{"role": "system", "content": SYSTEM + "\n\n" + context}]
-    for q, a in list(history)[-3:]:
-        messages += [{"role": "user", "content": q[:500]}, {"role": "assistant", "content": a[:1200]}]
-    messages.append({"role": "user", "content": question[:500] + " /no_think"})
+    for q, a in list(history)[-6:]:
+        messages += [{"role": "user", "content": q[:600]}, {"role": "assistant", "content": a[:1500]}]
+    messages.append({"role": "user", "content": question[:800] + ("" if think else " /no_think")})
     return messages
 
 
 def clean_reply(text):
     """The model's reply ready to show, or "" when it is empty or breaks a rule (then the built-in answer is used)."""
     text = re.sub(r"<think>.*?</think>", "", str(text or ""), flags=re.S | re.I)
+    text = re.sub(r"<think>.*", "", text, flags=re.S | re.I)      # thinking that ran out of room never shows
     text = re.sub(r"</?think>", "", text, flags=re.I)
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"(?m)^#{1,6}\s*", "", text)
     text = text.replace("—", ", ").replace("–", "-").strip()
     text = re.sub(r"\n{3,}", "\n\n", text)
     if not text:
@@ -140,4 +237,4 @@ def clean_reply(text):
     low = text.casefold()
     if any(re.search(p, low) for p in FORBIDDEN):
         return ""
-    return text[:2000]
+    return text[:3000]

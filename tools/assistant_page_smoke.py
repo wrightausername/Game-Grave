@@ -154,7 +154,12 @@ def main():
             assert "Resurrection Kit A Resurrection Kit" in text and "single ZIP file" in text and "Open Fix Kit" in buttons(window), text
             assert text.count("I answer from what Game Grave has already scanned") == 0, "A feature question is answered, not deflected"
             ask(window, "tell me a joke")
-            assert "don't have an answer for that one yet" in transcript(window)
+            assert "not sure what you mean yet" in transcript(window), "a miss offers best guesses"
+            assert "don't have an answer for that one yet" not in transcript(window)
+            guess = next(b for b in window.assistant_scroll.widget().findChildren(QPushButton) if b.text() == "Largest games")
+            guess.click()
+            settle()
+            assert "What are my largest games?" in transcript(window), "a guess button asks its question"
             ask(window, "hi")
             assert "Ask me anything about your games" in transcript(window)
             ask(window, "how many games do I have")
@@ -222,17 +227,28 @@ def main():
             assert "You have 2 games, from Steam." in transcript(window), transcript(window)
             assert "Local AI: Medium" in transcript(window), "the local model is named as a source"
             assert window.assistant_input.isEnabled()
-            # A reply that breaks the rules is never shown; the built-in answer is.
+            # A reply that breaks the rules is retried once; if the retry keeps the rules, that is what shows.
             with patch.object(ai, "start_best", return_value="cpu"), \
-                    patch.object(ai.LocalServer, "chat", return_value="Cyberpunk is safe to delete."), \
+                    patch.object(ai.LocalServer, "chat", side_effect=["Cyberpunk is safe to delete.",
+                                                                      "Cyberpunk is 70 GB. Review it in Games."]) as asked, \
                     patch.object(ai.LocalServer, "running", new=True):
                 ask(window, "what about cyberpunk")
                 deadline = time.time() + 10
-                while "didn't keep Game Grave's rules" not in transcript(window) and time.time() < deadline:
+                while "Review it in Games." not in transcript(window) and time.time() < deadline:
+                    settle()
+                    time.sleep(0.05)
+            assert asked.call_count == 2 and "Review it in Games." in transcript(window), transcript(window)
+            # Broken twice: never shown, the built-in answer is, and it says why.
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat", return_value="Cyberpunk is safe to delete."), \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "and cyberpunk again")
+                deadline = time.time() + 10
+                while "safety rules twice" not in transcript(window) and time.time() < deadline:
                     settle()
                     time.sleep(0.05)
             low = transcript(window).lower().replace("is it safe to delete", "")
-            assert "didn't keep game grave's rules" in low and "cyberpunk is safe to delete" not in low, low
+            assert "safety rules twice" in low and "cyberpunk is safe to delete" not in low, low
             local_ai_ui.stop(window)
             w.switch.click()
             settle()

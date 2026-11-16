@@ -1098,3 +1098,41 @@ reviewed, the findings are listed to the owner, and only the approved fixes are 
   a dot, and the Ready Room sample patch notes use colons. A lone "—" that stands for "not known" stays, as approved.
   One dash remains in the protected `gg_desktop/mod_conflicts.py` ("File overlap — review load order"); it is not edited
   because the photo reference guard locks that file.
+
+AI Assistant, smarter (owner instruction, 2026-11-16: "the AI assistant is still just super bare bones and needs to be very
+specific questions in order to run", then, with the Large model downloaded, "do all of that" to the plan). AI Assistant is
+reopened for its answers and the local AI; layout unchanged. Honesty rules unchanged: nothing is promised safe to delete,
+sizes stay reported, nothing is changed without the plan's one OK.
+- Local AI (`local_ai_prompt.py`, `local_ai_ui.py`, `local_ai_core.py`):
+  - New instructions: understand loose questions, work things out from the PC facts (add up, compare, match a game to its
+    saves and mods), answer general gaming and modding know-how from its own knowledge and say it's general advice, say what
+    is missing instead of giving up, never invent PC facts. Plain text, no markdown.
+  - Much fuller PC facts (`facts_digest`, capped at `CONTEXT_CHARS`): up to 80 games with each game's mod folders, labeled
+    save folders and capture count; up to 40 mods; save folders; Other Storage by type with the biggest items; old files;
+    captures by game; the last 10 history and activity records; hardware and drives. Sources switched off stay out.
+  - The keyword answer is no longer handed over when it missed (`NO_LOOKUP`: unknown, help, suggest); a real lookup still is,
+    and its rows and buttons stay beside the AI's words.
+  - Safety filter narrowed to real promises (`FORBIDDEN`: "safe to delete/remove/clear", "freed 12 GB", "I deleted"); "your
+    saves are safe" is fine. A blocked reply is retried once with a reminder (`RETRY_NOTE`); broken twice, the built-in
+    answer shows with a note saying so.
+  - Medium and Large reason before answering (`THINKS`, no "/no_think", up to 2,600 tokens, "Thinking it through on this
+    PC…"); Small stays quick. Context 12,288 tokens for Medium and Large, 8,192 for Small (`CONTEXT`). The last six
+    exchanges of the chat are kept. Unfinished thinking never shows.
+  - A plain request ("can you tidy up my temp stuff") can become a plan: the model may answer "PLAN: <job>" with one of the
+    jobs the automation already knows (`requests_list`, from `assistant_features` "do" requests); anything else is ignored.
+    The plan is the usual one (preview when running tools is off, Run all and its one confirmation when on).
+- Built-in assistant (`gg_desktop/assistant_understand.py`, pure, `tests/test_assistant_understand.py`), used by
+  `assistant_page.send` in front of the unchanged keyword answers:
+  - Slang and typos become the words the answers know ("hogging my c drive", "pics", "vids", "ctd", "lagging", "wat",
+    "biggets", "storge"); the typo list is read from the engine's compiled keywords, so it works in the installed app.
+    Loosely typed game names are matched ("cyber punk", "stafield") and put back exactly; a name it doesn't have is never
+    guessed.
+  - Follow-ups use the chat (`last_exchange`): "what about Cyberpunk?", "and Hades?", a bare game name, "the second one",
+    "tell me more", "why?" (names where the last answer came from).
+  - Two questions in one message get two answers ("how big is Starfield and when did I last play Cyberpunk").
+  - A miss is never "I don't have an answer": it says it isn't sure and offers its three best guesses as buttons that ask
+    them (`q:` hand-offs), plus a pointer to the local AI when that is off.
+  - Game questions: "is Hades modded" leads with the mod folder count; the game record gains its labeled save folders.
+  - Loosely worded requests also become plans ("nuke my temp files" plans the temp clean-up), through the same automation.
+- Covered by `tests/test_assistant_understand.py`, `tests/test_local_ai.py` and `tools/assistant_page_smoke.py` (best-guess
+  buttons, the retry, the twice-broken note).

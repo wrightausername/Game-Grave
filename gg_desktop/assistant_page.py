@@ -648,6 +648,11 @@ def add_answer(window, question, answer, plan=None, layout=None):
     actions_row = ActionFlow(spacing=6)
     from gg_desktop import autopilot_ui
     for caption, tab in answer.handoffs:
+        if tab.startswith("q:"):           # a best guess: asks that question as if it were typed
+            guess = tool(caption, "next", lambda _=False, q=tab[2:]: send(window, q), kind="primary",
+                         tip=f"Ask: {tab[2:]}")
+            actions_row.addWidget(guess)
+            continue
         if ":" in tab or tab in ("bisect", "tour") or "/" in tab:
             asks = tab.startswith("ask:")
             special = tool(caption, "play" if asks else "next", lambda _=False, t=tab: autopilot_ui.open_target(window, t),
@@ -755,6 +760,15 @@ def ensure_chats(window):
     return state
 
 
+def last_exchange(chat):
+    """The newest question and answer in this chat, so "what about Starfield?" or "why?" can refer back to them."""
+    messages = (chat or {}).get("messages") or []
+    for i in range(len(messages) - 1, 0, -1):
+        if messages[i].get("role") == "assistant" and messages[i - 1].get("role") == "user":
+            return str(messages[i - 1].get("text", "")), dict(messages[i].get("answer") or {})
+    return "", None
+
+
 def send(window, question=None, source=None):
     """Answer one message from the tab or the pop-out window (`source` is the input box it came from)."""
     shown = views(window)
@@ -771,11 +785,15 @@ def send(window, question=None, source=None):
     text = here_question(window, text)
     if follow_up(window, text):          # "proceed", "yes", "do it": act on what the assistant just offered
         return
-    if autopilot_ui.handle(window, text):  # a request to run Game Grave's own tools becomes a plan
+    from gg_desktop import assistant_understand as understand
+    loose = understand.normalize(text, make_facts(window))      # "nuke my temp files" is "delete my temp files"
+    if autopilot_ui.handle(window, text) or (loose != text.casefold() and autopilot_ui.handle(window, loose, shown=text)):
         window.status.setText("Planned with Game Grave's own tools. Nothing changes until you press Run all.")
         return
     facts = make_facts(window)
-    result = engine.answer(text, facts)
+    previous_question, previous_answer = last_exchange(current_chat(window))
+    result = understand.answer(text, facts, previous_question, previous_answer,
+                               local_ai_on=local_ai_ui.enabled(window))
     if result.intent == "hardware_unread" and not getattr(window, "_assistant_parts_tried", False):
         # Ask Windows for the parts once (read only, the same call as Hardware's Re-read), then answer again.
         window._assistant_parts_tried = True  # once per run; Hardware's Re-read still works after a failure
@@ -802,7 +820,7 @@ def send(window, question=None, source=None):
         state.current = chat["id"]
     if local_ai_ui.enabled(window) and result.intent not in ("greet", "thanks", "off", "hardware_unread"):
         msgs = chat["messages"]
-        history = [(msgs[i]["text"], msgs[i + 1]["text"]) for i in range(0, len(msgs) - 1, 2)
+        history = [(msgs[i]["text"], msgs[i + 1]["text"]) for i in range(max(0, len(msgs) - 13), len(msgs) - 1)
                    if msgs[i]["role"] == "user" and msgs[i + 1]["role"] == "assistant"]
         starting = local_ai_ui.state_of(window).server is None
         window.status.setText("Local AI is starting on this PC (the first answer can take up to a minute)…" if starting
@@ -816,7 +834,7 @@ def send(window, question=None, source=None):
                 layout.takeAt(layout.count() - 1)
             layout.addWidget(bubble(text))
             add_assistant_text(window, "Starting the local AI model, this first answer can take up to a minute…"
-                               if starting else "Thinking…", layout)
+                               if starting else ("Thinking it through on this PC…" if local_ai_ui.thinks(window) else "Thinking…"), layout)
             layout.addStretch()
             scroll_down(window, view.scroll)
         chat_id = chat["id"]
