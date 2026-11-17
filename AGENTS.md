@@ -1244,3 +1244,6 @@ for these; `app.py` gains one call after a scan; Mods' conflict wording changes 
 - Covered by `tests/test_assistant_memory.py`, `tests/test_local_ai_tools.py` (empty reply), `tests/test_local_ai.py` (four
   sizes) and `tools/autopilot_smoke.py` ("undo that" after ready-to-play, notes round trip, "Did that fix Elden Ring?" and
   "No, still broken").
+- Bench after the extras: 40 of 41 (98%). The Extra Large file resolved (Qwen3-14B-Q4_K_M.gguf, 8.38 GB, fingerprint
+  checked). The one miss was the Small model replying a bare "None" to a DXGI error; that now counts as no answer, so it is
+  asked once more and otherwise the built-in error explanation shows.

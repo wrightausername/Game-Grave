@@ -239,6 +239,7 @@ class Prompt(unittest.TestCase):
         self.assertTrue(prompt.clean_reply("You could free up space by reviewing Other Storage."))
         self.assertEqual(prompt.clean_reply("Recycling these freed up about 12 GB."), "")
         self.assertEqual(prompt.clean_reply("Your Windows settings have been restored."), "", "it never reports a change as done")
+        self.assertEqual(prompt.clean_reply("None"), "", "a bare None is no answer")
         self.assertEqual(prompt.clean_reply("<think>still working it out"), "", "unfinished thinking never shows")
         self.assertEqual(prompt.clean_reply("**Starfield** is your biggest game."), "Starfield is your biggest game.")
 

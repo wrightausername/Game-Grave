@@ -269,6 +269,8 @@ def clean_reply(text):
     text = re.sub(r"<think>.*?</think>", "", str(text or ""), flags=re.S | re.I)
     text = re.sub(r"<think>.*", "", text, flags=re.S | re.I)      # thinking that ran out of room never shows
     text = re.sub(r"</?think>", "", text, flags=re.I)
+    if text.strip().strip(".").casefold() in ("none", "null", "n/a", ""):
+        return ""                                   # the Small model sometimes answers with a bare "None"
     if text.strip().startswith(("{", "[")) and text.strip().endswith(("}", "]")):
         return ""                                   # a lookup result echoed back is not an answer
     text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
