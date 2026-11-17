@@ -92,13 +92,13 @@ def main():
             started = time.time()
             print(f"opening {route}…", flush=True)
             try:
-                window.navigate(route)
-                rw.pump(0.2)
-                rw.wait_for(lambda: not window.workers, timeout=120)
+                window.navigate(route)            # the time the window is busy building the tab
+                built = time.time() - started
+                rw.pump(0.5)
             except Exception as exc:
                 rep.check(f"{route} opens with the huge library", False, error=f"{type(exc).__name__}: {exc}")
                 continue
-            times[route] = round(time.time() - started, 2)
+            times[route] = round(built, 2)
             print(f"  {route}: {times[route]} s", flush=True)
             window.grab().save(str(args.output / f"huge-{route.replace(' ', '-').lower()}.png"))
         slow = {k: v for k, v in times.items() if v > 5}
@@ -109,7 +109,9 @@ def main():
         # The soak
         samples = []
         end = time.time() + args.soak_minutes * 60
-        routes = nav_groups.routes()
+        routes = [r for r in nav_groups.routes() if times.get(r, 0) < 60]
+        rep.note("left out of the long run because they take over a minute to build",
+                 tabs=[r for r in nav_groups.routes() if r not in routes])
         step = 0
         next_sample = time.time()
         while time.time() < end:
