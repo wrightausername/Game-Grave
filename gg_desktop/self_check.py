@@ -136,6 +136,10 @@ def run(window, folder: Path, scan_timeout=900):
             return
         route = left.pop(0)
         t = time.time()
+        if route == "AI Assistant" and hasattr(window, "assistant_enabled") and not window.assistant_enabled():
+            done.append({"tab": route, "ok": True, "note": "off until it's turned on in Settings, as designed"})
+            QTimer.singleShot(50, lambda: tabs(left, done))
+            return
         try:
             window.navigate(route)
             QApplication.processEvents()
