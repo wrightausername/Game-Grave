@@ -46,6 +46,18 @@ def recommended(window):
     return cached
 
 
+def fit_combo(combo):
+    """A drop-down that fits the narrow settings column: long names are cut with … instead of widening the column
+    past its edge; the full name is in the list and the tooltip."""
+    from PySide6.QtWidgets import QSizePolicy
+    combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+    combo.setMinimumContentsLength(10)
+    combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+    combo.setMinimumWidth(0)
+    combo.setToolTip(combo.currentText())
+    combo.currentTextChanged.connect(combo.setToolTip)
+
+
 def chosen(window):
     key = window.settings.get("local_ai_model")
     return key if key in ai.BY_KEY else recommended(window)
@@ -93,22 +105,26 @@ def build_panel(window, accent):
         combo.addItem(choice.title + (" · recommended for this PC" if choice.key == fits else ""), choice.key)
         combo.setItemData(combo.count() - 1, f"{choice.blurb} Needs about {choice.ram_gb} GB of memory.", 3)
     combo.setCurrentIndex(max(0, combo.findData(chosen(window))))
+    fit_combo(combo)
     lay.addWidget(combo)
-    buttons = row(spacing=6)
+    from gg_desktop.insight_widgets import ActionFlow
+    buttons = ActionFlow(spacing=6)            # wraps in the narrow column instead of running off the edge
     get = button("Download", lambda: download(window), kind="primary")
     remove = button("Remove", lambda: remove_model(window))
     cancel = button("Cancel", lambda: st.cancel.set())
     for b in (get, remove, cancel):
         b.setFixedHeight(28)
         buttons.addWidget(b)
-    lay.addLayout(buttons)
+    holder = QWidget()
+    holder.setLayout(buttons)
+    lay.addWidget(holder)
     bar = QProgressBar()
     bar.setFixedHeight(8)
     bar.setTextVisible(False)
     bar.setRange(0, 1000)
     lay.addWidget(bar)
-    lay.addWidget(label("Runs on this PC only; nothing you ask leaves it. Pauses while a game runs. The assistant never "
-                        "deletes, moves or changes anything.", "warning", wrap=True))
+    lay.addWidget(label("Runs on this PC only; nothing you ask leaves it. Pauses while a game runs. Nothing on your PC "
+                        "changes without your OK.", "warning", wrap=True))
     lay.addStretch()
     st.widgets = SimpleNamespace(switch=switch, status=status, combo=combo, get=get, remove=remove, cancel=cancel, bar=bar)
 

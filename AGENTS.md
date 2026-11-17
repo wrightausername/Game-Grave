@@ -1347,3 +1347,16 @@ first-scan summary, the low-space notice, Soulbind for new games), each on its o
 the page showing the old results; a failure is kept for Copy diagnostics ("After scan (<step>): ..."). A moment later the page is
 built again if it still shows results from before the scan (`page._built_for`). No layout or wording changed. Covered by
 `tools/overview_live_smoke.py` (a failing follow-up still shows the new results on Overview without changing tabs).
+
+Long confirmations and the assistant's Settings column (owner reports, 2026-11-17: "i click fix 270 entries and i just get a wall of
+text blocking me from confirming it", and "with the AI assistant the settings tab doesnt fit the rest of the section... its off and
+cut off and doesnt follow the art style").
+- Shared confirmation (`app.confirm`): a message longer than about 16 lines opens `confirm_long` instead of a message box: the first
+  paragraph on top, every other line in a scrolling box, Cancel (the default) and Yes always visible, sized to the screen. Same
+  question, same answer; short confirmations are unchanged. Registry Cleanup now lists every entry it will change (up to the 500
+  one fix takes) instead of the first 40, since the list scrolls. Covered by `tools/registry_smoke.py` (270 entries, Yes visible).
+- AI Assistant Settings column: "Explain things for" uses the same panel style and header icon as the panels under it; the model
+  and level drop-downs shorten long names with "…" instead of widening the column past its edge (full name in the list and the
+  tooltip); the Download / Remove / Cancel buttons wrap; the Local AI note says nothing changes without your OK (the automation
+  can change things after its one OK). Covered by `tools/assistant_page_smoke.py` (nothing in the column reaches past its right
+  edge at 960, 1280 and 1440 pixels).

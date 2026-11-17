@@ -46,6 +46,46 @@ class JobSignals(QObject):
     progress = Signal(int, str)
 
 
+def long_message(message: str) -> bool:
+    text = str(message or "")
+    return text.count("\n") > 16 or len(text) > 1400
+
+
+def confirm_long(window, title: str, message: str, destructive: bool = False) -> bool:
+    """The same question as the short confirmation, for a message too long for a message box (a fix of 270 registry
+    entries, a plan with many changes): the first paragraph on top, every line after it in a scrolling box, and Cancel
+    and Yes always visible at the bottom. Cancel is the default, as in the short one."""
+    from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QPlainTextEdit, QVBoxLayout
+    head, _, rest = str(message).partition("\n\n")
+    dialog = QDialog(window)
+    dialog.setWindowTitle(title)
+    screen = window.screen().availableGeometry() if window.screen() else None
+    width = min(760, int(screen.width() * 0.8)) if screen else 760
+    height = min(620, int(screen.height() * 0.8)) if screen else 620
+    dialog.resize(width, height)
+    lay = QVBoxLayout(dialog)
+    lay.setContentsMargins(20, 18, 20, 16)
+    lay.setSpacing(10)
+    top = QLabel(head)
+    top.setWordWrap(True)
+    top.setTextFormat(Qt.PlainText)
+    top.setStyleSheet("font-size:14px;font-weight:600;" + ("color:#ffb3bd;" if destructive else ""))
+    lay.addWidget(top)
+    details = QPlainTextEdit(rest)
+    details.setReadOnly(True)
+    details.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+    details.setAccessibleName("Details of what will change")
+    lay.addWidget(details, 1)
+    buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Yes)
+    buttons.button(QDialogButtonBox.Cancel).setDefault(True)
+    buttons.button(QDialogButtonBox.Cancel).setFocus()
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    lay.addWidget(buttons)
+    window._last_long_confirm = dialog
+    return dialog.exec() == QDialog.Accepted
+
+
 class Job(QRunnable):
     def __init__(self, fn):
         super().__init__()
@@ -533,6 +573,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             self._sync_scan_controls()
 
     def confirm(self, title: str, message: str, *, destructive: bool = False) -> bool:
+        if long_message(message):
+            return confirm_long(self, title, message, destructive)   # a list of hundreds: scrolls, buttons stay visible
         box = QMessageBox(self)
         box.setWindowTitle(title)
         box.setText(message)

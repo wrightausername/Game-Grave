@@ -508,6 +508,24 @@ def main():
                     bottom = window.assistant_send.mapTo(window, window.assistant_send.rect().bottomLeft()).y()
                     assert bottom <= window.height(), ("Send is cut off", (width, height), bottom)
                 assert window.grab().save(str(args.output / f"assistant-page-{width}.png"))
+                # The Settings column: everything inside its width, nothing cut off at the right edge (owner, 2026-11-17).
+                assistant_page.show_side(window, True)
+                settle()
+                QTest.qWait(40)
+                settle()
+                side = window.assistant_side
+                room = side.viewport().width()
+                inner = side.widget()
+                cut = []
+                for w in inner.findChildren(QWidget):
+                    if w.isVisible() and w.width() > 0:
+                        right = w.mapTo(inner, w.rect().topRight()).x()
+                        if right > room + 1:
+                            cut.append((type(w).__name__, w.objectName() or w.accessibleName(), right, room))
+                assert not cut, ("Settings column cut off", (width, height), cut[:8])
+                assert window.grab().save(str(args.output / f"assistant-settings-{width}.png"))
+                assistant_page.show_side(window, False)
+                settle()
             errors.assert_not_called()
             window.close()
             settle()

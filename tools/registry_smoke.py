@@ -138,6 +138,27 @@ def main():
             settle(0.1)
             assert "Put back" in asked[-1] and "Put back" in tab.banner.label.text()
             assert not tab.undo_button.isEnabled(), "nothing left to undo"
+            # A fix of hundreds of entries: the confirmation scrolls and its buttons stay on screen (owner, 2026-11-17).
+            from PySide6.QtCore import QTimer
+            from PySide6.QtWidgets import QDialogButtonBox
+            from gg_desktop import app as app_module, registry_core as rc
+            many = [rc.Finding("run", "HKCU", r"Software\Microsoft\Windows\CurrentVersion\Run", f"Tool{i}",
+                               rf"C:\Gone\tool{i}.exe", name=f"Tool{i}") for i in range(270)]
+            long_text = rc.confirmation(many, True, str(root / "registry_backups"))
+            assert app_module.long_message(long_text) and "Tool269" in long_text
+            seen = {}
+
+            def press_yes():
+                dialog = window._last_long_confirm
+                box = dialog.findChild(QDialogButtonBox)
+                yes = box.button(QDialogButtonBox.Yes)
+                seen["fits"] = dialog.rect().contains(yes.geometry().translated(box.pos()))
+                seen["height"] = dialog.height()
+                dialog.grab().save(str(args.output / "registry-confirm-270.png"))
+                yes.click()
+            QTimer.singleShot(300, press_yes)
+            assert app_module.confirm_long(window, "Fix registry entries?", long_text) is True
+            assert seen["fits"] and seen["height"] <= 640, seen
             window.close()
     print("PASS: Registry Cleanup reads nothing until Scan, groups results, keeps review-only items unticked, confirms "
           "the exact keys with a restore point and backup, fixes only ticked entries, and undoes.")

@@ -1823,9 +1823,16 @@ def level_panel(window, accent_fn):
     """"Explain things for": how much the assistant explains (used by the Local AI's answers)."""
     from PySide6.QtWidgets import QComboBox
     from gg_desktop import assistant_memory as memory
-    box, lay = panel(kind="fileResults", padding=10, spacing=6)
+    box, lay = panel(kind="fileFilterPanel", padding=9, spacing=6)     # the same look as the panels under it
     accent_fn(box, "assistantLevel", "cyan")
-    lay.addWidget(label("Explain things for", "sectionTitle"))
+    head = row(spacing=6)
+    mark = QLabel()
+    mark.setPixmap(icon("sparkles", "#13bcf5", 18).pixmap(18, 18))
+    head.addWidget(mark)
+    title = label("Explain things for", "sectionTitle")
+    title.setMinimumWidth(0)
+    head.addWidget(title, 1)
+    lay.addLayout(head)
     combo = QComboBox()
     combo.setAccessibleName("Explain things for")
     for key, name in memory.LEVELS.items():
@@ -1835,12 +1842,15 @@ def level_panel(window, accent_fn):
                      "details. Used by the Local AI's answers; the built-in answers stay the same.")
     combo.currentIndexChanged.connect(
         lambda _i: save(window, dict(window.settings, **{memory.LEVEL_KEY: combo.currentData() or ""})))
+    local_ai_ui.fit_combo(combo)
     lay.addWidget(combo)
     window.assistant_level = combo
     from gg_desktop import assistant_voice
     from gg_desktop.settings_page import Switch
     talk = row(spacing=6)
-    talk.addWidget(label("Read answers aloud", "caption"), 1)
+    reads = label("Read answers aloud", "caption", wrap=True)
+    reads.setMinimumWidth(0)
+    talk.addWidget(reads, 1)
     reader = Switch(bool(window.settings.get(assistant_voice.READ_KEY)), name="Read answers aloud")
     reader.setToolTip("The Gravekeeper's answers are read out with Windows' own voice.")
     reader.setEnabled(assistant_voice.can_speak())

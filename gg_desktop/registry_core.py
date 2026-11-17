@@ -344,9 +344,10 @@ def confirmation(chosen, restore_point: bool, backup_folder: str) -> str:
     lines.append("Each entry is checked again just before it changes; if its file has come back, it's left alone.")
     if hklm:
         lines.append(f"{hklm} of them are for all users, so Windows will ask you to allow the change.")
-    lines += ["", "Exactly what changes:"] + ["  " + what_changes(f) for f in chosen[:40]]
-    if len(chosen) > 40:
-        lines.append(f"  … and {len(chosen) - 40} more, listed in the backup folder.")
+    shown = chosen[:500]                 # the most one fix takes; the window scrolls
+    lines += ["", "Exactly what changes:"] + ["  " + what_changes(f) for f in shown]
+    if len(chosen) > len(shown):
+        lines.append(f"  … and {len(chosen) - len(shown)} more, listed in the backup folder.")
     return "\n".join(lines)
 
 
