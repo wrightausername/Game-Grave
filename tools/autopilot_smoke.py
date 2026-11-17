@@ -185,6 +185,7 @@ def main():
             assert closed == {10, 12} and 14 not in closed and applied == ["game_mode"], (closed, applied)
             assert next(s for s in plan.steps if s.key == "power_high").status == "waiting", "Unticked steps never run"
             # "Undo that" plans the way back through the existing undo paths; nothing changes until Run all.
+            wait_for(lambda: not ui.state_of(window).running, "the plan to finish and be saved with the chat")
             ask(window, "undo that")
             undo = list(ui.state_of(window).plans.values())[-1]
             assert [s.key for s in undo.steps] == ["undo_optimizer"], [s.key for s in undo.steps]
