@@ -186,7 +186,9 @@ class RegistryTab(QWidget):
             if kept:
                 words.append(f"{kept} left alone because their file came back.")
             if failed:
-                words.append(f"{failed} couldn't be changed (Windows refused); nothing else was affected.")
+                unsafe = len(result.get("not_backed_up") or [])
+                words.append(f"{failed} couldn't be changed" + (" (Windows wouldn't let them be backed up, so they were "
+                             "left alone)" if unsafe else " (Windows refused)") + "; nothing else was affected.")
             if restore:
                 made = result.get("restore") == "made"
                 words.append("A restore point was made." if made else

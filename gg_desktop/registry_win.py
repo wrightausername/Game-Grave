@@ -97,9 +97,31 @@ def backup_root():
     return Path(config_dir()) / "registry_backups"
 
 
-def backup(findings, root=None, runner=subprocess.run):
+def key_exists(full_key):
+    """Whether a registry key is still there (64-bit view, like the scan). Unreadable counts as there."""
+    import winreg
+    hive, _, key = full_key.partition("\\")
+    root = winreg.HKEY_LOCAL_MACHINE if hive == "HKEY_LOCAL_MACHINE" else winreg.HKEY_CURRENT_USER
+    try:
+        winreg.OpenKey(root, key, 0, winreg.KEY_READ | getattr(winreg, "KEY_WOW64_64KEY", 0)).Close()
+        return True
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+
+
+def _reason(result):
+    text = " ".join(((getattr(result, "stderr", "") or "") + " " + (getattr(result, "stdout", "") or "")).split())
+    return text.replace("ERROR:", "").strip()[:160]
+
+
+def backup(findings, root=None, runner=subprocess.run, exists=None, admin_later=False):
     """Exports every key the findings touch into a new dated folder, plus a list of exactly what will change.
-    Returns the folder. Raises if any export fails, so nothing changes without its backup."""
+    Returns the folder. A key that is already gone needs no backup (its entries are already removed). An all-users key
+    Windows won't let your own account read is, with admin_later, exported inside the Windows prompt instead, before
+    anything under it changes. Any other failed export stops everything, so nothing changes without its backup."""
+    exists = exists or key_exists
     base = Path(root or backup_root()) / time.strftime("%Y-%m-%d %H-%M-%S")
     folder, n = base, 1
     while folder.exists():
@@ -107,19 +129,28 @@ def backup(findings, root=None, runner=subprocess.run):
         folder = base.with_name(f"{base.name} ({n})")
     folder.mkdir(parents=True)
     keys = sorted({f.full_key for f in findings})
-    files = []
+    files, later, gone = [], [], []
     for i, key in enumerate(keys, 1):
         path = folder / f"{i:03d}.reg"
-        result = runner(["reg", "export", key, str(path), "/y"], capture_output=True, text=True, timeout=60,
+        result = runner(["reg", "export", key, str(path), "/y", "/reg:64"], capture_output=True, text=True, timeout=60,
                         creationflags=FLAGS)
-        if getattr(result, "returncode", 1) != 0 or not path.is_file():
-            for done in folder.glob("*.reg"):          # an incomplete backup is not kept as if it were one
+        hive = "HKLM" if key.startswith("HKEY_LOCAL") else "HKCU"
+        if getattr(result, "returncode", 1) == 0 and path.is_file():
+            files.append({"file": path.name, "key": key, "hive": hive})
+            continue
+        path.unlink(missing_ok=True)
+        if not exists(key):
+            gone.append(key)                       # removed since the scan: nothing to back up or change
+        elif hive == "HKLM" and admin_later:
+            later.append({"file": path.name, "key": key, "hive": hive})
+        else:
+            for done in folder.glob("*.reg"):      # an incomplete backup is not kept as if it were one
                 done.unlink(missing_ok=True)
             folder.rmdir()
-            raise RegistryError(f"Couldn't back up {key}, so nothing was changed.")
-        files.append({"file": path.name, "key": key, "hive": "HKLM" if key.startswith("HKEY_LOCAL") else "HKCU"})
+            why = _reason(result)
+            raise RegistryError(f"Couldn't back up {key}" + (f" ({why})" if why else "") + ", so nothing was changed.")
     (folder / "changes.json").write_text(json.dumps({
-        "when": time.time(), "backups": files,
+        "when": time.time(), "backups": files, "admin_backups": later, "already_gone": gone,
         "changes": [{"key": f.full_key, "value": f.value, "action": f.action, "target": f.target, "category": f.category,
                      "name": f.name} for f in findings]}, indent=1), encoding="utf-8")
     (folder / "changes.txt").write_text("\n".join(rc.what_changes(f) for f in findings), encoding="utf-8")
@@ -148,9 +179,17 @@ def _ps(text):
     return "'" + str(text).replace("'", "''") + "'"
 
 
-def elevated_script(findings, restore_point):
-    """One PowerShell run (through the Windows prompt) for a restore point and the all-users entries."""
-    lines = ["$ErrorActionPreference = 'Continue'", "$out = @{ restore = ''; done = @(); kept = @(); failed = @() }"]
+def elevated_script(findings, restore_point, exports=(), folder=None):
+    """One PowerShell run (through the Windows prompt) for a restore point and the all-users entries. Keys your own
+    account couldn't read are backed up here first; an entry whose key can't be backed up is left alone."""
+    lines = ["$ErrorActionPreference = 'Continue'",
+             "$out = @{ restore = ''; done = @(); kept = @(); failed = @(); backed_up = @(); not_backed_up = @() }",
+             "$nobackup = @{}"]
+    for item in exports:
+        file = str(Path(folder) / item["file"]) if folder else item["file"]
+        lines.append(f"& reg.exe export {_ps(item['key'])} {_ps(file)} /y /reg:64 2>$null | Out-Null; "
+                     f"if ($LASTEXITCODE -eq 0) {{ $out.backed_up += {_ps(item['key'])} }} "
+                     f"else {{ $nobackup[{_ps(item['key'])}] = $true; $out.not_backed_up += {_ps(item['key'])} }}")
     if restore_point:
         lines += ["try { Checkpoint-Computer -Description 'Game Grave registry cleanup' -RestorePointType MODIFY_SETTINGS "
                   "-ErrorAction Stop; $out.restore = 'made' } catch { $out.restore = $_.Exception.Message }"]
@@ -166,7 +205,8 @@ def elevated_script(findings, restore_point):
         else:
             continue
         # already gone: nothing to do; file came back: leave it; otherwise remove exactly this entry
-        lines.append(f"if ({gone}) {{ $out.done += {_ps(f.ident)} }} "
+        lines.append(f"if ($nobackup.ContainsKey({_ps(f.full_key)})) {{ $out.failed += {_ps(f.ident)} }} "
+                     f"elseif ({gone}) {{ $out.done += {_ps(f.ident)} }} "
                      f"elseif (Test-Path -LiteralPath {_ps(f.target)}) {{ $out.kept += {_ps(f.ident)} }} else {{ "
                      f"try {{ {change}; $out.done += {_ps(f.ident)} }} catch {{ $out.failed += {_ps(f.ident)} }} }}")
     lines.append("$out | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath '__RESULT__' -Encoding UTF8")
@@ -222,14 +262,18 @@ def fix(findings, restore_point=True, root=None, on_step=None):
         raise RegistryError("Nothing to change.")
     if on_step:
         on_step("Backing up the registry keys…")
-    folder = backup(findings, root)
-    result = {"folder": str(folder), "restore": "", "done": [], "kept": [], "failed": []}
+    folder = backup(findings, root, admin_later=True)
+    plan = json.loads((Path(folder) / "changes.json").read_text(encoding="utf-8"))
+    gone, later = set(plan.get("already_gone") or []), list(plan.get("admin_backups") or [])
+    result = {"folder": str(folder), "restore": "", "done": [f.ident for f in findings if f.full_key in gone],
+              "kept": [], "failed": []}
+    findings = [f for f in findings if f.full_key not in gone]
     machine = [f for f in findings if f.hive == "HKLM"]
     if machine or restore_point:
         if on_step:
             on_step("Waiting for you to allow the change in the Windows prompt…" if machine else
                     "Making a System Restore point (Windows asks to allow it)…")
-        raw = upkeep_core.run_elevated(elevated_script(machine, restore_point), timeout=900)
+        raw = upkeep_core.run_elevated(elevated_script(machine, restore_point, later, folder), timeout=900)
         if not raw:
             raise RegistryError("The Windows prompt was declined or closed, so nothing was changed. The backup was "
                                 f"kept in {folder}.")
@@ -238,6 +282,13 @@ def fix(findings, restore_point=True, root=None, on_step=None):
         except ValueError:
             data = {}
         result["restore"] = str(data.get("restore") or "")
+        missed = data.get("not_backed_up") or []
+        result["not_backed_up"] = [missed] if isinstance(missed, str) else list(missed)
+        saved = data.get("backed_up") or []
+        saved = {saved} if isinstance(saved, str) else set(saved)
+        if later:                                   # backups made inside the prompt count for Undo like the others
+            plan["backups"] = plan.get("backups", []) + [b for b in later if b["key"] in saved]
+            (Path(folder) / "changes.json").write_text(json.dumps(plan, indent=1), encoding="utf-8")
         for name in ("done", "kept", "failed"):
             got = data.get(name) or []
             result[name] += [got] if isinstance(got, str) else list(got)

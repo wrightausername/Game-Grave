@@ -1434,3 +1434,12 @@ Real-world check results and fixes (first full runs, 2026-11-17):
   notice still need a home PC.
 - Installer for this round: run 44159170108 (installed-app check 17 of 17).
 
+
+Registry Cleanup "Couldn't back up ... KyberLauncher_is1, so nothing was changed" (owner report, 2026-11-17: "fix this error
+when i use the reg cleanup"). Owner asked for this change in Hardware > Registry Cleanup directly.
+- `registry_win.backup`: a key that is already gone since the scan needs no backup and its entries count as done; an
+  all-users key your own account can't export is now exported inside the one Windows prompt, before anything under it
+  changes, and an entry whose key still can't be backed up there is left alone and counted as couldn't change. Your own
+  keys still stop everything if they can't be backed up, and the message now carries Windows' own reason. Exports use the
+  64-bit registry view, like the scan. Undo includes the backups made inside the prompt.
+- Covered by `tests/test_registry.py` (already-gone key, unreadable all-users key backed up before removal).

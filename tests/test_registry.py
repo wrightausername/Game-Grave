@@ -152,7 +152,7 @@ class Scripts(unittest.TestCase):
         f = rc.Finding("startup", "HKCU", r"Software\X", "a", r"C:\gone.exe")
         with tempfile.TemporaryDirectory() as d:
             with self.assertRaises(rw.RegistryError):
-                rw.backup([f], d, runner=lambda *a, **k: SimpleNamespace(returncode=1))
+                rw.backup([f], d, runner=lambda *a, **k: SimpleNamespace(returncode=1), exists=lambda key: True)
 
             def ok(args, **_):
                 open(args[3], "w").write("Windows Registry Editor Version 5.00\n")
@@ -160,6 +160,40 @@ class Scripts(unittest.TestCase):
             folder = rw.backup([f], d, runner=ok)
             self.assertTrue((folder / "001.reg").is_file() and (folder / "changes.json").is_file())
             self.assertEqual(rw.backups(d)[0][1], 1)
+
+    def test_a_key_already_gone_needs_no_backup(self):
+        import json
+        import tempfile
+        from types import SimpleNamespace
+        from gg_desktop import registry_win as rw
+        f = rc.Finding("uninstall", "HKLM", r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Kyber_is1",
+                       None, r"C:\gone\unins000.exe", action="delete_key")
+        with tempfile.TemporaryDirectory() as d:
+            folder = rw.backup([f], d, runner=lambda *a, **k: SimpleNamespace(returncode=1, stderr="ERROR: not found"),
+                               exists=lambda key: False)
+            data = json.loads((folder / "changes.json").read_text())
+            self.assertEqual(data["already_gone"], [f.full_key])
+            self.assertEqual(data["backups"], [])
+
+    def test_unreadable_all_users_key_is_backed_up_inside_the_prompt(self):
+        import json
+        import tempfile
+        from types import SimpleNamespace
+        from gg_desktop import registry_win as rw
+        f = rc.Finding("uninstall", "HKLM", r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Kyber_is1",
+                       None, r"C:\gone\unins000.exe", action="delete_key")
+        failing = lambda *a, **k: SimpleNamespace(returncode=1, stderr="ERROR: Access is denied.")
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(rw.RegistryError) as caught:
+                rw.backup([f], d, runner=failing, exists=lambda key: True)
+            self.assertIn("Access is denied", str(caught.exception))
+            folder = rw.backup([f], d, runner=failing, exists=lambda key: True, admin_later=True)
+            later = json.loads((folder / "changes.json").read_text())["admin_backups"]
+            self.assertEqual([b["key"] for b in later], [f.full_key])
+            script = rw.elevated_script([f], False, later, folder)
+            self.assertIn("reg.exe export", script)
+            self.assertLess(script.index("reg.exe export"), script.index("Remove-Item"), "backed up before removing")
+            self.assertIn("$nobackup.ContainsKey", script, "an entry whose backup failed is left alone")
 
 
 if __name__ == "__main__":
