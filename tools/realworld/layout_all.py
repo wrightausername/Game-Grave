@@ -25,6 +25,7 @@ SCALES = ("1", "1.25", "1.5")
 def cut_offs(window):
     """Words that don't fit: a control past the window's right edge, or text wider than the space it has. Text Game
     Grave shortens on purpose (ending in "…") is not counted. Buttons get 4 pixels of room for their border."""
+    from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QAbstractButton, QLabel, QAbstractScrollArea
     page = window.page
     found = []
@@ -46,7 +47,8 @@ def cut_offs(window):
         room = w.contentsRect().width()
         if isinstance(w, QAbstractButton):
             room -= 4
-            if not w.icon().isNull():
+            under = getattr(w, "toolButtonStyle", None) and w.toolButtonStyle() == Qt.ToolButtonTextUnderIcon
+            if not w.icon().isNull() and not under:
                 room -= w.iconSize().width() + 4
         if need > room + 1:
             found.append({"kind": type(w).__name__, "text": text[:60], "short_by": need - room})

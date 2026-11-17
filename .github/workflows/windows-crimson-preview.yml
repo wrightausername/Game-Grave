@@ -2,6 +2,11 @@ name: Crimson Command Qt desktop preview (unsigned)
 
 on:
   workflow_dispatch:
+    inputs:
+      parts:
+        description: 'Real-world checks to run, as a JSON list'
+        required: false
+        default: '["installed","files","crash","layout","huge","game","ai"]'
   push:
     branches: [main]
     paths:
@@ -942,7 +947,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [installed, files, crash, layout, huge, game, ai]
+        part: ${{ fromJSON(inputs.parts || '["installed","files","crash","layout","huge","game","ai"]') }}
     env:
       QT_QPA_PLATFORM: windows
       GAME_GRAVE_SCAN_CACHE: '0'
@@ -1000,7 +1005,15 @@ jobs:
           if ($failed) { throw "Problems found: $($failed -join ', '). See the reports." }
       - name: Real crashes, Black Box, crash notice, Crash Doctor
         if: ${{ matrix.part == 'crash' }}
-        run: python tools/realworld/crash_real.py --output _ci_temp/realworld
+        shell: pwsh
+        run: |
+          # Build machines ship with Windows Error Reporting off, so no crash is ever recorded. Turn it on, as on a home PC.
+          reg add 'HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting' /v Disabled /t REG_DWORD /d 0 /f | Out-Null
+          Set-Service -Name WerSvc -StartupType Manual -ErrorAction SilentlyContinue
+          Start-Service -Name WerSvc -ErrorAction SilentlyContinue
+          Get-Service WerSvc | Format-List Name,Status,StartType
+          python tools/realworld/crash_real.py --output _ci_temp/realworld
+          if ($LASTEXITCODE -ne 0) { throw 'The real crash check found problems; see the report.' }
       - name: Every tab at every size and scale
         if: ${{ matrix.part == 'layout' }}
         run: python tools/realworld/layout_all.py --output _ci_temp/realworld

@@ -102,6 +102,10 @@ def process_usage(pid=None):
                     ("PrivateUsage", ctypes.c_size_t)]
     k32, psapi = ctypes.windll.kernel32, ctypes.windll.psapi
     k32.OpenProcess.restype = wintypes.HANDLE
+    k32.GetCurrentProcess.restype = wintypes.HANDLE        # a 64-bit pseudo handle; the default int would cut it
+    psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD]
+    k32.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.c_void_p] * 4
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
     own = pid is None
     handle = k32.GetCurrentProcess() if own else k32.OpenProcess(0x1000 | 0x0010, False, int(pid))
     if not handle:
@@ -109,7 +113,8 @@ def process_usage(pid=None):
     try:
         c = Counters()
         c.cb = ctypes.sizeof(c)
-        psapi.GetProcessMemoryInfo(handle, ctypes.byref(c), c.cb)
+        if not psapi.GetProcessMemoryInfo(handle, ctypes.byref(c), c.cb):
+            raise OSError("Windows didn't give the memory numbers")
         times = [wintypes.FILETIME() for _ in range(4)]
         k32.GetProcessTimes(handle, *[ctypes.byref(t) for t in times])
         cpu = sum(((t.dwHighDateTime << 32) | t.dwLowDateTime) for t in times[2:]) / 1e7

@@ -1389,3 +1389,28 @@ Found while writing them, NOT changed because they reach locked tabs (waiting fo
   `save_discovery.documents_folders()` is added (asks Windows where Documents really is, then the usual folder and every
   OneDrive copy) and only Soulbind uses it so far; wiring it into those tabs waits for the owner.
 - A first attempt wired both fixes in; it was taken back before any installer was handed over, since it changed locked tabs.
+
+Real-world check results and fixes (first full runs, 2026-11-17):
+- Confirmed on real Windows: a file bigger than the drive's Recycle Bin limit is deleted for good by the current recycle path,
+  silently (`recycle_real.py`, "too big"). The Recycle Bin switched off for a drive is caught by the canary check. The fix
+  belongs in `core.py` (protected) and waits for the owner's "yes, fix core.py".
+- Confirmed: a read-only Mod Organizer 2 list makes My Mods leave `modlist.txt.gg-tmp` and show a raw PermissionError (Mods
+  is locked; fix waits for the owner). A moved or work-OneDrive Documents is missed by saves and Other Storage (locked tabs;
+  waits for the owner).
+- Fixed: Crash Doctor sat on "starting the game…" forever, with the mods switched aside, when the chosen way to start the game
+  failed (for example "Through Steam" with no Steam). It now stops, puts every mod back, says why, and keeps the answers so
+  far; it never says "every mod is back" while some wait in the holding folder. Covered by `crash_real.py`.
+- Fixed: the Gravekeeper could return an empty answer (seen on the first question on the Medium model). It now falls back to
+  Game Grave's own answer instead of an empty bubble. Covered by `tests/test_gravekeeper.py`.
+- Fixed: Fix Kit's card buttons wrap onto a second line in a narrow window instead of running past the edge.
+- Layout findings in locked tabs (reported, not changed): Game DNA scrolls sideways at every width; Games' "Open Folder" and
+  launcher labels are clipped; Mods, Hardware and Ready Room have clipped words at 960 pixels; the window's minimum width (960
+  points) is wider than a 1280-pixel screen at 150% scaling.
+- Checks: `self_check` treats the AI Assistant tab being off by default as expected; the build machine's crash recording
+  (Windows Error Reporting) is switched on for the crash check; Game Grave's own memory and CPU are read correctly (64-bit
+  handle); manual runs can choose which real-world parts to run and no longer cancel each other.
+- Passed on real Windows: Recycle Bin round trip; accented user name with spaces; very long paths; a drive that vanishes;
+  locked and read-only files; no internet; MO2 files (reading, change and exact undo, MO2 open, a briefly held list); the
+  installed program, upgrade with chats and notes kept, Defender finding nothing, uninstall keeping settings; Game Grave
+  noticing a running game, saying "Paused while you play" and holding back its background work; 100,000 old files scanned
+  in about 19 seconds; the Medium model at 97% on the question bench with multi-turn follow-ups.

@@ -130,6 +130,12 @@ class Turn(unittest.TestCase):
         self.assertIn("look_up_game", out["looked"])
         self.assertIn("think", server.sent[0][2])
 
+    def test_nothing_usable_from_the_model_still_gets_an_answer(self):
+        server = Script({"content": ""}, {"content": ""}, {"content": ""}, {"content": ""}, plain="")
+        out = gk.turn(server, "how many games do i have?", ctx().facts, [], ctx())
+        self.assertTrue(out["text"].strip())
+        self.assertTrue(out.get("fallback"))
+
     def test_a_plan_from_a_request(self):
         server = Script(call("make_plan", summary="Clear old temp files.", jobs=[{"job": "clean_temp_files"}]),
                         {"content": "I'll clear the old temp files once you press Run all."})

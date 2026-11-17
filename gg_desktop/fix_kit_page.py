@@ -7,7 +7,7 @@ own modules, with the same rules. Nothing new is changed on the PC from this pag
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from gg_desktop.header_banner import HeaderBannerArtwork
 from gg_desktop.reference_widgets import icon
@@ -115,8 +115,8 @@ def card(window, title, glyph, text, actions):
     words.setWordWrap(True)
     box.addWidget(words)
     box.addStretch(1)
-    line = QHBoxLayout()
-    line.setSpacing(8)
+    from gg_desktop.insight_widgets import ActionFlow
+    line = ActionFlow(spacing=8)        # buttons wrap onto a second line in a narrow window instead of running off the edge
     buttons = {}
     for caption, key, primary in actions:
         control = QPushButton(caption)
@@ -127,8 +127,9 @@ def card(window, title, glyph, text, actions):
         control.clicked.connect(lambda _=False, k=key: run(window, k))
         line.addWidget(control)
         buttons[key] = control
-    line.addStretch(1)
-    box.addLayout(line)
+    holder = QWidget()
+    holder.setLayout(line)
+    box.addWidget(holder)
     return frame, buttons
 
 

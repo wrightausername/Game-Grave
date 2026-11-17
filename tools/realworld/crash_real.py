@@ -159,6 +159,21 @@ def main():
             dialog.method_box.setCurrentIndex(dialog.method_box.findData("Folder"))
             rw.pump(0.3)
             rep.check("Crash Doctor finds the mod folder by itself", Path(dialog.folder) == mods, folder=str(dialog.folder))
+            choices = [(dialog.launch_box.itemText(i), dialog.launch_box.itemData(i)) for i in range(dialog.launch_box.count())]
+            rep.note("ways to start the game", choices=[c[0] for c in choices])
+            steam = next((i for i, (_t, d) in enumerate(choices) if isinstance(d[1], str)), None)
+            if steam is not None and not Path(r"C:\Program Files (x86)\Steam\steam.exe").exists():
+                # Steam isn't on this machine: starting through Steam must stop cleanly with every mod back
+                dialog.launch_box.setCurrentIndex(steam)
+                dialog.start()
+                stopped = rw.wait_for(lambda: dialog.phase == "idle", timeout=120)
+                text = dialog.result_line.label.text()
+                rep.check("when the game can't be started that way, Crash Doctor stops and puts every mod back",
+                          stopped and sorted(p.name for p in mods.iterdir()) == sorted(names), result=text[:300],
+                          now=sorted(p.name for p in mods.iterdir()))
+            direct = next((i for i, (_t, d) in enumerate(choices) if isinstance(d[1], (list, tuple))), None)
+            if direct is not None:
+                dialog.launch_box.setCurrentIndex(direct)
             started = time.time()
             dialog.start()
             rw.wait_for(lambda: dialog.phase != "idle", timeout=60)

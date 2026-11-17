@@ -487,5 +487,13 @@ def turn(server, question, facts, history, ctx, think=False, events=None, image=
         result["unchecked"] = still if again else wrong
     if not text and (result["jobs"] or ready is not None):
         text = (result["summary"] or "Here's the plan.") + " Nothing changes until you press OK."
+    if not text:                 # the model gave nothing usable: Game Grave's own answer, never an empty bubble
+        try:
+            from gg_desktop import assistant_engine as engine
+            text = engine.answer(question, facts).text
+            result["fallback"] = True
+        except Exception:
+            text = "I couldn't put an answer together just now. Try asking again in a moment."
+            result["fallback"] = True
     result["text"] = text
     return result

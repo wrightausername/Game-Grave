@@ -481,7 +481,19 @@ class DoctorDialog(ToolDialog):
     def _start_run(self, step):
         self.runs += 1
         self.result(self.progress_words(step, "starting the game…"), "info")
-        self._launch()
+        try:
+            self._launch()
+        except Exception as problem:     # no Steam, a moved game, a launcher Windows can't open: stop and put back
+            self._save()
+            self.stop()
+            why = "Couldn't start the game that way (" + (str(problem) or type(problem).__name__)[:160] + "). "
+            after = self.result_line.label.text()
+            if cd.HOLD_NAME in after:            # some mods are waiting in the holding folder: say so, never "all back"
+                self.result(why + after, "warn")
+            else:
+                self.result(why + "Every mod is back. Pick another way under \"Start the game with\" and press Start "
+                            "to carry on.", "warn")
+            return
         self.started_at, self.seen_at, self.phase = time.time(), None, "starting"
         self.timer.start()
 
