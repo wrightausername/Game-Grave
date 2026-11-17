@@ -176,7 +176,7 @@ def main():
                 # Steam isn't on this machine: starting through Steam must stop cleanly with every mod back
                 dialog.launch_box.setCurrentIndex(steam)
                 dialog.start()
-                stopped = rw.wait_for(lambda: dialog.phase == "idle", timeout=120)
+                stopped = rw.wait_for(lambda: dialog.phase == "idle", timeout=420)   # two tries of two minutes
                 text = dialog.result_line.label.text()
                 rep.check("when the game can't be started that way, Crash Doctor stops and puts every mod back",
                           stopped and sorted(p.name for p in mods.iterdir()) == sorted(names), result=text[:300],
