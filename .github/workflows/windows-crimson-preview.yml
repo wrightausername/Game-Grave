@@ -370,7 +370,8 @@ on:
       - 'installer/OVERVIEW_BUILD_README.txt'
 
 concurrency:
-  group: crimson-command-${{ github.ref }}
+  # Manual runs each get their own group, so starting one never cancels another that is still testing.
+  group: crimson-command-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'push' }}
   cancel-in-progress: true
 
 permissions:

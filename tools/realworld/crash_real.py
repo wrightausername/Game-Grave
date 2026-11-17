@@ -20,13 +20,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import rw_common as rw  # noqa: E402
 
 PROGRAM = r"""
-using System; using System.IO; using System.Threading;
+using System; using System.IO; using System.Threading; using System.Runtime.InteropServices;
 class PixelFarm {
-  static unsafe void Main(string[] args) {
+  [StructLayout(LayoutKind.Sequential)]
+  struct ExceptionRecord { public uint Code; public uint Flags; public IntPtr Record; public IntPtr Address;
+                           public uint Count; [MarshalAs(UnmanagedType.ByValArray, SizeConst = 15)] public IntPtr[] Info; }
+  [DllImport("kernel32.dll")] static extern void RaiseFailFastException(ref ExceptionRecord record, IntPtr context, uint flags);
+  static void Main(string[] args) {
     string dir = AppDomain.CurrentDomain.BaseDirectory;
+    int wait = 1500;
+    string waitFile = Path.Combine(dir, "crash-after-ms.txt");
+    if (File.Exists(waitFile)) { int.TryParse(File.ReadAllText(waitFile).Trim(), out wait); }
     if (Directory.Exists(Path.Combine(dir, "Mods", "Bad Mod"))) {
-      Thread.Sleep(1500);
-      int* nothing = (int*)0; *nothing = 1;          // a real access violation (0xc0000005)
+      Thread.Sleep(wait);
+      // A crash Windows records the way it records a game's: straight to Windows Error Reporting, code 0xc0000005.
+      var record = new ExceptionRecord { Code = 0xC0000005, Info = new IntPtr[15] };
+      RaiseFailFastException(ref record, IntPtr.Zero, 0);
     }
     Thread.Sleep(Timeout.Infinite);
   }
@@ -35,7 +44,7 @@ class PixelFarm {
 
 
 def compile_program(target: Path):
-    rw.compile_cs(PROGRAM, target, unsafe=True)
+    rw.compile_cs(PROGRAM, target)
 
 
 def quiet_crash_dialogs():
@@ -90,6 +99,11 @@ def main():
             if found:
                 break
             time.sleep(1)
+        if not found:
+            for query in ("*[System[(EventID=1000)]]", "*[System[(EventID=1026)]]", "*[System[(EventID=1001)]]"):
+                raw = subprocess.run(["wevtutil", "qe", "Application", f"/q:{query}", "/c:3", "/rd:true", "/f:text"],
+                                     capture_output=True, text=True).stdout
+                rep.note("Windows' Application log, " + query, newest=raw[:1500])
         rep.check("Black Box reads Windows' real crash record for the game", bool(found),
                   record=[dataclasses.asdict(c) if dataclasses.is_dataclass(c) else str(c) for c in found[:1]])
         report = bb.build_report("Pixel Farm", game_dir)
@@ -112,18 +126,29 @@ def main():
 
         # The tracker sees the game run and close, and the "just crashed" notice is offered
         def notice():
+            from gg_desktop import assistant_page
             from gg_desktop.games_tracking import tracker_for
             tracker = tracker_for(window)
             tracker.register(window.inventory.games)
-            before = len(comfort.state_of(window).notices)
-            proc = subprocess.Popen([str(exe)])
-            seen = rw.wait_for(lambda: bool(tracker.last_active), timeout=60)
-            rep.check("the Games tracker sees the game running", seen)
-            proc.wait(timeout=60)
-            offered = rw.wait_for(lambda: any("just crashed" in str(n) for n in comfort.state_of(window).notices[before:]),
-                                  timeout=90)
-            rep.check("the 'just crashed' notice appears", offered,
-                      notices=[str(n)[:160] for n in comfort.state_of(window).notices[before:]][:3])
+            told = []
+            real_notify, real_speak = comfort.notify, assistant_page.speak_first
+
+            def notify(win, title, *a, **k):
+                told.append(("notice", title))
+                return real_notify(win, title, *a, **k)
+
+            def speak(win, prompt, title, *a, **k):
+                told.append(("Gravekeeper", title))
+                return real_speak(win, prompt, title, *a, **k)
+            with patch.object(comfort, "notify", notify), patch.object(assistant_page, "speak_first", speak):
+                (game_dir / "crash-after-ms.txt").write_text("20000")       # a game that runs a while, then crashes
+                proc = subprocess.Popen([str(exe)])
+                seen = rw.wait_for(lambda: bool(tracker.last_active), timeout=60)
+                rep.check("the Games tracker sees the game running", seen)
+                proc.wait(timeout=90)
+                (game_dir / "crash-after-ms.txt").unlink()
+                offered = rw.wait_for(lambda: any("just crashed" in t for _how, t in told), timeout=90)
+            rep.check("the 'just crashed' notice appears", offered, told=told)
         rw.guarded(rep, "crash notice", notice)
 
         # Crash Doctor runs the real program; only the length of a fine test is shortened
