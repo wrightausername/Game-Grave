@@ -307,6 +307,7 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             self.stack_layout.removeWidget(self.page)
             self.page.deleteLater()
         self.page = page if page is not None else ScrollPage()
+        self.page._built_for = self.inventory          # which results this page shows (see _show_fresh_results)
         self.stack_layout.addWidget(self.page, 1)
         self.current_route = title
         self._sync_shell_layout()
@@ -469,34 +470,60 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
             self._last_scan_seconds = seconds
             previous = getattr(self, "inventory", None)
             self.inventory = inventory
-            from gg_desktop import assistant_page
-            assistant_page.after_scan(self, previous, inventory)   # one line in the chat if something important changed
-            from gg_desktop import scan_cache
-            scan_cache.keep_async("inventory", inventory)
-            self._sync_scan_time()
-            from gg_desktop import comfort
             from gg_desktop.reference_overview import counted
             found_words = (f"{counted(len(inventory.games), 'game')}, {counted(len(inventory.mods), 'mod location')}, "
                            f"{counted(len(inventory.graveyard), 'Graveyard finding')}.")
-            comfort.notify(self, "Quick scan finished" if parts else "Scan finished", found_words + (" Some sources weren't available."
-                                                                               if inventory.warnings else ""),
-                           "warn" if inventory.warnings else "good", "Overview")
             self.status.setText(
                 f"Scanned {inventory.scanned_at}  •  " + found_words
                 + ("  •  Some sources unavailable." if inventory.warnings else ""))
-            self.navigate(self.current_route)
-            from gg_desktop import first_scan
-            first_scan.after_scan(self, quick=bool(parts))   # once, after the first full scan
-            from gg_desktop import space_ui
-            space_ui.notify_if_low(self)                     # at most once a day, only when a game drive is low
-            from gg_desktop import soulbind_auto
-            soulbind_auto.after_scan(self)      # only acts when the owner switched it on in Settings
+            # The results go on screen first. Everything after is extra, and one of those failing (or a page that was
+            # built while the scan ran) must never leave the page showing the old, empty results.
+            self._after_scan_step("show results", lambda: self.navigate(self.current_route))
+            QTimer.singleShot(0, lambda: self._show_fresh_results(inventory))
+            from gg_desktop import assistant_page, comfort, first_scan, scan_cache, soulbind_auto, space_ui
+            steps = (
+                ("save results", lambda: scan_cache.keep_async("inventory", inventory)),
+                ("scan time", self._sync_scan_time),
+                ("notice", lambda: comfort.notify(self, "Quick scan finished" if parts else "Scan finished",
+                                                  found_words + (" Some sources weren't available." if inventory.warnings
+                                                                 else ""),
+                                                  "warn" if inventory.warnings else "good", "Overview")),
+                ("assistant news", lambda: assistant_page.after_scan(self, previous, inventory)),
+                ("first scan summary", lambda: first_scan.after_scan(self, quick=bool(parts))),  # once, first full scan
+                ("low space", lambda: space_ui.notify_if_low(self)),        # at most once a day, only when a drive is low
+                ("Soulbind", lambda: soulbind_auto.after_scan(self)),       # only when switched on in Settings
+            )
+            for name, step in steps:
+                self._after_scan_step(name, step)
         if parts:
             from gg_desktop import scan_parts
             self.status.setText("Quick scan: " + scan_parts.describe(parts) + ". The rest of the last scan is kept.")
         self.job(lambda emitter: (scan_inventory(settings, self.cancel.is_set, emitter, parts=parts, base=base) if parts
                                   else scan_inventory(settings, self.cancel.is_set, emitter)),
                  finish, error_title="Local scan incomplete", progress=progress)
+
+    def _after_scan_step(self, name, step):
+        """One thing done after a scan. A failure is kept for Copy diagnostics and never stops the rest."""
+        try:
+            step()
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            try:
+                from gg_desktop import comfort
+                errors = comfort.state_of(self).errors
+                errors.append(f"After scan ({name}): {type(exc).__name__}: {str(exc)[:200]}")
+                del errors[:-20]
+            except Exception:
+                pass
+
+    def _show_fresh_results(self, inventory):
+        """A moment later: if the page on screen was built before these results arrived, build it again."""
+        page = getattr(self, "page", None)
+        if self.inventory is not inventory or page is None or not self.isVisible():
+            return
+        if getattr(page, "_built_for", None) is not inventory:
+            self._after_scan_step("show results again", lambda: self.navigate(self.current_route))
 
     def cancel_scan(self):
         if self.scanning:

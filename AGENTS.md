@@ -1339,3 +1339,11 @@ games must match the data; nothing on the PC changes without the plan's one OK.
   (`<function=name><parameter=key>value</parameter></function>`) is read like the structured one, so a call written as text is
   run instead of shown; general how-it-works questions get the concept first; what_to_play lists games from longest since last
   played and says "no record" instead of "never" when Game Grave has no play time.
+
+Scan results show straight away (owner report, 2026-11-17: "when i launch GG and it starts to scan and its complete the page is
+blank on overview till i go to another tab then back"). Shell scan-finish only (`app.start_scan`): the page on screen is rebuilt
+with the new results first, then the extras run (saving the results, the scan time, the notice, the assistant's news line, the
+first-scan summary, the low-space notice, Soulbind for new games), each on its own so one failing can't stop the others or leave
+the page showing the old results; a failure is kept for Copy diagnostics ("After scan (<step>): ..."). A moment later the page is
+built again if it still shows results from before the scan (`page._built_for`). No layout or wording changed. Covered by
+`tools/overview_live_smoke.py` (a failing follow-up still shows the new results on Overview without changing tabs).

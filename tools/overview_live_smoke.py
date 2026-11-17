@@ -160,8 +160,13 @@ def main():
             blocked.set()
             window.activateWindow()
             window.page.setFocus()
-            QTest.keyClick(window,Qt.Key_F5)
-            wait_for(lambda:window.inventory is inventory and not window.workers)
+            # A step after the scan failing (here the assistant's news line) must not keep the old results on screen.
+            with patch("gg_desktop.assistant_page.after_scan",side_effect=RuntimeError("synthetic follow-up failure")):
+                QTest.keyClick(window,Qt.Key_F5)
+                wait_for(lambda:window.inventory is inventory and not window.workers)
+            assert window.current_route=="Overview" and window.page._built_for is inventory,"Overview kept the old results"
+            from gg_desktop import comfort
+            assert any("assistant news" in e for e in comfort.state_of(window).errors),comfort.state_of(window).errors
             wait_for(lambda:window.page.overview.snapshot is not None)
             control=window.page.overview
             expected=measure_storage(inventory)
