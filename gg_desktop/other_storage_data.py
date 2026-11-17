@@ -178,7 +178,8 @@ def known_spots(env=None, home=None, steam_roots=(), libraries=()):
     home = _home(env, home)
     local = Path(env.get("LOCALAPPDATA") or home / "AppData" / "Local")
     data = Path(env.get("PROGRAMDATA") or "C:/ProgramData")
-    docs = home / "Documents"
+    from save_discovery import documents_folders
+    docs = next((d for d in documents_folders(home) if (d / "My Games").is_dir()), home / "Documents")
     shader = [
         ("DirectX Shader Cache", local / "D3DSCache", "Windows / DirectX", "Compiled shaders for DirectX games"),
         ("NVIDIA DirectX Cache", local / "NVIDIA" / "DXCache", "NVIDIA driver", "Compiled shaders from the NVIDIA driver"),

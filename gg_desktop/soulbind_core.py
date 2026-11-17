@@ -266,8 +266,9 @@ def adapter_for(game_name: str):
 
 
 def default_roots() -> dict:
+    from save_discovery import documents_folders
     home = Path.home()
-    docs = [home / "Documents", home / "OneDrive" / "Documents"]
+    docs = documents_folders()
     return {"documents": docs, "appdata": [Path(os.environ.get("APPDATA") or home / "AppData" / "Roaming")]}
 
 

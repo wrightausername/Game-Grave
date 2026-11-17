@@ -19,13 +19,56 @@ class SaveLocation:
     reason: str
 
 
+def _known_documents() -> Path | None:
+    """Where Windows really keeps Documents (it can be moved, or redirected to OneDrive or another drive)."""
+    if os.name != 'nt':
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+        guid = (ctypes.c_byte * 16).from_buffer_copy(bytes.fromhex('d0 9a d3 fd 8f 23 af 46 ad b4 6c 85 48 03 69 c7'))
+        out = ctypes.c_wchar_p()
+        if ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(out)) != 0:
+            return None
+        try:
+            return Path(out.value) if out.value else None
+        finally:
+            ctypes.windll.ole32.CoTaskMemFree(out)
+    except (OSError, AttributeError, ValueError):
+        return None
+
+
+def documents_folders(home: Path | None = None, documents: Path | None = None) -> list[Path]:
+    """Every place this user's Documents can be: Windows' own answer (when home is the real home), the usual folder,
+    and OneDrive copies, including work accounts named "OneDrive - Company". No duplicates, in that order."""
+    real_home = Path(os.environ.get('USERPROFILE') or Path.home())
+    home = Path(home or real_home)
+    found = []
+    if documents is not None:
+        found.append(Path(documents))
+    if os.path.normcase(str(home)) == os.path.normcase(str(real_home)):
+        known = _known_documents()
+        if known is not None:
+            found.append(known)
+    found.append(home / 'Documents')
+    try:
+        found += sorted((p / 'Documents' for p in home.glob('OneDrive*') if p.is_dir()), key=lambda p: str(p).casefold())
+    except OSError:
+        pass
+    found.append(home / 'OneDrive' / 'Documents')
+    unique = {}
+    for path in found:
+        unique.setdefault(os.path.normcase(str(path)), path)
+    return list(unique.values())
+
+
 def discover_saves(home: Path | None = None, *, local: Path | None = None,
                    roaming: Path | None = None, documents: Path | None = None,
                    steam_roots: list[Path] | None = None) -> list[SaveLocation]:
     home = Path(home or os.environ.get('USERPROFILE') or Path.home())
     local = Path(local or os.environ.get('LOCALAPPDATA') or home / 'AppData' / 'Local')
     roaming = Path(roaming or os.environ.get('APPDATA') or home / 'AppData' / 'Roaming')
-    documents = Path(documents or home / 'Documents')
+    documents_all = documents_folders(home, documents)
     found: list[SaveLocation] = []
     seen: set[str] = set()
 
@@ -56,7 +99,7 @@ def discover_saves(home: Path | None = None, *, local: Path | None = None,
 
     # Windows known save folders, including common OneDrive Documents redirection.
     add_children(home / 'Saved Games', 'Game saves', 'Found in your Windows Saved Games folder.')
-    for docs in dict.fromkeys([documents, home / 'OneDrive' / 'Documents']):
+    for docs in documents_all:
         add_children(docs / 'My Games', 'Possible saves and settings',
                      'Found in Documents/My Games; may also contain game settings.')
         add_children(docs / 'My Saved Games', 'Possible game saves', 'Found in Documents/My Saved Games.')
@@ -77,10 +120,12 @@ def discover_saves(home: Path | None = None, *, local: Path | None = None,
         ('Cyberpunk 2077', local / 'CD Projekt Red' / 'Cyberpunk 2077', 'Possible game saves', 'Known game-specific local data location.'),
         ('Baldur\'s Gate 3', local / 'Larian Studios' / 'Baldur\'s Gate 3' / 'PlayerProfiles',
          'Profiles and saves', 'Game profiles, settings and saves may be here.'),
-        ('The Sims 4', documents / 'Electronic Arts' / 'The Sims 4' / 'saves', 'Game saves', 'Known Sims 4 saves folder.'),
-        ('The Sims 4', documents / 'Electronic Arts' / 'The Sims 4' / 'Tray', 'Game library', 'Custom library content, not necessarily saves.'),
     ):
         add(folder, game, kind, reason)
+    for docs in documents_all:
+        sims = docs / 'Electronic Arts' / 'The Sims 4'
+        add(sims / 'saves', 'The Sims 4', 'Game saves', 'Known Sims 4 saves folder.')
+        add(sims / 'Tray', 'The Sims 4', 'Game library', 'Custom library content, not necessarily saves.')
 
     for steam in (steam_roots or []):
         # Steam userdata has mixed configuration and sometimes cloud save data.

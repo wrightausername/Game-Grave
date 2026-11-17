@@ -655,4 +655,8 @@ def main() -> int:
         win.show()
         from gg_desktop import welcome_ui      # first launch only: what Game Grave is, then the first scan
         QTimer.singleShot(350, lambda: welcome_ui.show_if_needed(win))
+    from gg_desktop import self_check
+    folder = self_check.wanted()
+    if folder is not None:                    # the build machine testing the installed program (reads only)
+        self_check.run(win, folder)
     return app.exec()

@@ -1,0 +1,155 @@
+"""Real crashes: a small test program that really crashes, so Windows records a real crash.
+
+The program ("Pixel Farm") stays running unless its Mods folder holds "Bad Mod"; then it crashes with an access violation
+after a moment. Checked: Black Box reads Windows' real crash record, the Games tracker notices the game closing and the
+"just crashed" notice appears, and Crash Doctor, with nothing faked except how long a fine test lasts, launches the real
+program, watches it, finds Bad Mod and puts every mod back. Only this check's own folder is touched.
+"""
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import os
+import subprocess
+import sys
+import time
+import winreg
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import rw_common as rw  # noqa: E402
+
+PROGRAM = r"""
+using System; using System.IO; using System.Threading;
+class PixelFarm {
+  static unsafe void Main(string[] args) {
+    string dir = AppDomain.CurrentDomain.BaseDirectory;
+    if (Directory.Exists(Path.Combine(dir, "Mods", "Bad Mod"))) {
+      Thread.Sleep(1500);
+      int* nothing = (int*)0; *nothing = 1;          // a real access violation (0xc0000005)
+    }
+    Thread.Sleep(Timeout.Infinite);
+  }
+}
+"""
+
+
+def compile_program(target: Path):
+    rw.compile_cs(PROGRAM, target, unsafe=True)
+
+
+def quiet_crash_dialogs():
+    """No "has stopped working" window on the build machine (it would keep the crashed program open)."""
+    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\Windows Error Reporting", 0,
+                            winreg.KEY_WRITE) as k:
+        winreg.SetValueEx(k, "DontShowUI", 0, winreg.REG_DWORD, 1)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, default=Path("_ci_temp/realworld"))
+    args = parser.parse_args()
+    scratch = rw.isolate("GG-rw-crash-")
+    rep = rw.Report("crash-real", args.output)
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from core import SteamGame
+    from gg_desktop import blackbox_core as bb, comfort, crashdoctor_ui, fix_kit_page
+    from gg_desktop.app import CrimsonWindow
+    from gg_desktop.backend import Inventory
+    from gg_desktop.models import merge_games
+    from unittest.mock import patch
+
+    game_dir = scratch / "SteamLibrary" / "steamapps" / "common" / "Pixel Farm"
+    mods = game_dir / "Mods"
+    names = ["Better Crops", "Bad Mod", "Fishing Plus", "Map HD", "UI Tweaks", "Weather"]
+    for name in names:
+        (mods / name).mkdir(parents=True)
+        (mods / name / "manifest.json").write_text(name)
+    exe = game_dir / "PixelFarm.exe"
+    if not rw.guarded(rep, "build the test program", lambda: compile_program(exe) or True):
+        return rep.finish()
+    quiet_crash_dialogs()
+
+    # Black Box reads the real crash record
+    def black_box():
+        started = time.time()
+        proc = subprocess.Popen([str(exe)])
+        try:
+            proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            rep.check("the test program crashes with Bad Mod in place", False)
+            return
+        rep.check("the test program crashes with Bad Mod in place", proc.returncode != 0, exit_code=hex(proc.returncode & 0xFFFFFFFF))
+        found = []
+        for _ in range(20):                              # Windows writes the record a moment after the crash
+            crashes = bb.parse_events(bb.query_events(20))
+            found = [c for c in crashes if str(c.path or "").casefold().startswith(str(game_dir).casefold())
+                     and c.when.timestamp() >= started - 5]
+            if found:
+                break
+            time.sleep(1)
+        rep.check("Black Box reads Windows' real crash record for the game", bool(found),
+                  record=[dataclasses.asdict(c) if dataclasses.is_dataclass(c) else str(c) for c in found[:1]])
+        report = bb.build_report("Pixel Farm", game_dir)
+        rep.check("the Black Box report lists the crash", len(report.crashes) >= 1, crashes=len(report.crashes),
+                  event_log_ok=report.event_log_ok)
+    rw.guarded(rep, "Black Box", black_box)
+
+    with patch.object(CrimsonWindow, "confirm", lambda self, t, text, **_: True), \
+            patch.object(CrimsonWindow, "error", lambda self, t, m: rep.note("error shown", title=t, message=m)), \
+            patch.object(CrimsonWindow, "info", lambda self, t, m: None), \
+            patch.object(crashdoctor_ui.DoctorDialog, "_clear_the_way", lambda self, game: True):
+        window = CrimsonWindow()
+        window.show()
+        window.resize(1280, 820)
+        steam = [SteamGame("4242", "Pixel Farm", str(scratch / "SteamLibrary"), str(game_dir), 3 * 1024 ** 2, None,
+                           "Steam")]
+        window.inventory = Inventory(steam=steam, games=merge_games(steam, []), scanned_at="2026-11-17 10:00")
+        window.navigate("Overview")
+        rw.pump(0.5)
+
+        # The tracker sees the game run and close, and the "just crashed" notice is offered
+        def notice():
+            from gg_desktop.games_tracking import tracker_for
+            tracker = tracker_for(window)
+            tracker.register(window.inventory.games)
+            before = len(comfort.state_of(window).notices)
+            proc = subprocess.Popen([str(exe)])
+            seen = rw.wait_for(lambda: bool(tracker.last_active), timeout=60)
+            rep.check("the Games tracker sees the game running", seen)
+            proc.wait(timeout=60)
+            offered = rw.wait_for(lambda: any("just crashed" in str(n) for n in comfort.state_of(window).notices[before:]),
+                                  timeout=90)
+            rep.check("the 'just crashed' notice appears", offered,
+                      notices=[str(n)[:160] for n in comfort.state_of(window).notices[before:]][:3])
+        rw.guarded(rep, "crash notice", notice)
+
+        # Crash Doctor runs the real program; only the length of a fine test is shortened
+        def doctor():
+            fix_kit_page.run(window, "doctor")
+            rw.pump(0.5)
+            dialog = window.crash_doctor
+            dialog.method_box.setCurrentIndex(dialog.method_box.findData("Folder"))
+            rw.pump(0.3)
+            rep.check("Crash Doctor finds the mod folder by itself", Path(dialog.folder) == mods, folder=str(dialog.folder))
+            started = time.time()
+            dialog.start()
+            rw.wait_for(lambda: dialog.phase != "idle", timeout=60)
+            dialog.plan = dataclasses.replace(dialog.plan, fine_after=12)
+            done = rw.wait_for(lambda: dialog.phase == "idle", timeout=900)
+            text = dialog.result_line.label.text()
+            dialog.grab().save(str(args.output / "crash-doctor-real.png"))
+            rep.check("Crash Doctor finishes on the real program", done, minutes=round((time.time() - started) / 60, 1))
+            rep.check("it names Bad Mod", "Bad Mod" in text, result=text[:300])
+            rep.check("every mod is back where it was", sorted(p.name for p in mods.iterdir()) == sorted(names),
+                      now=sorted(p.name for p in mods.iterdir()))
+        rw.guarded(rep, "Crash Doctor", doctor)
+        subprocess.run(["taskkill", "/IM", "PixelFarm.exe", "/F"], capture_output=True)    # nothing left running
+        window.close()
+    return rep.finish()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

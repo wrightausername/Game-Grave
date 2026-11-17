@@ -406,7 +406,7 @@ jobs:
       - name: Pure model tests and source UI smoke
         shell: pwsh
         run: |
-          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_assistant_answers tests.test_local_ai tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_mods_gallery_data tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad tests.test_nexus tests.test_autopsy_library tests.test_theme_prompts tests.test_updater tests.test_update_check tests.test_bisect tests.test_bisect_clues tests.test_bisect_apply tests.test_bisect_units tests.test_bisect_flow tests.test_bisect_store tests.test_bisect_model tests.test_hardware tests.test_kit_install tests.test_kit_easy tests.test_a11y_and_tracking tests.test_squad_install tests.test_squad_flow tests.test_soulbind_auto tests.test_upkeep tests.test_upkeep_vendor tests.test_tools_words tests.test_autopilot tests.test_scan_cache tests.test_games_places tests.test_comfort tests.test_ask_about tests.test_update_install tests.test_search_core tests.test_scan_parts tests.test_first_scan tests.test_fixgame tests.test_gamenight tests.test_space tests.test_tune tests.test_followup tests.test_crashdoctor tests.test_registry tests.test_overview_reason tests.test_mymods tests.test_resurrection_v2 tests.test_resurrection_lab tests.test_kit_discovery_and_mo2 tests.test_kit_watch tests.test_welcome tests.test_nav_groups -v
+          python -m unittest tests.test_gg_desktop_models tests.test_ready_room_data tests.test_ready_room_services tests.test_overview_data tests.test_overview_storage tests.test_overview_preferences tests.test_games_functionality tests.test_mods_functionality tests.test_mods_insight tests.test_old_files_functionality tests.test_old_files_insight tests.test_other_storage tests.test_captures tests.test_grave tests.test_dna tests.test_undo tests.test_assistant tests.test_assistant_answers tests.test_local_ai tests.test_settings tests.test_tools tests.test_ready_room_live tests.test_mods_sort tests.test_winpc tests.test_scan_clock tests.test_mods_words tests.test_mods_visuals tests.test_mods_gallery_data tests.test_soulbind tests.test_blackbox tests.test_autopsy tests.test_exhume tests.test_squad tests.test_nexus tests.test_autopsy_library tests.test_theme_prompts tests.test_updater tests.test_update_check tests.test_bisect tests.test_bisect_clues tests.test_bisect_apply tests.test_bisect_units tests.test_bisect_flow tests.test_bisect_store tests.test_bisect_model tests.test_hardware tests.test_kit_install tests.test_kit_easy tests.test_a11y_and_tracking tests.test_squad_install tests.test_squad_flow tests.test_soulbind_auto tests.test_upkeep tests.test_upkeep_vendor tests.test_tools_words tests.test_autopilot tests.test_scan_cache tests.test_games_places tests.test_comfort tests.test_ask_about tests.test_update_install tests.test_search_core tests.test_scan_parts tests.test_first_scan tests.test_fixgame tests.test_gamenight tests.test_space tests.test_tune tests.test_followup tests.test_crashdoctor tests.test_registry tests.test_overview_reason tests.test_mymods tests.test_resurrection_v2 tests.test_resurrection_lab tests.test_kit_discovery_and_mo2 tests.test_kit_watch tests.test_welcome tests.test_nav_groups tests.test_documents_folders -v
           if ($LASTEXITCODE -ne 0) { throw 'Crimson view model safety tests failed.' }
           python tools/windows_crimson_ui_smoke.py
           if ($LASTEXITCODE -ne 0) { throw 'Crimson native Qt UI smoke failed.' }
@@ -927,3 +927,96 @@ jobs:
 
 # NOT a signed 1.0 release; LGPL/Qt redistributable obligations,
 # full UI feature parity, physical Windows human tests and beta remain open.
+
+  realworld:
+    # Real-world checks on a fresh Windows machine: the installed program and upgrade, the real Recycle Bin, real
+    # crashes, real Mod Organizer 2 files, every tab at every size and scale, messy PCs, huge libraries with a long
+    # run, Game Grave's cost while a game runs, the AI on the Medium model, and a Windows Defender scan.
+    # Each part only touches files it made in its own scratch folder; reports and pictures are uploaded.
+    name: Real-world check (${{ matrix.part }})
+    needs: desktop
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [installed, files, crash, layout, huge, game, ai]
+    env:
+      QT_QPA_PLATFORM: windows
+      GAME_GRAVE_SCAN_CACHE: '0'
+      GAME_GRAVE_TRAY: '0'
+      GAME_GRAVE_FIRST_SCAN_CARD: '0'
+      GAME_GRAVE_SPACE_CARD: '0'
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r build-requirements.txt -r ui-preview-requirements.txt
+      - name: Scratch folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force '_ci_temp/realworld' | Out-Null
+          $scratch = Join-Path $env:RUNNER_TEMP 'gg-rw'
+          New-Item -ItemType Directory -Force $scratch | Out-Null
+          "GG_RW_SCRATCH=$scratch" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Get this run's installer
+        if: ${{ matrix.part == 'installed' }}
+        uses: actions/download-artifact@v6
+        with:
+          name: GameGrave-Crimson-Qt-Preview-Unsigned
+          path: _ci_temp/new
+      - name: Installed program, upgrade over the previous version, Windows Defender
+        if: ${{ matrix.part == 'installed' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $setup = (Get-ChildItem '_ci_temp/new' -Recurse -Filter 'GameGrave-Crimson-Preview-Setup.exe' | Select-Object -First 1).FullName
+          if (-not $setup) { throw 'This run''s installer is missing.' }
+          $previous = ''
+          $tags = gh release list --repo $env:GITHUB_REPOSITORY --limit 30 --json tagName,createdAt | ConvertFrom-Json
+          $older = $tags | Where-Object { $_.tagName -like 'preview-run-*' -and $_.tagName -ne "preview-run-$env:GITHUB_RUN_ID" } | Sort-Object createdAt -Descending | Select-Object -First 1
+          if ($older) {
+            gh release download $older.tagName --repo $env:GITHUB_REPOSITORY -p 'GameGrave-Crimson-Preview-Setup.exe' -D '_ci_temp/previous' --clobber
+            if ($LASTEXITCODE -eq 0) { $previous = (Resolve-Path '_ci_temp/previous/GameGrave-Crimson-Preview-Setup.exe').Path; Write-Host "Upgrading from $($older.tagName)" }
+          }
+          if ($previous) { python tools/realworld/installed_app.py --setup $setup --previous $previous --output _ci_temp/realworld }
+          else { python tools/realworld/installed_app.py --setup $setup --output _ci_temp/realworld }
+          if ($LASTEXITCODE -ne 0) { throw 'The installed program check found problems; see the report.' }
+      - name: Real Recycle Bin, messy PCs, real Mod Organizer 2 files
+        if: ${{ matrix.part == 'files' }}
+        shell: pwsh
+        run: |
+          $failed = @()
+          python tools/realworld/recycle_real.py --output _ci_temp/realworld; if ($LASTEXITCODE -ne 0) { $failed += 'Recycle Bin' }
+          python tools/realworld/messy_pc.py --output _ci_temp/realworld; if ($LASTEXITCODE -ne 0) { $failed += 'messy PC' }
+          python tools/realworld/mo2_real.py --output _ci_temp/realworld; if ($LASTEXITCODE -ne 0) { $failed += 'Mod Organizer 2' }
+          if ($failed) { throw "Problems found: $($failed -join ', '). See the reports." }
+      - name: Real crashes, Black Box, crash notice, Crash Doctor
+        if: ${{ matrix.part == 'crash' }}
+        run: python tools/realworld/crash_real.py --output _ci_temp/realworld
+      - name: Every tab at every size and scale
+        if: ${{ matrix.part == 'layout' }}
+        run: python tools/realworld/layout_all.py --output _ci_temp/realworld
+      - name: Huge library and a 30-minute run
+        if: ${{ matrix.part == 'huge' }}
+        run: python tools/realworld/huge_library.py --output _ci_temp/realworld
+      - name: Game Grave's cost while a game runs
+        if: ${{ matrix.part == 'game' }}
+        run: python tools/realworld/game_running.py --output _ci_temp/realworld
+      - name: The Gravekeeper on the Medium model
+        if: ${{ matrix.part == 'ai' }}
+        run: python tools/realworld/ai_harder.py --model medium --output _ci_temp/realworld
+      - name: Upload the reports and pictures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: GameGrave-RealWorld-${{ matrix.part }}
+          path: _ci_temp/realworld
+          if-no-files-found: warn
+          retention-days: 14

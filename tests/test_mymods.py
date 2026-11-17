@@ -92,6 +92,22 @@ class Writes(unittest.TestCase):
             mc.set_enabled(self.folder, ["Nope"], True, running=False, root=self.snaps)
         self.assertEqual(mc.snapshots(self.folder, self.snaps), [])
 
+    def test_read_only_list_is_left_alone_before_any_snapshot(self):
+        import os
+        import stat
+        target = self.folder / "modlist.txt"
+        before = target.read_bytes()
+        os.chmod(target, stat.S_IREAD)
+        try:
+            with self.assertRaises(mc.ModsError) as caught:
+                mc.set_enabled(self.folder, ["Turned Off"], True, running=False, root=self.snaps)
+            self.assertIn("read-only", str(caught.exception))
+        finally:
+            os.chmod(target, stat.S_IREAD | stat.S_IWRITE)
+        self.assertEqual(target.read_bytes(), before)
+        self.assertEqual(mc.snapshots(self.folder, self.snaps), [])
+        self.assertEqual(list(self.folder.glob("*.gg-tmp")), [])
+
     def test_undo_leaves_outside_edits_alone(self):
         mc.set_enabled(self.folder, ["Turned Off"], True, running=False, root=self.snaps)
         (self.folder / "modlist.txt").write_text("+Something Else\n")

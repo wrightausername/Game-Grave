@@ -1360,3 +1360,31 @@ cut off and doesnt follow the art style").
   tooltip); the Download / Remove / Cancel buttons wrap; the Local AI note says nothing changes without your OK (the automation
   can change things after its one OK). Covered by `tools/assistant_page_smoke.py` (nothing in the column reaches past its right
   edge at 960, 1280 and 1440 pixels).
+
+Real-world checks on the Windows build machine (owner, 2026-11-17: "make a new list of things you could test instead of"
+manual testing, then "Do them all"). New folder `tools/realworld/`, run by a new `realworld` job in
+`windows-crimson-preview.yml` (manual runs only, after the build, one machine per part, reports and pictures uploaded as
+`GameGrave-RealWorld-<part>`). Every part touches only files it made in its own scratch folder.
+- `installed_app.py`: installs the previous preview, writes settings a person would have (chats, a note, Never Touch, a scan
+  setting), installs this build over it, runs the installed EXE with `--self-check`, checks the settings survived, scans the
+  installed folder and the installer with Windows Defender, uninstalls and checks the settings stay.
+- `gg_desktop/self_check.py` (new, started only by `--self-check <folder>`): the installed app imports every part, scans once,
+  opens every tab with a picture each and writes `self-check.json`. It reads only; it never cleans or changes anything.
+- `recycle_real.py`: a real Recycle Bin round trip through Game Grave's own recycle and restore, then a file bigger than the
+  drive's Recycle Bin limit and a drive with the Recycle Bin switched off. The drive's Recycle Bin settings on the build
+  machine are changed for the test and put back. If Windows deletes such a file for good, the report says so; the fix belongs in
+  `core.py` and waits for the owner's approval.
+- `crash_real.py`: a small test program that really crashes (built with the .NET compiler in Windows). Checks Black Box reads
+  the real crash record, the "just crashed" notice, and Crash Doctor finding the bad mod on the real program.
+- `mo2_real.py`, `messy_pc.py`, `layout_all.py`, `huge_library.py`, `game_running.py`, `ai_harder.py`: Mod Organizer 2 files
+  as MO2 writes them; accented user names, long paths, a drive that vanishes, Documents moved to OneDrive, locked and read-only
+  files, no internet; every tab at 960/1280/1920 pixels and 100/125/150% with cut-off words reported; 500 games, 5,000 mods,
+  100,000 real old files and a 30-minute memory run; Game Grave's own CPU and memory while a stand-in game keeps every core
+  busy; the Medium model through the whole bench, multi-turn conversations and first-answer time.
+Fixes found while writing them:
+- My Mods (`mymods_core._guard`): a read-only `modlist.txt` is refused with a plain message before anything is written or a
+  snapshot taken. Before, Windows would refuse the replace, leave a `.gg-tmp` file and show a raw error.
+- Documents can live elsewhere: `save_discovery.documents_folders()` asks Windows where Documents really is, then the usual
+  folder and every OneDrive copy, work accounts named "OneDrive - Company" included. Save discovery (so those saves are
+  protected), Other Storage's My Games, Soulbind and the add-on locations (`ecosystems.py`) all use it. Before, a Documents
+  folder moved to another drive or a work OneDrive was missed. Covered by `tests/test_documents_folders.py`.
