@@ -32,7 +32,7 @@ def known_locations(home: Path | None = None, env: dict | None = None) -> list[t
             ("World of Warcraft", wow / variant / "WTF" / "Account",
              "Saved addon settings protected", "WoW character, account and addon settings must be preserved."),
         ])
-    found = wow_locations + [
+    return wow_locations + [
         ("Thunderstore", appdata / "Thunderstore Mod Manager" / "DataFolder", "Managed profiles and downloaded mods", "Use Thunderstore to manage installed profiles; do not remove active dependencies."),
         ("r2modman", appdata / "r2modmanPlus-local", "Mod manager profile storage", "Profiles can contain active mods and configurations. Inspect in r2modman first."),
         ("Prism Launcher", appdata / "PrismLauncher" / "instances", "Minecraft instances / worlds protected", "Instances may contain unique Minecraft worlds and saves; never automatically clean."),
@@ -60,17 +60,6 @@ def known_locations(home: Path | None = None, env: dict | None = None) -> list[t
         ("Path of Exile", docs / "My Games" / "Path of Exile", "Item filters and settings", "Player filters and account preferences are important settings."),
         ("FiveM", local / "FiveM" / "FiveM.app" / "data" / "cache", "Runtime cache: review", "Do not touch while the client is running; cache removal can require redownloads."),
     ]
-    # Documents can live elsewhere (moved, or OneDrive): every Documents entry is looked for in each of those too.
-    from save_discovery import documents_folders
-    others = [d for d in documents_folders(home) if os.path.normcase(str(d)) != os.path.normcase(str(docs))]
-    extra = []
-    for source, folder, status, advice in found:
-        try:
-            inside = folder.relative_to(docs)
-        except ValueError:
-            continue
-        extra += [(source, other / inside, status, advice) for other in others]
-    return found + extra
 
 
 def find_ecosystem_storage(extra_steam_roots=None, custom_roots=None, cancel: Cancel = None,

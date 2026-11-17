@@ -23,6 +23,8 @@ SCALES = ("1", "1.25", "1.5")
 
 
 def cut_offs(window):
+    """Words that don't fit: a control past the window's right edge, or text wider than the space it has. Text Game
+    Grave shortens on purpose (ending in "…") is not counted. Buttons get 4 pixels of room for their border."""
     from PySide6.QtWidgets import QAbstractButton, QLabel, QAbstractScrollArea
     page = window.page
     found = []
@@ -31,19 +33,23 @@ def cut_offs(window):
         if not w.isVisibleTo(window) or w.width() <= 0 or w.height() <= 0:
             continue
         text = w.text() if hasattr(w, "text") else ""
-        if not text or not text.strip() or "<" in text:
+        if not text or not text.strip() or "<" in text or text.rstrip().endswith("…"):
             continue
         x = w.mapTo(window, w.rect().topRight()).x()
         if x > right + 1:
             found.append({"kind": "past the edge", "text": text[:60], "by": x - right})
             continue
-        if isinstance(w, QLabel) and (w.wordWrap() or not w.pixmap().isNull() if w.pixmap() is not None else w.wordWrap()):
+        if isinstance(w, QLabel) and w.wordWrap():
             continue
-        need = w.fontMetrics().horizontalAdvance(text.split("\n")[0]) + (24 if isinstance(w, QAbstractButton) else 0)
-        if isinstance(w, QAbstractButton) and not w.icon().isNull():
-            need += w.iconSize().width() + 4
-        if need > w.width() + 3:
-            found.append({"kind": type(w).__name__, "text": text[:60], "short_by": need - w.width()})
+        metrics = w.fontMetrics()
+        need = max(metrics.horizontalAdvance(line) for line in text.replace("&&", "&").split("\n"))
+        room = w.contentsRect().width()
+        if isinstance(w, QAbstractButton):
+            room -= 4
+            if not w.icon().isNull():
+                room -= w.iconSize().width() + 4
+        if need > room + 1:
+            found.append({"kind": type(w).__name__, "text": text[:60], "short_by": need - room})
     sideways = 0
     for area in [page] + page.findChildren(QAbstractScrollArea):
         bar = area.horizontalScrollBar() if hasattr(area, "horizontalScrollBar") else None

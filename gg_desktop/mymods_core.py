@@ -270,13 +270,6 @@ def _guard(profile_folder: Path, running):
     target = profile_folder / "modlist.txt"
     if not target.is_file() or _is_link(target):
         raise ModsError("This profile's mod list isn't an ordinary file, so Game Grave won't change it.")
-    try:
-        read_only = not (target.stat().st_mode & 0o200)
-    except OSError:
-        read_only = True
-    if read_only:
-        raise ModsError("This profile's mod list is set to read-only, so Game Grave left it alone. If you set that on "
-                        "purpose, it stays protected; otherwise clear Read-only in the file's Properties and try again.")
 
 
 def _replace(temp: Path, target: Path, tries=20, wait=0.1):

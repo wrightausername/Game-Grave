@@ -68,7 +68,7 @@ def discover_saves(home: Path | None = None, *, local: Path | None = None,
     home = Path(home or os.environ.get('USERPROFILE') or Path.home())
     local = Path(local or os.environ.get('LOCALAPPDATA') or home / 'AppData' / 'Local')
     roaming = Path(roaming or os.environ.get('APPDATA') or home / 'AppData' / 'Roaming')
-    documents_all = documents_folders(home, documents)
+    documents = Path(documents or home / 'Documents')
     found: list[SaveLocation] = []
     seen: set[str] = set()
 
@@ -99,7 +99,7 @@ def discover_saves(home: Path | None = None, *, local: Path | None = None,
 
     # Windows known save folders, including common OneDrive Documents redirection.
     add_children(home / 'Saved Games', 'Game saves', 'Found in your Windows Saved Games folder.')
-    for docs in documents_all:
+    for docs in dict.fromkeys([documents, home / 'OneDrive' / 'Documents']):
         add_children(docs / 'My Games', 'Possible saves and settings',
                      'Found in Documents/My Games; may also contain game settings.')
         add_children(docs / 'My Saved Games', 'Possible game saves', 'Found in Documents/My Saved Games.')
@@ -120,12 +120,10 @@ def discover_saves(home: Path | None = None, *, local: Path | None = None,
         ('Cyberpunk 2077', local / 'CD Projekt Red' / 'Cyberpunk 2077', 'Possible game saves', 'Known game-specific local data location.'),
         ('Baldur\'s Gate 3', local / 'Larian Studios' / 'Baldur\'s Gate 3' / 'PlayerProfiles',
          'Profiles and saves', 'Game profiles, settings and saves may be here.'),
+        ('The Sims 4', documents / 'Electronic Arts' / 'The Sims 4' / 'saves', 'Game saves', 'Known Sims 4 saves folder.'),
+        ('The Sims 4', documents / 'Electronic Arts' / 'The Sims 4' / 'Tray', 'Game library', 'Custom library content, not necessarily saves.'),
     ):
         add(folder, game, kind, reason)
-    for docs in documents_all:
-        sims = docs / 'Electronic Arts' / 'The Sims 4'
-        add(sims / 'saves', 'The Sims 4', 'Game saves', 'Known Sims 4 saves folder.')
-        add(sims / 'Tray', 'The Sims 4', 'Game library', 'Custom library content, not necessarily saves.')
 
     for steam in (steam_roots or []):
         # Steam userdata has mixed configuration and sometimes cloud save data.

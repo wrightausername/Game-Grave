@@ -26,9 +26,10 @@ import rw_common as rw  # noqa: E402
 EXE = "GameGrave-Crimson-Preview.exe"
 
 
-def install(setup: Path, folder: Path):
+def install(setup: Path, folder: Path, log: Path):
+    log.parent.mkdir(parents=True, exist_ok=True)
     done = subprocess.run([str(setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/DIR={folder}",
-                           f"/LOG={folder.parent / (setup.stem + '-install.log')}"], timeout=600)
+                           f"/LOG={log}"], timeout=600)
     return done.returncode
 
 
@@ -77,14 +78,14 @@ def main():
     seeded = None
 
     if args.previous and args.previous.is_file():
-        code = install(args.previous, folder)
+        code = install(args.previous, folder, args.output / "install-previous.log")
         rep.check("the previous version installs", code == 0 and (folder / EXE).is_file(), exit_code=code)
         seeded = seed(settings_file)
         rep.note("settings from the previous version", chats=2, notes=1, file=str(settings_file))
     else:
         rep.note("no previous installer to upgrade from; installing fresh")
 
-    code = install(args.setup, folder)
+    code = install(args.setup, folder, args.output / "install-new.log")
     rep.check("the new version installs silently" + (" over the previous one" if seeded else ""),
               code == 0 and (folder / EXE).is_file(), exit_code=code)
     entry = subprocess.run(["reg", "query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall", "/s", "/f",
@@ -95,6 +96,8 @@ def main():
     report_dir = args.output / "self-check"
     if report_dir.exists():
         shutil.rmtree(report_dir)
+    if not (folder / EXE).is_file():
+        return rep.finish()
     started = time.time()
     try:
         done = subprocess.run([str(folder / EXE), "--self-check", str(report_dir)], timeout=1500,
@@ -131,6 +134,9 @@ def main():
                   all(r["code"] == 0 for r in results), results=results)
 
     unins = folder / "unins000.exe"
+    if not unins.is_file():
+        rep.check("uninstall removes the program", False, why="no uninstaller in the install folder")
+        return rep.finish()
     done = subprocess.run([str(unins), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"], timeout=600)
     for _ in range(30):                      # the uninstaller finishes in a copy of itself
         if not (folder / EXE).exists():

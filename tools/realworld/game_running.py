@@ -83,6 +83,7 @@ def main():
             rep.check("Game Grave notices the game", seen)
             rw.pump(2)
             chip = getattr(window, "paused_chip", None)
+            rw.wait_for(lambda: chip is not None and "Stand In" in chip.text(), timeout=30)   # refreshed every 10 s
             shown = chip.text() if chip is not None else ""
             rep.check("the top bar says it's paused while you play", chip is not None and chip.isVisible()
                       and "Stand In" in shown, text=shown)

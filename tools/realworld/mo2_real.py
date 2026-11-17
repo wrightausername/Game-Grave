@@ -66,11 +66,23 @@ def build(base: Path):
     return root
 
 
+WAITER = "class Waiter { static void Main() { System.Threading.Thread.Sleep(120000); } }"
+
+
 def fake_mo2(folder: Path) -> Path:
-    """A program named ModOrganizer.exe that just waits (built from a copy of a harmless Windows program)."""
+    """A program named ModOrganizer.exe that just waits, so Windows lists it the way it lists the real one."""
     exe = folder / "ModOrganizer.exe"
-    shutil.copy2(Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32" / "timeout.exe", exe)
+    rw.compile_cs(WAITER, exe)
     return exe
+
+
+def put_back(profile: Path, original: bytes):
+    """Leave the list as it started, whatever a failed step did, so the next step is judged on its own."""
+    target = profile / "modlist.txt"
+    os.chmod(target, stat.S_IREAD | stat.S_IWRITE)
+    target.write_bytes(original)
+    for p in profile.glob("*.gg-tmp"):
+        p.unlink()
 
 
 def main():
@@ -117,8 +129,7 @@ def main():
 
     def mo2_open():
         exe = fake_mo2(scratch)
-        proc = subprocess.Popen([str(exe), "/t", "120", "/nobreak"], stdout=subprocess.DEVNULL,
-                                creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+        proc = subprocess.Popen([str(exe)])
         try:
             time.sleep(1.5)
             seen = bisect_apply.mo2_running()
@@ -131,6 +142,7 @@ def main():
                       (profile / "modlist.txt").read_bytes() == original, detected=seen, message=refused[:120])
         finally:
             proc.kill()
+            put_back(profile, original)
     rw.guarded(rep, "Mod Organizer 2 open", mo2_open)
 
     def held_open():
@@ -144,6 +156,7 @@ def main():
         mc.undo(profile, running=False)
         rep.check("a list another program has open for a moment is still changed, and undone",
                   off and (profile / "modlist.txt").read_bytes() == original)
+        put_back(profile, original)
     rw.guarded(rep, "held open", held_open)
 
     def read_only():
@@ -161,9 +174,7 @@ def main():
                       outcome.startswith("refused") and same and not leftovers, outcome=outcome[:200],
                       unchanged=same, leftovers=leftovers)
         finally:
-            os.chmod(target, stat.S_IREAD | stat.S_IWRITE)
-            for p in profile.glob("*.gg-tmp"):
-                p.unlink()
+            put_back(profile, original)
     rw.guarded(rep, "read-only list", read_only)
     return rep.finish()
 

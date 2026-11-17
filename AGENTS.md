@@ -1381,10 +1381,11 @@ manual testing, then "Do them all"). New folder `tools/realworld/`, run by a new
   files, no internet; every tab at 960/1280/1920 pixels and 100/125/150% with cut-off words reported; 500 games, 5,000 mods,
   100,000 real old files and a 30-minute memory run; Game Grave's own CPU and memory while a stand-in game keeps every core
   busy; the Medium model through the whole bench, multi-turn conversations and first-answer time.
-Fixes found while writing them:
-- My Mods (`mymods_core._guard`): a read-only `modlist.txt` is refused with a plain message before anything is written or a
-  snapshot taken. Before, Windows would refuse the replace, leave a `.gg-tmp` file and show a raw error.
-- Documents can live elsewhere: `save_discovery.documents_folders()` asks Windows where Documents really is, then the usual
-  folder and every OneDrive copy, work accounts named "OneDrive - Company" included. Save discovery (so those saves are
-  protected), Other Storage's My Games, Soulbind and the add-on locations (`ecosystems.py`) all use it. Before, a Documents
-  folder moved to another drive or a work OneDrive was missed. Covered by `tests/test_documents_folders.py`.
+Found while writing them, NOT changed because they reach locked tabs (waiting for the owner):
+- Mods (locked): a read-only `modlist.txt` makes My Mods write a `.gg-tmp` file, take a snapshot and show a raw Windows
+  error. The fix is a plain refusal in `mymods_core._guard` before anything is written. `mo2_real.py` reports it.
+- Other Storage, Mods and Graveyard protection (locked): a Documents folder moved to another drive or to a work OneDrive
+  ("OneDrive - Company") is missed by save discovery, Other Storage's My Games and the add-on locations. The shared
+  `save_discovery.documents_folders()` is added (asks Windows where Documents really is, then the usual folder and every
+  OneDrive copy) and only Soulbind uses it so far; wiring it into those tabs waits for the owner.
+- A first attempt wired both fixes in; it was taken back before any installer was handed over, since it changed locked tabs.
