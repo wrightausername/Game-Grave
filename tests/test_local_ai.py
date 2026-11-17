@@ -306,3 +306,13 @@ class Prompt(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Recommend(unittest.TestCase):
+    def test_sizes_follow_memory_and_graphics_memory(self):
+        self.assertEqual(ai.recommend(8, 0), "small")
+        self.assertEqual(ai.recommend(16, 0), "medium")
+        self.assertEqual(ai.recommend(16, 8), "large")
+        self.assertEqual(ai.recommend(32, 12), "xl")
+        self.assertEqual(ai.recommend(16, 12), "large", "Extra Large needs 32 GB of memory too")
+        self.assertEqual(ai.recommend(0, 0), "small")

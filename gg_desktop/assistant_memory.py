@@ -208,3 +208,23 @@ def scan_news(previous_games, games, low_drives=(), previous_mods=0, mods=0):
         if previous_mods and mods > previous_mods:
             lines.append(f"{mods - previous_mods} new mod location{'s' if mods - previous_mods != 1 else ''} found.")
     return lines[:3]
+
+
+# ------------------------------------------------------------------ how much to explain
+LEVEL_KEY = "assistant_level"
+LEVELS = {"new": "New to PC gaming", "": "In between", "expert": "I know my way around"}
+LEVEL_NOTES = {
+    "new": "The user is new to PC gaming: use everyday words, explain any technical term in a few words the first time, "
+           "say exactly where to click, and give one step at a time.",
+    "expert": "The user knows PCs well: be brief, use the normal technical terms, skip basics, and give the exact "
+              "settings, paths and error meanings.",
+}
+
+
+def level_of(settings):
+    value = str((settings or {}).get(LEVEL_KEY) or "")
+    return value if value in LEVELS else ""
+
+
+def level_text(settings):
+    return LEVEL_NOTES.get(level_of(settings), "")

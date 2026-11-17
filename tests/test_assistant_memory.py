@@ -81,3 +81,15 @@ class News(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Level(unittest.TestCase):
+    def test_level_reaches_the_prompt(self):
+        from gg_desktop import assistant_memory as memory, local_ai_prompt as prompt
+        self.assertEqual(memory.level_text({}), "")
+        self.assertEqual(memory.level_of({"assistant_level": "bogus"}), "")
+        note = memory.level_text({"assistant_level": "new"})
+        self.assertIn("new to PC gaming", note)
+        from tests.test_local_ai import facts
+        system = prompt.build_messages("hi", None, facts(), level=note)[0]["content"]
+        self.assertIn("How to explain: " + note, system)

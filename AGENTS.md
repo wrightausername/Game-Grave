@@ -1247,3 +1247,38 @@ for these; `app.py` gains one call after a scan; Mods' conflict wording changes 
 - Bench after the extras: 40 of 41 (98%). The Extra Large file resolved (Qwen3-14B-Q4_K_M.gguf, 8.38 GB, fingerprint
   checked). The one miss was the Small model replying a bare "None" to a DXGI error; that now counts as no answer, so it is
   asked once more and otherwise the built-in error explanation shows.
+
+AI Assistant, easier to use (owner instruction, 2026-11-16: "what else to make the AI more user friendly?", then "go" to the
+list of ten). AI Assistant is reopened for these; the shared warning box gains one button while the assistant is on.
+Honesty rules unchanged: nothing is called safe, sizes stay reported, nothing changes without the plan's one OK.
+- Live answers: the local AI's words appear as they are written (llama-server streaming), passed through the same safety
+  filter first; while it looks things up the line under the chat says what it is checking ("Checking the crashes Windows recorded…").
+  The finished answer is still checked as before and can replace the streamed words.
+- Recommended size: the Local AI panel and the empty-chat card mark the size that fits this PC from Windows' memory and
+  graphics memory figures (`local_ai_core.recommend`: Extra Large needs 12 GB graphics memory and 32 GB memory, Large 8 and
+  16, Medium 4 GB graphics or 12 GB memory, else Small). The card always offers the recommended size; nothing is downloaded
+  without the usual confirmation.
+- Clickable answers (`gg_desktop/assistant_links.py`, pure): installed game names open Games filtered to that game, tab names
+  open the tab (the Toolbox name opens More Tools), Windows folder paths open in File Explorer. Opening changes nothing; the
+  answer text is escaped, so nothing else in it becomes a link.
+- Next questions: up to three follow-up buttons under the newest answer that fit it ("Is Starfield modded?", "Check my
+  drivers"), plus Simpler and More detail under a Local AI answer. Each one only asks.
+- Ask the assistant from any warning: with the assistant on, Game Grave's warning box has "Ask the assistant", which opens
+  the pop-out and asks what the warning means. With it off the warning is the plain box as before.
+- Attach a log: a file button next to the message box (and dropping a file on it) attaches a .log, .txt, .ini, .cfg, .json,
+  .xml or .csv file. The file is only read (the last 4 MB of a bigger one); the lines that stand out (errors, exceptions,
+  crash codes, DLLs, missing files, with the line before each) are added to the question, up to 25 lines.
+- Guided troubleshooting (`gg_desktop/assistant_guide.py`, pure): "help me fix <game>" or "troubleshoot … step by step" asks
+  what is wrong if it wasn't said, then gives the usual fixes one at a time with "Did that work?" (Yes / No, next step / Skip /
+  Stop) and, where Game Grave can do the step, a button that asks for it (a plan still waits for Run all). Each answer is
+  kept in the game's fix history, and when every step was tried it says so and points to Crash Doctor and Fix Kit. A tool
+  walkthrough ("walk me through mod bisect") is unchanged.
+- Explain things for: New to PC gaming / In between / I know my way around (`assistant_level`), in the settings column. It
+  changes only how the Local AI explains; the built-in answers stay the same.
+- Search and pins: a Search chats box over Conversations finds chats by any word in their questions or answers; Pin keeps an
+  answer (30 at most, `assistant_pins`) under "Pinned answers" at the top of the list, which opens a window to read, copy or
+  unpin them. Only this PC's settings are used.
+- Tab names: the Local AI's feature list and the manual lookup use the sidebar's names (Toolbox, not More Tools).
+- Covered by `tests/test_assistant_links.py`, `tests/test_assistant_guide.py`, `tests/test_assistant_memory.py` (level),
+  `tests/test_local_ai.py` (recommended size) and `tools/assistant_page_smoke.py` (links, follow-up buttons, pin and search,
+  the guided flow and its fix history, an attached log left unchanged, the level setting, Ask the assistant on a warning).

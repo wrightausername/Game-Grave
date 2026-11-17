@@ -43,10 +43,12 @@ SYSTEM = (
 def feature_list():
     """What Game Grave can do and where, one line per feature, from the same descriptions the built-in answers use."""
     from gg_desktop import assistant_features as features
+    from gg_desktop import nav_groups
     lines = []
     for f in features.FEATURES:
         first = re.split(r"(?<=\.)\s", f.what.strip(), maxsplit=1)[0]
-        lines.append(f"- {f.title} ({f.tab or 'Game Grave'}): {first}")
+        tab = nav_groups.display_name(f.tab) if f.tab else "Game Grave"      # "Toolbox", as the sidebar shows it
+        lines.append(f"- {f.title} ({tab}): {first}")
     extra = ("- Games tab: every installed game from Steam, Epic, GOG, EA, Ubisoft, Battle.net and Xbox, with size, "
              "last played and Verify / Uninstall through the launcher.",
              "- Mods tab: Library gallery, Mod Radar, Load Order, Profiles, Conflicts (files two mods share), Cleanup and "
@@ -238,7 +240,7 @@ TOOL_RULES = (
 )
 
 
-def build_messages(question, answer, facts, history=(), think=False, tools=False, screen=None, notes=""):
+def build_messages(question, answer, facts, history=(), think=False, tools=False, screen=None, notes="", level=""):
     """Chat messages for llama-server. `history` is the earlier (question, reply) pairs of this conversation; the last
     six are kept. `think` lets Qwen3 reason before answering (Medium and Large). `tools` means the model can call the
     lookups in `local_ai_tools`, so the facts here are shorter and the rules say how to use them."""
@@ -248,6 +250,8 @@ def build_messages(question, answer, facts, history=(), think=False, tools=False
     context += f"\n\nPC facts (what Game Grave has on record):\n{digest}\n\nWhat Game Grave can do (features and " \
                f"where they are):\n{feature_list()}"
     context += "\n\n" + (TOOL_RULES if tools else PLAN_RULE + "; ".join(requests_list()) + ".")
+    if level:
+        context += "\n\nHow to explain: " + level
     if notes:
         context += ("\n\nThings the user asked you to remember (follow them unless they ask otherwise; never repeat "
                     "them back unless relevant):\n" + notes[:2500])

@@ -34,9 +34,21 @@ def state_of(window):
     return window._local_ai
 
 
+def recommended(window):
+    """The size this PC's memory and graphics memory suit, read once per run (read only)."""
+    cached = getattr(window, "_local_ai_fits", None)
+    if cached is None:
+        try:
+            cached = ai.recommended_for_this_pc()
+        except Exception:
+            cached = ai.DEFAULT_MODEL
+        window._local_ai_fits = cached
+    return cached
+
+
 def chosen(window):
     key = window.settings.get("local_ai_model")
-    return key if key in ai.BY_KEY else ai.DEFAULT_MODEL
+    return key if key in ai.BY_KEY else recommended(window)
 
 
 def enabled(window):
@@ -76,8 +88,9 @@ def build_panel(window, accent):
     lay.addWidget(status)
     combo = QComboBox()
     combo.setAccessibleName("Local AI model size")
+    fits = recommended(window)
     for choice in ai.MODELS:
-        combo.addItem(choice.title + (" · recommended" if choice.key == ai.DEFAULT_MODEL else ""), choice.key)
+        combo.addItem(choice.title + (" · recommended for this PC" if choice.key == fits else ""), choice.key)
         combo.setItemData(combo.count() - 1, f"{choice.blurb} Needs about {choice.ram_gb} GB of memory.", 3)
     combo.setCurrentIndex(max(0, combo.findData(chosen(window))))
     lay.addWidget(combo)
@@ -340,7 +353,7 @@ def lookup_context(window, facts):
                            screen={"tab": nav_groups.display_name(route) if route else "", "selected": selected()})
 
 
-def answer_async(window, question, base_answer, facts, history, deliver):
+def answer_async(window, question, base_answer, facts, history, deliver, live=None):
     """Ask the local model in the background, then call deliver(answer). Always delivers exactly once."""
     from gg_desktop import assistant_engine as engine
     st = state_of(window)
@@ -365,7 +378,24 @@ def answer_async(window, question, base_answer, facts, history, deliver):
                     server.stop()
                 server = st.server = ai.LocalServer(key)
                 ai.start_best(server)
-            return lookups.answer(server, question, base_answer, facts, history, ctx, think=think)
+            import time as _time
+            last = {"at": 0.0}
+
+            def events(kind, text):
+                # Live words for the waiting bubble: lookups as they happen, then the answer as it is written,
+                # at most ten updates a second. Nothing that breaks a rule is ever shown, even for a moment.
+                if kind == "text":
+                    now = _time.monotonic()
+                    if now - last["at"] < 0.1:
+                        return
+                    last["at"] = now
+                    shown = prompt.clean_reply(text)
+                    if not shown:
+                        return
+                    _progress(1, shown)
+                else:
+                    _progress(0, text)
+            return lookups.answer(server, question, base_answer, facts, history, ctx, think=think, events=events)
 
     def done(result):
         st.busy = False
@@ -407,7 +437,10 @@ def answer_async(window, question, base_answer, facts, history, deliver):
         deliver(_with_note(base_answer, "Local AI couldn't answer (" + message.split(":", 1)[-1].strip()[:120] +
                            "), so this is the built-in answer."))
 
-    _job(window, work, done, failed)
+    def shown(code, text):
+        if live is not None:
+            live(text)
+    _job(window, work, done, failed, progress=shown)
 
 
 def _with_note(answer, note):
@@ -511,8 +544,11 @@ def setup_card(window):
             w.combo.setCurrentIndex(max(0, w.combo.findData(key)))
             w.combo.blockSignals(False)
             sync(window)
-    for choice in [m for m in ai.MODELS if m.key != "xl"]:      # Extra Large is offered in the panel, with its warning
-        b = QPushButton(f"{choice.label}  ·  {choice.approx_bytes / ai.GB:.1f} GB\n{CARD_LINES[choice.key]}")
+    fits = recommended(window)
+    offered = [m for m in ai.MODELS if m.key != ("small" if fits == "xl" else "xl")]   # three sizes, always the one that fits
+    for choice in offered:
+        line = "Recommended for this PC" if choice.key == fits else CARD_LINES[choice.key]
+        b = QPushButton(f"{choice.label}  ·  {choice.approx_bytes / ai.GB:.1f} GB\n{line}")
         b.setObjectName("localAISize")
         b.setCheckable(True)
         b.setChecked(choice.key == current)

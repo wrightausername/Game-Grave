@@ -43,7 +43,8 @@ def main():
                 for p in folder.rglob("*") if p.is_file()}
 
     def transcript(window):
-        return " ".join(label.text() for label in window.assistant_scroll.widget().findChildren(QLabel))
+        return " ".join(label.property("plain") or label.text()
+                        for label in window.assistant_scroll.widget().findChildren(QLabel))
 
     def buttons(window):
         return [b.text() for b in window.assistant_scroll.widget().findChildren(QPushButton)]
@@ -98,6 +99,7 @@ def main():
             ("gg_desktop.local_ai_core._opener", dict(side_effect=AssertionError("No automatic AI download"))),
         ):
             stack.enter_context(patch(target, **options))
+        real_error = CrimsonWindow.error
         errors = stack.enter_context(patch.object(CrimsonWindow, "error"))
         stack.enter_context(patch.object(CrimsonWindow, "info"))
         confirm = stack.enter_context(patch.object(CrimsonWindow, "confirm", return_value=True))
@@ -371,6 +373,95 @@ def main():
             settle()
             assert not any(c["messages"] for c in state_of(window).chats) and state_of(window).chats
             assert saved[-1]["assistant_chats"] == [], saved[-1]["assistant_chats"]
+
+            # Clickable answers: game names, tabs and folders are links; follow-up buttons under the newest answer.
+            ask(window, "when did I last play Starfield")
+            rich = [l.text() for l in window.assistant_scroll.widget().findChildren(QLabel) if 'href="game:Starfield"' in l.text()]
+            assert rich, "The game name in the answer is a link"
+            assert "Is Starfield modded?" in buttons(window), buttons(window)
+            assistant_page.open_link(window, "game:Starfield")
+            settle()
+            assert window.current_route == "Games" and window.game_search.text() == "Starfield"
+            window.game_search.clear()
+            assistant_page.open_link(window, "tab:More Tools")
+            settle()
+            assert window.current_route == "More Tools", window.current_route
+            window.navigate("AI Assistant")
+            settle()
+            next(b for b in window.assistant_scroll.widget().findChildren(QPushButton) if b.text() == "Is Starfield modded?").click()
+            settle()
+            assert "is Starfield modded" in transcript(window), transcript(window)[-300:]
+
+            # Pin an answer; it is listed at the top of Conversations and opens in its own window.
+            next(b for b in reversed(window.assistant_scroll.widget().findChildren(QPushButton)) if b.text() == "Pin").click()
+            settle()
+            assert len(window.settings.get("assistant_pins") or []) == 1, window.settings.get("assistant_pins")
+            assert window.assistant_list.item(0).text().startswith("Pinned answers (1)")
+            window.assistant_list.setCurrentRow(0)
+            settle()
+            pins = window._assistant_pins_dialog
+            assert pins.isVisible() and "Starfield" in pins.findChildren(__import__("PySide6.QtWidgets", fromlist=["QTextBrowser"]).QTextBrowser)[0].toPlainText()
+            pins.close()
+            settle()
+            # Search past chats by any word in them.
+            window.assistant_find.setText("modded")
+            settle()
+            assert window.assistant_list.count() == 1 and window.assistant_list.item(0).data(Qt.UserRole) == state_of(window).current
+            window.assistant_find.setText("zzzz nothing")
+            settle()
+            assert window.assistant_list.item(0).text() == "No chats match"
+            window.assistant_find.clear()
+            settle()
+
+            # Guided troubleshooting: one fix at a time, "Did that work?", and what helped is remembered.
+            ask(window, "help me fix Starfield, it won't start")
+            assert "Step 1 of" in transcript(window) and "No, next step" in buttons(window), transcript(window)[-400:]
+            assert "Check it for me" in buttons(window), buttons(window)
+            ask(window, "no, still broken")
+            assert "Step 2 of" in transcript(window), transcript(window)[-400:]
+            ask(window, "yes it worked")
+            assert "glad that sorted it" in transcript(window)
+            history = (window.settings.get("fix_history") or {}).get("Starfield") or []
+            assert [r["result"] for r in history] == ["not_fixed", "fixed"], history
+            ask(window, "no")      # the session is over, so "no" is an ordinary message again
+            assert "Step 3 of" not in transcript(window)
+
+            # Attach a crash log: only the lines that stand out are asked about; the file is not changed.
+            logs = Path(tempfile.mkdtemp(prefix="GG-log-"))
+            log = logs / "crash.log"
+            log.write_text("boot ok\nloading SkyUI\nERROR: missing master Foo.esm\nfine\n", encoding="utf-8")
+            stamp = log.read_bytes()
+            assistant_page.attach_file(window, window.assistant_input, str(log))
+            settle()
+            text = transcript(window)
+            assert "From the file crash.log" in text and "missing master Foo.esm" in text and "boot ok" not in text, text[-500:]
+            assert log.read_bytes() == stamp
+
+            # Explain things for: saved and passed to the Local AI.
+            window.assistant_level.setCurrentIndex(window.assistant_level.findData("new"))
+            settle()
+            assert window.settings.get("assistant_level") == "new"
+
+            # Every warning offers "Ask the assistant", which asks about it in the pop-out.
+            from PySide6.QtCore import QTimer
+            from PySide6.QtWidgets import QMessageBox
+
+            def press_ask():
+                box = app.activeModalWidget()
+                if isinstance(box, QMessageBox):
+                    next(b for b in box.buttons() if b.text() == "Ask the assistant").click()
+            QTimer.singleShot(150, press_ask)
+            real_error(window, "Scan failed", "Access is denied.")
+            settle()
+            from gg_desktop import assistant_popout
+            pop = assistant_popout.current(window)
+            assert pop is not None and pop.isVisible()
+            last_user = [m for m in assistant_page.current_chat(window)["messages"] if m["role"] == "user"][-1]
+            assert '"Scan failed"' in last_user["text"], last_user
+            pop.close()
+            settle()
+            window.navigate("AI Assistant")
+            settle()
 
             # Layout at the supported sizes: no sideways scrolling and the composer is never cut off.
             for width, height in ((1280, 720), (1440, 900), (960, 650)):

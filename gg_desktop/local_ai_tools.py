@@ -227,6 +227,12 @@ def game_storage(ctx, name=""):
     return out
 
 
+def _tab_shown(tab):
+    """A tab as the sidebar names it (More Tools is shown as Toolbox), so answers use the name the user sees."""
+    from gg_desktop import nav_groups
+    return nav_groups.display_name(tab) if tab else tab
+
+
 def app_help(ctx, topic=""):
     """The manual: Game Grave's features that match the topic, with their full steps and where they are."""
     from gg_desktop import assistant_features as features
@@ -260,7 +266,7 @@ def app_help(ctx, topic=""):
         return {"note": "No feature matches that. Main tabs: Overview, Ready Room, Games, Mods, Old Files, Other Storage, "
                         "Captures, Graveyard, Fix Kit, Game DNA, Hardware, Undo Center, Toolbox, AI Assistant, Settings."}
     return {"best_match": picks[0].title,
-            "features": [{"name": f.title, "tab": f.tab, "what": f.what, "steps": list(f.steps), "never": f.never,
+            "features": [{"name": f.title, "tab": _tab_shown(f.tab), "what": f.what, "steps": list(f.steps), "never": f.never,
                           "where": f.where, "can_plan": f.do} for f in picks]}
 
 
@@ -557,12 +563,29 @@ def today():
 
 
 # ------------------------------------------------------------------ the conversation loop (pure: chat_fn is injected)
-def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS, question=None):
+DOING = {"look_up_game": "your game's details", "game_mods": "its mods", "game_crashes": "the crashes Windows recorded",
+         "pc_status": "your PC's parts and drives", "open_apps": "the apps that are open", "startup_apps":
+         "what starts with Windows", "runtimes": "Microsoft's runtimes", "game_storage": "its caches and files",
+         "app_help": "Game Grave's manual", "tab_help": "Game Grave's manual", "known_fixes": "the usual fixes",
+         "explain_error": "what that error means", "tried_before": "what was tried before", "space_use":
+         "what's using your space", "game_grave_state": "Game Grave's settings", "recent_activity": "recent activity"}
+
+
+def doing(name):
+    return "Checking " + DOING.get(name, "Game Grave") + "…"
+
+
+def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS, question=None, events=None):
     """Let the model look things up, then answer. chat_fn(messages, tools) returns the reply message dict.
     Returns dict(text, jobs, summary, checked, results, looked): `jobs` is set when the model proposed a plan.
     With `question`, the lookups it obviously needs are run first (`prefetch`)."""
+    events = events or (lambda kind, text: None)
     first = prefetch(question, ctx) if question else []
+    for fn, _args in first:
+        events("look", doing(fn))
     messages, results, checked = with_prefetch(messages, ctx, first)
+    if first:
+        events("look", "Writing the answer…")
     looked = [fn for fn, _args in first]
     tools = tool_specs()
     if question is not None and not _STATE.search(" ".join(str(question).casefold().split())):
@@ -594,6 +617,7 @@ def converse(chat_fn, messages, ctx, max_rounds=MAX_CALLS, question=None):
                 return {"text": "", "jobs": data.get("jobs") or [], "summary": str(data.get("summary") or "")[:300],
                         "checked": checked, "results": results, "looked": looked}
             looked.append(name)
+            events("look", doing(name))
             result = run(ctx, name, args)
             results.append(result)
             label = CHECKED_NAMES.get(name)
@@ -788,27 +812,32 @@ def _shrink(messages, limit=1200):
     return out
 
 
-def answer(server, question, base_answer, facts, history, ctx, think=False):
+def answer(server, question, base_answer, facts, history, ctx, think=False, events=None):
     """Ask the model with lookups, then check what it said. `server` has chat_message() and chat(). Returns the result
     dict from `converse`, with the final text (empty when it broke a rule twice) and `unchecked` problems."""
     from gg_desktop import local_ai_prompt as prompt
     from gg_desktop import assistant_memory as memory
     messages = prompt.build_messages(question, base_answer, facts, history, think=think, tools=True, screen=ctx.screen,
-                                     notes=memory.notes_text(ctx.settings or {}))
+                                     notes=memory.notes_text(ctx.settings or {}),
+                                     level=memory.level_text(ctx.settings or {}))
     budget = dict(max_tokens=2600, timeout=420) if think else dict(max_tokens=900, timeout=240)
     shrunk = {"on": False}
+
+    stream = {}
+    if events is not None:
+        stream["on_text"] = lambda text: events("text", text)
 
     def chat_fn(msgs, tools):
         if shrunk["on"]:
             msgs = _shrink(msgs)
         try:
-            return server.chat_message(msgs, tools, **budget)
+            return server.chat_message(msgs, tools, **budget, **stream)
         except Exception as exc:
             if "400" not in str(exc) or shrunk["on"]:
                 raise
             shrunk["on"] = True                       # too long for the model's window: cut lookup results and retry
-            return server.chat_message(_shrink(msgs), tools, **budget)
-    result = converse(chat_fn, messages, ctx, question=question)
+            return server.chat_message(_shrink(msgs), tools, **budget, **stream)
+    result = converse(chat_fn, messages, ctx, question=question, events=events)
     if result["jobs"] is not None:
         return result
     raw = result["text"]

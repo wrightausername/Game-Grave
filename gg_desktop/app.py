@@ -518,7 +518,22 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         QMessageBox.information(self, title, message)
 
     def error(self, title: str, message: str):
-        QMessageBox.warning(self, title, message)
+        if not self.assistant_enabled():
+            QMessageBox.warning(self, title, message)
+            return
+        box = QMessageBox(self)  # with the assistant on, every warning can be handed to it in one click
+        box.setWindowTitle(title)
+        box.setText(message)
+        box.setIcon(QMessageBox.Warning)
+        box.setStandardButtons(QMessageBox.Ok)
+        ask = box.addButton("Ask the assistant", QMessageBox.ActionRole)
+        ask.setToolTip("Opens the assistant chat and asks what this means and what to do. Nothing is changed.")
+        box.exec()
+        if box.clickedButton() is ask:
+            from gg_desktop import assistant_links, assistant_page, assistant_popout
+            pop = assistant_popout.open_popout(self)
+            if pop is not None:
+                assistant_page.send(self, assistant_links.error_question(title, message), source=pop.input)
 
     def closeEvent(self, event):
         from gg_desktop import comfort

@@ -77,6 +77,75 @@ MAX_DOWNLOAD = 11 * GB
 SPARE_BYTES = 1 * GB
 
 
+def recommend(ram_gb, vram_gb):
+    """The size that fits this PC: what its memory and graphics memory can run at a usable speed."""
+    ram, vram = float(ram_gb or 0), float(vram_gb or 0)
+    if vram >= 12 and ram >= 32:
+        return "xl"
+    if vram >= 8 and ram >= 16:
+        return "large"
+    if vram >= 4 or ram >= 12:
+        return "medium"
+    return "small"
+
+
+def system_memory_gb():
+    """Installed memory as Windows reports it (GlobalMemoryStatusEx), or 0 when it can't be read."""
+    try:
+        import ctypes
+
+        class Status(ctypes.Structure):
+            _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong),
+                        ("avail", ctypes.c_ulonglong), ("page_total", ctypes.c_ulonglong),
+                        ("page_avail", ctypes.c_ulonglong), ("virtual_total", ctypes.c_ulonglong),
+                        ("virtual_avail", ctypes.c_ulonglong), ("extended", ctypes.c_ulonglong)]
+        status = Status()
+        status.length = ctypes.sizeof(Status)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return status.total / GB
+    except Exception:
+        pass
+    return 0.0
+
+
+def graphics_memory_gb():
+    """The largest graphics card's own memory, from the display adapters' driver keys (read only), or 0."""
+    try:
+        import winreg
+    except ImportError:
+        return 0.0
+    base = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+    best = 0
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base) as root:
+            for i in range(0, 32):
+                try:
+                    name = winreg.EnumKey(root, i)
+                except OSError:
+                    break
+                if not name.isdigit():
+                    continue
+                try:
+                    with winreg.OpenKey(root, name) as key:
+                        for value_name in ("HardwareInformation.qwMemorySize", "HardwareInformation.MemorySize"):
+                            try:
+                                value, _kind = winreg.QueryValueEx(key, value_name)
+                            except OSError:
+                                continue
+                            if isinstance(value, bytes):
+                                value = int.from_bytes(value[:8], "little")
+                            best = max(best, int(value or 0))
+                except OSError:
+                    continue
+    except OSError:
+        return 0.0
+    return best / GB
+
+
+def recommended_for_this_pc():
+    return recommend(system_memory_gb(), graphics_memory_gb())
+
+
 class LocalAIError(RuntimeError):
     pass
 
@@ -380,14 +449,57 @@ class LocalServer:
         self.stop()
         raise LocalAIError("The AI engine did not start in time.")
 
-    def chat_message(self, messages, tools=None, max_tokens=500, timeout=180):
+    def _stream(self, body, timeout, on_text):
+        """The reply built from llama-server's streamed pieces (server-sent events); on_text(text so far) is called as
+        words arrive. Tool calls arrive in pieces too and are joined by their index."""
+        data = json.dumps(dict(body, stream=True)).encode("utf-8")
+        request = urllib.request.Request(f"http://127.0.0.1:{self.port}/v1/chat/completions", data=data,
+                                         headers={"Content-Type": "application/json"})
+        opener = self.opener or urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        content, calls = [], {}
+        with opener.open(request, timeout=timeout) as response:
+            for raw in response:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    delta = json.loads(payload)["choices"][0].get("delta") or {}
+                except (ValueError, KeyError, IndexError, TypeError):
+                    continue
+                if delta.get("content"):
+                    content.append(delta["content"])
+                    if not calls:
+                        on_text("".join(content))
+                for piece in delta.get("tool_calls") or []:
+                    slot = calls.setdefault(piece.get("index", len(calls)), {"id": "", "type": "function",
+                                                                              "function": {"name": "", "arguments": ""}})
+                    slot["id"] = piece.get("id") or slot["id"]
+                    fn = piece.get("function") or {}
+                    slot["function"]["name"] += fn.get("name") or ""
+                    slot["function"]["arguments"] += fn.get("arguments") or ""
+        message = {"role": "assistant", "content": "".join(content)}
+        if calls:
+            message["tool_calls"] = [calls[k] for k in sorted(calls)]
+        return {"choices": [{"message": message}]}
+
+    def chat_message(self, messages, tools=None, max_tokens=500, timeout=180, on_text=None):
         """The reply message as a dict (content, and tool_calls when the model asked for a lookup). The same system
-        text is sent every time, so the server's prompt cache skips reading it again (cache_prompt)."""
+        text is sent every time, so the server's prompt cache skips reading it again (cache_prompt). With on_text, the
+        answer is streamed and on_text gets the text so far as it is written."""
         body = {"messages": messages, "max_tokens": max_tokens, "temperature": 0.3, "top_p": 0.9, "stream": False,
                 "cache_prompt": True}
         if tools:
             body["tools"] = tools
-        reply = self._http("/v1/chat/completions", body, timeout=timeout)
+        if on_text is not None:
+            try:
+                reply = self._stream(body, timeout, on_text)
+            except (OSError, ValueError):
+                reply = self._http("/v1/chat/completions", body, timeout=timeout)   # streaming refused: ask once whole
+        else:
+            reply = self._http("/v1/chat/completions", body, timeout=timeout)
         self.last_used = time.monotonic()
         try:
             message = dict(reply["choices"][0]["message"])

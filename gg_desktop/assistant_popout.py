@@ -79,6 +79,13 @@ class AssistantPopout(QWidget):
         self.input.setFixedHeight(34)
         self.input.returnPressed.connect(self.send)
         compose.addWidget(self.input, 1)
+        from gg_desktop import assistant_page
+        attach = tool("", "file", lambda: assistant_page.pick_attachment(self.window_, self.input),
+                      tip="Attach a crash log or text file. You can also drop one here.")
+        attach.setAccessibleName("Attach a log file")
+        attach.setFixedSize(34, 34)
+        compose.addWidget(attach)
+        assistant_page.accept_drops(self.window_, self.input)
         self.send_button = tool("Send", "next", self.send, kind="primary", tip="Ask (Enter)")
         self.send_button.setFixedHeight(34)
         compose.addWidget(self.send_button)

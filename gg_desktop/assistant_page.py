@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import re
 import time
 
-from PySide6.QtCore import QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QPainter
 from PySide6.QtWidgets import (QFrame, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
                                QScrollArea, QSizePolicy, QWidget)
@@ -28,7 +28,7 @@ from gg_desktop.grave_page import CheckRow
 from gg_desktop.header_banner import HeaderBannerArtwork
 from gg_desktop.insight_widgets import ActionFlow
 from gg_desktop.reference_library import _detail_scroll, _split, _widget
-from gg_desktop.reference_widgets import MetricStrip, icon, tool
+from gg_desktop.reference_widgets import ICONS, MetricStrip, icon, tool
 from gg_desktop.widgets import button, column, label, panel, row
 
 SUBTITLE = "Ask about your games, mods and storage. Answers come from data scanned on this PC."
@@ -88,6 +88,32 @@ def row_game(window, item):
         if candidate in names:
             return candidate
     return ""
+
+
+def open_link(window, href):
+    """A link in an answer: a game opens in Games, a tab opens, a folder opens in File Explorer. Nothing is changed."""
+    kind, _, value = str(href).partition(":")
+    if kind == "game":
+        show_in_games(window, value)
+    elif kind == "tab":
+        window.navigate(value)
+    elif kind == "path":
+        import os
+        target = value if os.path.isdir(value) else os.path.dirname(value)
+        if target and os.path.isdir(target):
+            try:
+                os.startfile(target)
+            except (OSError, AttributeError):
+                window.status.setText("That folder couldn't be opened.")
+        else:
+            window.status.setText("That folder isn't there any more.")
+
+
+def row_game_name(window, question):
+    """The installed game a question names, for follow-up buttons ("Is Hades modded?")."""
+    games = sorted((g.name for g in getattr(getattr(window, "inventory", None), "games", []) or []), key=len, reverse=True)
+    q = (question or "").casefold()
+    return next((g for g in games if len(g) >= 3 and g.casefold() in q), "")
 
 
 def show_in_games(window, name):
@@ -264,6 +290,12 @@ def build(window):
     head.addWidget(self.assistant_delete)
     side.addLayout(head)
     side.addWidget(tool("New Chat", "plus", lambda: new_chat(self), kind="primary", tip="Start a new conversation"))
+    self.assistant_find = QLineEdit()
+    self.assistant_find.setPlaceholderText("Search chats")
+    self.assistant_find.setAccessibleName("Search chats")
+    self.assistant_find.setClearButtonEnabled(True)
+    self.assistant_find.textChanged.connect(lambda _t: fill_list(self))
+    side.addWidget(self.assistant_find)
     self.assistant_list = QListWidget()
     self.assistant_list.setObjectName("assistantList")
     self.assistant_list.setAccessibleName("Conversations")
@@ -352,6 +384,13 @@ def build(window):
     self.assistant_input.setMinimumWidth(60)
     self.assistant_input.returnPressed.connect(lambda: send(self))
     compose.addWidget(self.assistant_input, 1)
+    attach = tool("", "file", lambda: pick_attachment(self, self.assistant_input),
+                  tip="Attach a crash log or text file (.log, .txt, .ini...). You can also drop one here. "
+                      "Only the lines that stand out are asked about; the file is not changed.")
+    attach.setAccessibleName("Attach a log file")
+    attach.setFixedSize(34, 34)
+    compose.addWidget(attach)
+    accept_drops(self, self.assistant_input)
     self.assistant_send = tool("Send", "next", lambda: send(self), kind="primary", tip="Ask (Enter)")
     self.assistant_send.setFixedHeight(34)
     self.assistant_send.setStyleSheet("border-radius:17px;padding:0 16px;")
@@ -403,6 +442,7 @@ def build(window):
     right = QWidget()
     right_lay = column(spacing=8)
     right.setLayout(right_lay)
+    right_lay.addWidget(level_panel(self, accent))
     right_lay.addWidget(can, 4)
     right_lay.addWidget(auto, 3)
     right_lay.addWidget(used, 4)
@@ -495,7 +535,22 @@ def fill_list(window):
     widget = window.assistant_list
     widget.blockSignals(True)
     widget.clear()
-    ordered = sorted(state.chats, key=lambda c: (-(c["updated"] or 0)))
+    from gg_desktop import assistant_links as links
+    words = window.assistant_find.text() if hasattr(window, "assistant_find") else ""
+    pins = window.settings.get(links.PINS_KEY) or []
+    if pins and not words:
+        item = QListWidgetItem(f"Pinned answers ({len(pins)})\nOpen to read or unpin")
+        item.setData(Qt.UserRole, PINNED)
+        item.setToolTip("Answers you pinned")
+        item.setSizeHint(QSize(10, 42))
+        widget.addItem(item)
+    keep = set(links.search_chats(state.chats, words))
+    ordered = sorted((c for c in state.chats if c["id"] in keep and (c["messages"] or not words)),
+                     key=lambda c: (-(c["updated"] or 0)))
+    if words and not ordered:
+        item = QListWidgetItem("No chats match")
+        item.setFlags(Qt.NoItemFlags)
+        widget.addItem(item)
     for chat in ordered:
         stamp = time.strftime("%b %d, %H:%M", time.localtime(chat["updated"])) if chat["messages"] else "Not started"
         item = QListWidgetItem(f"{chat['title']}\n{stamp}")
@@ -535,13 +590,14 @@ def render_chat(window, layout=None, title=None, scroll=None, compact=False):
             layout.addWidget(local_ai_ui.setup_card(window))
     else:
         question = ""
-        for message in chat["messages"]:
+        last = max((i for i, m in enumerate(chat["messages"]) if m["role"] == "assistant"), default=-1)
+        for index, message in enumerate(chat["messages"]):
             if message["role"] == "user":
                 question = message["text"]
                 layout.addWidget(bubble(message["text"]))
             else:
                 add_answer(window, question, engine.answer_from_dict(message.get("answer") or {}), message.get("plan"),
-                           layout)
+                           layout, latest=index == last)
     layout.addStretch()
     scroll_down(window, scroll)
 
@@ -616,9 +672,10 @@ def add_assistant_text(window, text, layout=None):
     words.setStyleSheet("color:#e8eef5;font-size:13px;")
     line.addWidget(words, 1)
     (layout if layout is not None else window.assistant_messages).addWidget(holder)
+    return words
 
 
-def add_answer(window, question, answer, plan=None, layout=None):
+def add_answer(window, question, answer, plan=None, layout=None, latest=False):
     if answer is None:
         return
     line = row(spacing=10)
@@ -633,9 +690,16 @@ def add_answer(window, question, answer, plan=None, layout=None):
         title.setTextFormat(Qt.PlainText)
         title.setStyleSheet("color:#ffffff;font-size:14px;font-weight:700;")
         stack.addWidget(title)
-    text = label(body, "subtle", wrap=True)
-    text.setTextFormat(Qt.PlainText)
-    text.setTextInteractionFlags(Qt.TextSelectableByMouse)
+    from gg_desktop import assistant_links as links
+    games = [g.name for g in getattr(getattr(window, "inventory", None), "games", []) or []]
+    text = label("", "subtle", wrap=True)
+    text.setTextFormat(Qt.RichText)                 # game, tab and folder names are links; everything else is escaped
+    text.setText(links.linkify(body, games))
+    text.setProperty("plain", body)                 # the words without links, for checks and screen readers
+    text.setAccessibleDescription(body[:400])
+    text.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse)
+    text.setOpenExternalLinks(False)
+    text.linkActivated.connect(lambda href: open_link(window, href))
     text.setStyleSheet("color:#e8eef5;font-size:13px;")
     stack.addWidget(text)
     for index, item in enumerate(answer.rows):
@@ -665,11 +729,26 @@ def add_answer(window, question, answer, plan=None, layout=None):
     actions_row.addWidget(tool("Copy", "file", lambda _=False, q=question, a=answer: copy_answer(window, q, a),
                                tip="Copy this question and answer"))
     if question:
+        actions_row.addWidget(tool("Pin", "pin" if "pin" in ICONS else "file",
+                                   lambda _=False, q=question, a=answer: pin_answer(window, q, a),
+                                   tip="Keep this answer in Pinned answers so you can find it again"))
         bad = tool("Not helpful", "warning", lambda _=False, q=question, a=answer: not_helpful(window, q, a),
                    tip="Keeps this question and answer on this PC so they can be looked at later, and copies a report "
                        "you can send if you want. Nothing is sent by itself.")
         actions_row.addWidget(bad)
     stack.addWidget(_widget(actions_row))
+    if latest and question and answer.intent not in ("followup", "note", "ask_fixed", "news", "troubleshoot"):
+        follow = ActionFlow(spacing=6)
+        game = row_game_name(window, question)
+        for caption, ask in links.next_questions(answer.intent, question, answer.text, game):
+            follow.addWidget(tool(caption, "next", lambda _=False, q=ask: send(window, q), tip="Ask: " + ask))
+        if any(str(s).startswith("Local AI") for s in answer.sources):
+            follow.addWidget(tool("Simpler", "next", lambda _=False: send(window, links.SIMPLER),
+                                  tip="Ask for the same answer in plainer words"))
+            follow.addWidget(tool("More detail", "next", lambda _=False: send(window, links.MORE),
+                                  tip="Ask for more detail and the exact steps"))
+        if follow.count():
+            stack.addWidget(_widget(follow))
     if answer.sources:
         sources = row(spacing=5)
         sources.addWidget(label("Sources", "caption"))
@@ -774,8 +853,9 @@ def last_exchange(chat):
     return "", None
 
 
-def send(window, question=None, source=None):
-    """Answer one message from the tab or the pop-out window (`source` is the input box it came from)."""
+def send(window, question=None, source=None, attached=""):
+    """Answer one message from the tab or the pop-out window (`source` is the input box it came from).
+    `attached` is the key lines of a file the owner attached; it is added after the typed text, line breaks kept."""
     shown = views(window)
     if not shown:
         return
@@ -787,7 +867,11 @@ def send(window, question=None, source=None):
     from gg_desktop import autopilot_ui
     if question is None:
         box.clear()
+    if attached:
+        text = text + "\n\n" + attached[:3500]
     text = here_question(window, text)
+    if guide_reply(window, text):        # guided troubleshooting: one fix at a time, "Did that work?"
+        return
     if memory_reply(window, text):       # notes, "undo that", "it's fixed" / "still broken"
         return
     if follow_up(window, text):          # "proceed", "yes", "do it": act on what the assistant just offered
@@ -833,6 +917,7 @@ def send(window, question=None, source=None):
         window.status.setText("Local AI is starting on this PC (the first answer can take up to a minute)…" if starting
                               else "Local AI is writing the answer on this PC…")
         # Show the question and a thinking line right away in every view; the real answer replaces them.
+        live_labels = []
         for view in views(window):
             view.input.setEnabled(False)
             view.send.setEnabled(False)
@@ -840,11 +925,20 @@ def send(window, question=None, source=None):
             if layout.count() and layout.itemAt(layout.count() - 1).spacerItem() is not None:
                 layout.takeAt(layout.count() - 1)
             layout.addWidget(bubble(text))
-            add_assistant_text(window, "Starting the local AI model, this first answer can take up to a minute…"
-                               if starting else ("Thinking it through on this PC…" if local_ai_ui.thinks(window) else "Thinking…"), layout)
+            waiting = add_assistant_text(window, "Starting the local AI model, this first answer can take up to a minute…"
+                                         if starting else ("Thinking it through on this PC…" if local_ai_ui.thinks(window)
+                                                           else "Thinking…"), layout)
+            live_labels.append((waiting, view.scroll))
             layout.addStretch()
             scroll_down(window, view.scroll)
         chat_id = chat["id"]
+
+        def live(words):
+            """The waiting bubble shows what is being checked, then the answer as it is written."""
+            for waiting, scroll in live_labels:
+                if isValid(waiting):
+                    waiting.setText(words)
+                    scroll_down(window, scroll)
 
         def deliver(answer):
             target = next((c for c in state.chats if c["id"] == chat_id), None)
@@ -858,7 +952,7 @@ def send(window, question=None, source=None):
                 box.setFocus()
             window.status.setText("Answered on this PC from scanned data. Nothing was changed.")
             refresh_all(window)
-        local_ai_ui.answer_async(window, text, result, facts, history, deliver)
+        local_ai_ui.answer_async(window, text, result, facts, history, deliver, live=live)
         return
     actions.add_exchange(chat, text, result, time.time())
     persist_chats(window)
@@ -957,6 +1051,75 @@ def _asked_fixed(chat):
         if message.get("role") == "assistant":
             return message.get("fix_game", "")
     return ""
+
+
+def _guide_of(chat):
+    """The guided-troubleshooting session still waiting for an answer: on one of the last three assistant messages (a
+    step's button, such as Check it for me, adds a plan or answer after it), unless the session ended since."""
+    seen = 0
+    for message in reversed((chat or {}).get("messages") or []):
+        if message.get("role") != "assistant":
+            continue
+        if message.get("guide"):
+            return message["guide"]
+        if (message.get("answer") or {}).get("intent") == "troubleshoot":
+            return None                      # stopped, fixed or out of steps
+        seen += 1
+        if seen >= 3:
+            break
+    return None
+
+
+def guide_reply(window, text):
+    """Starts or carries on a guided troubleshooting session in this chat. Each step is one message with its buttons."""
+    from gg_desktop import assistant_guide as guide
+    from gg_desktop import assistant_memory as memory
+    chat = current_chat(window)
+    session = _guide_of(chat)
+    games = [g.name for g in getattr(getattr(window, "inventory", None), "games", []) or []]
+    if session is None and not guide.starts(text):
+        return False
+    if session is not None:
+        verdict = guide.reply(session, text)
+        if not verdict:
+            if not guide.starts(text):
+                return False                 # an ordinary question in the middle: answered normally, session ends
+            session = None
+        elif verdict == "stop":
+            _reply(window, text, engine.Answer("troubleshoot", "Okay, stopped. Ask again any time.",
+                                               sources=("Known fixes",)))
+            return True
+        elif verdict == "fixed":
+            game = session.get("game")
+            steps = guide.steps_for(session["problem"])
+            worked = steps[session["at"]] if session["at"] < len(steps) else ""
+            if game:
+                save(window, memory.record_fix(window.settings, game, worked[:120], "fixed"))
+            _reply(window, text, engine.Answer("troubleshoot", "Great, glad that sorted it." +
+                                               (f" I'll remember what fixed {game}." if game else ""),
+                                               sources=("Known fixes",)))
+            return True
+        else:
+            session = guide.advance(session, verdict)
+            if verdict == "next" and session.get("game") and session["tried"]:
+                save(window, memory.record_fix(window.settings, session["game"], session["tried"][-1][:120],
+                                               "not_fixed"))
+    if session is None:
+        session = guide.begin(text, games)
+    if not session["problem"]:
+        body, buttons = guide.ask_problem(session)
+    else:
+        view = guide.step_view(session)
+        if view is None:
+            body, buttons = guide.done_view(session)
+            _reply(window, text, engine.Answer("troubleshoot", body, sources=("Known fixes",), handoffs=buttons))
+            return True
+        body, buttons = view
+    _reply(window, text, engine.Answer("troubleshoot", body, sources=("Known fixes",), handoffs=buttons))
+    if session["problem"]:
+        current_chat(window)["messages"][-1]["guide"] = session
+        persist_chats(window)
+    return True
 
 
 def memory_reply(window, text):
@@ -1121,6 +1284,10 @@ def pick_chat(window):
         return
     state = state_of(window)
     chat_id = items[0].data(Qt.UserRole)
+    if chat_id == PINNED:
+        show_pins(window)
+        fill_list(window)
+        return
     if chat_id and chat_id != state.current:
         state.current = chat_id
         render_chat(window)
@@ -1202,6 +1369,149 @@ def review_text(window, question, answer):
     model = local_ai_ui.chosen(window) if local_ai_ui.enabled(window) else "built-in"
     return (f"Game Grave {version} · assistant: {model}\n\nQuestion: {question}\n\n"
             f"{actions.answer_text(question, answer)}\n\nSources: {', '.join(answer.sources) or 'none'}")
+
+
+class _Drops(QObject):
+    """Lets a text file be dropped on the chat box; it is attached like the Attach button does."""
+    def __init__(self, window, box):
+        super().__init__(box)
+        self.window_, self.box = window, box
+
+    def eventFilter(self, obj, event):
+        kind = event.type()
+        if kind in (QEvent.DragEnter, QEvent.DragMove) and event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            return True
+        if kind == QEvent.Drop and event.mimeData().hasUrls():
+            urls = [u.toLocalFile() for u in event.mimeData().urls() if u.isLocalFile()]
+            if urls:
+                attach_file(self.window_, self.box, urls[0])
+            event.acceptProposedAction()
+            return True
+        return False
+
+
+def accept_drops(window, box):
+    box.setAcceptDrops(True)
+    box.installEventFilter(_Drops(window, box))
+
+
+def pick_attachment(window, box):
+    from PySide6.QtWidgets import QFileDialog
+    path, _ = QFileDialog.getOpenFileName(window, "Attach a log or text file", "",
+                                          "Text and log files (*.log *.txt *.ini *.cfg *.json *.xml *.csv);;All files (*)")
+    if path:
+        attach_file(window, box, path)
+
+
+def attach_file(window, box, path):
+    """Reads the file (read only), keeps the lines that stand out, and asks about them with whatever was typed."""
+    from gg_desktop import assistant_links as links
+    name, text, *why = links.read_log(path)
+    if text is None:
+        window.info("Can't attach that file", why[0] if why else "That file couldn't be read.")
+        return
+    typed = box.text().strip()
+    box.clear()
+    block = "From the file " + name + " (the lines that stand out):\n" + ("\n".join(links.key_lines(text))
+                                                                            or "(the file is empty)")
+    send(window, typed or "What does this log say went wrong, and what should I try?", source=box, attached=block)
+
+
+def level_panel(window, accent_fn):
+    """"Explain things for": how much the assistant explains (used by the Local AI's answers)."""
+    from PySide6.QtWidgets import QComboBox
+    from gg_desktop import assistant_memory as memory
+    box, lay = panel(kind="fileResults", padding=10, spacing=6)
+    accent_fn(box, "assistantLevel", "cyan")
+    lay.addWidget(label("Explain things for", "sectionTitle"))
+    combo = QComboBox()
+    combo.setAccessibleName("Explain things for")
+    for key, name in memory.LEVELS.items():
+        combo.addItem(name, key)
+    combo.setCurrentIndex(max(0, combo.findData(memory.level_of(window.settings))))
+    combo.setToolTip("New: everyday words and one step at a time. Know my way around: short answers with the technical "
+                     "details. Used by the Local AI's answers; the built-in answers stay the same.")
+    combo.currentIndexChanged.connect(
+        lambda _i: save(window, dict(window.settings, **{memory.LEVEL_KEY: combo.currentData() or ""})))
+    lay.addWidget(combo)
+    window.assistant_level = combo
+    return box
+
+
+PINNED = "__pinned__"
+
+
+def pin_answer(window, question, answer):
+    """Keeps the answer in this PC's settings under Pinned answers. Nothing else changes."""
+    from datetime import datetime
+    from gg_desktop import assistant_links as links
+    pins = links.add_pin(window.settings.get(links.PINS_KEY), question, answer.text,
+                         datetime.now().isoformat(timespec="minutes"))
+    save(window, dict(window.settings, **{links.PINS_KEY: pins}))
+    window.status.setText("Pinned. Find it at the top of Conversations.")
+    if hasattr(window, "assistant_list"):
+        fill_list(window)
+
+
+def show_pins(window):
+    """A small window with every pinned answer: read, copy or unpin."""
+    from PySide6.QtWidgets import QDialog, QTextBrowser, QVBoxLayout, QHBoxLayout, QListWidget as _List
+    from gg_desktop import assistant_links as links
+    pins = list(window.settings.get(links.PINS_KEY) or [])
+    if not pins:
+        return
+    dialog = QDialog(window)
+    dialog.setWindowTitle("Pinned answers")
+    dialog.resize(640, 460)
+    lay = QVBoxLayout(dialog)
+    names = _List()
+    names.setAccessibleName("Pinned answers")
+    view = QTextBrowser()
+    view.setOpenLinks(False)
+    view.anchorClicked.connect(lambda url: open_link(window, url.toString()))
+
+    def refill():
+        names.clear()
+        for pin in reversed(pins):
+            names.addItem(pin["question"][:80])
+        if names.count():
+            names.setCurrentRow(0)
+        else:
+            view.clear()
+
+    def shown(row):
+        if 0 <= row < len(pins):
+            pin = pins[len(pins) - 1 - row]
+            games = [g.name for g in getattr(getattr(window, "inventory", None), "games", []) or []]
+            view.setHtml(f"<p><b>{links.html.escape(pin['question'])}</b></p><p>{links.linkify(pin['answer'], games)}</p>"
+                         f"<p style='color:#8a96a8'>Pinned {links.html.escape(pin.get('when') or '')}</p>")
+
+    def unpin():
+        row = names.currentRow()
+        if 0 <= row < len(pins):
+            pins[:] = links.remove_pin(pins, len(pins) - 1 - row)
+            save(window, dict(window.settings, **{links.PINS_KEY: list(pins)}))
+            refill()
+
+    def copy():
+        row = names.currentRow()
+        if 0 <= row < len(pins):
+            pin = pins[len(pins) - 1 - row]
+            QGuiApplication.clipboard().setText(pin["question"] + "\n\n" + pin["answer"])
+
+    names.currentRowChanged.connect(shown)
+    lay.addWidget(names, 1)
+    lay.addWidget(view, 2)
+    buttons = QHBoxLayout()
+    buttons.addWidget(tool("Close", "", dialog.accept))
+    buttons.addStretch(1)
+    buttons.addWidget(tool("Copy", "file", copy))
+    buttons.addWidget(tool("Unpin", "trash", unpin))
+    lay.addLayout(buttons)
+    window._assistant_pins_dialog = dialog
+    refill()
+    dialog.show()
 
 
 def not_helpful(window, question, answer):

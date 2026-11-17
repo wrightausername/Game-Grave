@@ -46,7 +46,8 @@ def main():
         raise AssertionError("Timed out waiting for " + what)
 
     def transcript(window):
-        return " ".join(label.text() for label in window.assistant_scroll.widget().findChildren(QLabel))
+        return " ".join(label.property("plain") or label.text()
+                        for label in window.assistant_scroll.widget().findChildren(QLabel))
 
     def press(window, caption):
         found = [b for b in window.assistant_scroll.widget().findChildren(QPushButton) if b.text().startswith(caption)
@@ -313,7 +314,7 @@ def main():
             pop = assistant_popout.current(window)
             assert pop is not None and pop.isVisible() and pop.pin.isChecked(), "Opens, kept on top by default"
             assert "You're on: Games" in pop.where.text(), pop.where.text()
-            pop_text = lambda: " ".join(l.text() for l in pop.scroll.widget().findChildren(QLabel))
+            pop_text = lambda: " ".join(l.property("plain") or l.text() for l in pop.scroll.widget().findChildren(QLabel))
             pop.input.setText("how do I use this tab")
             QTest.keyClick(pop.input, Qt.Key_Return)
             settle()
