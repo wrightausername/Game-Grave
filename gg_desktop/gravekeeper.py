@@ -487,7 +487,7 @@ def turn(server, question, facts, history, ctx, think=False, events=None, image=
         result["unchecked"] = still if again else wrong
     if not text and (result["jobs"] or ready is not None):
         text = (result["summary"] or "Here's the plan.") + " Nothing changes until you press OK."
-    if not text:                 # the model gave nothing usable: Game Grave's own answer, never an empty bubble
+    if not text and not result.get("broke_rules"):   # nothing usable (rule breaks are explained by the chat page)
         try:
             from gg_desktop import assistant_engine as engine
             text = engine.answer(question, facts).text
