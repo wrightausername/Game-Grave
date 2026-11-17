@@ -28,7 +28,7 @@ from gg_desktop.grave_page import CheckRow
 from gg_desktop.header_banner import HeaderBannerArtwork
 from gg_desktop.insight_widgets import ActionFlow
 from gg_desktop.reference_library import _detail_scroll, _split, _widget
-from gg_desktop.reference_widgets import ICONS, MetricStrip, icon, tool
+from gg_desktop.reference_widgets import MetricStrip, icon, tool
 from gg_desktop.widgets import button, column, label, panel, row
 
 SUBTITLE = "Ask about your games, mods and storage. Answers come from data scanned on this PC."
@@ -729,7 +729,7 @@ def add_answer(window, question, answer, plan=None, layout=None, latest=False):
     actions_row.addWidget(tool("Copy", "file", lambda _=False, q=question, a=answer: copy_answer(window, q, a),
                                tip="Copy this question and answer"))
     if question:
-        actions_row.addWidget(tool("Pin", "pin" if "pin" in ICONS else "file",
+        actions_row.addWidget(tool("Pin", "pin",
                                    lambda _=False, q=question, a=answer: pin_answer(window, q, a),
                                    tip="Keep this answer in Pinned answers so you can find it again"))
         bad = tool("Not helpful", "warning", lambda _=False, q=question, a=answer: not_helpful(window, q, a),
