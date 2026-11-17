@@ -131,7 +131,7 @@ def main():
             assert "not measured disk use" in text and "Game library" in text, text
             assert "Open Games" in buttons(window) and "Copy" in buttons(window), buttons(window)
             assert buttons(window).count("Open Games") == 1 and "Show" in buttons(window), buttons(window)
-            assert window.assistant_mode.text() in ("Tools: Off", "Tools: Ask first"), window.assistant_mode.text()
+            assert window.assistant_mode.text().endswith(("Tools: Off", "Tools: Ask first")), window.assistant_mode.text()
             assert window.assistant_input.text() == ""
             assert saved and "assistant_chats" in saved[-1] and saved[-1]["assistant_chats"][0]["messages"], saved[-1:]
             assert [v.text() for v in window.assistant_metrics.values][0] == "1"
@@ -210,9 +210,9 @@ def main():
             # Pretend the Medium model and engine are on disk, then answer through the real background path with a
             # stand-in server: the model's text replaces the built-in text and its source is named.
             (root / "AI" / "models").mkdir(parents=True, exist_ok=True)
-            (root / "AI" / "models" / "medium.gguf").write_bytes(b"m")
-            (root / "AI" / "runtime" / "cpu").mkdir(parents=True, exist_ok=True)
-            (root / "AI" / "runtime" / "cpu" / "llama-server.exe").write_bytes(b"e")
+            (root / "AI" / "models" / "medium-q35.gguf").write_bytes(b"m")
+            (root / "AI" / "runtime" / ai.RUNTIME_TAG / "cpu").mkdir(parents=True, exist_ok=True)
+            (root / "AI" / "runtime" / ai.RUNTIME_TAG / "cpu" / "llama-server.exe").write_bytes(b"e")
             local_ai_ui.sync(window)
             assert w.switch.isEnabled() and w.remove.isVisible() and not w.get.isVisible(), w.status.text()
             w.switch.click()
@@ -232,8 +232,30 @@ def main():
                 ask(window, "how many games have i got")
                 wait_for("You have 2 games, from Steam.")
             assert "You have 2 games, from Steam." in transcript(window), transcript(window)
-            assert "Local AI: Medium" in transcript(window), "the local model is named as a source"
+            assert window.assistant_mode.text().startswith("Gravekeeper"), window.assistant_mode.text()
+            assert "Sources" not in transcript(window).split("how many games have i got")[-1], "no source chips under it"
             assert window.assistant_input.isEnabled()
+            # Every message goes to the Gravekeeper now, even "hi" and "thanks": no scripted replies.
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat_message", return_value=said("Hey! What are we fixing today?")), \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "hi")
+                wait_for("What are we fixing today?")
+            assert "What are we fixing today?" in transcript(window)
+            # It can show a chart and offer a button; the chart is drawn from the scan, not from its words.
+            chart = {"content": "", "tool_calls": [
+                {"id": "v1", "type": "function", "function": {"name": "show_chart", "arguments": "{\"kind\": \"games\"}"}},
+                {"id": "v2", "type": "function", "function": {"name": "offer_button",
+                                                              "arguments": "{\"label\": \"Open Graveyard\", \"opens\": \"Graveyard\"}"}}]}
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat_message", side_effect=[chart, said("Starfield is the big one.")]), \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "show me my biggest games")
+                wait_for("Starfield is the big one.")
+            visuals = [f for f in window.assistant_scroll.widget().findChildren(QFrame) if f.objectName() == "assistantVisual"]
+            assert visuals and "Starfield" in visuals[-1].accessibleName(), [v.accessibleName() for v in visuals]
+            assert "Open Graveyard" in buttons(window)
+            window.grab().save(str(args.output / "assistant-gravekeeper-chart-1280.png"))
             # The model looks a game up first, then answers; the answer says what it checked.
             lookup = {"content": "", "tool_calls": [{"id": "c1", "type": "function", "function": {
                 "name": "look_up_game", "arguments": "{\"name\": \"cyberpunk\"}"}}]}
@@ -244,14 +266,15 @@ def main():
                 ask(window, "tell me about cyber punk")
                 wait_for("reports 70.0 GB on drive C:")
             sent = asked.call_args_list[1].args[0]
-            assert any(m.get("role") == "tool" and "Cyberpunk 2077" in m.get("content", "") for m in sent), sent[-2:]
-            assert "Checked: Games" in transcript(window), transcript(window)
-            # Not helpful keeps the exchange on this PC and copies a report; nothing is sent.
-            bad = [b for b in window.assistant_scroll.widget().findChildren(QPushButton) if b.text() == "Not helpful"]
+            assert any(m.get("role") == "tool" and "Cyberpunk 2077" in str(m.get("content", "")) for m in sent), sent[-2:]
+            # Not helpful keeps the exchange on this PC, becomes a lesson for next time, and copies a report.
+            bad = [b for b in window.assistant_scroll.widget().findChildren(QPushButton)
+                   if b.accessibleName() == "Not helpful"]
             bad[-1].click()
             settle()
             kept = window.settings.get("assistant_feedback") or []
             assert kept and kept[-1]["question"] == "tell me about cyber punk", kept
+            assert (window.settings.get("assistant_lessons") or [])[-1]["question"] == "tell me about cyber punk"
             from PySide6.QtGui import QGuiApplication
             assert "Question: tell me about cyber punk" in QGuiApplication.clipboard().text()
             # A size the data doesn't back up is sent back once for correction.
@@ -270,7 +293,7 @@ def main():
                     patch.object(ai.LocalServer, "chat_message", return_value=planned), \
                     patch.object(ai.LocalServer, "running", new=True):
                 ask(window, "my pc feels full of junk, sort it out")
-                wait_for("nothing changes until you say OK")
+                wait_for("left out: format_drive")
                 for _ in range(10):
                     settle()
             text = transcript(window)
@@ -289,9 +312,16 @@ def main():
                     patch.object(ai.LocalServer, "chat", return_value="Cyberpunk is safe to delete."), \
                     patch.object(ai.LocalServer, "running", new=True):
                 ask(window, "and cyberpunk again")
-                wait_for("safety rules twice")
+                wait_for("won't let me promise")
             low = transcript(window).lower().replace("is it safe to delete", "")
-            assert "safety rules twice" in low and "cyberpunk is safe to delete" not in low, low
+            assert "won't let me promise" in low and "cyberpunk is safe to delete" not in low, low
+            # A correction is kept as a lesson.
+            with patch.object(ai, "start_best", return_value="cpu"), \
+                    patch.object(ai.LocalServer, "chat_message", return_value=said("Sorry about that, noted.")), \
+                    patch.object(ai.LocalServer, "running", new=True):
+                ask(window, "no, that's wrong, it's on drive D")
+                wait_for("Sorry about that, noted.")
+            assert "drive D" in (window.settings.get("assistant_lessons") or [{}])[-1].get("correction", "")
             local_ai_ui.stop(window)
             w.switch.click()
             settle()

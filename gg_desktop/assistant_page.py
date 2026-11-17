@@ -35,6 +35,16 @@ SUBTITLE = "Ask about your games, mods and storage. Answers come from data scann
 ROW_COLORS = ("#30d76b", "#13bcf5", "#f2a5b2", "#f6be24", "#b455ff", "#ff254a")
 WELCOME = ("Ask about your games, storage, mods or captures. I answer from what Game Grave scanned on this PC, and I "
            "never change any file.")
+GRAVEKEEPER_WELCOME = ("Ask me anything about your games, mods or this PC, or just tell me what's wrong. I check before I "
+                       "answer, and nothing changes without your OK.")
+KEEPER_SUGGESTIONS = (
+    ("warning", "Something's broken", "My game keeps crashing, can you help?"),
+    ("game", "What should I play?", "What should I play tonight?"),
+    ("list", "Where did my space go?", "Where did all my space go?"),
+    ("sparkles", "Make it run better", "My game stutters, what can I do?"),
+    ("star", "Play with friends", "Which of my games are good for co-op?"),
+    ("check", "Check my PC", "Give my PC a quick health check"),
+)
 WELCOME_TOOLS = ("Ask a question, or tell me what to do. I show a plan first, and nothing changes until you press Run all.")
 PROMPT_CHIP = ("QPushButton{background:#0f161e;border:1px solid #243243;border-radius:13px;color:#c9d4df;font-size:11px;"
                "padding:0 10px;text-align:left;} QPushButton:hover{border-color:#e5243b;color:#ffffff;}")
@@ -107,6 +117,34 @@ def open_link(window, href):
                 window.status.setText("That folder couldn't be opened.")
         else:
             window.status.setText("That folder isn't there any more.")
+
+
+def _icon_names():
+    from gg_desktop import reference_widgets
+    return reference_widgets.PATHS
+
+
+WEB_HOSTS = ("pcgamingwiki.com", "store.steampowered.com", "nexusmods.com", "steamcommunity.com")
+
+
+def open_web(window, url):
+    """Opens a page the Gravekeeper linked, only on the hosts it may link to, in the user's browser."""
+    import urllib.parse
+    from PySide6.QtGui import QDesktopServices
+    from PySide6.QtCore import QUrl
+    host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    if urllib.parse.urlsplit(url).scheme != "https" or not any(host == h or host.endswith("." + h) for h in WEB_HOSTS):
+        window.status.setText("That link isn't one Game Grave opens.")
+        return
+    QDesktopServices.openUrl(QUrl(url))
+    window.status.setText("Opened in your browser.")
+
+
+def open_tool(window, key):
+    from gg_desktop import assistant_features as features, autopilot_ui
+    feature = features.BY_KEY.get(key)
+    if feature is not None and feature.opens:
+        autopilot_ui.open_target(window, feature.opens)
 
 
 def row_game_name(window, question):
@@ -390,6 +428,12 @@ def build(window):
     attach.setAccessibleName("Attach a log file")
     attach.setFixedSize(34, 34)
     compose.addWidget(attach)
+    from gg_desktop import assistant_voice
+    mic = tool("", "mic", lambda: assistant_voice.listen(self, self.assistant_input),
+               tip="Say your question instead of typing it (Windows' own speech recognition; nothing is sent anywhere)")
+    mic.setAccessibleName("Speak a question")
+    mic.setFixedSize(34, 34)
+    compose.addWidget(mic)
     accept_drops(self, self.assistant_input)
     self.assistant_send = tool("Send", "next", lambda: send(self), kind="primary", tip="Ask (Enter)")
     self.assistant_send.setFixedHeight(34)
@@ -501,7 +545,8 @@ def refresh(window):
     from gg_desktop import autopilot_ui
     strip.set_value(4, "Runs Tools" if autopilot_ui.enabled(window) else "Read Only")
     runs = autopilot_ui.enabled(window)
-    window.assistant_mode.setText("Tools: Ask first" if runs else "Tools: Off")
+    window.assistant_mode.setText(("Gravekeeper · " if gravekeeper_on(window) else "Basic · ") +
+                                  ("Tools: Ask first" if runs else "Tools: Off"))
     window.assistant_mode.setToolTip("The assistant can run Game Grave's own tools; nothing changes until you press Run all. "
                                      "Click to change." if runs else
                                      "The assistant only answers. Click to switch on running tools.")
@@ -597,7 +642,7 @@ def render_chat(window, layout=None, title=None, scroll=None, compact=False):
                 layout.addWidget(bubble(message["text"]))
             else:
                 add_answer(window, question, engine.answer_from_dict(message.get("answer") or {}), message.get("plan"),
-                           layout, latest=index == last)
+                           layout, latest=index == last, visuals=message.get("visuals") or ())
     layout.addStretch()
     scroll_down(window, scroll)
 
@@ -615,7 +660,10 @@ def welcome_hero(window, text, compact=False):
     mark.setStyleSheet("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #4a1220,stop:1 #170910);"
                        "border:1px solid #6a1a2b;border-radius:26px;")
     box.addWidget(mark, 0, Qt.AlignHCenter)
-    title = label("What can I help with?", "sectionTitle")
+    keeper = gravekeeper_on(window)
+    if keeper:
+        text = GRAVEKEEPER_WELCOME
+    title = label("Hey, I'm the Gravekeeper." if keeper else "What can I help with?", "sectionTitle")
     title.setStyleSheet("font-size:%dpx;font-weight:800;color:#ffffff;" % (17 if compact else 22))
     title.setAlignment(Qt.AlignCenter)
     box.addWidget(title)
@@ -625,11 +673,18 @@ def welcome_hero(window, text, compact=False):
     words.setStyleSheet("color:#aab6c3;font-size:12px;")
     words.setMinimumWidth(0)
     box.addWidget(words)
+    if not keeper:
+        basic = label("These are basic answers. For a real conversation that checks your PC, download the free Local AI "
+                      "(Settings in the chat header).", "caption", wrap=True)
+        basic.setAlignment(Qt.AlignCenter)
+        basic.setStyleSheet("color:#f6be24;font-size:11px;")
+        basic.setAccessibleName("Basic answers")
+        box.addWidget(basic)
     grid = QGridLayout()
     grid.setHorizontalSpacing(8)
     grid.setVerticalSpacing(8)
     columns = 1 if compact else 2
-    for n, (symbol, name, question) in enumerate(SUGGESTIONS):
+    for n, (symbol, name, question) in enumerate(KEEPER_SUGGESTIONS if keeper else SUGGESTIONS):
         card = QPushButton()
         card.setObjectName("assistantSuggestion")
         card.setCursor(Qt.PointingHandCursor)
@@ -675,9 +730,10 @@ def add_assistant_text(window, text, layout=None):
     return words
 
 
-def add_answer(window, question, answer, plan=None, layout=None, latest=False):
+def add_answer(window, question, answer, plan=None, layout=None, latest=False, visuals=()):
     if answer is None:
         return
+    talking = answer.intent == "local_ai" or "Gravekeeper" in answer.sources   # the Gravekeeper's own words
     line = row(spacing=10)
     holder = QWidget()
     holder.setLayout(line)
@@ -700,8 +756,13 @@ def add_answer(window, question, answer, plan=None, layout=None, latest=False):
     text.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse)
     text.setOpenExternalLinks(False)
     text.linkActivated.connect(lambda href: open_link(window, href))
-    text.setStyleSheet("color:#e8eef5;font-size:13px;")
+    text.setStyleSheet("color:#e8eef5;font-size:13px;" + ("line-height:140%;" if talking else ""))
     stack.addWidget(text)
+    from gg_desktop import assistant_visuals
+    for visual in visuals or ():
+        widget = assistant_visuals.widget_for(window, visual)
+        if widget is not None:
+            stack.addWidget(widget)
     for index, item in enumerate(answer.rows):
         stack.addWidget(AnswerRow(window, item, ROW_COLORS[index % len(ROW_COLORS)]))
     if answer.note:
@@ -712,6 +773,14 @@ def add_answer(window, question, answer, plan=None, layout=None, latest=False):
     actions_row = ActionFlow(spacing=6)
     from gg_desktop import autopilot_ui
     for caption, tab in answer.handoffs:
+        if tab.startswith("url:"):         # a page on the web (PCGamingWiki, the Steam store): opened in the browser
+            actions_row.addWidget(tool(caption, "next", lambda _=False, u=tab[4:]: open_web(window, u),
+                                       tip="Opens this page in your web browser"))
+            continue
+        if tab.startswith("tool:"):        # a Game Grave tool the Gravekeeper offered
+            actions_row.addWidget(tool(caption, "next", lambda _=False, k=tab[5:]: open_tool(window, k),
+                                       tip="Open it now. It asks before it changes anything."))
+            continue
         if tab.startswith("q:"):           # a best guess: asks that question as if it were typed
             guess = tool(caption, "next", lambda _=False, q=tab[2:]: send(window, q), kind="primary",
                          tip=f"Ask: {tab[2:]}")
@@ -726,18 +795,32 @@ def add_answer(window, question, answer, plan=None, layout=None, latest=False):
             actions_row.addWidget(special)
             continue
         actions_row.addWidget(tool(caption, "next", lambda _=False, t=tab: window.navigate(t), tip=f"Open the {tab} tab"))
-    actions_row.addWidget(tool("Copy", "file", lambda _=False, q=question, a=answer: copy_answer(window, q, a),
-                               tip="Copy this question and answer"))
+    small = []
+    small.append(tool("" if talking else "Copy", "file", lambda _=False, q=question, a=answer: copy_answer(window, q, a),
+                      tip="Copy this question and answer"))
+    small[-1].setAccessibleName("Copy")
+    from gg_desktop import assistant_voice
+    if talking and assistant_voice.can_speak():
+        small.append(tool("", "volume" if "volume" in _icon_names() else "play",
+                          lambda _=False, a=answer: assistant_voice.say(window, a.text), tip="Read this answer aloud"))
+        small[-1].setAccessibleName("Read aloud")
     if question:
-        actions_row.addWidget(tool("Pin", "pin",
-                                   lambda _=False, q=question, a=answer: pin_answer(window, q, a),
-                                   tip="Keep this answer in Pinned answers so you can find it again"))
-        bad = tool("Not helpful", "warning", lambda _=False, q=question, a=answer: not_helpful(window, q, a),
-                   tip="Keeps this question and answer on this PC so they can be looked at later, and copies a report "
-                       "you can send if you want. Nothing is sent by itself.")
-        actions_row.addWidget(bad)
+        small.append(tool("" if talking else "Pin", "pin",
+                          lambda _=False, q=question, a=answer: pin_answer(window, q, a),
+                          tip="Keep this answer in Pinned answers so you can find it again"))
+        small[-1].setAccessibleName("Pin")
+        small.append(tool("" if talking else "Not helpful", "warning",
+                          lambda _=False, q=question, a=answer: not_helpful(window, q, a),
+                          tip="Keeps this question and answer on this PC so the assistant learns from it, and copies a "
+                              "report you can send if you want. Nothing is sent by itself."))
+        small[-1].setAccessibleName("Not helpful")
+    for b in small:
+        if talking:
+            b.setFixedSize(28, 26)
+        actions_row.addWidget(b)
     stack.addWidget(_widget(actions_row))
-    if latest and question and answer.intent not in ("followup", "note", "ask_fixed", "news", "troubleshoot"):
+    if latest and question and not talking and answer.intent not in ("followup", "note", "ask_fixed", "news",
+                                                                     "troubleshoot"):
         follow = ActionFlow(spacing=6)
         game = row_game_name(window, question)
         for caption, ask in links.next_questions(answer.intent, question, answer.text, game):
@@ -749,7 +832,7 @@ def add_answer(window, question, answer, plan=None, layout=None, latest=False):
                                   tip="Ask for more detail and the exact steps"))
         if follow.count():
             stack.addWidget(_widget(follow))
-    if answer.sources:
+    if answer.sources and not talking:
         sources = row(spacing=5)
         sources.addWidget(label("Sources", "caption"))
         for name in answer.sources:
@@ -853,7 +936,7 @@ def last_exchange(chat):
     return "", None
 
 
-def send(window, question=None, source=None, attached=""):
+def send(window, question=None, source=None, attached="", image=""):
     """Answer one message from the tab or the pop-out window (`source` is the input box it came from).
     `attached` is the key lines of a file the owner attached; it is added after the typed text, line breaks kept."""
     shown = views(window)
@@ -870,6 +953,9 @@ def send(window, question=None, source=None, attached=""):
     if attached:
         text = text + "\n\n" + attached[:3500]
     text = here_question(window, text)
+    if gravekeeper_on(window):           # the local AI holds the conversation; Game Grave's tools are its tools
+        model_send(window, text, box, image=image)
+        return
     if guide_reply(window, text):        # guided troubleshooting: one fix at a time, "Did that work?"
         return
     if memory_reply(window, text):       # notes, "undo that", "it's fixed" / "still broken"
@@ -960,6 +1046,243 @@ def send(window, question=None, source=None, attached=""):
     refresh_all(window)
 
 
+# ------------------------------------------------------------------ the Gravekeeper (local AI first)
+def gravekeeper_on(window):
+    """The model answers everything when it is switched on and downloaded, and no game is running (then it pauses and
+    the built-in answers take over, as before)."""
+    return local_ai_ui.enabled(window) and not local_ai_ui.game_running(window)
+
+
+def model_history(chat):
+    """The conversation as (user, assistant) pairs, with plans written out so "go ahead" and "undo that" make sense."""
+    pairs, pending = [], None
+    for m in (chat or {}).get("messages") or []:
+        if m.get("role") == "user":
+            pending = str(m.get("text") or "")
+        elif m.get("role") == "assistant":
+            if pending is None:
+                pending = "(Game Grave told you something had happened.)"   # a message the Gravekeeper started
+            said = str(m.get("text") or "")
+            plan = m.get("plan") or m.get("off_plan")
+            if isinstance(plan, dict) and plan.get("steps"):
+                steps = "; ".join(f"{s.get('title', s.get('key', ''))} ({s.get('status', 'waiting')})"
+                                  for s in plan["steps"][:10])
+                said += f"\n[Plan shown: {plan.get('request', '')}. Steps: {steps}]"
+            pairs.append((pending, said))
+            pending = None
+    return pairs
+
+
+def _extras(window, chat):
+    """What the Gravekeeper should know beyond the question: memory, the waiting plan, the undo it could offer."""
+    from gg_desktop import assistant_followup as fu
+    from gg_desktop import assistant_memory as memory
+    from gg_desktop import autopilot_core, autopilot_ui
+    from gg_desktop import gravekeeper
+    state = state_of(window)
+    offer = fu.last_offer(chat)
+    waiting = off = ""
+    if offer is not None and offer.kind == "plan" and offer.plan_id in autopilot_ui.state_of(window).plans:
+        waiting = autopilot_ui.state_of(window).plans[offer.plan_id].request
+    elif offer is not None and offer.kind == "turn_on":
+        off = offer.request
+    steps, _notes, request = memory.undo_steps(chat)
+    return {"memory": gravekeeper.memory_text(state.chats, chat.get("id") if chat else None,
+                                              window.settings.get(memory.FIX_KEY)),
+            "waiting_plan": waiting, "tools_off_request": off, "tools_on": bool(window.settings.get(autopilot_core.SETTING)),
+            "undo_preview": ("Undo: " + request) if steps else "", "all_chats": list(state.chats),
+            "chat_id": chat.get("id") if chat else None, "allow_plans": False}
+
+
+def model_send(window, text, box=None, image="", event=False):
+    """One Gravekeeper turn: the question shows at once with a live line (what it is checking, then its words as they
+    are written), and the reply replaces it. `event` is Game Grave telling it something (a plan finished, a crash):
+    then no user bubble is drawn and the reply speaks first."""
+    from gg_desktop import gravekeeper
+    state = ensure_chats(window)
+    chat = current_chat(window)
+    if chat is None:
+        chat = actions.new_chat(time.time())
+        state.chats.insert(0, chat)
+        state.current = chat["id"]
+    previous_q, previous_a = last_exchange(chat)
+    if not event and previous_a and previous_a.get("intent") == "local_ai" and gravekeeper.CORRECTION.search(text):
+        save(window, gravekeeper.add_lesson(window.settings, previous_q, previous_a.get("text", ""), text))
+    history = model_history(chat)
+    extras = _extras(window, chat)
+    extras["allow_plans"] = bool(event)
+    starting = local_ai_ui.state_of(window).server is None
+    window.status.setText("Starting the Gravekeeper (the first answer can take up to a minute)…" if starting
+                          else "The Gravekeeper is thinking…")
+    live_labels = []
+    for view in views(window):
+        view.input.setEnabled(False)
+        view.send.setEnabled(False)
+        layout = view.messages
+        if layout.count() and layout.itemAt(layout.count() - 1).spacerItem() is not None:
+            layout.takeAt(layout.count() - 1)
+        if not event:
+            layout.addWidget(bubble(text.split("\n\nFrom the file")[0] + ("\n[screenshot attached]" if image else "")))
+        waiting = add_assistant_text(window, "Waking up, the first answer can take up to a minute…" if starting
+                                     else "Thinking…", layout)
+        live_labels.append((waiting, view.scroll))
+        layout.addStretch()
+        scroll_down(window, view.scroll)
+    chat_id = chat["id"]
+
+    def live(words):
+        for waiting, scroll in live_labels:
+            if isValid(waiting):
+                waiting.setText(words)
+                scroll_down(window, scroll)
+
+    def unlock():
+        for view in views(window):
+            view.input.setEnabled(True)
+            view.send.setEnabled(True)
+        if box is not None and isValid(box):
+            box.setFocus()
+
+    def deliver(result, key):
+        unlock()
+        target = next((c for c in state.chats if c["id"] == chat_id), None)
+        if target is None:
+            return
+        state.current = chat_id
+        model_reply(window, target, text, result, event=event)
+
+    def fallback(reason):
+        unlock()
+        if event:
+            refresh_all(window)
+            return
+        facts = make_facts(window)
+        from gg_desktop import assistant_understand as understand
+        q, a = last_exchange(chat)
+        answer = understand.answer(text, facts, q, a, local_ai_on=False)
+        answer = engine.Answer(answer.intent, answer.text, answer.rows, (answer.note + " " if answer.note else "") +
+                               reason + ", so this is the basic answer.", answer.sources, answer.handoffs)
+        actions.add_exchange(chat, text, answer, time.time())
+        persist_chats(window)
+        refresh_all(window)
+    if not local_ai_ui.agent_async(window, text, history, deliver, live=live, image=image or None, extras=extras,
+                                   failed_to=fallback):
+        return
+
+
+def model_reply(window, chat, text, result, event=False):
+    """Put the Gravekeeper's reply in the chat and do what it asked for (plans, notes, buttons, pictures)."""
+    from gg_desktop import assistant_memory as memory
+    from gg_desktop import autopilot_core as core, autopilot_ui
+    from gg_desktop import local_ai_tools as lookups
+    from gg_desktop import assistant_followup as fu
+    before = fu.last_offer(chat)                      # what was waiting before this reply joins the chat
+    pending_request = before.request if before is not None and before.kind == "turn_on" else ""
+    preview = None
+    if pending_request:                               # the previewed plan itself, so turning on runs exactly that
+        for m in reversed(chat.get("messages") or []):
+            if m.get("role") == "assistant":
+                preview = core.plan_from_dict(m.get("plan") or {}) if m.get("plan") else None
+                break
+    pending_plan = before.plan_id if before is not None and before.kind == "plan" else None
+    reply = (result.get("text") or "").strip()
+    if result.get("unchecked") and reply:
+        reply += "\n\n(Double-check: " + "; ".join(result["unchecked"]) + ".)"
+    effects = list(result.get("effects") or [])
+    buttons, extra = [], {}
+    for item in effects:
+        kind = item[0]
+        if kind == "button":
+            buttons.append((item[1], item[2]))
+        elif kind == "link":
+            buttons.append((item[1], "url:" + item[2]))
+        elif kind == "chart":
+            extra.setdefault("visuals", []).append({"chart": item[1]})
+        elif kind == "game_card":
+            extra.setdefault("visuals", []).append({"game": item[1]})
+        elif kind == "note_add":
+            save(window, memory.add_note(window.settings, item[1]))
+        elif kind == "note_forget":
+            updated, _gone = memory.forget(window.settings, item[1])
+            save(window, updated)
+        elif kind == "fix_result":
+            game, ok, what = item[1], item[2], item[3]
+            history = memory.tried_for(window.settings, game)
+            if history:
+                save(window, memory.mark_last(window.settings, game, "fixed" if ok else "not_fixed"))
+            else:
+                save(window, memory.record_fix(window.settings, game, what or "a fix from the chat",
+                                               "fixed" if ok else "not_fixed"))
+    plan = None
+    if result.get("jobs"):
+        steps, dropped = lookups.plan_steps(result["jobs"])
+        if steps:
+            plan = core.Plan(" ".join(str(result.get("summary") or text).split())[:300], steps)
+            if dropped:
+                reply = (reply + " (left out: " + ", ".join(dropped) + ")").strip()
+    if not reply and plan is None:
+        reply = ("I started to say something Game Grave won't let me promise, so I stopped. Could you ask that another "
+                 "way?" if result.get("broke_rules") else "Sorry, I lost my train of thought there. Could you ask that "
+                 "again?")
+    answer = engine.Answer("local_ai", reply, (), "", ("Gravekeeper",), tuple(buttons))
+    shown_q = "" if event else text
+    if plan is not None:
+        autopilot_ui.post_plan(window, plan, shown_q or "(Game Grave)", text=reply, sources=("Gravekeeper",))
+        if event:   # a plan Game Grave asked about has no question of its own: keep the reply without a user bubble
+            msgs = chat.get("messages") or []
+            if len(msgs) >= 2 and msgs[-2].get("role") == "user" and msgs[-2].get("text") == "(Game Grave)":
+                del msgs[-2]
+    elif event:
+        chat.setdefault("messages", []).append(dict({"role": "assistant", "text": answer.text, "at": time.time(),
+                                                     "answer": answer.to_dict()}, **extra))
+        chat["updated"] = time.time()
+    else:
+        actions.add_exchange(chat, text, answer, time.time())
+        if extra and chat.get("messages"):
+            chat["messages"][-1].update(extra)
+    for item in effects:
+        if item[0] == "undo":
+            steps, notes, request = memory.undo_steps(chat)
+            if steps:
+                autopilot_ui.post_plan(window, core.Plan(("Undo: " + request)[:300], steps), "(undo)",
+                                       text="Here's what I can put back.", sources=("Gravekeeper",))
+                _drop_marker(chat, "(undo)")
+        elif item[0] == "run_plan":
+            if pending_plan and pending_plan in autopilot_ui.state_of(window).plans:
+                QTimer.singleShot(0, lambda pid=pending_plan: autopilot_ui.run_all(window, pid))
+        elif item[0] == "tools_on":
+            if save(window, dict(window.settings, **{core.SETTING: True})):
+                if _alive_switch(window):
+                    window.autopilot_switch.blockSignals(True)
+                    window.autopilot_switch.setChecked(True)
+                    window.autopilot_switch.blockSignals(False)
+                autopilot_ui.sync_panel(window)
+                if preview is not None and plan is None:
+                    import uuid
+                    fresh = core.Plan(preview.request, [core.Step(s.key, dict(s.args), s.detail, s.ticked)
+                                                         for s in preview.steps], preview.schedule, uuid.uuid4().hex[:10])
+                    autopilot_ui.post_plan(window, fresh, "(go ahead)", text="Switched on. Here's the plan again; "
+                                           "press Run all when you're ready.", sources=("Gravekeeper",))
+                    _drop_marker(chat, "(go ahead)")
+                elif pending_request and plan is None:
+                    autopilot_ui.handle(window, pending_request, shown="(go ahead)")
+                    _drop_marker(chat, "(go ahead)")
+    persist_chats(window)
+    window.status.setText("Answered on this PC. Nothing changes without your OK.")
+    refresh_all(window)
+    from gg_desktop import assistant_voice
+    assistant_voice.after_answer(window, reply)
+
+
+def _drop_marker(chat, marker):
+    """Plans posted on the Gravekeeper's behalf come without a typed question; remove the placeholder bubble."""
+    msgs = (chat or {}).get("messages") or []
+    for i in range(len(msgs) - 1, -1, -1):
+        if msgs[i].get("role") == "user" and msgs[i].get("text") == marker:
+            del msgs[i]
+            break
+
+
 def _reply(window, text, answer, plan=None):
     state = ensure_chats(window)
     chat = current_chat(window)
@@ -989,10 +1312,24 @@ def _fix_game_of(window, plan):
     return getattr(game, "name", "") or ""
 
 
+def plan_report(plan):
+    """A finished plan in words for the Gravekeeper: each step, its outcome and what it found."""
+    lines = [f"- {s.title}: {s.status}" + (f" ({s.result[:160]})" if s.result else "") for s in plan.steps]
+    return "Game Grave finished the plan \"" + plan.request[:200] + "\":\n" + "\n".join(lines)
+
+
 def after_plan(window, plan):
-    """After a fix plan for a game: remember what was tried, then ask whether it fixed it (two buttons)."""
+    """After a plan: the Gravekeeper says what happened and what's next (when it's on). For a fix plan for a game,
+    what was tried is remembered and, without the Gravekeeper, the chat asks whether it fixed it (two buttons)."""
     from gg_desktop import assistant_memory as memory, autopilot_core as core
     game = _fix_game_of(window, plan)
+    if gravekeeper_on(window):
+        if game:
+            done = [s.title for s in plan.steps if s.status == "done" and s.kind == core.CHANGE]
+            save(window, memory.record_fix(window.settings, game, ", ".join(done) or "checked the usual causes"))
+        model_send(window, plan_report(plan) + "\nTell the user what happened in plain words and what to do next" +
+                   (f" (ask whether {game} works now)." if game else "."), event=True)
+        return
     if not game:
         return
     done = [s.title for s in plan.steps if s.status == "done" and s.kind == core.CHANGE]
@@ -1025,12 +1362,43 @@ def after_scan(window, previous, inventory):
         return
     if not lines or window.settings.get(NEWS_KEY, True) is False:
         return
+    if gravekeeper_on(window):
+        speak_first(window, "Game Grave just finished a scan. What changed: " + " ".join(lines) + " Tell the user in "
+                    "a sentence or two what matters most and offer the next step.", "", "")
+        return
     answer = engine.Answer("news", "Since the last scan: " + " ".join(lines),
                            sources=("Last scan",), handoffs=(("Open Graveyard", "Graveyard"),) if low else ())
     chat = current_chat(window)
     if chat is None or not chat.get("messages"):
         return                                        # an empty chat keeps its welcome; the scan notice covers it
     _append_assistant(window, answer)
+
+
+def speak_first(window, event, title, text):
+    """Something happened that the user should hear about. With the model already running or the chat on screen, the
+    Gravekeeper writes the message now; otherwise a notice offers it (so a 5 GB model never loads by itself). Skipped
+    while a game runs, like all background work."""
+    if not gravekeeper_on(window):
+        return False
+    from gg_desktop import comfort
+    warm = local_ai_ui.state_of(window).server is not None or bool(views(window))
+
+    def go():
+        model_send(window, event, event=True)
+    if warm:
+        go()
+        if title:
+            comfort.notify(window, title, text, "warn", "AI Assistant",
+                           action=("Open chat", lambda: _open_chat(window)))
+    elif title:
+        comfort.notify(window, title, text, "warn", "AI Assistant",
+                       action=("Ask the Gravekeeper", lambda: (_open_chat(window), go())))
+    return True
+
+
+def _open_chat(window):
+    from gg_desktop import assistant_popout
+    assistant_popout.open_popout(window)
 
 
 def _append_assistant(window, answer, **extra):
@@ -1396,10 +1764,40 @@ def accept_drops(window, box):
     box.installEventFilter(_Drops(window, box))
 
 
+IMAGE_TYPES = (".png", ".jpg", ".jpeg", ".bmp", ".webp")
+
+
+def attach_image(window, box, path):
+    """A screenshot of an error: the Gravekeeper reads it when its model can see images (Qwen 3.5 with its image file)."""
+    from gg_desktop import local_ai_core as ai
+    if not gravekeeper_on(window) or not ai.sees_images(local_ai_ui.chosen(window)):
+        window.info("Can't read screenshots yet", "Reading screenshots needs the Local AI switched on with a Qwen 3.5 "
+                    "model (Settings in the chat header, then Local AI). You can also type or paste the error text.")
+        return
+    from PySide6.QtCore import QBuffer, QByteArray, QIODevice
+    from PySide6.QtGui import QImage
+    picture = QImage(str(path))
+    if picture.isNull():
+        window.info("Can't read that picture", "That file couldn't be opened as a picture.")
+        return
+    if max(picture.width(), picture.height()) > 1600:      # enough to read an error box, small enough to be quick
+        picture = picture.scaled(1600, 1600, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    data = QByteArray()
+    buffer = QBuffer(data)
+    buffer.open(QIODevice.WriteOnly)
+    picture.save(buffer, "PNG")
+    import base64
+    uri = "data:image/png;base64," + base64.b64encode(bytes(data)).decode("ascii")
+    typed = box.text().strip()
+    box.clear()
+    send(window, typed or "What does this screenshot show, and what should I do about it?", source=box, image=uri)
+
+
 def pick_attachment(window, box):
     from PySide6.QtWidgets import QFileDialog
-    path, _ = QFileDialog.getOpenFileName(window, "Attach a log or text file", "",
-                                          "Text and log files (*.log *.txt *.ini *.cfg *.json *.xml *.csv);;All files (*)")
+    path, _ = QFileDialog.getOpenFileName(window, "Attach a log, text file or screenshot", "",
+                                          "Logs, text and screenshots (*.log *.txt *.ini *.cfg *.json *.xml *.csv *.png "
+                                          "*.jpg *.jpeg *.bmp *.webp);;All files (*)")
     if path:
         attach_file(window, box, path)
 
@@ -1407,6 +1805,9 @@ def pick_attachment(window, box):
 def attach_file(window, box, path):
     """Reads the file (read only), keeps the lines that stand out, and asks about them with whatever was typed."""
     from gg_desktop import assistant_links as links
+    if str(path).lower().endswith(IMAGE_TYPES):
+        attach_image(window, box, path)
+        return
     name, text, *why = links.read_log(path)
     if text is None:
         window.info("Can't attach that file", why[0] if why else "That file couldn't be read.")
@@ -1436,6 +1837,22 @@ def level_panel(window, accent_fn):
         lambda _i: save(window, dict(window.settings, **{memory.LEVEL_KEY: combo.currentData() or ""})))
     lay.addWidget(combo)
     window.assistant_level = combo
+    from gg_desktop import assistant_voice
+    from gg_desktop.settings_page import Switch
+    talk = row(spacing=6)
+    talk.addWidget(label("Read answers aloud", "caption"), 1)
+    reader = Switch(bool(window.settings.get(assistant_voice.READ_KEY)), name="Read answers aloud")
+    reader.setToolTip("The Gravekeeper's answers are read out with Windows' own voice.")
+    reader.setEnabled(assistant_voice.can_speak())
+
+    def flipped(on):
+        save(window, dict(window.settings, **{assistant_voice.READ_KEY: bool(on)}))
+        if not on:
+            assistant_voice.stop(window)
+    reader.toggled.connect(flipped)
+    talk.addWidget(reader)
+    lay.addLayout(talk)
+    window.assistant_reader = reader
     return box
 
 
@@ -1520,7 +1937,11 @@ def not_helpful(window, question, answer):
     kept = list(window.settings.get(FEEDBACK_KEY) or [])[-(MAX_FEEDBACK - 1):]
     kept.append({"when": datetime.now().isoformat(timespec="seconds"), "question": question[:600],
                  "answer": answer.text[:2000], "intent": answer.intent, "sources": list(answer.sources)})
-    save(window, dict(window.settings, **{FEEDBACK_KEY: kept}))
+    updated = dict(window.settings, **{FEEDBACK_KEY: kept})
+    if answer.intent == "local_ai" or "Gravekeeper" in answer.sources:
+        from gg_desktop import gravekeeper
+        updated = gravekeeper.add_lesson(updated, question, answer.text)     # it is told about this mistake next time
+    save(window, updated)
     QGuiApplication.clipboard().setText(review_text(window, question, answer))
     window.status.setText("Thanks. Kept on this PC, and a report is copied if you want to send it. Try asking it another "
                           "way, or with more detail.")

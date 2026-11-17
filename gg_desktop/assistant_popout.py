@@ -85,6 +85,11 @@ class AssistantPopout(QWidget):
         attach.setAccessibleName("Attach a log file")
         attach.setFixedSize(34, 34)
         compose.addWidget(attach)
+        from gg_desktop import assistant_voice
+        mic = tool("", "mic", lambda: assistant_voice.listen(self.window_, self.input), tip="Say your question")
+        mic.setAccessibleName("Speak a question")
+        mic.setFixedSize(34, 34)
+        compose.addWidget(mic)
         assistant_page.accept_drops(self.window_, self.input)
         self.send_button = tool("Send", "next", self.send, kind="primary", tip="Ask (Enter)")
         self.send_button.setFixedHeight(34)

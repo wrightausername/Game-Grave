@@ -55,7 +55,7 @@ class Hosts(unittest.TestCase):
         self.assertEqual([m.key for m in ai.MODELS], ["small", "medium", "large", "xl"])
         self.assertLessEqual(max(m.approx_bytes for m in ai.MODELS), ai.MAX_DOWNLOAD)
         for m in ai.MODELS:
-            self.assertTrue(m.repo.startswith(("ggml-org/Qwen3-", "Qwen/Qwen3-")), m.repo)
+            self.assertTrue(m.repo.startswith("unsloth/Qwen3.5-"), m.repo)     # Qwen 3.5, Apache 2.0, GGUF by Unsloth
 
 
 class Resolve(unittest.TestCase):
@@ -83,22 +83,33 @@ class Resolve(unittest.TestCase):
             ai.pick_model_file([{"type": "file", "path": "x-Q4_K_M.gguf", "size": 5}], "Q4_K_M")
 
     def test_resolve_model_uses_huggingface_api(self):
-        opener = FakeOpener({"https://huggingface.co/api/models/ggml-org/Qwen3-1.7B-GGUF/tree/main":
-                             [{"type": "file", "path": "Qwen3-1.7B-Q4_K_M.gguf", "lfs": {"oid": self.SHA, "size": 7}}]})
+        listing = [{"type": "file", "path": "Qwen3.5-2B-Q4_K_M.gguf", "lfs": {"oid": self.SHA, "size": 7}},
+                   {"type": "file", "path": "mmproj-BF16.gguf", "lfs": {"oid": "d" * 64, "size": 3}},
+                   {"type": "file", "path": "mmproj-F16.gguf", "lfs": {"oid": "e" * 64, "size": 3}}]
+        opener = FakeOpener({"https://huggingface.co/api/models/unsloth/Qwen3.5-2B-GGUF/tree/main": listing})
         remote = ai.resolve_model("small", opener)
-        self.assertEqual(remote.url, "https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf")
+        self.assertEqual(remote.url, "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf")
         self.assertEqual(remote.sha256, self.SHA)
+        vision = ai.resolve_vision("small", opener)          # the F16 image file is preferred
+        self.assertEqual((vision.name, vision.sha256), ("mmproj-F16.gguf", "e" * 64))
+        self.assertIsNone(ai.pick_vision_file(listing[:1]))
 
-    def test_runtime_digest_must_match_the_pinned_one(self):
+    def test_runtime_digest_is_githubs(self):
         name = ai.RUNTIMES["vulkan"]
         good = {"assets": [{"name": name, "size": 3, "browser_download_url": "https://github.com/x",
-                            "digest": "sha256:" + ai.PINNED_SHA256[name]}]}
-        self.assertEqual(ai.pick_runtime_asset(good, name).sha256, ai.PINNED_SHA256[name])
-        bad = {"assets": [dict(good["assets"][0], digest="sha256:" + "c" * 64)]}
-        with self.assertRaises(ai.LocalAIError):
-            ai.pick_runtime_asset(bad, name)
+                            "digest": "sha256:" + "b" * 64}]}
+        self.assertEqual(ai.pick_runtime_asset(good, name).sha256, "b" * 64)
         nodigest = {"assets": [dict(good["assets"][0], digest=None)]}
-        self.assertEqual(ai.pick_runtime_asset(nodigest, name).sha256, ai.PINNED_SHA256[name])
+        with self.assertRaises(ai.LocalAIError):              # no fingerprint, no download
+            ai.pick_runtime_asset(nodigest, name)
+        pinned = dict(ai.PINNED_SHA256)
+        try:
+            ai.PINNED_SHA256[name] = "a" * 64                  # a pinned value that disagrees with GitHub is refused
+            with self.assertRaises(ai.LocalAIError):
+                ai.pick_runtime_asset(good, name)
+        finally:
+            ai.PINNED_SHA256.clear()
+            ai.PINNED_SHA256.update(pinned)
         cpu = ai.RUNTIMES["cpu"]
         with self.assertRaises(ai.LocalAIError):
             ai.pick_runtime_asset({"assets": [{"name": cpu, "browser_download_url": "https://github.com/y"}]}, cpu)
@@ -189,9 +200,10 @@ class Server(unittest.TestCase):
     def test_start_chat_stop(self):
         base = Path(tempfile.mkdtemp())
         (base / "models").mkdir(parents=True)
-        (base / "models" / "small.gguf").write_bytes(b"m")
-        (base / "runtime" / "cpu").mkdir(parents=True)
-        (base / "runtime" / "cpu" / "llama-server.exe").write_bytes(b"e")
+        (base / "models" / "small-q35.gguf").write_bytes(b"m")
+        (base / "models" / "small-q35-mmproj.gguf").write_bytes(b"v")
+        (base / "runtime" / ai.RUNTIME_TAG / "cpu").mkdir(parents=True)
+        (base / "runtime" / ai.RUNTIME_TAG / "cpu" / "llama-server.exe").write_bytes(b"e")
 
         class Proc:
             def __init__(self, *a, **k):
@@ -211,13 +223,15 @@ class Server(unittest.TestCase):
                 if request.full_url.endswith("/health"):
                     return FakeResponse(b'{"status":"ok"}')
                 body = json.loads(request.data)
-                assert body["messages"][-1]["content"].endswith("/no_think")
+                assert body["chat_template_kwargs"] == {"enable_thinking": False}
                 return FakeResponse(json.dumps({"choices": [{"message": {"content": "Hello"}}]}).encode())
 
         server = ai.LocalServer("small", base, popen=Proc, opener=Local())
         server.start("cpu", sleep=lambda s: None)
         self.assertTrue(server.running)
-        self.assertEqual(server.chat([{"role": "user", "content": "hi /no_think"}]), "Hello")
+        self.assertTrue(server.vision)                        # the image file is passed with --mmproj
+        self.assertIn("--mmproj", server.process.args[0])
+        self.assertEqual(server.chat([{"role": "user", "content": "hi"}], think=False), "Hello")
         server.stop()
         self.assertFalse(server.running)
 
@@ -314,5 +328,34 @@ class Recommend(unittest.TestCase):
         self.assertEqual(ai.recommend(16, 0), "medium")
         self.assertEqual(ai.recommend(16, 8), "large")
         self.assertEqual(ai.recommend(32, 12), "xl")
+        self.assertEqual(ai.recommend(32, 6), "xl", "the 35B mixture of experts lives mostly in memory")
+        self.assertEqual(ai.recommend(32, 4), "medium")
         self.assertEqual(ai.recommend(16, 12), "large", "Extra Large needs 32 GB of memory too")
         self.assertEqual(ai.recommend(0, 0), "small")
+
+
+class Generations(unittest.TestCase):
+    def test_older_qwen3_file_still_runs_and_asks_for_update(self):
+        base = Path(tempfile.mkdtemp())
+        (base / "models").mkdir(parents=True)
+        (base / "models" / "large.gguf").write_bytes(b"old")
+        self.assertEqual(ai.installed_models(base), ["large"])
+        self.assertTrue(ai.is_legacy("large", base))
+        self.assertEqual(ai.model_file("large", base).name, "large.gguf")
+        self.assertFalse(ai.sees_images("large", base))
+        (base / "models" / "large-q35.gguf").write_bytes(b"new")
+        self.assertFalse(ai.is_legacy("large", base))
+        self.assertEqual(ai.remove_model("large", base), 6)
+        self.assertEqual(ai.installed_models(base), [])
+
+    def test_engine_folder_is_per_version(self):
+        base = Path(tempfile.mkdtemp())
+        (base / "runtime" / "vulkan").mkdir(parents=True)       # an older engine folder
+        (base / "runtime" / "vulkan" / "llama-server.exe").write_bytes(b"e")
+        self.assertEqual(ai.installed_runtime(base), "")         # not the version Qwen 3.5 needs
+        self.assertEqual([p.name for p in ai.old_runtimes(base)], ["vulkan"])
+
+    def test_big_model_keeps_experts_in_memory(self):
+        args = ai.server_args("s.exe", "m.gguf", 1, "vulkan", 4096, None, moe=True)
+        self.assertIn("--cpu-moe", args)
+        self.assertNotIn("--cpu-moe", ai.server_args("s.exe", "m.gguf", 1, "cpu", 4096, None, moe=True))

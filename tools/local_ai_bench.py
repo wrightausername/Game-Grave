@@ -159,31 +159,26 @@ def run(server, think=False, budget_s=35 * 60, cases=CASES, log=print):
             log(f"(time budget reached after {asked} questions)")
             break
         asked += 1
-        base = engine.answer(question, ctx.facts)
         called = []
         t = time.monotonic()
-        built_in = built_in_plan(question, ctx)
-        if built_in is not None:          # the app plans these before the model is asked
-            result = {"text": "", "jobs": [{"job": j} for j in built_in], "results": [], "looked": []}
-        else:
-            class Counting:
-                def chat_message(self, msgs, tools, **budget):
-                    reply = server.chat_message(msgs, tools, **dict(budget, max_tokens=1600 if think else 500))
-                    called.extend(name for _cid, name, _a in lookups.calls_in(reply))
-                    return reply
+        from gg_desktop import gravekeeper
 
-                def chat(self, msgs, **budget):
-                    return server.chat(msgs, **dict(budget, max_tokens=500))
-            try:
-                result = lookups.answer(Counting(), question, base, ctx.facts, (), ctx, think=think)
-            except Exception as exc:          # one slow or broken answer must not end the bench
-                misses.append((question, [f"error: {exc}"]))
-                log(f"  ERROR {question}: {exc}")
-                continue
-            called.extend(result.get("looked") or [])
-            if result.get("request"):
-                plan = __import__("gg_desktop.autopilot_core", fromlist=["x"]).plan_for(result["request"])
-                result = dict(result, jobs=[{"job": j} for j in jobs_of(plan.steps if plan else [])])
+        class Counting:
+            def chat_message(self, msgs, tools, **budget):
+                reply = server.chat_message(msgs, tools, **dict(budget, max_tokens=1600 if think else 600))
+                called.extend(name for _cid, name, _a in lookups.calls_in(reply))
+                return reply
+
+            def chat(self, msgs, **budget):
+                return server.chat(msgs, **dict(budget, max_tokens=500))
+        ctx.effects = []
+        try:      # the app's own path: the Gravekeeper holds the conversation and picks its tools and plans
+            result = gravekeeper.turn(Counting(), question, ctx.facts, (), ctx, think=think)
+        except Exception as exc:          # one slow or broken answer must not end the bench
+            misses.append((question, [f"error: {exc}"]))
+            log(f"  ERROR {question}: {exc}")
+            continue
+        called.extend(result.get("looked") or [])
         text = result["text"] or ("" if result.get("jobs") is not None else "[blocked by the rules twice]")
         result = dict(result)
         holder = SimpleNamespace(called=called)

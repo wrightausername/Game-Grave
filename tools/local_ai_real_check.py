@@ -34,12 +34,17 @@ def main():
         remote = ai.resolve_model(key)
         print(f"{key}: {remote.name} {remote.size / ai.GB:.2f} GB sha256 {remote.sha256[:12]}…")
         assert remote.size > 0.5 * ai.BY_KEY[key].approx_bytes
+        sight = ai.resolve_vision(key)
+        print(f"  image file: {sight.name if sight else 'none'}")
     print("Engine:", ai.RUNTIMES["vulkan"])
     ai.install_runtime("vulkan", report, base=base)
     shown["pct"] = -10
     print("Model: Small,", ai.BY_KEY["small"].repo)
     path = ai.install_model("small", report, base=base)
     print(f"Downloaded and SHA-256 verified in {time.monotonic() - t:.0f}s: {path.name} {path.stat().st_size / ai.GB:.2f} GB")
+    vision = ai.vision_path("small", base)
+    print("Image file (reads screenshots):", f"{vision.name} {vision.stat().st_size / ai.GB:.2f} GB" if vision.is_file()
+          else "none in the repo")
 
     server = ai.LocalServer("small", base)
     t = time.monotonic()
@@ -47,7 +52,41 @@ def main():
     print(f"llama-server started with the {kind} build in {time.monotonic() - t:.0f}s on port {server.port}")
     f = facts()
     good = 0
+    seen_picture = None
     try:
+        # The Gravekeeper itself: a casual opener answered in its own voice, through the app's own turn.
+        from gg_desktop import gravekeeper
+        sys.path.insert(0, str(ROOT / "tools"))
+        import local_ai_bench as bench
+        ctx = bench.context()
+        t = time.monotonic()
+        out = gravekeeper.turn(server, "hey, what should I play tonight?", ctx.facts, (), ctx)
+        print(f"\nGravekeeper ({time.monotonic() - t:.0f}s): {out['text'][:400]}  [looked: {out['looked']}]")
+        assert out["text"], "the Gravekeeper should answer a casual question"
+        # A screenshot of an error: drawn here, read by the model through its image file.
+        if server.vision:
+            import base64
+            from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
+            from PySide6.QtGui import QColor, QFont, QGuiApplication, QImage, QPainter
+            app = QGuiApplication.instance() or QGuiApplication([])
+            picture = QImage(640, 200, QImage.Format_RGB32)
+            picture.fill(QColor("white"))
+            painter = QPainter(picture)
+            painter.setPen(QColor("black"))
+            painter.setFont(QFont("Segoe UI", 22))
+            painter.drawText(picture.rect(), Qt.AlignCenter, "The application was unable to start\ncorrectly (0xc0000142)")
+            painter.end()
+            data = QByteArray()
+            buffer = QBuffer(data)
+            buffer.open(QIODevice.WriteOnly)
+            picture.save(buffer, "PNG")
+            uri = "data:image/png;base64," + base64.b64encode(bytes(data)).decode("ascii")
+            t = time.monotonic()
+            ctx.effects = []
+            out = gravekeeper.turn(server, "what does this error mean?", ctx.facts, (), ctx, image=uri)
+            seen_picture = "0xc0000142" in out["text"].casefold() or "unable to start" in out["text"].casefold()
+            print(f"Screenshot ({time.monotonic() - t:.0f}s): {out['text'][:400]}  read the code: {seen_picture}")
+            del app
         for q in ("how many games do i have?", "which game should i uninstall to free up space?",
                   "when did i last play cyberpunk?", "what would you recommend adding to game grave?"):
             base_answer = engine.answer(q, f)
@@ -80,6 +119,8 @@ def main():
     assert not base.exists()
     print(f"\nRemoved {removed / ai.GB:.2f} GB.")
     assert good >= 3, "The local model should answer most questions within the rules"
+    if seen_picture is False:
+        print("NOTE: the Small model didn't repeat the error code from the screenshot; Large reads it far better.")
     assert asked >= 10, "the bench should get through at least 10 questions in its time budget"
     assert score >= 0.5, f"The Small model passed only {score:.0%} of the bench; see the misses above"
     print("PASS: the local AI model downloads verified, runs on this PC, answers within the rules and removes cleanly.")

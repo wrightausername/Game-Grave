@@ -155,18 +155,24 @@ def sync(window):
     elif getattr(st, "last_error", "") and not (have and engine):
         text = "Last download didn't finish: " + st.last_error[:160]
     elif have and engine:
-        size = human_size(ai.model_path(key).stat().st_size)
+        size = human_size(ai.model_file(key).stat().st_size)
         text = (f"{model_name(key)} is ready ({size}). " +
+                ("It reads screenshots too. " if ai.sees_images(key) else "") +
                 ("Answers are written by it." if window.settings.get("local_ai_enabled") else "Switch it on to use it."))
+        if ai.is_legacy(key):
+            text = (f"An older {ai.BY_KEY[key].label} model (Qwen3) is ready. Press Update for the newer Qwen 3.5 "
+                    "model: smarter, better at checking your PC, and it can read screenshots.")
     elif have:
-        text = f"{model_name(key)} is downloaded; the AI engine still needs downloading (about 30 MB)."
+        text = (f"{ai.BY_KEY[key].label} is downloaded; the newer AI engine it needs still has to be downloaded "
+                "(about 40 MB).")
     else:
         others = [ai.BY_KEY[k].label for k in ai.installed_models()]
         text = (f"Not downloaded. {ai.BY_KEY[key].blurb} Answers use the built-in lookup until then." +
                 (f" Also on this PC: {', '.join(others)}." if others else ""))
     w.status.setText(text)
-    w.get.setVisible(not st.downloading and not (have and engine))
-    w.get.setText("Download" if not have else "Finish download")
+    legacy = have and ai.is_legacy(key)
+    w.get.setVisible(not st.downloading and (not (have and engine) or legacy))
+    w.get.setText("Update" if legacy else "Download" if not have else "Finish download")
     w.remove.setVisible(not st.downloading and have)
     w.cancel.setVisible(st.downloading)
     w.bar.setVisible(st.downloading)
@@ -190,13 +196,13 @@ def download(window):
     key = chosen(window)
     choice = ai.BY_KEY[key]
     need_engine = not ai.installed_runtime()
-    need_model = key not in ai.installed_models()
+    need_model = key not in ai.installed_models() or ai.is_legacy(key)
     parts = []
     if need_model:
-        parts.append(f"the {choice.label} AI model, Qwen3 ({choice.approx_bytes / ai.GB:.1f} GB) from Hugging Face "
-                     f"({choice.repo})")
+        parts.append(f"the {choice.label} AI model, Qwen 3.5 ({choice.approx_bytes / ai.GB:.1f} GB, plus about 1 GB "
+                     f"that lets it read screenshots) from Hugging Face ({choice.repo})")
     if need_engine:
-        parts.append(f"llama.cpp's AI engine {ai.RUNTIME_TAG} (about 30 MB) from GitHub (ggml-org/llama.cpp)")
+        parts.append(f"llama.cpp's AI engine {ai.RUNTIME_TAG} (about 40 MB) from GitHub (ggml-org/llama.cpp)")
     if not parts:
         return
     if not window.confirm("Download the local AI model?",
@@ -271,7 +277,7 @@ def download(window):
 
 def remove_model(window):
     key = chosen(window)
-    path = ai.model_path(key)
+    path = ai.model_file(key)
     if not path.is_file():
         return
     last = ai.installed_models() == [key]
@@ -499,8 +505,8 @@ def show_card(window):
     return not ai.installed_models() and not window.settings.get("local_ai_card_hidden") and not state_of(window).downloading
 
 
-CARD_LINES = {"small": "Fastest, lightest", "medium": "Recommended for most PCs", "large": "Best answers, 16 GB RAM",
-              "xl": "Most capable, 12 GB+ graphics card"}
+CARD_LINES = {"small": "Fastest, lightest", "medium": "Good for most PCs", "large": "Much smarter, 16 GB RAM",
+              "xl": "The smartest, 32 GB RAM"}
 
 
 def setup_card(window):
@@ -586,3 +592,77 @@ def refresh_chat(window):
     from gg_desktop import assistant_page
     if assistant_page.live(window):
         assistant_page.render_chat(window)
+
+
+# ------------------------------------------------------------------ the Gravekeeper: the model holds the conversation
+def agent_context(window, facts, extras):
+    """lookup_context plus what only the Gravekeeper uses (chat memory, waiting plan, undo preview, library tags)."""
+    ctx = lookup_context(window, facts)
+    for k, v in extras.items():
+        setattr(ctx, k, v)
+    from gg_desktop import gamenight_core
+    ctx.modes = gamenight_core.load_modes          # read in the worker, only when what_to_play asks
+    ctx.effects = []
+    return ctx
+
+
+def agent_async(window, question, history, deliver, live=None, image=None, extras=None, failed_to=None):
+    """Ask the Gravekeeper in the background; deliver(result, key) runs on the main thread exactly once.
+    `failed_to(message)` is called instead when the model can't run (then the caller answers the built-in way)."""
+    from gg_desktop import gravekeeper
+    st = state_of(window)
+    if st.busy:
+        if failed_to:
+            failed_to("The local AI is still answering the last message.")
+        return False
+    key = chosen(window)
+    st.busy = True
+    think = key in ai.THINKS
+    from gg_desktop import assistant_page
+    facts = assistant_page.make_facts(window)
+    ctx = agent_context(window, facts, extras or {})
+
+    def work(_progress):
+        with st.lock:
+            server = st.server
+            if server is None or server.model_key != key or not server.running:
+                if server is not None:
+                    server.stop()
+                server = st.server = ai.LocalServer(key)
+                ai.start_best(server)
+            import time as _time
+            last = {"at": 0.0}
+
+            def events(kind, text):
+                if kind == "text":
+                    now = _time.monotonic()
+                    if now - last["at"] < 0.1:
+                        return
+                    last["at"] = now
+                    shown = prompt.clean_reply(text)
+                    if shown:
+                        _progress(1, shown)
+                else:
+                    _progress(0, text)
+            picture = image if getattr(server, "vision", False) else None
+            result = gravekeeper.turn(server, question, facts, history, ctx, think=think, events=events,
+                                      image=picture)
+            result["image_seen"] = bool(picture)
+            return result
+
+    def done(result):
+        st.busy = False
+        _arm_idle(window)
+        deliver(result, key)
+
+    def failed(message):
+        st.busy = False
+        stop(window)
+        if failed_to:
+            failed_to("Local AI couldn't answer (" + message.split(":", 1)[-1].strip()[:120] + ")")
+
+    def shown(code, text):
+        if live is not None:
+            live(text)
+    _job(window, work, done, failed, progress=shown)
+    return True

@@ -25,6 +25,8 @@ RED = "#ff183b"
 
 # Consistent 24px outline icons; no platform-dependent chess/emoji glyphs.
 PATHS = {
+    "volume": '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>',
+    "mic": '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>',
     "wrench": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
     "home": '<path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z"/>',
     "game": '<path d="M7 7h10a4 4 0 0 1 3.95 3.4l.9 5.4a2.4 2.4 0 0 1-4.1 2.1L15.6 16H8.4l-2.15 1.9A2.4 2.4 0 0 1 2.15 15.8l.9-5.4A4 4 0 0 1 7 7z"/><path d="M8 10v3M6.5 11.5h3M15.5 10.8h.01M17.8 12.8h.01"/>',

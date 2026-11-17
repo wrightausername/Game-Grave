@@ -1,6 +1,6 @@
 """Optional local AI model for the AI Assistant: download, verify, run and remove. No Qt here.
 
-What it is: a small open language model (Qwen3, Apache 2.0, published by ggml-org, the llama.cpp team, or by Qwen) run on this PC by
+What it is: an open language model (Qwen 3.5, Apache 2.0, GGUF files published by Unsloth on Hugging Face) run on this PC by
 llama.cpp's own `llama-server.exe`. Nothing is sent anywhere: the server listens on 127.0.0.1 only, and the model only
 sees the facts Game Grave already holds plus the question.
 
@@ -41,6 +41,7 @@ class ModelChoice:
     approx_bytes: int
     ram_gb: int
     blurb: str
+    vision: bool = True          # Qwen 3.5 reads images through its separate projector file (mmproj)
 
     @property
     def title(self):
@@ -49,38 +50,40 @@ class ModelChoice:
 
 GB = 1024 ** 3
 MODELS = (
-    ModelChoice("small", "Small", "ggml-org/Qwen3-1.7B-GGUF", "Q4_K_M", int(1.28 * GB), 6,
-                "Fastest and lightest. Fine for short answers; weaker on long questions."),
-    ModelChoice("medium", "Medium", "ggml-org/Qwen3-4B-GGUF", "Q4_K_M", int(2.5 * GB), 8,
-                "The best balance. Runs on most gaming PCs and answers in a few seconds."),
-    ModelChoice("large", "Large", "Qwen/Qwen3-8B-GGUF", "Q4_K_M", int(5.03 * GB), 16,
-                "Best answers. Needs 16 GB of memory and is slower without a strong graphics card."),
-    ModelChoice("xl", "Extra Large", "Qwen/Qwen3-14B-GGUF", "Q4_K_M", int(9.0 * GB), 32,
-                "The most capable. Only for graphics cards with 12 GB or more of video memory and 32 GB of memory; "
-                "it is slow on anything less."),
+    ModelChoice("small", "Small", "unsloth/Qwen3.5-2B-GGUF", "Q4_K_M", int(1.3 * GB), 6,
+                "Fastest and lightest. Fine for short answers; weaker on long problems."),
+    ModelChoice("medium", "Medium", "unsloth/Qwen3.5-4B-GGUF", "Q4_K_M", int(2.7 * GB), 8,
+                "A good balance. Runs on most gaming PCs and answers in a few seconds."),
+    ModelChoice("large", "Large", "unsloth/Qwen3.5-9B-GGUF", "Q4_K_M", int(5.8 * GB), 16,
+                "Much better answers. Wants 16 GB of memory and a graphics card with 8 GB for good speed."),
+    ModelChoice("xl", "Extra Large", "unsloth/Qwen3.5-35B-A3B-GGUF", "Q4_K_M", int(21.5 * GB), 32,
+                "The smartest. Only a small part of it works on each word, so it is fast for its size, but it needs "
+                "32 GB of memory and about 23 GB of free space."),
 )
 BY_KEY = {m.key: m for m in MODELS}
-# How much text each model may hold at once. Bigger lets it see more of the PC and think longer; Small stays light.
-CONTEXT = {"small": 12288, "medium": 12288, "large": 12288, "xl": 12288}
+# How much text each model may hold at once: the chat, what it looked up, and its thinking.
+CONTEXT = {"small": 12288, "medium": 16384, "large": 16384, "xl": 16384}
 THINKS = frozenset({"medium", "large", "xl"})       # these reason step by step before answering
+MOE = frozenset({"xl"})                             # mixture of experts: the experts stay in memory, the rest on graphics
 DEFAULT_MODEL = "medium"
+GENERATION = "q35"                                  # in the file name, so an older Qwen3 file is never mistaken for this
 
 # llama.cpp's own Windows builds. Vulkan uses NVIDIA, AMD or Intel graphics; CPU is the fallback that runs anywhere.
+# Qwen 3.5 needs a 2026 build. Every file is checked against the SHA-256 GitHub records for the release asset.
 RUNTIME_REPO = "ggml-org/llama.cpp"
-RUNTIME_TAG = "b7388"
+RUNTIME_TAG = "b12189"
 RUNTIMES = {"vulkan": f"llama-{RUNTIME_TAG}-bin-win-vulkan-x64.zip", "cpu": f"llama-{RUNTIME_TAG}-bin-win-cpu-x64.zip"}
-# Published by winget's manifest for ggml.llamacpp b7388; GitHub's own digest is checked as well.
-PINNED_SHA256 = {RUNTIMES["vulkan"]: "10393a8ac9e891b86975d5e8ae4393eaa02700fcb48266b87cf9b778cb5190e3"}
+PINNED_SHA256 = {}
 
 ALLOWED_HOSTS = ("huggingface.co", "hf.co", "github.com", "githubusercontent.com")
-MAX_DOWNLOAD = 11 * GB
+MAX_DOWNLOAD = 24 * GB
 SPARE_BYTES = 1 * GB
 
 
 def recommend(ram_gb, vram_gb):
     """The size that fits this PC: what its memory and graphics memory can run at a usable speed."""
     ram, vram = float(ram_gb or 0), float(vram_gb or 0)
-    if vram >= 12 and ram >= 32:
+    if ram >= 32 and vram >= 6:                   # mixture of experts: lives mostly in memory, so RAM decides
         return "xl"
     if vram >= 8 and ram >= 16:
         return "large"
@@ -160,11 +163,43 @@ def ai_dir(base=None) -> Path:
 
 
 def model_path(key, base=None) -> Path:
+    return ai_dir(base) / "models" / f"{key}-{GENERATION}.gguf"
+
+
+def vision_path(key, base=None) -> Path:
+    """The image projector that lets the model read screenshots (optional: without it, text only)."""
+    return ai_dir(base) / "models" / f"{key}-{GENERATION}-mmproj.gguf"
+
+
+def legacy_path(key, base=None) -> Path:
+    """A Qwen3 model downloaded by an earlier Game Grave. It still runs, and the panel offers the newer one."""
     return ai_dir(base) / "models" / f"{key}.gguf"
 
 
+def model_file(key, base=None) -> Path:
+    new = model_path(key, base)
+    return new if new.is_file() else legacy_path(key, base)
+
+
+def is_legacy(key, base=None) -> bool:
+    return not model_path(key, base).is_file() and legacy_path(key, base).is_file()
+
+
+def sees_images(key, base=None) -> bool:
+    return model_path(key, base).is_file() and vision_path(key, base).is_file()
+
+
 def runtime_dir(kind, base=None) -> Path:
-    return ai_dir(base) / "runtime" / kind
+    """Each engine version has its own folder, so an older engine is never mistaken for the one Qwen 3.5 needs."""
+    return ai_dir(base) / "runtime" / RUNTIME_TAG / kind
+
+
+def old_runtimes(base=None):
+    """Engine folders from earlier versions (Game Grave's own folder only)."""
+    root = ai_dir(base) / "runtime"
+    if not root.is_dir():
+        return []
+    return [p for p in root.iterdir() if p.is_dir() and p.name != RUNTIME_TAG]
 
 
 def server_exe(kind, base=None) -> Path | None:
@@ -176,7 +211,7 @@ def server_exe(kind, base=None) -> Path | None:
 
 
 def installed_models(base=None):
-    return [m.key for m in MODELS if model_path(m.key, base).is_file()]
+    return [m.key for m in MODELS if model_file(m.key, base).is_file()]
 
 
 def installed_runtime(base=None):
@@ -246,12 +281,44 @@ def pick_model_file(listing, quant):
     return item["path"], size, sha
 
 
+def pick_vision_file(listing):
+    """The F16 image projector (mmproj) at the top of the repo, with its SHA-256, or None when the repo has none."""
+    hits = [f for f in listing if isinstance(f, dict) and f.get("type") == "file" and "/" not in str(f.get("path", ""))
+            and str(f.get("path", "")).lower().startswith("mmproj") and str(f.get("path", "")).lower().endswith(".gguf")]
+    if not hits:
+        return None
+    rank = lambda f: (0 if str(f["path"]).lower().endswith("-f16.gguf") else 1 if "bf16" in str(f["path"]).lower()
+                      else 2, len(str(f["path"])))
+    item = min(hits, key=rank)
+    lfs = item.get("lfs") or {}
+    sha = str(lfs.get("oid") or lfs.get("sha256") or "").lower()
+    size = int(lfs.get("size") or item.get("size") or 0)
+    if len(sha) != 64 or not all(c in "0123456789abcdef" for c in sha):
+        return None
+    return item["path"], size, sha
+
+
+def _listing(choice, opener=None):
+    return _get_json(f"https://huggingface.co/api/models/{choice.repo}/tree/main", opener)
+
+
+def _remote(choice, picked):
+    name, size, sha = picked
+    return Remote(name, f"https://huggingface.co/{choice.repo}/resolve/main/{urllib.parse.quote(name)}", size, sha)
+
+
 def resolve_model(key, opener=None) -> Remote:
     choice = BY_KEY[key]
-    listing = _get_json(f"https://huggingface.co/api/models/{choice.repo}/tree/main", opener)
-    name, size, sha = pick_model_file(listing, choice.quant)
-    url = f"https://huggingface.co/{choice.repo}/resolve/main/{urllib.parse.quote(name)}"
-    return Remote(name, url, size, sha)
+    return _remote(choice, pick_model_file(_listing(choice, opener), choice.quant))
+
+
+def resolve_vision(key, opener=None):
+    """The image projector for this model as a Remote, or None (then the model runs text only)."""
+    choice = BY_KEY[key]
+    if not choice.vision:
+        return None
+    picked = pick_vision_file(_listing(choice, opener))
+    return _remote(choice, picked) if picked else None
 
 
 def pick_runtime_asset(release, name):
@@ -336,6 +403,8 @@ def extract_runtime(archive: Path, kind, base=None):
             raise LocalAIError("The AI engine archive has no llama-server.exe.")
         shutil.rmtree(target, ignore_errors=True)
         os.replace(staging, target)
+        for old in old_runtimes(base):          # the earlier engine in Game Grave's own AI folder, replaced by this one
+            shutil.rmtree(old, ignore_errors=True)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -355,18 +424,39 @@ def install_runtime(kind, progress=lambda done, total: None, cancel=lambda: Fals
 
 
 def install_model(key, progress=lambda done, total: None, cancel=lambda: False, base=None, opener=None):
+    """The model, then its image projector (when the repo has one; a failure there leaves the model text only)."""
     remote = resolve_model(key, opener)
-    return download(remote, model_path(key, base), progress, cancel, opener)
+    vision = None
+    try:
+        vision = resolve_vision(key, opener)
+    except LocalAIError:
+        vision = None
+    total = remote.size + (vision.size if vision else 0)
+    done_model = download(remote, model_path(key, base), lambda d, t: progress(d, total or t), cancel, opener)
+    if vision is not None:
+        try:
+            download(vision, vision_path(key, base), lambda d, t: progress(remote.size + d, total), cancel, opener)
+        except Canceled:
+            raise
+        except LocalAIError:
+            pass
+    legacy = legacy_path(key, base)             # the older Qwen3 file of the same size is replaced, not kept twice
+    try:
+        legacy.unlink()
+    except OSError:
+        pass
+    return done_model
 
 
 def remove_model(key, base=None) -> int:
-    path = model_path(key, base)
-    size = path.stat().st_size if path.is_file() else 0
-    for p in (path, path.with_name(path.name + ".part")):
-        try:
-            p.unlink()
-        except FileNotFoundError:
-            pass
+    size = 0
+    for path in (model_path(key, base), vision_path(key, base), legacy_path(key, base)):
+        size += path.stat().st_size if path.is_file() else 0
+        for p in (path, path.with_name(path.name + ".part")):
+            try:
+                p.unlink()
+            except FileNotFoundError:
+                pass
     return size
 
 
@@ -389,11 +479,15 @@ def threads():
     return max(1, (os.cpu_count() or 2) // 2)
 
 
-def server_args(exe, model, port, kind, context=4096):
+def server_args(exe, model, port, kind, context=4096, vision=None, moe=False):
     args = [str(exe), "-m", str(model), "--host", "127.0.0.1", "--port", str(port), "-c", str(context),
             "-t", str(threads()), "--jinja"]   # --jinja: the model's own chat template, needed for lookups (tool calls)
+    if vision:
+        args += ["--mmproj", str(vision)]
     if kind == "vulkan":
         args += ["-ngl", "99"]
+        if moe:
+            args += ["--cpu-moe"]          # the experts stay in system memory, so a 35B model fits next to an 8 GB card
     return args
 
 
@@ -405,6 +499,7 @@ class LocalServer:
         self.process = None
         self.port = 0
         self.kind = ""
+        self.vision = False
         self.last_used = 0.0
 
     @property
@@ -423,14 +518,17 @@ class LocalServer:
         if self.running:
             return
         exe = server_exe(kind, self.base)
-        model = model_path(self.model_key, self.base)
+        model = model_file(self.model_key, self.base)
         if exe is None or not model.is_file():
             raise LocalAIError("The local AI model or engine is not downloaded.")
         self.port, self.kind = free_port(), kind
         flags = 0
         if os.name == "nt":
             flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
-        self.process = self.popen(server_args(exe, model, self.port, kind, CONTEXT.get(self.model_key, 8192)),
+        vision = vision_path(self.model_key, self.base) if sees_images(self.model_key, self.base) else None
+        self.vision = vision is not None
+        self.process = self.popen(server_args(exe, model, self.port, kind, CONTEXT.get(self.model_key, 8192), vision,
+                                              self.model_key in MOE),
                                   stdin=subprocess.DEVNULL,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags,
                                   cwd=str(exe.parent))
@@ -485,12 +583,14 @@ class LocalServer:
             message["tool_calls"] = [calls[k] for k in sorted(calls)]
         return {"choices": [{"message": message}]}
 
-    def chat_message(self, messages, tools=None, max_tokens=500, timeout=180, on_text=None):
+    def chat_message(self, messages, tools=None, max_tokens=500, timeout=180, on_text=None, think=None):
         """The reply message as a dict (content, and tool_calls when the model asked for a lookup). The same system
         text is sent every time, so the server's prompt cache skips reading it again (cache_prompt). With on_text, the
         answer is streamed and on_text gets the text so far as it is written."""
-        body = {"messages": messages, "max_tokens": max_tokens, "temperature": 0.3, "top_p": 0.9, "stream": False,
+        body = {"messages": messages, "max_tokens": max_tokens, "temperature": 0.6, "top_p": 0.9, "stream": False,
                 "cache_prompt": True}
+        if think is not None:                 # Qwen's chat template switch for reasoning before answering
+            body["chat_template_kwargs"] = {"enable_thinking": bool(think)}
         if tools:
             body["tools"] = tools
         if on_text is not None:
@@ -508,8 +608,8 @@ class LocalServer:
         message["content"] = str(message.get("content") or "")
         return message
 
-    def chat(self, messages, max_tokens=500, timeout=180):
-        return self.chat_message(messages, None, max_tokens, timeout)["content"]
+    def chat(self, messages, max_tokens=500, timeout=180, think=None):
+        return self.chat_message(messages, None, max_tokens, timeout, think=think)["content"]
 
     def stop(self):
         process, self.process = self.process, None

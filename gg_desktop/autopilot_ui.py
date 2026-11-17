@@ -288,8 +288,9 @@ def handle(window, text, shown=None):
     return post_plan(window, plan, shown or text)
 
 
-def post_plan(window, plan, shown):
-    """Show a plan in the chat: a preview when running tools is off, the card with Run all when it is on."""
+def post_plan(window, plan, shown, text=None, sources=None):
+    """Show a plan in the chat: a preview when running tools is off, the card with Run all when it is on. `text` is the
+    Gravekeeper's own words for it (then they are said instead of the standard introduction)."""
     from gg_desktop import assistant_engine as engine
     on = enabled(window)
     tabs = []
@@ -299,8 +300,12 @@ def post_plan(window, plan, shown):
         if tab not in tabs:
             tabs.append(tab)
     tab_names = {"More Tools": "Toolbox"}
-    answer = engine.Answer("autopilot" if on else "autopilot_off", core.intro(plan, on), sources=("Game Grave tools",),
-                           handoffs=tuple(("Open " + tab_names.get(t, t), t) for t in tabs[:3]))
+    words = core.intro(plan, on)
+    if text:
+        words = text.strip() + ("" if on else "\n\nRunning tools is switched off, so this is only a preview. Say go "
+                                             "ahead and I'll switch it on; nothing changes until you press Run all.")
+    answer = engine.Answer("autopilot" if on else "autopilot_off", words, sources=sources or ("Game Grave tools",),
+                           handoffs=() if text else tuple(("Open " + tab_names.get(t, t), t) for t in tabs[:3]))
     _post(window, shown, answer, plan if on else None, off_plan=None if on else plan)
     return True
 

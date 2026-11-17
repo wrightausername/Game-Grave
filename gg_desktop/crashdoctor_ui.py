@@ -742,7 +742,13 @@ def watch_crashes(window):
             for game in hits[:1]:
                 seen[game.name] = now
                 window.settings = dict(window.settings, **{CRASH_SEEN_KEY: seen})
-                from gg_desktop import comfort
+                from gg_desktop import assistant_page, comfort
+                if assistant_page.speak_first(
+                        window, f"Game Grave saw {game.name} close and Windows recorded a crash for it just now. It is "
+                        "modded. Tell the user briefly, check its crash records, and offer Crash Doctor (it tests the "
+                        "mods and puts everything back) or the usual fixes.",
+                        f"{game.name} just crashed", "The Gravekeeper can look into it with you."):
+                    continue
                 comfort.notify(window, f"{game.name} just crashed", "Find the mod causing it? Crash Doctor tests "
                                "your mods for you and puts everything back.", "warn", "Mods",
                                action=("Find the mod", lambda g=game: open_doctor(window, g)))

@@ -1282,3 +1282,54 @@ Honesty rules unchanged: nothing is called safe, sizes stay reported, nothing ch
 - Covered by `tests/test_assistant_links.py`, `tests/test_assistant_guide.py`, `tests/test_assistant_memory.py` (level),
   `tests/test_local_ai.py` (recommended size) and `tools/assistant_page_smoke.py` (links, follow-up buttons, pin and search,
   the guided flow and its fix history, an attached log left unchanged, the level setting, Ask the assistant on a warning).
+
+The Gravekeeper (owner instructions, 2026-11-16: the assistant "just feels like I'm talking to a scripted NPC", then "Add all" to
+the plan: the model does the talking, clean answers, a voice, longer memory, Qwen 3.5, a Basic label, plus speaking first, game
+knowledge, memory across chats, pictures, game talk, a character, narrated checks, reacting to results, voice, and learning from
+corrections). AI Assistant is reopened for this; the crash notice gains one path and the icon set gains two icons. The character
+starts as "the Gravekeeper" (the owner may rename it). Honesty rules unchanged and now enforced in code on every reply
+(`clean_reply`, `problems`): nothing called safe to delete, no space called freed, no change reported as done, sizes and installed
+games must match the data; nothing on the PC changes without the plan's one OK.
+- Model first (`gg_desktop/gravekeeper.py`, pure; `local_ai_ui.agent_async`; `assistant_page.model_send` / `model_reply`): with
+  the Local AI switched on and no game running, every message goes to the model with the whole chat (10 exchanges, plans written
+  out). The scripted paths (guided steps, notes, undo, "go ahead", plans, greetings) are its tools instead: remember, forget,
+  undo_last, run_waiting_plan, turn_on_running_tools, record_fix_result, offer_button (a tab or tool only), show_chart,
+  show_game, game_page, what_to_play, past_chats, plus every lookup and make_plan. Tools only add effects the Qt layer applies:
+  notes and fix history in settings, buttons, pictures, the usual plan card. Run all and its confirmation are unchanged; a
+  question never becomes a plan. With the model off or a game running, the built-in answers work exactly as before, and the
+  empty chat says they are "basic answers" and how to get the Local AI.
+- Its answers are its own words: no table of rows, no source chips, no next-question chips; small icon buttons for Copy, Read
+  aloud, Pin and Not helpful. What it says while looking ("Let me check your crash records") shows live, then the answer.
+- Persona: short, relaxed, technician-like, asks one question when unsure, talks about games freely (recommendations, modding,
+  co-op) without inventing facts about this PC. The prompt is the persona plus a short PC summary; the safety checks live in code.
+- Memory: a summary of the last 8 other chats and each game's fix history goes in its instructions (`memory_text`), and it can
+  search earlier chats (`past_chats`). Lessons (`assistant_lessons`, newest 12): a "no, that's wrong" after its answer or Not
+  helpful keeps the question, its answer and the correction; the last 6 are given as mistakes not to repeat. Local only.
+- Pictures (`gg_desktop/assistant_visuals.py`): bar charts of where the space goes, drives, or the biggest games, and a game card
+  with its artwork, size and last played. Every bar comes from the scanned figures, never from the model's words.
+- Game knowledge: `game_page` shows a button to the game's PCGamingWiki page (Steam app id redirect, else a search). The wiki's
+  text is not copied into Game Grave: its licence (CC BY-NC-SA) is non-commercial. Links open only https pages on
+  pcgamingwiki.com, store.steampowered.com, nexusmods.com and steamcommunity.com.
+- Speaks first (`assistant_page.speak_first`): after a scan with news, after any plan finishes (`plan_report`: each step and
+  result, then what's next, asking whether the game works for a fix plan) and when a modded game just crashed. It writes the
+  message only when the model is already running or the chat is on screen; otherwise the notice offers "Ask the Gravekeeper", so
+  a model never loads by itself. Skipped while a game runs.
+- Voice (`gg_desktop/assistant_voice.py`): a microphone button listens once (up to 10 s) with Windows' own speech recognition
+  (System.Speech dictation, a hidden PowerShell) and puts the words in the box; a speaker button and "Read answers aloud"
+  (`assistant_read_aloud`) use Qt's text-to-speech with Windows' voices. Nothing is downloaded or sent; listening is off while a
+  game runs; a missing recognizer or microphone is said plainly.
+- Screenshots: a .png/.jpg attached or dropped on the box is sent to the model when it can see images; otherwise it says what's
+  needed. Scaled to 1600 px at most.
+- Models (`local_ai_core.py`): Qwen 3.5 GGUF from Unsloth on Hugging Face (Apache 2.0): Small 2B, Medium 4B, Large 9B, Extra Large
+  35B-A3B (a mixture of experts: about 21 GB, needs 32 GB of memory; with graphics it runs with `--cpu-moe`). Each also downloads
+  its image file (mmproj, F16 preferred) when the repo has one, checked the same way; a failure there leaves the model text only.
+  Files are named `<size>-q35.gguf` so an older Qwen3 file still runs and the panel offers Update; engines live in
+  `runtime/<tag>/` and the newer engine (llama.cpp b12189, GitHub's own SHA-256 per asset) replaces the old one in Game Grave's own
+  folder. Thinking is switched with Qwen's `enable_thinking` template setting. Recommend: Extra Large with 32 GB memory and 6 GB
+  graphics memory, Large 16 and 8, Medium 4 GB graphics or 12 GB memory, else Small. Download cap 24 GB.
+- Bench and real check: `tools/local_ai_bench.py` now runs every question through `gravekeeper.turn` (the app's path, no
+  built-in plans first); `tools/local_ai_real_check.py` also asks a casual question and, when the image file came, has the model
+  read a drawn error screenshot.
+- Covered by `tests/test_gravekeeper.py`, `tests/test_assistant_voice.py`, `tests/test_local_ai.py` (Qwen 3.5 files, image file,
+  older files, engine folder, mixture of experts) and `tools/assistant_page_smoke.py` (every message to the model, no source
+  chips, a chart and an offered button, a rule-breaking reply retried and then refused in words, a correction kept as a lesson).
