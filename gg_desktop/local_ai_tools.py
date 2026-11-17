@@ -531,7 +531,10 @@ def fit(result, limit=None):
 
 
 # ------------------------------------------------------------------ calls written as text
-_TEXT_CALL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
+_TEXT_CALL = re.compile(r"<tool_call>\s*(\{.*?\}|<function=.*?</function>)\s*</tool_call>", re.S)
+# Qwen 3.5 writes calls as <function=name><parameter=key>value</parameter></function> when it doesn't use the API form
+_XML_CALL = re.compile(r"<function=([\w.-]+)>(.*?)</function>", re.S)
+_XML_PARAM = re.compile(r"<parameter=([\w.-]+)>\s*(.*?)\s*</parameter>", re.S)
 
 
 def calls_in(message):
@@ -542,6 +545,10 @@ def calls_in(message):
         calls.append((call.get("id") or f"call{i}", fn.get("name", ""), fn.get("arguments") or "{}"))
     if not calls:
         for i, raw in enumerate(_TEXT_CALL.findall(str((message or {}).get("content") or ""))):
+            xml = _XML_CALL.search(raw)
+            if xml:
+                calls.append((f"text{i}", xml.group(1), {k: v for k, v in _XML_PARAM.findall(xml.group(2))}))
+                continue
             try:
                 data = json.loads(raw)
             except ValueError:

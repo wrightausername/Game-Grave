@@ -1335,3 +1335,7 @@ games must match the data; nothing on the PC changes without the plan's one OK.
 - Covered by `tests/test_gravekeeper.py`, `tests/test_assistant_voice.py`, `tests/test_local_ai.py` (Qwen 3.5 files, image file,
   older files, engine folder, mixture of experts) and `tools/assistant_page_smoke.py` (every message to the model, no source
   chips, a chart and an offered button, a rule-breaking reply retried and then refused in words, a correction kept as a lesson).
+- Tuning after the first full bench on Qwen 3.5 (56 of 60): Qwen 3.5's written tool-call form
+  (`<function=name><parameter=key>value</parameter></function>`) is read like the structured one, so a call written as text is
+  run instead of shown; general how-it-works questions get the concept first; what_to_play lists games from longest since last
+  played and says "no record" instead of "never" when Game Grave has no play time.

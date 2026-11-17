@@ -221,3 +221,14 @@ class Knowledge(unittest.TestCase):
         from gg_desktop import assistant_understand as u
         self.assertEqual(u.answer("The program can't start because MSVCP140.dll is missing", facts()).intent, "error")
         self.assertEqual(u.answer("my controller isnt detected", facts()).intent, "fixes")
+
+
+class Qwen35Calls(unittest.TestCase):
+    def test_written_function_form(self):
+        from gg_desktop import local_ai_tools as lookups
+        msg = {"content": "<tool_call>\n<function=look_up_game>\n<parameter=name>\nStarfield\n</parameter>\n</function>\n"
+                          "</tool_call>"}
+        self.assertEqual(lookups.calls_in(msg), [("text0", "look_up_game", {"name": "Starfield"})])
+        bare = {"content": "<tool_call> <function=game_grave_state> </function> </tool_call>"}
+        self.assertEqual(lookups.calls_in(bare)[0][1], "game_grave_state")
+        self.assertEqual(lookups._TEXT_CALL.sub("", bare["content"]).strip(), "")

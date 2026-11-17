@@ -33,6 +33,8 @@ PERSONA = (
     "say it's done.\n"
     "- Talk about games freely: what to play, whether a game is any good, modding advice, settings, co-op picks. "
     "General knowledge is fine; just never invent facts about this PC (games, sizes, files, mods, dates).\n"
+    "- A general question (how load order works, what a shader cache is) gets the concept explained first; bring in "
+    "this PC only if it helps.\n"
     "- Unsure what they mean? Ask one short question. Don't know? Say so and suggest the best next step.\n"
     "- Never say something is safe to delete. Sizes are what the scans reported. Never say space was freed.\n"
     "- Offer a button (offer_button) when the user will want to open a tab or tool; show a chart (show_chart) or a "
@@ -159,15 +161,19 @@ def what_to_play(ctx, mood=""):
     rows = []
     for g in list(getattr(f, "games", ()) or ())[:120]:
         days = lookups._days(g.last_played_at, f.now) if g.last_played_at else None
-        row = {"game": g.name, "last_played": f"{days} days ago" if days is not None else "never or unknown",
-               "size": lookups._size(g.size_bytes) if g.size_bytes else "unknown"}
+        row = {"game": g.name, "last_played": f"{days} days ago" if days is not None else "no record",
+               "days": days, "size": lookups._size(g.size_bytes) if g.size_bytes else "unknown"}
         tags = modes.get(str(getattr(g, "app_id", "") or "")) if modes else None
         if tags:
             row["modes"] = list(tags)
         rows.append(row)
-    rows.sort(key=lambda r: (r["last_played"] != "never or unknown", r["game"]))
+    rows.sort(key=lambda r: (r["days"] is None, -(r["days"] or 0), r["game"]))     # longest since played first
+    for r in rows:
+        r.pop("days")
     return {"mood": mood, "installed": rows[:60], "count": len(rows),
-            "note": "Pick from these. Use what you know about the games themselves (genre, length, co-op) and say why."}
+            "note": "Listed from longest since last played. 'no record' means Game Grave has no play time for it, not "
+                    "that it was never played. Pick from these and use what you know about the games (genre, length, "
+                    "co-op); say why."}
 
 
 def past_chats(ctx, query=""):
