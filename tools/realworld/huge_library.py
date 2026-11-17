@@ -24,6 +24,8 @@ def main():
     parser.add_argument("--soak-minutes", type=float, default=30)
     parser.add_argument("--files", type=int, default=100_000)
     args = parser.parse_args()
+    import faulthandler
+    faulthandler.dump_traceback_later(300, repeat=True)       # if anything hangs, the log shows exactly where
     scratch = rw.isolate("GG-rw-huge-")
     rep = rw.Report("huge-library", args.output)
     from unittest.mock import patch
@@ -88,6 +90,7 @@ def main():
         times = {}
         for route in nav_groups.routes():
             started = time.time()
+            print(f"opening {route}…", flush=True)
             try:
                 window.navigate(route)
                 rw.pump(0.2)
@@ -96,6 +99,7 @@ def main():
                 rep.check(f"{route} opens with the huge library", False, error=f"{type(exc).__name__}: {exc}")
                 continue
             times[route] = round(time.time() - started, 2)
+            print(f"  {route}: {times[route]} s", flush=True)
             window.grab().save(str(args.output / f"huge-{route.replace(' ', '-').lower()}.png"))
         slow = {k: v for k, v in times.items() if v > 5}
         rep.check("every tab appears within 5 seconds with the huge library", not slow, slow=slow, all=times)
@@ -123,6 +127,7 @@ def main():
             if time.time() >= next_sample:
                 mb, cpu = rw.process_usage()
                 samples.append((round((time.time() - (end - args.soak_minutes * 60)) / 60, 1), round(mb)))
+                print(f"  minute {samples[-1][0]}: {samples[-1][1]} MB, {step} tab switches", flush=True)
                 next_sample = time.time() + 60
         heart.stop()
         window.close()

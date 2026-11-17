@@ -399,12 +399,13 @@ def list_processes(runner, *, own_pid=None):
     if result.code != 0:
         return []
     procs = []
-    for row in csv.reader(io.StringIO(result.output)):
-        if len(row) < 5:
-            continue
+    rows = [row for row in csv.reader(io.StringIO(result.output)) if len(row) >= 5]
+    # "Your own session" is the one Game Grave runs in: "Console" at the PC, "RDP-Tcp#0" over Remote Desktop.
+    mine = next((row[2] for row in rows if row[1].isdigit() and int(row[1]) == own_pid), "Console").casefold()
+    for row in rows:
         name, pid, session, _num, mem = row[:5]
         digits = re.sub(r"[^0-9]", "", mem)
-        if (session.casefold() != "console" or not pid.isdigit() or int(pid) == own_pid
+        if (session.casefold() != mine or not pid.isdigit() or int(pid) == own_pid
                 or name.casefold() in PROTECTED_PROCESSES or not digits):
             continue
         procs.append(Proc(name, int(pid), int(digits)))

@@ -1414,3 +1414,11 @@ Real-world check results and fixes (first full runs, 2026-11-17):
   installed program, upgrade with chats and notes kept, Defender finding nothing, uninstall keeping settings; Game Grave
   noticing a running game, saying "Paused while you play" and holding back its background work; 100,000 old files scanned
   in about 19 seconds; the Medium model at 97% on the question bench with multi-turn follow-ups.
+- Fixed (second pass): the process list used by Crash Doctor, Memory Optimizer, the assistant and plans only kept apps in a
+  session named "Console", so over Remote Desktop (or on the build machine) a running game was never seen. It now keeps the
+  session Game Grave itself runs in. Covered by `tests/test_winpc_session.py`.
+- Fixed: Crash Doctor kept relaunching a game that never started (two minutes each, up to 40 times). After two launches in a
+  row where the game never appears it stops, puts every mod back and says what to check.
+- Checks: the crash part says plainly when the build machine records no crashes at all; the huge library part prints its
+  progress and where it is stuck if it hangs.
+

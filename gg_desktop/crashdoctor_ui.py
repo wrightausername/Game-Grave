@@ -583,6 +583,16 @@ class DoctorDialog(ToolDialog):
         result = cd.judge(obs, self.plan.fine_after)
         self.result(cd.explain(result, obs, self.plan.fine_after), "warn" if result == "crash" else "info")
         self._close_game()
+        self.no_starts = getattr(self, "no_starts", 0) + 1 if not obs.started else 0
+        if self.no_starts >= 2:          # twice in a row the game never appeared: stop asking it to, and say so
+            self.no_starts = 0
+            self._save()
+            self.stop()
+            after = self.result_line.label.text()
+            why = "The game didn't start twice in a row, so Crash Doctor stopped. "
+            self.result(why + after if cd.HOLD_NAME in after else why + "Every mod is back. Check the game starts on its "
+                        "own, or pick another way under \"Start the game with\", then press Start to carry on.", "warn")
+            return
         step = self.flow.step()
         if result == "ok" and getattr(step, "runs", 1) > self.repeat and self.runs < cd.MAX_RUNS:
             self.repeat += 1                          # "only crashes sometimes": run the same test again
