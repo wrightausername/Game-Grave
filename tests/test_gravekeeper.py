@@ -162,3 +162,11 @@ class Turn(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Asked(unittest.TestCase):
+    def test_questions_and_requests(self):
+        self.assertTrue(gk.asked_not_told("what are temp files?"))
+        self.assertTrue(gk.asked_not_told("how do I find which mod is crashing my game"))
+        self.assertFalse(gk.asked_not_told("my pc feels full of junk, sort it out"))
+        self.assertFalse(gk.asked_not_told("clean up my temp files please"))

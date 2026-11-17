@@ -343,6 +343,16 @@ def messages(question, facts, history, ctx, think=False, notes="", level="", mem
     return out
 
 
+def asked_not_told(text):
+    """True for a plain question ("what are temp files?"), which is answered, never turned into a plan. Anything that
+    asks for something to be done ("sort it out", "can you clean my temp files?") may become a plan."""
+    from gg_desktop import autopilot_core as core
+    t = " ".join(str(text or "").casefold().split())
+    if core.is_request(t):
+        return False
+    return t.endswith("?") or bool(core._QUESTION.match(t))
+
+
 # ------------------------------------------------------------------ one turn
 MAX_ROUNDS = 6
 _PROMISE = re.compile(r"\b(let me|i'?ll|i will|i'?m going to) (check|look|find|see|pull|get)\b", re.I)
@@ -403,7 +413,7 @@ def turn(server, question, facts, history, ctx, think=False, events=None, image=
         for cid, name, args in calls:
             if name == "make_plan":
                 data = args if isinstance(args, dict) else lookups._json(args)
-                if not core.is_request(question) and not getattr(ctx, "allow_plans", False):
+                if asked_not_told(question) and not getattr(ctx, "allow_plans", False):
                     content = json.dumps({"note": "That was a question, not a request to do something. Answer it; "
                                                   "offer the plan in words if it would help."})
                 else:
