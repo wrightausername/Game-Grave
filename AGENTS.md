@@ -1421,4 +1421,16 @@ Real-world check results and fixes (first full runs, 2026-11-17):
   row where the game never appears it stops, puts every mod back and says what to check.
 - Checks: the crash part says plainly when the build machine records no crashes at all; the huge library part prints its
   progress and where it is stuck if it hangs.
+- Huge library (500 games, 5,000 mods, 100,000 old files), measured on the build machine: Overview, Games, Captures, Other
+  Storage, Graveyard and Fix Kit build in under 2 seconds; Ready Room about 3 seconds; Old Files about 68 seconds; Mods about
+  178 seconds (`mods_data.build_catalog` checks every mod's folder); Game DNA freezes the window for over 40 minutes, because
+  `dna_page.pick_game` runs `game_intelligence.build_game_dna` on the screen's own thread and it resolves every path of every
+  game against every mod and file. All of these are locked or protected; reported to the owner, not changed.
+- Game Grave's own cost while a stand-in game kept every core busy: under 1% of one CPU core and about 110 MB, unchanged from
+  idle; the paused note and every background hold worked.
+- Crash Doctor with "Through Steam" and no Steam: stopped after two tries (about 4 minutes) with every mod back. The run of
+  Crash Doctor on the real crashing program could not be completed on the build machine (it stopped at a question Crash
+  Doctor asks when carrying on); the build machine also records no application crashes at all, so Black Box and the crash
+  notice still need a home PC.
+- Installer for this round: run 44159170108 (installed-app check 17 of 17).
 
