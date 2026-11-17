@@ -170,3 +170,17 @@ class Asked(unittest.TestCase):
         self.assertTrue(gk.asked_not_told("how do I find which mod is crashing my game"))
         self.assertFalse(gk.asked_not_told("my pc feels full of junk, sort it out"))
         self.assertFalse(gk.asked_not_told("clean up my temp files please"))
+
+
+class Ready(unittest.TestCase):
+    def test_game_graves_own_plans_come_first(self):
+        server = Script({"content": "I'll check the usual suspects for Cyberpunk first."})
+        out = gk.turn(server, "fix cyberpunk", ctx().facts, [], ctx())
+        self.assertIsNotNone(out["plan"])
+        self.assertIn("check_game_fix", [s.key for s in out["plan"].steps])
+        tools = {s["function"]["name"] for s in server.sent[0][1]}
+        self.assertNotIn("make_plan", tools)
+        self.assertTrue(any("prepared a plan" in str(m["content"]) for m in server.sent[0][0] if m["role"] == "user"))
+
+    def test_questions_never_get_one(self):
+        self.assertIsNone(gk.ready_plan("what does fix my game do?", ctx().facts))

@@ -91,7 +91,7 @@ def main():
                   "when did i last play cyberpunk?", "what would you recommend adding to game grave?"):
             base_answer = engine.answer(q, f)
             t = time.monotonic()
-            raw = server.chat(prompt.build_messages(q, base_answer, f), max_tokens=300, timeout=600)
+            raw = server.chat(prompt.build_messages(q, base_answer, f), max_tokens=300, timeout=600, think=False)
             text = prompt.clean_reply(raw)
             print(f"\nQ: {q}  ({time.monotonic() - t:.0f}s)\nA: {text or '[rejected by the rules; built-in answer shown] ' + raw[:300]}")
             if text:

@@ -1213,8 +1213,8 @@ def model_reply(window, chat, text, result, event=False):
             else:
                 save(window, memory.record_fix(window.settings, game, what or "a fix from the chat",
                                                "fixed" if ok else "not_fixed"))
-    plan = None
-    if result.get("jobs"):
+    plan = result.get("plan")
+    if plan is None and result.get("jobs"):
         steps, dropped = lookups.plan_steps(result["jobs"])
         if steps:
             plan = core.Plan(" ".join(str(result.get("summary") or text).split())[:300], steps)

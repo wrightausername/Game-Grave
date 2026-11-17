@@ -343,6 +343,27 @@ def messages(question, facts, history, ctx, think=False, notes="", level="", mem
     return out
 
 
+def ready_plan(question, facts):
+    """The plan Game Grave's own request reader makes for this message ("fix cyberpunk", "turn off skyui", "put my
+    Windows settings back"), loosely worded ones too, or None. Questions never get one."""
+    from gg_desktop import autopilot_core as core
+    from gg_desktop import assistant_understand as understand
+    if asked_not_told(question):
+        return None
+    tries = [question]
+    try:
+        loose = understand.normalize(question, facts)
+        if loose and loose != str(question).casefold():
+            tries.append(loose)
+    except Exception:
+        pass
+    for text in tries:
+        plan = core.plan_for(text)
+        if plan is not None and plan.steps:
+            return core.Plan(" ".join(str(question).split())[:300], plan.steps, plan.schedule)
+    return None
+
+
 def asked_not_told(text):
     """True for a plain question ("what are temp files?"), which is answered, never turned into a plan. Anything that
     asks for something to be done ("sort it out", "can you clean my temp files?") may become a plan."""
@@ -369,12 +390,21 @@ def turn(server, question, facts, history, ctx, think=False, events=None, image=
     msgs = messages(question, facts, history, ctx, think=think, notes=memory.notes_text(settings),
                     level=memory.level_text(settings), memory=getattr(ctx, "memory", ""),
                     lessons=lessons_text(settings), image=image)
-    first = lookups.prefetch(question, ctx) if lookups_first else []
+    ready = ready_plan(question, facts) if not image else None
+    if ready is not None:     # Game Grave's own request reader already knows this job: the plan is made, the model talks
+        titles = "; ".join(s.title for s in ready.steps)
+        last = msgs[-1]
+        last["content"] = (str(last["content"]) + f"\n\n(Game Grave read this as a request and prepared a plan: {titles}. "
+                           "It is shown with a Run all button; nothing changes until the user presses it. Say in one or "
+                           "two sentences what it will do, in your own words.)")
+    first = lookups.prefetch(question, ctx) if lookups_first and ready is None else []
     for fn, _a in first:
         events("look", doing(fn))
     msgs, results, _checked = lookups.with_prefetch(msgs, ctx, first)
     looked = [fn for fn, _a in first]
     tools = agent_specs(ctx)
+    if ready is not None:
+        tools = [s for s in tools if s["function"]["name"] != "make_plan"]
     from gg_desktop import autopilot_core as core
     budget = dict(max_tokens=2600, timeout=420) if think else dict(max_tokens=1000, timeout=240)
     shrunk = {"on": False}
@@ -389,14 +419,14 @@ def turn(server, question, facts, history, ctx, think=False, events=None, image=
             shrunk["on"] = True
             return server.chat_message(lookups._shrink(m), offer, think=think, **budget, **stream)
     result = {"text": "", "jobs": None, "summary": "", "effects": ctx.effects, "results": results, "looked": looked,
-              "unchecked": []}
+              "unchecked": [], "plan": ready}
     nudged = False
     for round_no in range(MAX_ROUNDS + 1):
         offer = tools if round_no < MAX_ROUNDS else None
         reply = ask(msgs, offer) or {}
         calls = lookups.calls_in(reply)
         said = lookups._TEXT_CALL.sub("", str(reply.get("content") or "")).strip()
-        if not calls and offer is not None and not nudged and _PROMISE.search(said) and len(said) < 200:
+        if not calls and offer is not None and not nudged and ready is None and _PROMISE.search(said) and len(said) < 200:
             nudged = True
             msgs += [{"role": "assistant", "content": said}, {"role": "user", "content": "Go ahead and look."}]
             continue
@@ -432,12 +462,12 @@ def turn(server, question, facts, history, ctx, think=False, events=None, image=
             results.append(out)
             msgs.append({"role": "tool", "tool_call_id": cid, "name": name, "content": out})
     raw = result["text"]
-    if not raw.strip() and not result["jobs"]:
+    if not raw.strip() and not result["jobs"] and ready is None:
         raw = server.chat(msgs + [{"role": "user", "content": "Reply to me now in plain words."}],
                           max_tokens=700, timeout=240, think=False) or ""
         result["blank"] = not raw.strip()
     text = prompt.clean_reply(raw)
-    if not text and raw.strip() and not result["jobs"]:
+    if not text and raw.strip() and not result["jobs"] and ready is None:
         retry = msgs + [{"role": "assistant", "content": "…"}, {"role": "user", "content": prompt.RETRY_NOTE}]
         text = prompt.clean_reply(server.chat(retry, max_tokens=900, timeout=240, think=False))
         result["broke_rules"] = not text
@@ -449,7 +479,7 @@ def turn(server, question, facts, history, ctx, think=False, events=None, image=
         still = lookups.problems(again, facts, results) if again else wrong
         text = again if again and len(still) < len(wrong) else text
         result["unchecked"] = still if again else wrong
-    if not text and result["jobs"]:
+    if not text and (result["jobs"] or ready is not None):
         text = (result["summary"] or "Here's the plan.") + " Nothing changes until you press OK."
     result["text"] = text
     return result

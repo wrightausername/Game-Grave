@@ -1296,7 +1296,9 @@ games must match the data; nothing on the PC changes without the plan's one OK.
   undo_last, run_waiting_plan, turn_on_running_tools, record_fix_result, offer_button (a tab or tool only), show_chart,
   show_game, game_page, what_to_play, past_chats, plus every lookup and make_plan. Tools only add effects the Qt layer applies:
   notes and fix history in settings, buttons, pictures, the usual plan card. Run all and its confirmation are unchanged; a
-  question never becomes a plan. With the model off or a game running, the built-in answers work exactly as before, and the
+  question never becomes a plan. A request Game Grave's own request reader understands ("fix cyberpunk", "turn off skyui",
+  "put my Windows settings back", loosely worded ones through `assistant_understand.normalize`) gets that plan
+  (`gravekeeper.ready_plan`) and the model only says what it will do; make_plan is for everything else. With the model off or a game running, the built-in answers work exactly as before, and the
   empty chat says they are "basic answers" and how to get the Local AI.
 - Its answers are its own words: no table of rows, no source chips, no next-question chips; small icon buttons for Copy, Read
   aloud, Pin and Not helpful. What it says while looking ("Let me check your crash records") shows live, then the answer.

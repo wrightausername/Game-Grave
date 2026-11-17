@@ -179,6 +179,8 @@ def run(server, think=False, budget_s=35 * 60, cases=CASES, log=print):
             log(f"  ERROR {question}: {exc}")
             continue
         called.extend(result.get("looked") or [])
+        if result.get("plan") is not None:      # made by Game Grave's request reader, as in the app
+            result = dict(result, jobs=[{"job": j} for j in jobs_of(result["plan"].steps)])
         text = result["text"] or ("" if result.get("jobs") is not None else "[blocked by the rules twice]")
         result = dict(result)
         holder = SimpleNamespace(called=called)
