@@ -1443,3 +1443,36 @@ when i use the reg cleanup"). Owner asked for this change in Hardware > Registry
   keys still stop everything if they can't be backed up, and the message now carries Windows' own reason. Exports use the
   64-bit registry view, like the scan. Undo includes the backups made inside the prompt.
 - Covered by `tests/test_registry.py` (already-gone key, unreadable all-users key backed up before removal).
+
+Why did it crash? (owner instructions, 2026-11-18: "when a game crashes the app needs to determine why accurately over all",
+"Needs to be extensive... looks on the internet if it's a new game for solutions... unknown is unacceptable", "Yup it should also
+test your software, hardware, and game itself"; online sources: Steam automatically plus a browser search, as proposed). Fix Kit
+only: its first card's main button is now "Find out why" (Check the usual fixes stays), and the "just crashed" notice offers it for
+games without mods (modded games keep Find the mod). Black Box in Ready Room is unchanged; the new engine only reads through
+`blackbox_core`'s existing functions.
+- `gg_desktop/crash_investigate.py` (no Qt, `tests/test_crash_investigate.py`): reads the game's crashes, hangs and .NET errors
+  (Application log 1000/1002/1026), Windows Error Reports (ReportArchive/ReportQueue, system and user), the System log (graphics
+  driver resets 4101, Kernel-Power 41, unexpected shutdowns, blue screens, WHEA hardware errors, low memory, drive errors), Windows
+  Security's protection history for the game folder, Windows Update installs, graphics driver installs, the game's own logs
+  (Unreal Saved\Crashes and Logs, Unity LocalLow Player.log and %TEMP% crash folders, Bethesda My Games and script extender crash
+  loggers, logs in the install), settings files changed, mod files changed (Black Box's folder scan), Steam's last update time from
+  the appmanifest, free space, memory and page file, graphics drivers (Win32_VideoController), drive health (Get-PhysicalDisk),
+  overlays running and the Microsoft runtimes. A signature library (crashing file, error code, log text, system events) and "what
+  changed just before the first crash" weigh the clues into ranked causes (graphics driver, card stopped responding, overlay,
+  missing runtime, damaged game files, memory, video memory, drive, unstable hardware, power, anti-cheat, antivirus, a mod, a game
+  update, a Windows update, settings, audio software, the game's own code), each with its evidence and "Very likely / Likely /
+  Possible". Never just "unknown": when the clues don't settle it, it lists the tests that will, safest first. It also says what
+  was checked and came back fine.
+- `gg_desktop/crash_investigate_ui.py`: the window, opened from Fix Kit. Tests by group: Software (close overlays, asked and
+  logged; previous driver through Exhume; Hardware > Drivers & Startup; Microsoft's runtime download; Windows Security; the page
+  file setting), Hardware (Graveyard for space; drive health from Windows; Windows Memory Diagnostic, asked first and logged;
+  Hardware for temperatures; how to remove overclocks, Game Grave never changes the BIOS or clocks), Game (Steam's own verify,
+  asked first; Crash Doctor; reset settings: the game's top-level .ini/.cfg files in its My Games folder and Unreal's
+  Saved\Config\Windows* are moved into a dated backup folder next to them, asked first, saves never touched, the same button puts
+  them back without overwriting, logged; lower graphics settings).
+- Online: asks first, then (or with the person's "allow from now on", `investigate_online`) asks Steam's public news API for the
+  game's recent posts, sending only the Steam app number; a patch just before the crashes became a clue. Search buttons open the
+  person's browser (DuckDuckGo, Steam discussions, Steam news, PCGamingWiki) with the game name, crashing file and error code;
+  nothing about the person is included and Game Grave doesn't fetch those pages.
+- Covered by `tests/test_crash_investigate.py` (18 causes, never-just-unknown, real report formats), `tools/crash_investigate_smoke.py`
+  and the real-PC part of `tools/realworld/crash_real.py`.

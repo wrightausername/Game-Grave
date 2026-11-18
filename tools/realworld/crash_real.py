@@ -120,6 +120,32 @@ def main():
                   event_log_ok=report.event_log_ok)
     rw.guarded(rep, "Black Box", black_box)
 
+    # Why did it crash?, reading the real PC: Windows' logs and error reports, drive health, the graphics driver, and a
+    # Unity-style log the game wrote in LocalLow that says it ran out of memory
+    def investigate():
+        from types import SimpleNamespace
+        from gg_desktop import crash_investigate as ci
+        locallow = Path(os.environ["USERPROFILE"]) / "AppData" / "LocalLow" / "GG Test Studio" / "Pixel Farm"
+        locallow.mkdir(parents=True, exist_ok=True)
+        (locallow / "Player.log").write_text("Initialize engine\nCould not allocate memory: System out of memory!\n"
+                                             "Crash!!!\n")
+        try:
+            game = SimpleNamespace(name="Pixel Farm", install_path=str(game_dir), app_id="")
+            started = time.time()
+            src = ci.read_sources(game)
+            inv = ci.investigate(game, src)
+            took = time.time() - started
+            rep.check("Why did it crash? reads the whole real PC in under 2 minutes", took < 120, seconds=round(took, 1),
+                      looked=inv.looked, fine=inv.fine, gpus=src.gpus, disks=src.disks, page_file=src.page_file)
+            rep.check("it finds the game's own log in LocalLow and names running out of memory",
+                      any(c.id == "memory" for c in inv.causes), causes=[(c.id, c.score, c.sure) for c in inv.causes],
+                      logs=[str(p) for _w, p in src.logs])
+            rep.note("investigation report", text=ci.render(inv)[:3000])
+        finally:
+            import shutil
+            shutil.rmtree(locallow.parent, ignore_errors=True)
+    rw.guarded(rep, "Why did it crash?", investigate)
+
     with patch.object(CrimsonWindow, "confirm", lambda self, t, text, **_: True), \
             patch.object(CrimsonWindow, "error", lambda self, t, m: rep.note("error shown", title=t, message=m)), \
             patch.object(CrimsonWindow, "info", lambda self, t, m: None), \

@@ -756,15 +756,26 @@ def watch_crashes(window):
             for game in games:
                 folder = str(game.install_path).casefold()
                 if any(now - c.when.timestamp() < 90 and str(c.path or "").casefold().startswith(folder) for c in crashes):
-                    if has_mods(window, game):
-                        hits.append(game)
+                    hits.append((game, has_mods(window, game)))
             return hits
 
         def done(hits):
-            for game in hits[:1]:
+            for game, modded in hits[:1]:
                 seen[game.name] = now
                 window.settings = dict(window.settings, **{CRASH_SEEN_KEY: seen})
                 from gg_desktop import assistant_page, comfort
+                if not modded:             # not modded: find out why (crash records, the PC, what changed)
+                    if assistant_page.speak_first(
+                            window, f"Game Grave saw {game.name} close and Windows recorded a crash for it just now. "
+                            "Tell the user briefly, check its crash records, and offer Fix Kit's Find out why.",
+                            f"{game.name} just crashed", "The Gravekeeper can look into it with you."):
+                        continue
+                    from gg_desktop import crash_investigate_ui
+                    comfort.notify(window, f"{game.name} just crashed", "Find out why? Game Grave reads the crash "
+                                   "records, the game's logs and your PC and tells you the likely cause.", "warn",
+                                   "Fix Kit", action=("Find out why",
+                                                      lambda g=game: crash_investigate_ui.open_investigation(window, g)))
+                    continue
                 if assistant_page.speak_first(
                         window, f"Game Grave saw {game.name} close and Windows recorded a crash for it just now. It is "
                         "modded. Tell the user briefly, check its crash records, and offer Crash Doctor (it tests the "

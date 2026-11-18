@@ -107,7 +107,7 @@ def main():
             settle()
             from PySide6.QtWidgets import QPushButton
             words = [b.text() for b in window.page.findChildren(QPushButton)]
-            assert {"Check the usual fixes", "Find the crashing mod", "Mod Bisect, step by step"} <= set(words), words
+            assert {"Find out why", "Check the usual fixes", "Find the crashing mod", "Mod Bisect, step by step"} <= set(words), words
             fix_kit_page.run(window, "doctor")
             settle()
             dialog = window.crash_doctor

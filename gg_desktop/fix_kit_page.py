@@ -26,10 +26,10 @@ QLabel#fixSection { color: #8C9AA9; font-size: 11px; font-weight: 800; letter-sp
 
 CARDS = (
     ("bisect", "Game crashing or won't start?", "warning",
-     "Check the usual causes first (crash records, overlays, Microsoft runtimes, drivers). If mods are behind it, Crash "
-     "Doctor finds the one, with Mod Organizer 2, Vortex or a plain mod folder.",
-     (("Check the usual fixes", "fix", True), ("Find the crashing mod", "doctor", False),
-      ("Mod Bisect, step by step", "bisect", False))),
+     "Find out why: Game Grave reads every crash record, the game's logs and your PC, and names the likely cause with "
+     "the evidence, then the tests that settle it. If mods are behind it, Crash Doctor finds the one.",
+     (("Find out why", "investigate", True), ("Find the crashing mod", "doctor", False),
+      ("Check the usual fixes", "fix", False), ("Mod Bisect, step by step", "bisect", False))),
     ("kit", "Resurrection Kit", "grave",
      "Back up a whole game: the install, your saves and the load order, so you can bring it back later.",
      (("Set up a kit", "kit_setup", True), ("Restore a game", "kit_restore", False), ("More kit tools", "kit_menu", False))),
@@ -72,6 +72,10 @@ def ask_fix(window):
 
 
 def run(window, key):
+    if key == "investigate":
+        from gg_desktop import crash_investigate_ui
+        crash_investigate_ui.open_investigation(window)
+        return
     if key == "doctor":
         from gg_desktop import crashdoctor_ui
         crashdoctor_ui.open_doctor(window)
