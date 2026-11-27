@@ -190,3 +190,28 @@ def free_now():
     """Games their store lists at $0 right now (CheapShark), for free game alerts."""
     params = next(p for key, _t, _n, p in dc.FRONT if key == "free")
     return dc.parse_deals(get_json(dc.deals_list_url(dict(params, pageSize=20))), stores())
+
+
+def about(app_ids, limit=30, pause=0.35):
+    """{Steam app number: short description} for these games, from a 30-day cache in the Deals folder, asking Steam's
+    public store for at most `limit` missing ones, spaced out. A game Steam won't describe is cached as "" so it isn't
+    asked again for a month. Network trouble stops the lookups quietly; what was found is kept."""
+    path = folder() / "about.json"
+    try:
+        cache = json.loads(path.read_text(encoding="utf-8"))
+        cache = cache if isinstance(cache, dict) else {}
+    except (OSError, ValueError):
+        cache = {}
+    now = time.time()
+    for app in dc.about_wanted(app_ids, cache, now)[:limit]:
+        try:
+            text = dc.parse_about(get_json(dc.about_url(app)), app)
+        except DealsError:
+            break
+        cache[app] = {"at": now, "text": text}
+        time.sleep(pause)
+    try:
+        path.write_text(json.dumps(cache), encoding="utf-8")
+    except OSError:
+        pass
+    return {app: str(hit.get("text") or "") for app, hit in cache.items() if isinstance(hit, dict)}

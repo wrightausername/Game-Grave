@@ -48,6 +48,7 @@ QLabel#dealOld { font-size:12px; color:#6f8091; }
 QLabel#dealBadge { background:#1d7a45; color:#ffffff; font-size:12px; font-weight:800; border-radius:6px; padding:1px 6px; }
 QLabel#dealBadgeFree { background:#a86f00; color:#ffffff; font-size:12px; font-weight:800; border-radius:6px; padding:1px 6px; }
 QLabel#dealStore { font-size:11px; color:#8fa0b3; }
+QLabel#dealAbout { font-size:11px; color:#a7b4c2; }
 QLabel#dealRating { font-size:11px; color:#7fd7ff; }
 QLabel#dealsRowTitle { font-size:17px; font-weight:800; color:#ffffff; }
 QPushButton#dealsBack { padding:4px 10px; }
@@ -213,6 +214,11 @@ class DealCard(QFrame):
         title.setFixedHeight(36)
         title.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         inner.addWidget(title)
+        self.about = _text("", "dealAbout")            # what the game is, from Steam's store page (filled in a moment)
+        self.about.setFixedHeight(42)
+        self.about.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        inner.addWidget(self.about)
+        self.set_about(state(window).about.get(deal.steam_app_id, "") if hasattr(state(window), "about") else "")
         prices = QHBoxLayout()
         prices.setSpacing(6)
         free = deal.price == 0
@@ -241,6 +247,13 @@ class DealCard(QFrame):
             store.addWidget(_text(f"{deal.rating}", "dealRating", wrap=False))
         inner.addLayout(store)
         lay.addLayout(inner)
+
+    def set_about(self, text):
+        """Up to three short lines; the whole description is in the hover text."""
+        self.about.setText(text or ("" if self.deal.steam_app_id else "Not sold on Steam, so no description here. "
+                                                                        "Pick the card for the store's page."))
+        if text:
+            self.setToolTip(f"{self.deal.title}: {text}\n\nPick it for every store's price.")
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -334,9 +347,42 @@ def build_front(window, holder):
         box = QWidget()
         box.setLayout(flow)
         holder.addWidget(box)
-    holder.addWidget(_text("Prices in US dollars, as CheapShark reports them. Pick a card for every store's price. "
-                           "Game Grave never buys anything.", "dealsNote"))
+    holder.addWidget(_text("Prices in US dollars, as CheapShark reports them. Descriptions are Steam's own. Pick a card "
+                           "for every store's price. Game Grave never buys anything.", "dealsNote"))
     holder.addStretch(1)
+    load_about(window, [d.steam_app_id for key, *_r in dc.FRONT for d in (st.front.get(key) or [])])
+
+
+def load_about(window, app_ids):
+    """Fill each card's short description from Steam's store page (cached for 30 days), in the background."""
+    st = state(window)
+    if not hasattr(st, "about"):
+        st.about = {}
+    wanted = [a for a in dict.fromkeys(app_ids) if a and a not in st.about]
+    if not wanted or getattr(st, "loading_about", False):
+        _fill_about(window)
+        return
+    st.loading_about = True
+    from gg_desktop import deals_net
+
+    def done(kind, value):
+        st.loading_about = False
+        if kind == "ok":
+            st.about.update(value)
+        for app in wanted:                 # never ask again this run, even when Steam had nothing
+            st.about.setdefault(app, "")
+        _fill_about(window)
+    _run(window, lambda: deals_net.about(wanted), done)
+
+
+def _fill_about(window):
+    st = state(window)
+    w = widgets(window)
+    if w is None:
+        return
+    for card in w.front_lay.parentWidget().findChildren(DealCard) if w.front_lay.parentWidget() else []:
+        if isValid(card):
+            card.set_about(getattr(st, "about", {}).get(card.deal.steam_app_id, ""))
 
 
 def load_front(window, force=False):

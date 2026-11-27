@@ -1603,3 +1603,12 @@ tab's page is unchanged: only where it is reached from changed. Route keys are u
   Touch entry says Settings is at the bottom of the sidebar.
 - Covered by `tests/test_nav_groups.py`, `tools/shell_polish_smoke.py` (order, pinned bottom, hub rows, last tab remembered,
   collapse and expand, art clear of the pinned block) and the updated Ready Room, Deals and Hardware checks.
+
+Deals, what each game is (owner, 2026-11-27: "also a brief description of what the free games and what not are"). Deals only.
+Every storefront card (Best deals, Free to keep right now, and the other rows) shows up to three short lines saying what the
+game is: Steam's own store description (`store.steampowered.com/api/appdetails?appids=<n>&filters=basic`, public, no key; only
+the Steam app number is sent), plain text, shortened at a word to about 150 characters, the whole line in the hover text.
+`deals_core.parse_about` / `about_wanted` (pure, `tests/test_deals.py`), `deals_net.about` (30-day cache `<config>/deals/about.json`,
+at most 30 lookups per storefront load, spaced out, network trouble stops quietly), `deals_page.load_about` (background, after
+the storefront is drawn). A game not sold on Steam says so instead of a description. Covered by `tools/deals_smoke.py` (faked
+answers, and a real Steam answer for Portal 2 when the store is reachable).

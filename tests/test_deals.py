@@ -171,3 +171,36 @@ class Wishlist(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AboutTests(unittest.TestCase):
+    """A short line saying what each game is, from Steam's own store description."""
+
+    def test_plain_short_text(self):
+        from gg_desktop import deals_core as dc
+        data = {"620": {"success": True, "data": {"short_description":
+                "The &quot;perpetual testing initiative&quot; has been expanded to allow you to design co-op puzzles "
+                "for you and your friends — <b>Portal 2</b> draws from the award-winning formula of innovative gameplay, "
+                "story, and music."}}}
+        text = dc.parse_about(data, "620")
+        self.assertTrue(text.startswith('The "perpetual testing initiative"'))
+        self.assertNotIn("<b>", text)
+        self.assertNotIn("—", text)
+        self.assertLessEqual(len(text), dc.ABOUT_LIMIT + 1)
+        self.assertTrue(text.endswith("…"))
+
+    def test_nothing_when_steam_has_nothing(self):
+        from gg_desktop import deals_core as dc
+        self.assertEqual(dc.parse_about({"1": {"success": False}}, "1"), "")
+        self.assertEqual(dc.parse_about({}, "1"), "")
+
+    def test_only_missing_or_old_are_asked(self):
+        from gg_desktop import deals_core as dc
+        now = 10_000_000
+        cache = {"1": {"at": now - 100, "text": "x"}, "2": {"at": now - 40 * 86400, "text": "old"}}
+        self.assertEqual(dc.about_wanted(["1", "2", "3", "3", "", "abc"], cache, now), ["2", "3"])
+
+    def test_steam_store_is_allowed_only_for_descriptions(self):
+        from gg_desktop import deals_core as dc
+        self.assertTrue(dc.api_allowed(dc.about_url("620")))
+        self.assertIn("filters=basic", dc.about_url("620"))

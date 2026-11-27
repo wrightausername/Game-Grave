@@ -20,7 +20,7 @@ from urllib.parse import quote, quote_plus, urlparse
 
 CHEAPSHARK = "https://www.cheapshark.com/api/1.0"
 GGDEALS = "https://api.gg.deals/v1/prices/by-steam-app-id/"
-API_HOSTS = {"www.cheapshark.com", "api.gg.deals"}
+API_HOSTS = {"www.cheapshark.com", "api.gg.deals", "store.steampowered.com"}   # Steam: game descriptions only
 MAX_WISHLIST = 100
 BATCH = 25                 # CheapShark answers up to 25 games per request
 WATCH_HOURS = 6            # the wishlist is checked at most this often while Game Grave runs
@@ -453,4 +453,49 @@ def remember_drops(settings, news, now=None, keep=20):
     old = [d for d in (settings.get(DROPS_KEY) or []) if isinstance(d, dict) and d.get("title")]
     out = dict(settings)
     out[DROPS_KEY] = (old + [{"title": t, "message": m, "at": stamp} for t, m in news])[-keep:]
+    return out
+
+
+# ------------------------------------------------------------------ what a game is (owner, 2026-11-27: "a brief description
+# of what the free games and what not are"). Steam's public store page text, by Steam app number; nothing else is sent.
+ABOUT_DAYS = 30
+ABOUT_LIMIT = 150
+
+
+def about_url(app_id) -> str:
+    return f"https://store.steampowered.com/api/appdetails?appids={int(app_id)}&filters=basic&l=english"
+
+
+def parse_about(data, app_id) -> str:
+    """Steam's one-paragraph description of the game, as plain text, shortened at a word to about 150 characters.
+    "" when Steam has none (or the app isn't a game it lists)."""
+    import html
+    import re
+    try:
+        entry = data[str(app_id)]
+        if not entry.get("success"):
+            return ""
+        info = entry.get("data") or {}
+        text = info.get("short_description") or ""
+    except (KeyError, TypeError, AttributeError):
+        return ""
+    text = html.unescape(re.sub(r"<[^>]+>", " ", str(text)))
+    text = " ".join(text.replace("\u2014", ", ").replace("\u2013", ", ").replace("—", ", ").replace("–", ", ").split())
+    if len(text) > ABOUT_LIMIT:
+        cut = text[:ABOUT_LIMIT].rsplit(" ", 1)[0].rstrip(",.;: ")
+        text = cut + "…"
+    return text
+
+
+def about_wanted(app_ids, cache, now) -> list:
+    """Steam app numbers still to look up: not cached, or cached over 30 days ago. In first-seen order, no repeats."""
+    out = []
+    for app in app_ids:
+        app = str(app or "")
+        if not app.isdigit() or app in out:
+            continue
+        hit = cache.get(app)
+        if isinstance(hit, dict) and now - float(hit.get("at", 0)) < ABOUT_DAYS * 86400:
+            continue
+        out.append(app)
     return out

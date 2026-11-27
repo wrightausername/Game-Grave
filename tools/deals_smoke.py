@@ -91,6 +91,9 @@ def main():
             return {"612": game_answer(price["fan"])}
         if "games?id=" in url:
             return game_answer(price["fan"])
+        if "store.steampowered.com/api/appdetails" in url:
+            app = url.split("appids=")[1].split("&")[0]
+            return {app: {"success": True, "data": {"short_description": f"A test game number {app} about racing."}}}
         if "api.gg.deals" in url:
             assert "key=TESTKEY0123456789" in url
             return {"success": True, "data": {"620": {"title": "Portal 2", "url": "https://gg.deals/game/portal-2/",
@@ -144,6 +147,11 @@ def main():
             assert "Free Game" in titles and "Deal Game 0" in titles, titles
             assert sum(1 for c in cards if c.deal.price == 0) >= 1
             wait_for(lambda: all(c.art.pixmap() is not None and not c.art.pixmap().isNull() for c in cards))
+            # What each game is: Steam's short description on the card (games not on Steam say so).
+            wait_for(lambda: all("racing" in c.about.text() for c in cards if c.deal.steam_app_id), 20)
+            free_card = next(c for c in cards if c.deal.title == "Free Game")
+            assert "Not sold on Steam" in free_card.about.text(), free_card.about.text()
+            assert "racing" in next(c for c in cards if c.deal.steam_app_id).toolTip()
             settle(200)
             assert window.grab().save(str(args.output / "deals-front-1280.png"))
             first = next(c for c in cards if c.deal.title == "Deal Game 0")
@@ -273,6 +281,11 @@ def main():
         assert rows.get("best"), "live storefront 'best deals' row came back empty"
         assert all(d.title and d.price >= 0 and d.url.startswith("https://www.cheapshark.com/redirect?dealID=")
                    for row in rows.values() for d in row)
+        about = deals_net.about(["620"], pause=0)
+        if about.get("620"):
+            print("PASS real Steam description:", about["620"][:120])
+        else:
+            print("SKIP real Steam description (Steam's store didn't answer from the build machine)")
         print("PASS real storefront rows:", {k: len(v) for k, v in rows.items()}, "e.g.",
               [(d.title, d.price, d.store) for d in rows["best"][:3]])
         print(f"PASS real CheapShark: {len(hits)} results for Portal 2; {found.title}: {dc.summary(found)} "
