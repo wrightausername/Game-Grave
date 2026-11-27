@@ -11,6 +11,10 @@ import tempfile
 import time
 from pathlib import Path
 
+# Model replies can hold any character; the Windows CI console is cp1252.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
