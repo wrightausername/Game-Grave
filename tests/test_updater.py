@@ -141,7 +141,7 @@ class Download(unittest.TestCase):
 
     def test_wrong_hash_wrong_size_leave_nothing(self):
         good = hashlib.sha256(self.body).hexdigest()
-        for body, digest in ((self.body[:-1] + b"X", good), (self.body[:-5], good), (self.body + b"extra", good)):
+        for body, digest in ((self.body[:-1] + bytes([self.body[-1] ^ 0xFF]), good), (self.body[:-5], good), (self.body + b"extra", good)):
             with self.assertRaises(up.UpdaterError):
                 up.download_setup(self.rel, "", self.folder, digest, None, self.opener(body))
             self.assertEqual(list(self.folder.iterdir()), [], "a rejected download must not stay on disk")
