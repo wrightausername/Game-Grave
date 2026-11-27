@@ -8,7 +8,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QPointF, QRect, QRectF, QSize, Signal, Slot
+from PySide6.QtCore import Qt, QPoint, QPointF, QRect, QRectF, QSize, Signal, Slot
 from PySide6.QtGui import (
     QColor, QFont, QIcon, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
 )
@@ -25,6 +25,9 @@ RED = "#ff183b"
 
 # Consistent 24px outline icons; no platform-dependent chess/emoji glyphs.
 PATHS = {
+    "broom": '<path d="M19 3 11.5 10.5"/><path d="M9.2 9.8c1.6-1.1 3.9-.9 5.2.4s1.5 3.6.4 5.2L11 21c-2.8-.3-5.4-1.5-7.4-3.6L3 16.8l3.5-1.2-2.3-2.3c2-.7 3.7-2.1 5-3.5z"/>',
+    "sidebar": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 10l-2 2 2 2"/>',
+    "sidebar_open": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M13 10l2 2-2 2"/>',
     "volume": '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>',
     "mic": '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>',
     "wrench": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
@@ -254,6 +257,15 @@ class Brand(QWidget):
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         canvas_w, canvas_h = self.CANVAS
         left, top, right, bottom = self.CONTENT
+        if self.width() < 120:               # the sidebar is collapsed to icons: the GG mark alone, centred
+            from gg_desktop.insight_widgets import gg_mark
+            side = min(self.width() - 16, self.height() - 18)
+            mark = gg_mark(side, side * 0.78, self.devicePixelRatioF())
+            if not mark.isNull():
+                w = mark.width() / mark.devicePixelRatio()
+                h = mark.height() / mark.devicePixelRatio()
+                painter.drawPixmap(QPointF((self.width() - w) / 2, (self.height() - h) / 2), mark)
+            return
         content_w = min(self.width() - 34, 248)
         scale = content_w / (right - left)
         width, height = canvas_w * scale, canvas_h * scale
@@ -275,9 +287,15 @@ class NavRail(QFrame):
         super().paintEvent(event)
         # Subtle abstract backdrop in the free space under the menu. It only uses room the menu is not using,
         # so it can never run over a button, and the picture itself fades to transparent at the top.
-        menu_bottom = max((child.geometry().bottom() for child in self.findChildren(QAbstractButton)
-                           if child.isVisibleTo(self)), default=0)
-        free = self.height() - menu_bottom - 14
+        # The menu's last visible row and the pinned block at the bottom (Assistant, Undo, Settings), in rail
+        # coordinates: the picture sits in the gap between them, never behind a button.
+        pinned = next((w for w in self.findChildren(QWidget) if w.objectName() == "navPinned" and w.isVisibleTo(self)),
+                      None)
+        floor = pinned.mapTo(self, QPoint(0, 0)).y() if pinned is not None else self.height()
+        rows = [child for child in self.findChildren(QAbstractButton) if child.isVisibleTo(self)
+                and (pinned is None or not pinned.isAncestorOf(child))]
+        menu_bottom = max((child.mapTo(self, QPoint(0, child.height())).y() for child in rows), default=0)
+        free = floor - menu_bottom - 14
         source = brand_source("nav_backdrop.png")
         if source.isNull() or free < 90:
             return
@@ -290,7 +308,7 @@ class NavRail(QFrame):
         p = QPainter(self)
         p.setRenderHint(QPainter.SmoothPixmapTransform)
         p.setOpacity(.9)
-        p.drawPixmap(0, round(self.height() - pix.height() / pix.devicePixelRatio()), pix)
+        p.drawPixmap(0, round(floor - pix.height() / pix.devicePixelRatio()), pix)
 
 
 class TitleBar(QWidget):

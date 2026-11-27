@@ -415,7 +415,7 @@ FEATURES = FEATURES + (
         "Never Touch rules are folders Game Grave will never remove anything from, whatever a tab finds there. Excluded "
         "folders are left out of scans entirely.",
         ("Open Settings, then Protection.", "Add a folder; each rule is added or removed one at a time with a confirmation."),
-        "Import and Reset never remove a rule.", "PC and Help, Settings.", "Settings", "Folders Game Grave never touches."),
+        "Import and Reset never remove a rule.", "Settings, at the bottom of the sidebar.", "Settings", "Folders Game Grave never touches."),
     Feature(
         "welcome_tour", "Welcome tour",
         ("welcome tour", "tutorial", "tour", "walkthrough of the app", "show me around", "how does game grave work",

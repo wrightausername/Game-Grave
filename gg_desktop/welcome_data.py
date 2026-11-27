@@ -29,14 +29,15 @@ STEPS = (
     },
     {
         "kicker": "FINDING YOUR WAY",
-        "title": "Five groups in the sidebar.",
-        "body": ("The sidebar on the left is sorted by what you want to do. Click a heading to open its tabs; click it again to "
-                 "fold them away. Each tab has one line under it saying what it is for."),
+        "title": "The sidebar, in three parts.",
+        "body": ("Everyday places sit at the top, the tools that keep your games running under them, and Assistant, Undo "
+                 "and Settings at the bottom. Hover over any entry to see what it is for; Collapse at the bottom shrinks "
+                 "the sidebar to icons."),
         "points": (
-            ("Home and Library", "Overview and Ready Room, then your Games, Deals, Mods and Captures."),
-            ("Clean Up", "Old Files, Other Storage and Graveyard: find what is taking up space."),
-            ("Fix and Protect", "Fix Kit, Game DNA and Undo Center: crashes, backups and rollbacks."),
-            ("PC and Help", "Hardware, Toolbox, the AI Assistant and Settings."),
+            ("Home, Games, Mods, Deals", "Overview and your gaming news, everything installed, your mods, and prices."),
+            ("Keep it running", "Fix a game, Free up space (Old Files, Other Storage, Graveyard) and My PC."),
+            ("More", "Captures, Game DNA and the Toolbox."),
+            ("At the bottom", "The AI Assistant, Undo (every change Game Grave made) and Settings."),
         ),
     },
     {
@@ -50,9 +51,9 @@ STEPS = (
         ),
     },
     {
-        "kicker": "CLEAN UP",
+        "kicker": "FREE UP SPACE",
         "title": "Find what is eating your drives.",
-        "body": ("These tabs show what is taking up space. You review every item yourself, and anything you choose to "
+        "body": ("Free up space has three tabs that show what is taking up space. You review every item yourself, and anything you choose to "
                  "remove goes to the Recycle Bin, so you can get it back."),
         "points": (
             ("Old Files", "Older files in a folder you pick. Age alone never decides for you."),
@@ -61,9 +62,10 @@ STEPS = (
         ),
     },
     {
-        "kicker": "FIX AND PROTECT",
+        "kicker": "FIX A GAME",
         "title": "Bring a broken game back.",
-        "body": "Fix Kit holds every tool for a crashing, stuttering or risky game. Undo Center keeps track of what changed.",
+        "body": ("Fix a game (Fix Kit) holds every tool for a crashing, stuttering or risky game. Find out why reads the "
+                 "crash records and your PC and names the likely cause. Undo keeps track of what changed."),
         "points": (
             ("Mod Bisect", "Finds the mod that is crashing a game, one test launch at a time."),
             ("Black Box, Autopsy, Exhume", "Crash reports, frame-time comparisons and rolling back a graphics driver."),
@@ -72,9 +74,9 @@ STEPS = (
         ),
     },
     {
-        "kicker": "READY ROOM",
+        "kicker": "HOME",
         "title": "Your setup, ready to play.",
-        "body": "Ready Room shows official news and patches for your games, plus two tools for how you play.",
+        "body": "Ready Room, under Home, shows official news and patches for your games, plus two tools for how you play.",
         "points": (
             ("Patch Watch", "Official Steam news for your games, refreshed while Ready Room is open."),
             ("Soulbind", "Set your controls and comfort settings once. Game Grave applies them where a game supports them, with a backup first."),
@@ -82,11 +84,11 @@ STEPS = (
         ),
     },
     {
-        "kicker": "PC AND HELP",
+        "kicker": "MY PC AND HELP",
         "title": "Your PC, and help when you need it.",
         "body": "Click any tool or strip to open it. Strips open and close with one click anywhere on their title line.",
         "points": (
-            ("Hardware", "Your parts and live load, upgrade notes, outdated drivers and what starts with Windows."),
+            ("My PC", "Hardware: your parts and live load, upgrade notes, outdated drivers and what starts with Windows."),
             ("Toolbox", "Windows tune-ups, backups, reports and file utilities, each listed once."),
             ("AI Assistant", "Ask about your games or PC. Optional: turn it on in Settings."),
         ),

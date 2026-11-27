@@ -100,8 +100,8 @@ def main():
             window.inventory.games = [game("Big Game", "D", 112), game("Other Game", "D", 100), game("Small Game", "C", 50)]
             settle(100)
             assert "Hardware" in window.nav_buttons, "Hardware is missing from the sidebar"
-            names = list(window.nav_buttons)
-            assert names.index("Undo Center") + 1 == names.index("Hardware") and names.index("Hardware") + 1 == names.index("More Tools")
+            from gg_desktop import nav_groups
+            assert nav_groups.entry_of("Hardware") == "My PC" and window.nav_entries["My PC"].isVisibleTo(window)
 
             window.navigate("Hardware")
             wait_for(lambda: window.page.isVisible(), "the Hardware page")

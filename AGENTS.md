@@ -1583,3 +1583,23 @@ clickable... AI assistant on the right panel is still scuffed up"). Reopens Over
   drives that hold games in the Graveyard's low zone, and official Steam news for your games from the last 3 days; else
   "All quiet: nothing needs you today". Chips only open Deals, Graveyard or Ready Room. Covered by `tests/test_today.py`,
   `tests/test_deals.py`, `tools/deals_smoke.py` and `tools/overview_live_smoke.py`.
+
+Sidebar, organised (owner instruction, 2026-11-27: "it can be overwhelming to first time users looking at the tabs on the
+left… any way we can organize them better and look more professional?", then "I like. Implement it" to the proposal, which
+named the merges into Home and Free up space). This reopens the shared sidebar and the welcome tour's sidebar screen. Every
+tab's page is unchanged: only where it is reached from changed. Route keys are unchanged everywhere in the code.
+- `gg_desktop/nav_groups.py` (pure, `tests/test_nav_groups.py`): everyday entries first (Home, Games, Mods, Deals), "Keep it
+  running" (Fix a game = Fix Kit, Free up space = Old Files / Other Storage / Graveyard, My PC = Hardware), "More" (Captures,
+  Game DNA, Toolbox), and Assistant, Undo (Undo Center) and Settings pinned at the bottom. Home holds Overview and Ready Room.
+  16 tabs, 13 entries, 10 visible without the optional assistant. Each tab's plain line is the entry's hover text instead of a
+  second line under every row. `GROUPS`, `routes()`, `subtitle()` and `display_name()` keep working for search, numbering and
+  the assistant (More Tools is still "Toolbox" there).
+- `gg_desktop/nav_rail.py`: one 36 px line per entry (icon and name, a slim red mark and red icon on the active one), quiet
+  section labels that never fold, a hub's tabs indented under it only while you are in one, and a click on a hub opens the
+  tab you were last on inside it (`nav_hub_last`). The pinned block sits under a thin rule with a Collapse button that shrinks
+  the sidebar to icons (64 px; the logo becomes the GG mark; remembered as `nav_collapsed`). The sidebar art is drawn in the
+  free space between the menu and the pinned block, never behind a row. The rail stays 219 px wide when open.
+- Welcome tour: the sidebar screen describes the three parts; the other screens use the new names. The assistant's Never
+  Touch entry says Settings is at the bottom of the sidebar.
+- Covered by `tests/test_nav_groups.py`, `tools/shell_polish_smoke.py` (order, pinned bottom, hub rows, last tab remembered,
+  collapse and expand, art clear of the pinned block) and the updated Ready Room, Deals and Hardware checks.

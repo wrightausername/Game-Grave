@@ -20,7 +20,7 @@ def main():
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from PySide6.QtCore import QCoreApplication, QEvent
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QWidget
     from PySide6.QtTest import QTest
     import core
     from gg_desktop import reference_widgets as rw
@@ -59,47 +59,58 @@ def main():
             window.navigate("Overview")
             settle()
 
-            # Grouped sidebar: Toolbox (More Tools), then the optional AI Assistant, then Settings last.
-            order = [route for route, _ in ROUTES]
-            assert order[-3:] == ["More Tools", "AI Assistant", "Settings"], order
-            visible = [route for route, control in window.nav_buttons.items() if not control.isHidden()]
-            assert visible[-2:] == ["More Tools", "Settings"], visible
-            # Dropdown groups: each stays open until its own heading is clicked again; going to a tab never folds others.
+            # The sidebar: everyday entries first, sections that never fold, Assistant / Undo / Settings pinned at the
+            # bottom, one line per entry (no subtitle), hub tabs only under the hub you are in, Collapse to icons.
             from PySide6.QtCore import QPoint
-            from gg_desktop import nav_rail
-            assert window.nav_open_groups == {"Home"} and window.nav_bodies["Home"].isVisible()
-            assert all(not window.nav_bodies[g].isVisible() for g in window.nav_bodies if g != "Home")
-            window.nav_heads["Library"].click()
+            from gg_desktop import nav_groups, nav_rail
+            order = [route for route, _ in ROUTES]
+            assert order[-3:] == ["AI Assistant", "Undo Center", "Settings"], order
+            names = [e for e, item in window.nav_entries.items() if not item.isHidden()]
+            assert names[:4] == ["Home", "Games", "Mods", "Deals"] and names[-2:] == ["Undo", "Settings"], names
+            assert not window.nav_entries["Assistant"].isVisibleTo(window), "the assistant starts off"
+            assert window.nav_entries["Home"].property("active") and window.nav_hubs["Home"].isVisible()
+            assert not window.nav_hubs["Free up space"].isVisible(), "a hub's tabs show only while you are in it"
+            heights = {e: item.height() for e, item in window.nav_entries.items() if item.isVisibleTo(window)}
+            assert set(heights.values()) == {nav_rail.ITEM_HEIGHT}, heights
+            assert all(not lbl.isHidden() for lbl, _ in window.nav_sections.values())
+            pinned_top = window.nav_entries["Settings"].mapTo(window.nav_rail, QPoint(0, 0)).y()
+            assert pinned_top > window.nav_rail.height() - 160, ("Settings is pinned at the bottom", pinned_top)
+            window.nav_entries["Free up space"].click()
             settle()
-            assert window.nav_open_groups == {"Home", "Library"}, window.nav_open_groups
-            assert window.nav_bodies["Home"].isVisible() and window.nav_bodies["Library"].isVisible(), "Opening one keeps the other"
-            window.navigate("Old Files")
+            assert window.current_route == "Old Files" and window.nav_hubs["Free up space"].isVisible()
+            assert not window.nav_hubs["Home"].isVisible()
+            window.nav_buttons["Graveyard"].click()
             settle()
-            assert window.nav_bodies["Library"].isVisible() and window.nav_bodies["Home"].isVisible(), "Another tab folds nothing"
-            assert window.nav_open_groups == {"Home", "Library", "Clean Up"}, window.nav_open_groups
-            window.nav_heads["Library"].click()
+            assert window.current_route == "Graveyard" and window.nav_buttons["Graveyard"].property("active")
+            assert window.nav_entries["Free up space"].property("active")
+            window.navigate("Games")
             settle()
-            assert "Library" not in window.nav_open_groups and not window.nav_bodies["Library"].isVisible(), "Its own heading folds it"
-            assert window.settings.get("nav_open_groups") == ["Home", "Clean Up"], window.settings.get("nav_open_groups")
-            for heading in ("Home", "Clean Up"):                     # fold them so the row check below sees one group
-                window.nav_heads[heading].click()
-            window.navigate("Hardware")
+            window.nav_entries["Free up space"].click()
             settle()
-            assert window.nav_open_groups == {"PC and Help"} and window.nav_buttons["Hardware"].isVisibleTo(window)
-            QTest.qWait(250)
+            assert window.current_route == "Graveyard", "a hub opens the tab you were last on"
+            assert window.settings.get(nav_groups.HUB_KEY, {}).get("Free up space") == "Graveyard"
+            window.nav_entries["Fix a game"].click()
             settle()
-            holder = window.nav_scroll.widget()
-            shown = [route for route in visible if window.nav_buttons[route].isVisibleTo(window)]
-            assert shown == ["Hardware", "More Tools", "Settings"], shown
-            tops = {route: window.nav_buttons[route].mapTo(holder, QPoint(0, 0)).y() for route in shown}
-            heights = {route: window.nav_buttons[route].height() for route in shown}
-            assert min(heights.values()) >= 38, ("Sidebar rows are squeezed", heights)
-            ordered = sorted(tops.values())
-            assert all(b - a >= 38 for a, b in zip(ordered, ordered[1:])), ("Sidebar rows overlap", tops)
-            assert tops["More Tools"] < tops["Settings"] and max(tops.values()) == tops["Settings"], tops
-            widths = {window.nav_buttons[route].width() for route in window.nav_buttons}
-            assert len(widths) == 1, ("Every sidebar row keeps one width", widths)
-            assert window.grab().save(str(args.output / "shell-sidebar-dropdown.png"))
+            assert window.current_route == "Fix Kit"
+            tops = sorted(item.mapTo(window.nav_rail, QPoint(0, 0)).y() for item in window.nav_entries.values()
+                          if item.isVisibleTo(window))
+            assert all(b - a >= nav_rail.ITEM_HEIGHT for a, b in zip(tops, tops[1:])), ("Sidebar rows overlap", tops)
+            widths = {item.width() for item in window.nav_entries.values()}
+            assert widths == {nav_rail.ITEM_WIDTH}, ("Every sidebar row keeps one width", widths)
+            assert window.grab().save(str(args.output / "shell-sidebar.png"))
+            window.nav_collapse_button.click()
+            settle()
+            assert window.nav_collapsed and window.nav_rail.width() == nav_rail.NARROW
+            assert all(not item.title.isVisible() for item in window.nav_entries.values())
+            assert window.settings.get(nav_groups.COLLAPSED_KEY) is True
+            window.nav_entries["Games"].click()
+            settle()
+            assert window.current_route == "Games", "icons still navigate when collapsed"
+            assert window.grab().save(str(args.output / "shell-sidebar-collapsed.png"))
+            window.nav_collapse_button.click()
+            settle()
+            assert not window.nav_collapsed and window.nav_rail.width() == nav_rail.WIDE
+            visible = nav_rail.visible_routes(window)
             window.navigate("Overview")
             settle()
 
@@ -167,22 +178,25 @@ def main():
             whites = sum(1 for x in range(0, image.width(), 2) for y in range(0, image.height(), 2)
                          if image.pixelColor(x, y).red() > 235 and image.pixelColor(x, y).green() > 235)
             assert reds > 40 and whites > 60, (reds, whites)
-            # Sidebar backdrop: abstract art in the free space under the menu only; the menu itself stays clean.
-            for size in ((1280, 800), (1280, 1000)):
-                window.resize(*size)
-                settle()
-                window.navigate("Mods")
-                settle()
-                rail = window.nav_rail
-                image = rail.grab().toImage()
-                last = max(b.geometry().bottom() for b in window.nav_buttons.values() if b.isVisibleTo(rail))
-                drawn = [(x, y) for y in range(image.height() - 90, image.height(), 3) for x in range(0, image.width(), 5)
-                         if image.pixelColor(x, y).red() > 28 and image.pixelColor(x, y).red() > image.pixelColor(x, y).blue() + 8]
-                assert drawn, "The abstract backdrop is visible in the free space at the bottom of the sidebar"
-                assert image.height() - last > 90, "There is room under the menu for the backdrop at this size"
+            # Sidebar backdrop: abstract art in the free space between the menu and the pinned buttons; never behind a row.
+            from PySide6.QtCore import QPoint
+            window.resize(1280, 1000)
+            settle()
+            window.navigate("Mods")
+            settle()
+            rail = window.nav_rail
+            image = rail.grab().toImage()
+            pinned = next(w for w in rail.findChildren(QWidget) if w.objectName() == "navPinned")
+            floor = pinned.mapTo(rail, QPoint(0, 0)).y()
+            last = max(item.mapTo(rail, QPoint(0, item.height())).y() for e, item in window.nav_entries.items()
+                       if item.isVisibleTo(rail) and not pinned.isAncestorOf(item))
+            assert floor - last > 104, ("There is room under the menu for the backdrop at this size", floor, last)
+            drawn = [(x, y) for y in range(floor - 90, floor, 3) for x in range(0, image.width(), 5)
+                     if image.pixelColor(x, y).red() > 28 and image.pixelColor(x, y).red() > image.pixelColor(x, y).blue() + 8]
+            assert drawn, "The abstract backdrop is visible in the free space above the pinned buttons"
             window.close()
             settle()
-    print("PASS: shell polish: HD logo and backdrop, More Tools above Settings, optional AI Assistant off by default, scan bar floats without shifting any page.")
+    print("PASS: shell polish: HD logo and backdrop, the organised sidebar (hubs, pinned, collapse), optional AI Assistant off by default, scan bar floats without shifting any page.")
     return 0
 
 

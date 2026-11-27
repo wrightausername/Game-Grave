@@ -122,9 +122,9 @@ def main():
             window.resize(1280, 760)
             settle()
 
-            # Sidebar: Deals sits in Library right after Games.
-            library = dict(nav_groups.GROUPS)["Library"]
-            assert [r for r, _ in library][:2] == ["Games", "Deals"], library
+            # Sidebar: Deals is one of the everyday entries at the top, after Games and Mods.
+            first = [e for s, e, _r, _p in nav_groups.entries() if not s and not _p]
+            assert first == ["Home", "Games", "Mods", "Deals"], first
             assert "Deals" in window.nav_buttons
             window.navigate("Deals")
             settle(200)

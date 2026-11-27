@@ -311,7 +311,8 @@ class CrimsonWindow(ReadyRoomMethods, PhotoIntegration, ScreenMethods, QMainWind
         if not hasattr(self, "nav_rail"):
             return
         wide_overview = False
-        self.nav_rail.setFixedWidth(296 if wide_overview else 219)
+        from gg_desktop import nav_rail
+        self.nav_rail.setFixedWidth(nav_rail.rail_width(self))
         self.top_bar.setFixedHeight(56 if wide_overview else 46)
         self.brand.setFixedHeight(80 if wide_overview else 65)
 

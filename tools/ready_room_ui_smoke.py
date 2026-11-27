@@ -29,10 +29,14 @@ def main():
         app.processEvents()
     def click(widget):
         route=getattr(widget,'route',None)
-        if route:   # sidebar groups are dropdowns: open the tab's group first, as a person would
-            from gg_desktop import nav_rail, nav_groups
-            w=widget.window(); nav_rail.show_groups(w,nav_groups.open_for(route,w.nav_open_groups),animate=False)
-            settle()
+        if route:   # a tab inside Home shows under it once Home is open: open Home first, as a person would
+            from gg_desktop import nav_groups
+            w=widget.window()
+            if not widget.isVisibleTo(w):
+                QTest.mouseClick(w.nav_entries[nav_groups.entry_of(route)],Qt.LeftButton)
+                settle()
+                if w.current_route==route:
+                    return
         QTest.mouseClick(widget,Qt.LeftButton)
         settle()
     def button(window,text):
