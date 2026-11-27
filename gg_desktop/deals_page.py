@@ -20,7 +20,7 @@ from shiboken6 import isValid
 from gg_desktop import deals_core as dc
 from gg_desktop.header_banner import HeaderBannerArtwork
 
-SUBTITLE = "The cheapest price for any game across the stores, and a wishlist that watches prices for you."
+SUBTITLE = "Cheapest prices for any game, plus a wishlist that watches them."
 FIRST_WATCH_MS = 2 * 60 * 1000
 WATCH_TICK_MS = 30 * 60 * 1000
 
@@ -174,6 +174,9 @@ def build(window):
     w.results.setObjectName("dealsList")
     w.results.setAccessibleName("Games found")
     w.results.setIconSize(QSize(92, 34))
+    w.results.setWordWrap(True)
+    w.results.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    w.results.setTextElideMode(Qt.ElideRight)
     w.results.setMinimumHeight(220)
     w.results.currentItemChanged.connect(lambda cur, _old: cur is not None and pick(self, cur.data(Qt.UserRole)))
     left.addWidget(w.results, 3)
@@ -182,6 +185,9 @@ def build(window):
     w.wish.setObjectName("dealsList")
     w.wish.setAccessibleName("Wishlist")
     w.wish.setIconSize(QSize(92, 34))
+    w.wish.setWordWrap(True)
+    w.wish.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    w.wish.setTextElideMode(Qt.ElideRight)
     w.wish.setMinimumHeight(170)
     w.wish.setSelectionMode(QAbstractItemView.SingleSelection)
     w.wish.itemDoubleClicked.connect(lambda item: pick(self, item.data(Qt.UserRole)))
@@ -235,8 +241,11 @@ def build(window):
     w.table.setSelectionMode(QAbstractItemView.NoSelection)
     head = w.table.horizontalHeader()
     head.setSectionResizeMode(0, QHeaderView.Stretch)
-    for col in (1, 2, 3, 4):
+    for col in (1, 2, 3):
         head.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+    head.setSectionResizeMode(4, QHeaderView.Fixed)
+    w.table.setColumnWidth(4, 118)
+    w.table.verticalHeader().setDefaultSectionSize(38)
     w.table.setMinimumHeight(200)
     w.table.setMinimumWidth(0)
     right.addWidget(w.table, 1)
@@ -402,6 +411,7 @@ def show_game(window):
             w.table.setItem(r, c, cell)
         control = _button("Open store", lambda _=False, u=offer.url: open_url(u),
                           tip=f"Opens {offer.store}'s page for {g.title} in your browser.")
+        control.setMinimumWidth(104)
         w.table.setCellWidget(r, 4, control)
     on_list = dc.on_wishlist(dc.wishlist(window.settings), g.game_id)
     w.watch.setText("Update wishlist" if on_list else "Add to wishlist")
@@ -530,7 +540,7 @@ def fill_wishlist(window):
         w.wish.addItem(item)
         picture(window, i["thumb"], QSize(92, 34))
     if not items:
-        empty = QListWidgetItem("Nothing yet. Pick a game and press Add to wishlist.")
+        empty = QListWidgetItem("Nothing yet. Pick a game, then Add to wishlist.")
         empty.setFlags(Qt.NoItemFlags)
         w.wish.addItem(empty)
     when = window.settings.get(dc.CHECKED_KEY)

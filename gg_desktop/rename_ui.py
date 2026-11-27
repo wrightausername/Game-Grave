@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QRect, QRunnable, QSize, Qt, QThreadPool, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QImage, QImageReader, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QImage, QImageReader, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QFileIconProvider, QFrame, QGridLayout, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QProgressBar, QPushButton, QSpinBox, QStyle, QStyledItemDelegate,
@@ -123,14 +123,14 @@ class Thumbs(QObject):
                 self.pending.add(path)
                 self.pool.start(_ThumbJob(path, size, self.signals))
         else:
-            self.cache[path] = self.icons.icon(QFileInfo(path)).pixmap(size, size)
+            self.cache[path] = self.icons.icon(QFileInfo(path))      # a QIcon: painted at the tile's size
             return self.cache[path]
-        return self.icons.icon(QFileIconProvider.Folder if is_dir else QFileIconProvider.File).pixmap(size, size)
+        return self.icons.icon(QFileIconProvider.Folder if is_dir else QFileIconProvider.File)
 
     def _ready(self, path, image):
         self.pending.discard(path)
         if image.isNull():
-            self.cache[path] = self.icons.icon(QFileInfo(path)).pixmap(THUMB * 2, THUMB * 2)
+            self.cache[path] = self.icons.icon(QFileInfo(path))
         else:
             self.cache[path] = QPixmap.fromImage(image)
         self.changed.emit()
@@ -189,7 +189,9 @@ class RowPainter(QStyledItemDelegate):
         p.setBrush(QColor("#111b25"))
         p.drawRoundedRect(tile, 6, 6)
         pix = d.thumbs.get(entry.path, entry.is_dir, THUMB * 2)
-        if pix is not None and not pix.isNull():
+        if isinstance(pix, QIcon):
+            pix.paint(p, tile.adjusted(6, 6, -6, -6))
+        elif pix is not None and not pix.isNull():
             scaled = pix.scaled(THUMB, THUMB, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             p.drawPixmap(tile.left() + (THUMB - scaled.width()) // 2, tile.top() + (THUMB - scaled.height()) // 2, scaled)
 
@@ -315,7 +317,7 @@ class RenameDialog(shell.ToolDialog):
         super().__init__(window, "batch_rename", TITLE, "file", width=900)
         self.window_ = window
         self.setStyleSheet(self.styleSheet() + LOCAL_STYLE)
-        self.setMinimumHeight(680)
+        self.setMinimumHeight(760)
         self.setAcceptDrops(True)
         self.close_button.setAutoDefault(False)
         self.options, advanced_open, self.rename_folders = load_prefs()
@@ -382,6 +384,7 @@ class RenameDialog(shell.ToolDialog):
         self.start.setFixedWidth(110)
         self.digits.setFixedWidth(80)
         self.hint = shell.text("", "toolNote", wrap=False)
+        self.hint.setMinimumHeight(18)
         names.addWidget(self.hint, 2, 0, 1, 3)
         self.body.addLayout(names)
 
@@ -390,6 +393,7 @@ class RenameDialog(shell.ToolDialog):
         self.adv_toggle.setObjectName("toolDetails")
         self.adv_toggle.setCursor(Qt.PointingHandCursor)
         self.adv_toggle.setAccessibleName("Advanced options")
+        self.adv_toggle.setMinimumHeight(26)
         self.adv_toggle.clicked.connect(lambda: self.open_advanced(not self.advanced.isVisible()))
         self.body.addWidget(self.adv_toggle, 0, Qt.AlignLeft)
         self.advanced = QFrame()
