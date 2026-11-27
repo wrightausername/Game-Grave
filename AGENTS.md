@@ -1573,3 +1573,13 @@ clickable... AI assistant on the right panel is still scuffed up"). Reopens Over
   drive that folder is on (else the first drive). Protected and system places are still left out.
 - AI Assistant: the right-column panels size to their own content (no stretched empty gaps), side text is 12 px, and the
   column is up to 340 px wide when there is room.
+- Free game alerts and Overview's Today strip (owner answers, 2026-11-27: "I do like the free game alerts... implement that
+  where you best think it fits", "Add a Today strip", tagline stays "a caretaker for PC games"; the one-stop hub is the
+  app's direction, not a tab). Free game alerts live in Deals' watch: every 6 hours at most, never while a game, scan or
+  clean-up runs, CheapShark's $0 list (`deals_net.free_now`); one quiet notice per new giveaway (`deals_free_seen`, 300
+  kept), a "Tell me when a game is free to keep" switch (`deals_free_alerts`, default on). Game Grave never claims a game.
+  Overview gains one row under its header (`today_core.py` pure, `today_strip.py` Qt, not in the photo-reference preview):
+  free games (if the free check ran in the last 2 days), wishlist price drops from the last 7 days (`deals_recent_drops`),
+  drives that hold games in the Graveyard's low zone, and official Steam news for your games from the last 3 days; else
+  "All quiet: nothing needs you today". Chips only open Deals, Graveyard or Ready Room. Covered by `tests/test_today.py`,
+  `tests/test_deals.py`, `tools/deals_smoke.py` and `tools/overview_live_smoke.py`.

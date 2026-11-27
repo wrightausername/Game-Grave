@@ -421,6 +421,14 @@ def build(window):
     left.addLayout(wish_buttons)
     w.checked = _text("", "dealsNote")
     left.addWidget(w.checked)
+    from PySide6.QtWidgets import QCheckBox
+    w.free_alerts = QCheckBox("Tell me when a game is free to keep")
+    w.free_alerts.setAccessibleName("Free game alerts")
+    w.free_alerts.setToolTip("Checked every 6 hours while Game Grave runs, never while you play. One quiet notice per "
+                             "new giveaway. Game Grave never claims anything for you.")
+    w.free_alerts.setChecked(dc.free_alerts_on(self.settings))
+    w.free_alerts.toggled.connect(lambda on: toggle_free_alerts(self, on))
+    left.addWidget(w.free_alerts)
     holder = QWidget()
     holder.setLayout(left)
     holder.setMinimumWidth(250)
@@ -841,6 +849,8 @@ def check_wishlist(window, manual=False):
 
 def notify_drops(window, news, manual=False):
     from gg_desktop import comfort
+    if news:
+        _save(window, dc.remember_drops(window.settings, news))
     if not news:
         if manual and widgets(window) is not None:
             widgets(window).status.setText("No price drops on your wishlist since the last check.")
@@ -868,11 +878,47 @@ def install(window):
 
 
 def watch_tick(window, now=None):
+    """Wishlist prices and free game alerts, each at most every 6 hours, never while a game, scan or clean-up runs."""
     try:
         from gg_desktop.autopsy_ui import game_running
         busy = window.scanning or window.cleaning or game_running(window)
     except Exception:
         busy = True
-    if busy or not dc.wishlist(window.settings) or not dc.due(window.settings, now):
+    if busy:
         return False
-    return check_wishlist(window)
+    ran = False
+    if dc.free_alerts_on(window.settings) and dc.free_due(window.settings, now):
+        ran = check_free(window, now) or ran
+    if dc.wishlist(window.settings) and dc.due(window.settings, now):
+        ran = check_wishlist(window) or ran
+    return ran
+
+
+def check_free(window, now=None):
+    """Free game alerts (owner, 2026-11-27): one quiet notice when a store starts giving a game away."""
+    st = state(window)
+    if getattr(st, "checking_free", False):
+        return False
+    from gg_desktop import comfort, deals_net
+    st.checking_free = True
+    _save(window, dict(window.settings, **{dc.FREE_CHECKED_KEY: now if now is not None else time.time()}))
+
+    def done(kind, value):
+        st.checking_free = False
+        if kind == "error":
+            return
+        updated, fresh = dc.free_update(window.settings, value, now)
+        _save(window, updated)
+        message = dc.free_message(fresh)
+        if message:
+            comfort.notify(window, message[0], message[1], "good", "tab:Deals")
+    _run(window, deals_net.free_now, done)
+    return True
+
+
+def toggle_free_alerts(window, on):
+    _save(window, dict(window.settings, **{dc.FREE_ALERTS_KEY: bool(on)}))
+    w = widgets(window)
+    if w is not None:
+        w.status.setText("Game Grave will tell you quietly when a store gives a game away." if on else
+                         "Free game alerts are off. The Free to keep row still shows today's giveaways.")

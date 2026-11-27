@@ -173,6 +173,16 @@ def main():
             assert control.snapshot.totals==expected.totals
             assert expected.shared_files==1
             assert window.overview_metrics["Games"].value_label.text()=="8"
+            # Today strip (owner, 2026-11-27): always one line; a chip only opens its tab.
+            assert window.today_chips and window.today_chips[0].text(), "Today strip missing"
+            routes=[c for c in window.today_chips if c.isEnabled()]
+            if routes:
+                routes[0].click()
+                settle()
+                assert window.current_route!="Overview"
+                window.navigate("Overview")
+                QTest.qWait(30)
+                settle()
             assert window.overview_metrics["Mods"].value_label.text().rstrip("+")=="4", (window.overview_metrics["Mods"].value_label.text(), expected.catalog.warnings)
             assert window.overview_metrics["Mods"].caption_label.text()=="Mods"
             assert [n for n,_,_ in window.overview_ring.segments]==["Games","Mods","Other Storage","Captures","Old Files"]

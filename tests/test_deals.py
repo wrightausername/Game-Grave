@@ -100,6 +100,31 @@ class Storefront(unittest.TestCase):
             self.assertNotIn("safe", (title + note).casefold())
 
 
+class FreeAlerts(unittest.TestCase):
+    def card(self, gid, price=0.0, title=None):
+        return dc.Deal(gid, title or f"Game {gid}", "", price, 19.99, 100, "GOG", "7", "https://x", "", 0, 0, "")
+
+    def test_new_giveaways_once_and_today_list(self):
+        settings, fresh = dc.free_update({}, [self.card("1"), self.card("2"), self.card("3", 4.99)], now=50)
+        self.assertEqual([d.game_id for d in fresh], ["1", "2"], "only $0 games count")
+        self.assertEqual([f["title"] for f in settings[dc.FREE_NOW_KEY]], ["Game 1", "Game 2"])
+        self.assertEqual(settings[dc.FREE_CHECKED_KEY], 50)
+        settings, fresh = dc.free_update(settings, [self.card("1"), self.card("4")])
+        self.assertEqual([d.game_id for d in fresh], ["4"])
+        self.assertEqual(dc.free_message([self.card("4", title="Hades")])[0], "Free to keep: Hades")
+        self.assertIn("3 games are free", dc.free_message([self.card(str(n)) for n in range(3)])[0])
+        self.assertIsNone(dc.free_message([]))
+        self.assertNotIn("safe", " ".join(dc.free_message([self.card("9")])).casefold())
+        self.assertTrue(dc.free_alerts_on({}))
+        self.assertFalse(dc.free_alerts_on({dc.FREE_ALERTS_KEY: False}))
+        self.assertTrue(dc.free_due({}, now=1_800_000_000))
+
+    def test_recent_drops_kept_for_today(self):
+        s = dc.remember_drops({}, [("Hades", "$5 at GOG")], now=10)
+        s = dc.remember_drops(s, [("Doom", "$3 at Steam")], now=20, keep=1)
+        self.assertEqual(s[dc.DROPS_KEY], [{"title": "Doom", "message": "$3 at Steam", "at": 20}])
+
+
 class Wishlist(unittest.TestCase):
     def test_add_remove_target_and_cap(self):
         items = dc.add_item([], game(4.99), target=3, now=10)

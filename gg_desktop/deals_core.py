@@ -25,6 +25,9 @@ MAX_WISHLIST = 100
 BATCH = 25                 # CheapShark answers up to 25 games per request
 WATCH_HOURS = 6            # the wishlist is checked at most this often while Game Grave runs
 WISHLIST_KEY, CHECKED_KEY = "deals_wishlist", "deals_checked_at"
+FREE_ALERTS_KEY, FREE_CHECKED_KEY, FREE_SEEN_KEY, FREE_NOW_KEY = ("deals_free_alerts", "deals_free_checked_at",
+                                                                  "deals_free_seen", "deals_free_now")
+DROPS_KEY = "deals_recent_drops"
 RESELLER_WARNING = ("Key reseller: keys come from third-party sellers, not the publisher. They can be region-locked, "
                     "resold or revoked later. Buy at your own risk.")
 
@@ -403,3 +406,51 @@ def summary(game: GameDeals) -> str:
     if game.lowest_ever is not None:
         text += f". Lowest ever: {price_text(game.lowest_ever)}" + (f" ({game.lowest_ever_date})" if game.lowest_ever_date else "")
     return text + "."
+
+
+# ------------------------------------------------------------------ free game alerts (owner, 2026-11-27)
+def free_alerts_on(settings) -> bool:
+    return bool(settings.get(FREE_ALERTS_KEY, True)) if isinstance(settings, dict) else True
+
+
+def free_due(settings, now=None) -> bool:
+    try:
+        last = float(settings.get(FREE_CHECKED_KEY) or 0)
+    except (TypeError, ValueError):
+        last = 0
+    return (now if now is not None else time.time()) - last >= WATCH_HOURS * 3600
+
+
+def free_update(settings, deals, now=None):
+    """(new settings, [Deal]) after a free-games check: the list shown on Overview's Today strip, and the giveaways that
+    are new since the last check. Only games their store lists at $0 count. The seen list keeps the newest 300 ids."""
+    free = [d for d in deals if d.price == 0]
+    seen = [str(x) for x in (settings.get(FREE_SEEN_KEY) or []) if isinstance(x, (str, int))]
+    known = set(seen)
+    fresh = [d for d in free if d.game_id not in known]
+    out = dict(settings)
+    out[FREE_SEEN_KEY] = (seen + [d.game_id for d in fresh])[-300:]
+    out[FREE_NOW_KEY] = [{"game_id": d.game_id, "title": d.title, "store": d.store, "url": d.url} for d in free[:12]]
+    out[FREE_CHECKED_KEY] = now if now is not None else time.time()
+    return out, fresh
+
+
+def free_message(fresh):
+    """(title, detail) for one quiet notice, or None."""
+    if not fresh:
+        return None
+    if len(fresh) == 1:
+        d = fresh[0]
+        return (f"Free to keep: {d.title}",
+                f"On {d.store} for a limited time. Claim it in the store; Game Grave doesn't claim anything for you.")
+    names = ", ".join(d.title for d in fresh[:3]) + (f" and {len(fresh) - 3} more" if len(fresh) > 3 else "")
+    return (f"{len(fresh)} games are free to keep right now", names + ". Open Deals to claim them in their stores.")
+
+
+def remember_drops(settings, news, now=None, keep=20):
+    """Keep the newest price-drop notices for Overview's Today strip."""
+    stamp = now if now is not None else time.time()
+    old = [d for d in (settings.get(DROPS_KEY) or []) if isinstance(d, dict) and d.get("title")]
+    out = dict(settings)
+    out[DROPS_KEY] = (old + [{"title": t, "message": m, "at": stamp} for t, m in news])[-keep:]
+    return out

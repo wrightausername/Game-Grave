@@ -184,3 +184,9 @@ def forget_key():
         _key_file().unlink()
     except OSError:
         pass
+
+
+def free_now():
+    """Games their store lists at $0 right now (CheapShark), for free game alerts."""
+    params = next(p for key, _t, _n, p in dc.FRONT if key == "free")
+    return dc.parse_deals(get_json(dc.deals_list_url(dict(params, pageSize=20))), stores())

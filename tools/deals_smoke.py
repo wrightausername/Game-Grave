@@ -134,8 +134,11 @@ def main():
             assert not w.buy.isEnabled() and not w.watch.isEnabled()
 
             # The storefront: three rows of cards with pictures, badges and store icons (owner, 2026-11-27).
-            wait_for(lambda: len(window.findChildren(deals_page.DealCard)) >= 7)
-            cards = [c for c in window.findChildren(deals_page.DealCard) if c.isVisible()]
+            def shown_cards():
+                return [c for c in window.findChildren(deals_page.DealCard) if c.isVisible()]
+            wait_for(lambda: len(shown_cards()) >= 7)
+            settle(100)
+            cards = shown_cards()
             assert w.stack.currentIndex() == 0
             titles = [c.deal.title for c in cards]
             assert "Free Game" in titles and "Deal Game 0" in titles, titles
@@ -200,17 +203,34 @@ def main():
             assert w.watch.text() == "Update wishlist"
             assert "Portal 2" in w.wish.item(0).text() and "target $1.50" in w.wish.item(0).text()
 
+            # Free game alerts: one quiet notice for a new giveaway, never twice for the same one (owner, 2026-11-27).
+            assert w.free_alerts.isChecked() and dc.free_alerts_on(window.settings)
+            window.settings = dict(window.settings, **{dc.FREE_CHECKED_KEY: 0})
+            assert deals_page.watch_tick(window) is True
+            wait_for(lambda: not getattr(deals_page.state(window), "checking_free", False) and not deals_page.state(window).checking)
+            assert notices and notices[-1][0] == "Free to keep: Free Game", notices
+            assert window.settings[dc.FREE_NOW_KEY][0]["title"] == "Free Game"
+            window.settings = dict(window.settings, **{dc.FREE_CHECKED_KEY: 0})
+            deals_page.watch_tick(window)
+            wait_for(lambda: not getattr(deals_page.state(window), "checking_free", False) and not deals_page.state(window).checking)
+            assert len(notices) == 1, ("a giveaway is announced once", notices)
+            w.free_alerts.setChecked(False)
+            assert not dc.free_alerts_on(window.settings)
+            w.free_alerts.setChecked(True)
+            notices.clear()
+
             # The watch: never while a game runs; checks when due; a real drop notifies once, quietly.
-            window.settings = dict(window.settings, **{dc.CHECKED_KEY: 0})
+            window.settings = dict(window.settings, **{dc.CHECKED_KEY: 0, dc.FREE_CHECKED_KEY: time.time()})
             with patch("gg_desktop.autopsy_ui.game_running", return_value=True):
                 assert deals_page.watch_tick(window) is False, "never while a game runs"
             price["fan"] = "1.49"
             assert deals_page.watch_tick(window) is True
             wait_for(lambda: not deals_page.state(window).checking)
             assert len(notices) == 1 and notices[0][0] == "Price drop: Portal 2", notices
+            assert window.settings[dc.DROPS_KEY][-1]["title"] == "Portal 2"
             assert "$1.49 at Fanatical (was $1.99)" in notices[0][1] and "target" in notices[0][1]
             assert deals_page.watch_tick(window) is False, "not again until the next six-hour window"
-            window.settings = dict(window.settings, **{dc.CHECKED_KEY: 0})
+            window.settings = dict(window.settings, **{dc.CHECKED_KEY: 0, dc.FREE_CHECKED_KEY: time.time()})
             assert deals_page.watch_tick(window) is True
             wait_for(lambda: not deals_page.state(window).checking)
             assert len(notices) == 1, "the same price never notifies twice"

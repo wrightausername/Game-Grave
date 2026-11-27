@@ -280,6 +280,9 @@ class OverviewScreens:
         page.content.addWidget(self.overview_hero)
         from gg_desktop.header_banner import HeaderBannerArtwork
         page.banner_artwork = HeaderBannerArtwork(self, page, self.overview_hero, route="Overview")
+        if not getattr(self, "reference_preview", False):    # owner, 2026-11-27: "Add a Today strip"
+            from gg_desktop import today_strip
+            page.content.addWidget(today_strip.build(self))
         found = bool(self.inventory.scanned_at)
         other_bytes = sum(r.size for r in storage_items(self.inventory))
         values = [
