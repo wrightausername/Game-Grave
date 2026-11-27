@@ -108,17 +108,33 @@ def _run(window, work, done, title="Deals"):
 
 
 # ------------------------------------------------------------------ pictures
+def _fit(pix, size):
+    """Cards and the big picture are filled edge to edge (cropped); small icons keep their shape."""
+    if size.width() > 60:
+        return pix.scaled(size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation).copy(0, 0, size.width(), size.height())
+    return pix.scaled(size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+
 def picture(window, url, size, label=None, fallback=""):
+    """Load a picture once and give it to every label waiting for it (the same game can be in two storefront rows).
+    A picture that can't be loaded falls back to `fallback` (the store's own thumbnail)."""
     st = state(window)
+    if not hasattr(st, "waiting"):
+        st.waiting = {}
     if not url:
         if fallback:
             picture(window, fallback, size, label)
         return
     if url in st.images:
         pix = st.images[url]
-        if label is not None and not pix.isNull() and isValid(label):
-            label.setPixmap(pix.scaled(size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        if pix.isNull():
+            if fallback and fallback != url:
+                picture(window, fallback, size, label)
+        elif label is not None and isValid(label):
+            label.setPixmap(_fit(pix, size))
         return
+    if label is not None or fallback:
+        st.waiting.setdefault(url, []).append((label, size, fallback))
     if url in st.pending_images:
         return
     st.pending_images.add(url)
@@ -130,13 +146,12 @@ def picture(window, url, size, label=None, fallback=""):
         if kind == "ok" and data:
             pix.loadFromData(data)
         st.images[url] = pix
-        if pix.isNull() and fallback and fallback != url:
-            picture(window, fallback, size, label)      # no Steam header for this game: use the store's picture
-            return
-        if label is not None and isValid(label) and not pix.isNull():
-            label.setPixmap(pix.scaled(size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-                            .copy(0, 0, size.width(), size.height()) if size.width() > 60 else
-                            pix.scaled(size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        for waiting_label, waiting_size, waiting_fallback in st.waiting.pop(url, []):
+            if pix.isNull():
+                if waiting_fallback and waiting_fallback != url:
+                    picture(window, waiting_fallback, waiting_size, waiting_label)
+            elif waiting_label is not None and isValid(waiting_label):
+                waiting_label.setPixmap(_fit(pix, waiting_size))
         if window.current_route == "Deals":
             refresh_pictures(window)
     _run(window, lambda: deals_net.image(url), done)
