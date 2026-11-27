@@ -242,7 +242,9 @@ def follow(window, route):
         body.setVisible(entry == current and not window.nav_collapsed)
     if nav_groups.is_hub(current) and window.nav_hub_last.get(current) != route:
         window.nav_hub_last[current] = route
-        _save(window, nav_groups.HUB_KEY, dict(window.nav_hub_last))
+        # Kept with the settings in memory (saved the next time Game Grave saves settings), never written on its own,
+        # so moving between tabs never writes to disk.
+        window.settings = dict(getattr(window, "settings", {}) or {}, **{nav_groups.HUB_KEY: dict(window.nav_hub_last)})
 
 
 def set_collapsed(window, collapsed, remember=True):
