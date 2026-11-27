@@ -230,6 +230,42 @@ def main():
             control.refresh_storage(force=True)
             wait_for(lambda:not control.storage_busy)
 
+            # Leaving Overview keeps measuring; coming back shows its progress, then its result (owner, 2026-11-27).
+            release,started=threading.Event(),threading.Event()
+            real_measure=measure_storage
+            def gated(inv,*,canceled,progress):
+                started.set()
+                progress(1,"Measuring folder 1 of 9…")
+                while not release.is_set():
+                    if canceled():
+                        raise InterruptedError()
+                    time.sleep(.002)
+                return real_measure(inv)
+            (Path(games[0].install_path)/"later.bin").write_bytes(b"L"*11)
+            with patch("gg_desktop.overview_storage_ui.measure_storage",side_effect=gated):
+                control.refresh_storage(force=True)
+                wait_for(started.is_set)
+                window.navigate("Games")
+                settle()
+                assert window.current_route=="Games"
+                assert window._overview_measure.busy and not window._overview_measure.cancel.is_set(),"Leaving Overview stopped the measurement"
+                window.navigate("Overview")
+                QTest.qWait(30)
+                settle()
+                back=window.page.overview
+                assert back.storage_busy and "Measuring folder 1 of 9" in window.overview_storage_note.text(),window.overview_storage_note.text()
+                window.navigate("Games")
+                settle()
+                release.set()
+                wait_for(lambda:not window._overview_measure.busy)
+                assert window._overview_storage_cache[1].total==old_total+37+11,"Result kept while away from Overview"
+            window.navigate("Overview")
+            QTest.qWait(30)
+            settle()
+            control=window.page.overview
+            wait_for(lambda:control.snapshot is not None)
+            assert control.snapshot.total==old_total+37+11,(control.snapshot.total,old_total)
+
             item=window.overview_library.item(0)
             rect=window.overview_library.visualItemRect(item)
             QTest.mouseClick(window.overview_library.viewport(),Qt.LeftButton,pos=QPoint(rect.right()-15,rect.top()+15))

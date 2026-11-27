@@ -65,7 +65,8 @@ def accent(frame, name, tone):
     rgb = ACCENTS[tone]
     frame.setObjectName(name)
     frame.setStyleSheet(   # calm: one quiet border, a thin coloured line on top, a faint tint
-        f"QFrame#{name}{{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 rgba({rgb},14),stop:.25 #0a1017,stop:1 #080d13);"
+        # A solid dark fill: the earlier faint top gradient was drawn as a white band on Windows (owner, 2026-11-27).
+        f"QFrame#{name}{{background:#0a1017;"
         f"border:1px solid #1b2633;border-top:2px solid rgba({rgb},170);border-radius:12px;}}")
     return frame
 

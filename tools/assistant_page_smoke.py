@@ -322,6 +322,15 @@ def main():
                 ask(window, "no, that's wrong, it's on drive D")
                 wait_for("Sorry about that, noted.")
             assert "drive D" in (window.settings.get("assistant_lessons") or [{}])[-1].get("correction", "")
+            # "Shut off now" closes the loaded model and the panel says how much memory it was using (owner, 2026-11-27).
+            assert local_ai_ui.state_of(window).server is not None
+            with patch.object(ai.LocalServer, "running", new=True), patch.object(ai, "process_memory", return_value=3 * 1024 ** 3):
+                local_ai_ui.sync(window)
+                assert not w.off.isHidden() and "GB of memory" in w.loaded.text(), w.loaded.text()
+                local_ai_ui.shut_off(window)
+            settle()
+            assert local_ai_ui.state_of(window).server is None and w.off.isHidden() and "using no memory" in w.loaded.text(), w.loaded.text()
+            assert local_ai_ui.KEEP_WHILE_OPEN_MS == local_ai_ui.IDLE_STOP_MS == 5 * 60 * 1000
             local_ai_ui.stop(window)
             w.switch.click()
             settle()

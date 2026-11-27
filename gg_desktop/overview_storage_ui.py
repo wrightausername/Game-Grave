@@ -49,6 +49,29 @@ def coverage_reports(inventory, settings):
     return reports
 
 
+def measure_state(window):
+    """The storage measurement belongs to the window, not the Overview page (owner, 2026-11-27: "overview also needs to
+    continue to work even when i am not in the tab itself"). Leaving Overview no longer cancels it; coming back shows its
+    progress or its result. Cancel measurement and closing Game Grave still stop it."""
+    m = getattr(window, "_overview_measure", None)
+    if m is None:
+        from types import SimpleNamespace
+        m = SimpleNamespace(busy=False, cancel=threading.Event(), message="")
+        window._overview_measure = m
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(m.cancel.set)
+    return m
+
+
+def current_controller(window):
+    page = getattr(window, "page", None)
+    control = getattr(page, "overview", None) if page is not None and isValid(page) else None
+    if isinstance(control, OverviewStorageController) and isValid(control) and control.valid():
+        return control
+    return None
+
+
 class OverviewStorageController(QObject):
     changed = Signal()
 
@@ -57,14 +80,20 @@ class OverviewStorageController(QObject):
         self.window, self.page = window, page
         self.active = threading.Event()
         self.active.set()
-        self.cancel = threading.Event()
-        active, cancel = self.active, self.cancel
-        page.destroyed.connect(lambda: (active.clear(), cancel.set()))
-        self.storage_busy = False
+        self.measure = measure_state(window)
+        self.cancel = self.measure.cancel
+        active = self.active
+        page.destroyed.connect(active.clear)          # the page goes; the measurement carries on
         self.snapshot = None
         self.logged_moves = window.overview_storage_note.toolTip()
         self.message = "Scan PC to detect your game libraries and mod locations."
         self.legend_targets = {}
+        if self.measure.busy and self.measure.message:
+            self.message = self.measure.message
+
+    @property
+    def storage_busy(self):
+        return self.measure.busy
 
     def valid(self):
         return (isValid(self) and self.active.is_set() and isValid(self.window)
@@ -161,7 +190,11 @@ class OverviewStorageController(QObject):
             w.overview_next.setEnabled(bar.value() < bar.maximum())
 
     def refresh_storage(self, force=False):
-        if not self.valid() or self.storage_busy:
+        if not self.valid():
+            return
+        if self.storage_busy:                    # still measuring from an earlier visit: show its progress
+            self.message = self.measure.message or "Measuring detected game and mod folders…"
+            self.render()
             return
         inventory = self.window.inventory
         if not inventory.scanned_at:
@@ -174,14 +207,15 @@ class OverviewStorageController(QObject):
             self.message = self.snapshot_message()
             self.render()
             return
-        self.storage_busy = True
-        self.cancel.clear()
-        self.message = "Measuring detected game and mod folders…"
+        m = self.measure
+        m.busy = True
+        m.cancel.clear()
+        self.message = m.message = "Measuring detected game and mod folders…"
         self.render()
-        owner, active, cancel = weakref.ref(self), self.active, self.cancel
+        window, cancel = self.window, m.cancel
         def run(progress):
             try:
-                snapshot = measure_storage(inventory, canceled=lambda: cancel.is_set() or not active.is_set(),
+                snapshot = measure_storage(inventory, canceled=cancel.is_set,
                     progress=lambda checked, message: progress(checked, message))
                 return snapshot, ""
             except InterruptedError:
@@ -189,23 +223,28 @@ class OverviewStorageController(QObject):
             except Exception as exc:
                 return None, "Measurement unavailable: " + (str(exc)[:250] or type(exc).__name__)
         def finish(packet):
-            control = owner()
-            if control is None or not isValid(control) or not control.valid():
+            m.busy = False
+            if not isValid(window):
                 return
-            control.storage_busy = False
             result, error = packet
-            if control.window.inventory is not inventory:
+            fresh = window.inventory is inventory
+            if fresh and result is not None and not cancel.is_set():
+                window._overview_storage_cache = (key, result)     # kept even when Overview isn't on screen
+            control = current_controller(window)
+            if control is None or not fresh:
+                m.message = ""
                 return
             if result is not None and not cancel.is_set():
                 control.snapshot = result
-                control.window._overview_storage_cache = (key, result)
                 control.message = control.snapshot_message()
             else:
                 control.message = error or "Measurement canceled. Previous reading retained."
+            m.message = ""
             control.render()
         def progress(_checked, message):
-            control = owner()
-            if control is not None and isValid(control) and control.valid():
+            m.message = message
+            control = current_controller(window)
+            if control is not None:
                 control.message = message
                 control.window.overview_storage_note.setText(message)
                 control.changed.emit()

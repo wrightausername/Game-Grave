@@ -1539,3 +1539,19 @@ for the wishlist watch; no other tab changed.
   the notice; then a REAL CheapShark search, game and batch check so the parsing is proven on live answers; skipped only
   when the service can't be reached). `tests/test_nav_groups.py`, `tools/first_run_smoke.py` and the welcome tour text
   include Deals.
+
+AI Assistant panels and memory, Overview keeps working (owner instructions, 2026-11-27: "fix that white that doesnt match the
+theme on the right... there needs to be an option to turn off the assistant with a button so its not eating your ram... auto
+shut off after 5 minutes of inactivity", and "overview also needs to continue to work even when i am not in the tab itself").
+AI Assistant is reopened for its right-column panel look and the Local AI panel; Overview for its storage measurement only.
+- `assistant_page.accent`: the right-column panels (Explain things for, Local AI, Automation, Data Used) use a solid
+  #0a1017 fill with the coloured top line. The faint top gradient they had was drawn as a white band on Windows.
+- Local AI: the model now shuts off after 5 idle minutes whether the assistant is on screen or not (`KEEP_WHILE_OPEN_MS`
+  = `IDLE_STOP_MS`), and still while a game runs. The panel shows "Loaded and ready, using about N GB of memory" (the
+  llama-server process's working set, `local_ai_core.process_memory`) with a "Shut off now" button, or "Not loaded: using
+  no memory". Shutting off keeps the Local AI switch as it is; the next question starts the model again.
+- Overview: the storage measurement belongs to the window (`overview_storage_ui.measure_state`). Leaving Overview no
+  longer cancels it; coming back shows its progress, and the result is kept in `_overview_storage_cache` even when Overview
+  isn't on screen. Cancel measurement and closing Game Grave still stop it. The PC scan itself already ran in the
+  background. Covered by `tools/overview_live_smoke.py` (leave mid-measurement, come back to progress, result kept) and
+  `tools/assistant_page_smoke.py` (memory line, Shut off now).

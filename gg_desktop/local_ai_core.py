@@ -625,6 +625,32 @@ class LocalServer:
                 pass
 
 
+def process_memory(process) -> int | None:
+    """Bytes of memory a running process uses right now (Windows working set), or None when it can't be read."""
+    if process is None or os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class Counters(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t), ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t), ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
+        counters = Counters()
+        counters.cb = ctypes.sizeof(Counters)
+        handle = int(process._handle)          # subprocess.Popen keeps the Windows process handle
+        psapi = ctypes.WinDLL("psapi")
+        psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD]
+        if not psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+            return None
+        return int(counters.WorkingSetSize)
+    except Exception:
+        return None
+
+
 def start_best(server: LocalServer, base=None, progress=lambda done, total: None):
     """Start with the graphics (Vulkan) build when present; if it won't start on this PC, use the CPU build,
     downloading it once (verified like every other download) if it isn't there yet."""

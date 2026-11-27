@@ -22,7 +22,7 @@ from gg_desktop.settings_page import Switch
 from gg_desktop.widgets import button, column, label, panel, row
 
 IDLE_STOP_MS = 5 * 60 * 1000
-KEEP_WHILE_OPEN_MS = 20 * 60 * 1000
+KEEP_WHILE_OPEN_MS = IDLE_STOP_MS   # owner, 2026-11-27: shut off after 5 idle minutes, tab open or not
 GAME_CHECK_MS = 30 * 1000
 
 
@@ -118,15 +118,25 @@ def build_panel(window, accent):
     holder = QWidget()
     holder.setLayout(buttons)
     lay.addWidget(holder)
+    running = row(spacing=6)
+    loaded = label("", "caption", wrap=True)
+    loaded.setMinimumWidth(0)
+    running.addWidget(loaded, 1)
+    off = button("Shut off now", lambda: shut_off(window),
+                 tip="Closes the local AI model now and gives its memory back to your PC. It starts again on your next question.")
+    off.setFixedHeight(28)
+    running.addWidget(off)
+    lay.addLayout(running)
     bar = QProgressBar()
     bar.setFixedHeight(8)
     bar.setTextVisible(False)
     bar.setRange(0, 1000)
     lay.addWidget(bar)
-    lay.addWidget(label("Runs on this PC only; nothing you ask leaves it. Pauses while a game runs. Nothing on your PC "
-                        "changes without your OK.", "warning", wrap=True))
+    lay.addWidget(label("Runs on this PC only; nothing you ask leaves it. Shuts itself off after 5 minutes without a question "
+                        "and while a game runs. Nothing on your PC changes without your OK.", "warning", wrap=True))
     lay.addStretch()
-    st.widgets = SimpleNamespace(switch=switch, status=status, combo=combo, get=get, remove=remove, cancel=cancel, bar=bar)
+    st.widgets = SimpleNamespace(switch=switch, status=status, combo=combo, get=get, remove=remove, cancel=cancel, bar=bar,
+                                 loaded=loaded, off=off)
 
     def picked(_i):
         window.settings = dict(window.settings, local_ai_model=combo.currentData())
@@ -197,6 +207,16 @@ def sync(window):
     w.switch.setChecked(bool(window.settings.get("local_ai_enabled")) and have and bool(engine))
     w.switch.blockSignals(False)
     w.switch.setEnabled(have and bool(engine) and not st.downloading)
+    if hasattr(w, "loaded") and _alive(w.loaded):
+        server = st.server
+        on = server is not None and server.running
+        if on:
+            used = ai.process_memory(server.process)
+            w.loaded.setText("Loaded and ready" + (f", using about {human_size(used)} of memory" if used else "") +
+                             ". Shuts off after 5 idle minutes.")
+        else:
+            w.loaded.setText("Not loaded: using no memory. It starts on your next question." if have and engine else "")
+        w.off.setVisible(on and not st.busy)
 
 
 def _save(window):
@@ -478,6 +498,7 @@ def _arm_idle(window):
         st.timer.setInterval(GAME_CHECK_MS)
         st.timer.timeout.connect(lambda: _tick(window))
     st.timer.start()
+    sync(window)
 
 
 def _tick(window):
@@ -489,7 +510,8 @@ def _tick(window):
     import time
     if st.busy:
         return
-    # While the assistant is on screen (its tab or the pop-out) the model stays ready for 20 minutes, else 5.
+    sync(window)                                    # refresh the memory figure in the panel
+    # Five idle minutes, whether the assistant is on screen or not (owner, 2026-11-27).
     popout = getattr(window, "assistant_popout", None)
     watching = getattr(window, "current_route", "") == "AI Assistant" or bool(popout is not None and popout.isVisible())
     limit = (KEEP_WHILE_OPEN_MS if watching else IDLE_STOP_MS) / 1000
@@ -504,6 +526,17 @@ def stop(window):
         threading.Thread(target=server.stop, daemon=True).start()
     if st.timer is not None:
         st.timer.stop()
+    sync(window)
+
+
+def shut_off(window):
+    """The panel's "Shut off now": close the model and give its memory back. The Local AI switch stays as it is."""
+    st = state_of(window)
+    if st.busy:
+        window.status.setText("The local AI is answering. Shut it off when the answer is done.")
+        return
+    stop(window)
+    window.status.setText("Local AI shut off. Its memory is free again; it starts on your next question.")
 
 
 def shutdown(window):
