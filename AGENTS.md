@@ -1507,3 +1507,35 @@ one new tile in Files and its window; no other tab, the shell or shared styles c
 - Covered by `tests/test_rename.py` and `tools/batch_rename_smoke.py` on Windows CI (drop, oldest first, thumbnails, live
   preview, a taken name blocking Enter, reorder, advanced prefix, real rename with contents unchanged and logged, Undo, Undo
   after reopening, a 1,500-file batch and its undo). `tests/test_tools.py` and `tools/tools_page_smoke.py` count 21 tiles.
+- CI note (2026-11-27): `tools/upkeep_real_check.py` now prints SKIP for its install part when the build machine's Windows
+  Update offers no update at all (it failed two runs in a row for that reason alone). The search, every other real part
+  and a failed install of an offered update still fail the run. No Hardware code changed.
+
+Deals tab (owner instructions, 2026-11-27: "another tab that finds the game you are looking for at the cheapest possible
+prices", answers "Official plus key resellers" and "New Deals tab in Library", then "a way to make a wishlist that scans for
+any deals on said games on that list when the app is running and notify's the user subtly"). New sidebar row "Deals" in
+Library after Games (`nav_groups`, `ROUTE_SYMBOLS` "tag" with a new `tag` icon, `header_banner` and
+`tools/make_banner_art.py deals`: price tag, cart, coins, percent in green). `app.py` gains the route and one install call
+for the wishlist watch; no other tab changed.
+- `gg_desktop/deals_core.py` (pure, `tests/test_deals.py`), `gg_desktop/deals_net.py` (the only network calls),
+  `gg_desktop/deals_page.py` (Qt and the watch).
+- Official stores: CheapShark's free public API (www.cheapshark.com, no key): search by name, every store's current price
+  cheapest first, usual price, percent off, lowest price ever. Stores CheapShark marks inactive are left out. Prices are in
+  US dollars, as CheapShark reports them, and the screen says so. "Open store" opens CheapShark's redirect link to the
+  store's own page in the browser; Game Grave never buys anything.
+- Key resellers: there is no free public price feed for G2A, Kinguin or Eneba. With the user's own free GG.deals API key
+  (asked once, stored encrypted with Windows DPAPI like the Nexus key, sent only to api.gg.deals), GG.deals' current and
+  lowest keyshop prices are shown with a link to its offers page. Without a key, buttons search G2A, Kinguin, Eneba and
+  GG.deals in the browser and no number is shown. Every reseller line carries `RESELLER_WARNING` (keys can be
+  region-locked, resold or revoked).
+- Wishlist (`deals_wishlist`, 100 games at most, optional target price): the watch starts 2 minutes after launch, wakes
+  every 30 minutes, and asks for prices only when the last check is 6+ hours old (`deals_checked_at`), the list is not
+  empty and no game, scan or clean-up is running. Up to 25 games per request, 1.5 s apart. A notice (bell, plus the usual
+  pop-up if Pop-up notices is on; three or more drops become one notice) only for a real drop: at or under the target, or
+  at least 5% and 50 cents below the last price the user was told about. The same price never notifies twice; a rise
+  resets the mark. "Check prices now" asks on demand.
+- Honest words: "Cheapest found" (in these sources), never "cheapest anywhere", "safe" or "guaranteed".
+- Covered by `tests/test_deals.py` and `tools/deals_smoke.py` on Windows CI (stand-in answers for the screen, the watch and
+  the notice; then a REAL CheapShark search, game and batch check so the parsing is proven on live answers; skipped only
+  when the service can't be reached). `tests/test_nav_groups.py`, `tools/first_run_smoke.py` and the welcome tour text
+  include Deals.

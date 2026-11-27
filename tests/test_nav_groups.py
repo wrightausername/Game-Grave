@@ -8,7 +8,7 @@ class NavGroupTests(unittest.TestCase):
         self.assertEqual([h for h, _ in nav_groups.GROUPS], ["Home", "Library", "Clean Up", "Fix and Protect", "PC and Help"])
         routes = nav_groups.routes()
         self.assertEqual(len(routes), len(set(routes)))
-        self.assertEqual(set(routes), {"Overview", "Ready Room", "Games", "Mods", "Captures", "Old Files", "Other Storage",
+        self.assertEqual(set(routes), {"Overview", "Ready Room", "Games", "Deals", "Mods", "Captures", "Old Files", "Other Storage",
                                        "Graveyard", "Fix Kit", "Game DNA", "Undo Center", "Hardware", "More Tools",
                                        "AI Assistant", "Settings"})
         self.assertEqual(routes[-1], "Settings")

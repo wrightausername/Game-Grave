@@ -424,6 +424,10 @@ class PhotoIntegration:
         from gg_desktop import fix_kit_page
         fix_kit_page.build(self)
 
+    def deals_page(self):
+        from gg_desktop import deals_page
+        deals_page.build(self)
+
     def graveyard_page(self):
         from gg_desktop import grave_page
         self._merge_manual_reviews()

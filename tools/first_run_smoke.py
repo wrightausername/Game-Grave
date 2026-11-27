@@ -50,7 +50,7 @@ def main():
             assert window.inventory.scanned_at in (None, 0, ""), "A new install starts with nothing scanned"
             assert any(b.isVisible() and "scan" in b.text().casefold() for b in window.findChildren(QAbstractButton)), \
                 "The first screen offers a scan"
-            for route in ("Overview", "Ready Room", "Games", "Mods", "Old Files", "Other Storage", "Captures", "Graveyard",
+            for route in ("Overview", "Ready Room", "Games", "Deals", "Mods", "Old Files", "Other Storage", "Captures", "Graveyard",
                           "Fix Kit", "Game DNA", "Hardware", "Undo Center", "More Tools", "Settings"):
                 window.navigate(route)
                 settle(500)

@@ -13,6 +13,7 @@ GROUPS = (
     )),
     ("Library", (
         ("Games", "Everything installed, in one place"),
+        ("Deals", "Cheapest prices and your wishlist"),
         ("Mods", "Switch, sort and fix your mods"),
         ("Captures", "Screenshots and recordings"),
     )),

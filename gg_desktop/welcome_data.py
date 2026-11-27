@@ -33,7 +33,7 @@ STEPS = (
         "body": ("The sidebar on the left is sorted by what you want to do. Click a heading to open its tabs; click it again to "
                  "fold them away. Each tab has one line under it saying what it is for."),
         "points": (
-            ("Home and Library", "Overview and Ready Room, then your Games, Mods and Captures."),
+            ("Home and Library", "Overview and Ready Room, then your Games, Deals, Mods and Captures."),
             ("Clean Up", "Old Files, Other Storage and Graveyard: find what is taking up space."),
             ("Fix and Protect", "Fix Kit, Game DNA and Undo Center: crashes, backups and rollbacks."),
             ("PC and Help", "Hardware, Toolbox, the AI Assistant and Settings."),

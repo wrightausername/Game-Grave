@@ -297,7 +297,22 @@ ICONS = {f.__name__: f for f in (gamepad, keycaps, mouse, headset, monitor, cpu,
                                  cartridge, disc, coin, trophy, crosshair, camera, filmstrip, tombstone, gear, sliders,
                                  toggle, chat, network, wrench, screwdriver, puzzle, cube, cassette, rewind, clock,
                                  joystick, helix, battery_bars)}
+def price_tag(c, a, sw):
+    return (_p("M14 50 V20 a6 6 0 0 1 6 -6 H50 L86 50 L50 86 Z", c, sw) + _c(30, 30, 6, a, sw * .8, a, .5)
+            + _p("M46 52 l10 -10 M44 60 h16", a, sw * .7))
+
+
+def cart(c, a, sw):
+    return (_p("M8 18 H22 L32 64 H78 L88 30 H26", c, sw) + _c(38, 80, 6, a, sw * .8) + _c(72, 80, 6, a, sw * .8)
+            + _p("M40 42 H74 M38 52 H72", a, sw * .6))
+
+
+def percent(c, a, sw):
+    return _p("M22 82 L78 18", c, sw * 1.2) + _c(28, 28, 11, a, sw) + _c(72, 72, 11, a, sw)
+
+
 ICONS["heart"] = pixel_heart
+ICONS.update({"price_tag": price_tag, "cart": cart, "percent": percent})
 ICONS["heart_empty"] = lambda c, a, sw: pixel_heart(c, a, sw, empty=True)
 
 # slug: (main accent, line colour, hero cluster as (icon, x, y, size, rotate, depth 0 far .. 1 near))
@@ -346,6 +361,9 @@ TABS = {
     "fix_kit": ("#ff4a3a", "#ffe0d6", [("tombstone", 4300, 260, 290, 0, 1), ("wrench", 4950, 250, 290, -20, .9),
                                         ("heart", 5600, 250, 220, 0, .7), ("crosshair", 3720, 250, 160, 0, .45),
                                         ("rewind", 3360, 260, 100, 0, .3)]),
+    "deals": ("#32d67a", "#dcffe9", [("price_tag", 4300, 250, 300, -12, 1), ("cart", 4980, 255, 300, 0, .9),
+                                      ("coin", 5600, 240, 220, 0, .75), ("percent", 3720, 250, 160, 0, .45),
+                                      ("coin", 3360, 270, 100, 0, .3)]),
 }
 
 

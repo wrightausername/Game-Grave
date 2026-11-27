@@ -69,6 +69,7 @@ PATHS = {
     "chevron": '<path d="m6 9 6 6 6-6"/>',
     "next": '<path d="m9 5 7 7-7 7"/>',
     "plus": '<path d="M12 3v18M3 12h18"/>',
+    "tag": '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9Z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
     "steam": '<circle cx="15.5" cy="8.5" r="4.5"/><circle cx="7" cy="16.5" r="3"/><path d="M4.2 14.7l-1.7-.7M12 11.5l-3.7 3.2"/>',
 }
 
@@ -323,7 +324,7 @@ ROUTE_SYMBOLS = {
     "Overview": "home", "Ready Room": "radio", "Games": "game", "Mods": "mods", "Old Files": "archive",
     "Other Storage": "storage", "Captures": "camera", "Graveyard": "grave", "Game DNA": "dna",
     "Hardware": "chip", "Undo Center": "undo", "AI Assistant": "sparkles", "More Tools": "grid", "Settings": "settings",
-    "Fix Kit": "wrench",
+    "Fix Kit": "wrench", "Deals": "tag",
 }
 
 
