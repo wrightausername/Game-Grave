@@ -80,9 +80,11 @@ def is_hub(entry: str) -> bool:
 
 def tip(entry: str) -> str:
     rs = routes_of(entry)
+    if not rs:
+        return entry
     if len(rs) > 1:
         return f"{entry}: {', '.join(display_name(r) for r in rs)}"
-    names = display_name(rs[0]) if rs else entry
+    names = display_name(rs[0])
     return f"{entry}: {LINES.get(rs[0], '')}" if names == entry else f"{entry} ({names}): {LINES.get(rs[0], '')}"
 
 
