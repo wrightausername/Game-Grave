@@ -22,6 +22,8 @@ TOOLS = {
     "junction_manager": ("See and manage folder links, such as a game moved to another drive.",
                          ("Pick a folder", "See its links", "Add or remove"), "yellow"),
     "kit_menu": ("Save a whole game into one file, and put it back later.", (), "purple"),
+    "batch_rename": ("Drag files in, type a name, press Rename All. Only names change; Undo puts them back.",
+                     ("Drop files", "Type a name", "Rename All"), "blue"),
     "hash": ("A file's fingerprint. Compare it with the one the publisher lists.", ("Pick a file", "Read it", "Compare"),
              "blue"),
 }

@@ -1476,3 +1476,34 @@ games without mods (modded games keep Find the mod). Black Box in Ready Room is 
   nothing about the person is included and Game Grave doesn't fetch those pages.
 - Covered by `tests/test_crash_investigate.py` (18 causes, never-just-unknown, real report formats), `tools/crash_investigate_smoke.py`
   and the real-PC part of `tools/realworld/crash_real.py`.
+
+Batch Rename (owner instruction, 2026-11-27: the renamer "should of been added to my game grave app not a whole seperate
+thing"; the spec: drag files in, type a name, Rename All, no regular expressions or special syntax). Toolbox is reopened for
+one new tile in Files and its window; no other tab, the shell or shared styles changed.
+- `gg_desktop/rename_core.py` (no Qt, `tests/test_rename.py`): typing "WW" gives WW_01.png, WW_02.png ...; the whole old
+  name is replaced and the extension kept. Start number, digits (grow automatically for big batches), and advanced options:
+  find and replace (any case), prefix, suffix, remove characters, separator, capitalization, today's date or the file's
+  creation date, renaming dropped folders themselves. A dropped folder otherwise adds the files directly inside it (hidden
+  and system files left out). New files sort by creation time, oldest first, then natural name order.
+- Checks before anything moves: duplicate names in the batch, a name another file already has (a name owned by another file
+  in the batch is fine), invalid Windows names, a file gone since it was added, and a file inside a folder being renamed.
+  Any of these blocks Rename All and the row says why.
+- Writes, NEW: only renames. Every batch is one transaction: each file goes to a unique `.ggbr-<id>-<n>.tmp` name in its
+  own folder, then to its final name, with `<config>/Batch Rename/rename-journal.json` written first. The disk is checked
+  again right before the move, and the move never replaces a file (Windows `os.rename` refuses an existing target), so a
+  file created in the meantime is safe. Any failure puts every file back; after a crash or power cut the next open puts
+  files back from the journal. File contents are never opened for writing. No confirmation dialog, by the owner's
+  "drag, type, rename": the list itself shows every old and new name before Rename All, and Undo is one click.
+- Undo: the last 50 batches in `<config>/Batch Rename/undo-history.json`; Undo last rename works after Game Grave was
+  closed. Files moved, renamed or deleted since are named and the rest can be put back after asking.
+- Logged: "Batch Rename" and "Batch Rename undo" in the activity log. Preferences (name, numbers, options, advanced open)
+  in `<config>/Batch Rename/settings.json`, not in Settings.
+- `gg_desktop/rename_ui.py`: a `tools_shell.ToolDialog` like the other Toolbox windows (steps Drop files / Type a name /
+  Rename All, result banner, technical details folded). The list takes files and folders dropped from Explorer (also on
+  the window), reorders by dragging rows, Delete removes rows from the list only, thumbnails for pictures load on two
+  background threads for rows on screen, other files show their Windows icon. Enter renames.
+- Not built yet: an Explorer right-click entry (it needs `app.py` startup and single-instance changes, waiting for the
+  owner), and the AI Assistant / top search do not know Batch Rename yet (AI Assistant is locked).
+- Covered by `tests/test_rename.py` and `tools/batch_rename_smoke.py` on Windows CI (drop, oldest first, thumbnails, live
+  preview, a taken name blocking Enter, reorder, advanced prefix, real rename with contents unchanged and logged, Undo, Undo
+  after reopening, a 1,500-file batch and its undo). `tests/test_tools.py` and `tools/tools_page_smoke.py` count 21 tiles.

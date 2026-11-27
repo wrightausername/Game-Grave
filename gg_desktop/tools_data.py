@@ -62,6 +62,7 @@ CATEGORIES = (
         Tile("mod_report", "Mod Report", "mods", RUN, "mod_report", "Save a CSV of the mod and game folders the scan found."),
         Tile("system_report", "System Report", "list", RUN, "system_report", "Save a text summary of the last scan and this PC."))),
     Category("files", "Files", "Small utilities for files and folders.", "blue", (
+        Tile("batch_rename", "Batch Rename", "file", RUN, "batch_rename", "Drag files in, type a name, Rename All: WW gives WW_01, WW_02, WW_03. Only names change, nothing is overwritten, and Undo puts them back."),
         Tile("hash_checker", "Hash Checker", "check", RUN, "hash", "Compute a SHA-256 checksum of any file you choose."),
         Tile("file_associations", "File Associations", "file", RUN, "file_associations", "Look up which app opens a file type and jump to Windows Default apps."),
         Tile("junction_manager", "Junction Manager", "folder", RUN, "junction_manager", "List, create or remove folder junctions. Removing deletes only the link."),

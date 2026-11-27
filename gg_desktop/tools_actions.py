@@ -50,12 +50,19 @@ def run_action(window, key):
                "game_report": lambda: export_games(window),
                "mod_report": lambda: export_mods(window),
                "system_report": lambda: export_system(window),
-               "hash": lambda: choose_hash_file(window)}.get(key)
+               "hash": lambda: choose_hash_file(window),
+               "batch_rename": lambda: open_batch_rename(window)}.get(key)
     if handler is None:
         from gg_desktop import tools_windows
         handler = (lambda: tools_windows.HANDLERS[key](window)) if key in tools_windows.HANDLERS else None
     if handler:
         handler()
+
+
+def open_batch_rename(window, paths=None):
+    """Batch Rename (Files): its own window. Only file names change; see `rename_core`."""
+    from gg_desktop import rename_ui
+    return rename_ui.open_batch_rename(window, paths)
 
 
 def run_quick(window, key):

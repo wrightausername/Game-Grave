@@ -112,7 +112,7 @@ def main():
 
             # One Toolbox page: five groups, every tool listed once, no inner tab row.
             assert list(window.tools_tabs) == ["hub"] and not window.tools_tabs["hub"].isVisible()
-            assert len(window.tools_panels) == 5 and len(window.tools_tiles) == 20
+            assert len(window.tools_panels) == 5 and len(window.tools_tiles) == 21
             assert not window.tools_quick.isVisible(), "no Quick Actions column repeating the tiles"
             assert all(window.tools_panels[c.key].isVisible() for c in data.CATEGORIES)
             assert window.grab().save(str(args.output / "tools-hub-1280.png"))

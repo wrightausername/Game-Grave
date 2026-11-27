@@ -25,8 +25,8 @@ class Registry(unittest.TestCase):
     def test_toolbox_lists_every_tool_once_in_five_groups(self):
         self.assertEqual([c.key for c in data.CATEGORIES], ["windows", "backup", "reports", "files", "elsewhere"])
         keys = [t.key for t in data.all_tiles()]
-        self.assertEqual(len(keys), 20)
-        self.assertEqual(len(set(keys)), 20)
+        self.assertEqual(len(keys), 21)
+        self.assertEqual(len(set(keys)), 21)
         titles = [t.title for t in data.all_tiles()]
         self.assertEqual(len(titles), len(set(titles)), "no tool is listed twice")
 
