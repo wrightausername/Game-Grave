@@ -402,7 +402,8 @@ def build(window):
     main.setSpacing(12)
     left = QVBoxLayout()
     left.setSpacing(6)
-    left.addWidget(_section("Results"))
+    w.results_label = _section("Results")
+    left.addWidget(w.results_label)
     w.results = QListWidget()
     w.results.setObjectName("dealsList")
     w.results.setAccessibleName("Games found")
@@ -458,7 +459,7 @@ def build(window):
     top = QHBoxLayout()
     top.setSpacing(14)
     w.art = QLabel()
-    w.art.setFixedSize(300, 140)
+    w.art.setFixedSize(240, 112)
     w.art.setAlignment(Qt.AlignCenter)
     w.art.setStyleSheet("background:#111b25;border-radius:8px;")
     top.addWidget(w.art, 0, Qt.AlignTop)
@@ -594,6 +595,8 @@ def fill_results(window):
     if w is None:
         return
     st = state(window)
+    for widget in (w.results_label, w.results):      # only after a search, so the storefront has no empty box beside it
+        widget.setVisible(bool(st.hits))
     w.results.blockSignals(True)
     w.results.clear()
     for hit in st.hits:
@@ -687,7 +690,7 @@ def show_game(window):
     current = next((i for i in dc.wishlist(window.settings) if i["game_id"] == g.game_id), None)
     w.target.setValue((current["target"] or 0) if current else 0)
     w.art.clear()
-    picture(window, dc.art_url(g.steam_app_id, g.thumb), QSize(300, 140), w.art, fallback=g.thumb)
+    picture(window, dc.art_url(g.steam_app_id, g.thumb), QSize(240, 112), w.art, fallback=g.thumb)
 
     # Key resellers
     w.resellers.setVisible(True)
