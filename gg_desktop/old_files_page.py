@@ -279,7 +279,7 @@ def build(window):
         page.photo_page_shortcuts.append(shortcut)
     self.photo_cancel.clicked.connect(control.state.cancel)
     self.photo_full.setChecked(control.state.full)
-    self.photo_full.toggled.connect(control.full.setChecked)
+    self.photo_full.toggled.connect(lambda on: full_toggled(self, on))
     self.photo_drives.currentIndexChanged.connect(lambda index: self._photo_choose_drive(index))
     self.photo_drives.currentIndexChanged.connect(lambda *_: sync_drive_rows(self))
     copy_drives(self, control)
@@ -348,7 +348,25 @@ def refresh_drives(window):
 def choose_drive(window, index):
     control = window.page.old_files
     control.drives.setCurrentIndex(index)
-    window.photo_full.setEnabled(bool(control.drives.currentData()))
+
+
+def full_toggled(window, on):
+    """"Scan the whole drive" is always clickable (owner, 2026-11-27: it "doesnt seem to be clickable"). Turned on while
+    "Selected folder" is chosen, it picks the drive that folder is on (else the first drive), then scans that whole drive.
+    The protected and system places are still left out, as before."""
+    control = window.page.old_files
+    if on and not control.drives.currentData():
+        anchor = Path(control.state.folder or "").anchor.casefold()
+        drives = [(i, str(control.drives.itemData(i) or "")) for i in range(control.drives.count())]
+        pick = next((i for i, root in drives if root and root.casefold() == anchor), None)
+        pick = pick if pick is not None else next((i for i, root in drives if root), None)
+        if pick is None:
+            with QSignalBlocker(window.photo_full):
+                window.photo_full.setChecked(False)
+            window.info("No drive found", "Game Grave couldn't list a drive to scan. Plug the drive in and try again.")
+            return
+        window.photo_drives.setCurrentIndex(pick)
+    control.full.setChecked(on)
 
 
 def old_age_toggled(window, control, on):
@@ -369,7 +387,10 @@ def changed(window, page):
     window.photo_drives.setEnabled(not state.busy and not window.cleaning)
     for check in window.old_drive_checks:
         check.setEnabled(not state.busy and not window.cleaning)
-    window.photo_full.setEnabled(not state.busy and bool(state.location))
+    window.photo_full.setEnabled(not state.busy and not window.cleaning)
+    if window.photo_full.isChecked() != bool(state.full):
+        with QSignalBlocker(window.photo_full):
+            window.photo_full.setChecked(bool(state.full))
     if state.result:
         window._old_source = list(state.result.files)
         window._old_root, window._old_days = state.result.plan.root, state.result.plan.days

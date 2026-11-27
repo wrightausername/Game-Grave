@@ -69,6 +69,37 @@ class Parsing(unittest.TestCase):
             self.assertNotIn(banned, text)
 
 
+class Storefront(unittest.TestCase):
+    DEALS = [{"internalName": "PORTAL2", "title": "Portal 2", "dealID": "d1", "storeID": "15", "gameID": "612",
+              "salePrice": "1.99", "normalPrice": "9.99", "savings": "80.08", "steamRatingText": "Overwhelmingly Positive",
+              "steamRatingPercent": "98", "metacriticScore": "95", "steamAppID": "620", "thumb": "https://t/p2.jpg"},
+             {"title": "Portal 2", "dealID": "d2", "storeID": "1", "gameID": "612", "salePrice": "9.99"},
+             {"title": "Closed store", "dealID": "d3", "storeID": "99", "gameID": "5", "salePrice": "1"},
+             {"title": "Giveaway", "dealID": "d4", "storeID": "7", "gameID": "77", "salePrice": "0.00",
+              "normalPrice": "19.99", "savings": "100", "steamAppID": None, "thumb": "https://t/g.jpg"}]
+
+    def test_deals_parse_one_card_per_game_and_skip_closed_stores(self):
+        cards = dc.parse_deals(self.DEALS, dc.parse_stores(STORES))
+        self.assertEqual([(c.title, c.store, c.price, c.savings) for c in cards],
+                         [("Portal 2", "Fanatical", 1.99, 80), ("Giveaway", "GOG", 0.0, 100)])
+        self.assertEqual((cards[0].rating, cards[0].rating_pct, cards[0].metacritic), ("Overwhelmingly Positive", 98, 95))
+        self.assertTrue(cards[0].url.startswith("https://www.cheapshark.com/redirect?dealID=d1"))
+        self.assertEqual(dc.parse_deals({"oops": 1}, {}), [])
+
+    def test_art_store_icons_rows_and_meter(self):
+        self.assertEqual(dc.art_url("620"), "https://cdn.cloudflare.steamstatic.com/steam/apps/620/header.jpg")
+        self.assertEqual(dc.art_url("", "https://t/x.jpg"), "https://t/x.jpg")
+        icons = dc.parse_store_icons([{"storeID": "1", "images": {"icon": "/img/stores/icons/0.png"}}, {"storeID": "2"}])
+        self.assertEqual(icons, {"1": "https://www.cheapshark.com/img/stores/icons/0.png"})
+        self.assertTrue(all(dc.api_allowed(dc.deals_list_url(params)) for *_, params in dc.FRONT))
+        self.assertIn("sortBy=Deal%20Rating", dc.deals_list_url(dc.FRONT[0][3]))
+        g = dc.parse_game("612", GAME, dc.parse_stores(STORES))
+        self.assertEqual(dc.meter(g), (1.99, 9.99, 0.99))
+        self.assertIsNone(dc.meter(dc.GameDeals("1", "x", "", "")))
+        for _key, title, note, _p in dc.FRONT:
+            self.assertNotIn("safe", (title + note).casefold())
+
+
 class Wishlist(unittest.TestCase):
     def test_add_remove_target_and_cap(self):
         items = dc.add_item([], game(4.99), target=3, now=10)

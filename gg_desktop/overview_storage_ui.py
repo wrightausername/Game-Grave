@@ -56,7 +56,7 @@ def measure_state(window):
     m = getattr(window, "_overview_measure", None)
     if m is None:
         from types import SimpleNamespace
-        m = SimpleNamespace(busy=False, cancel=threading.Event(), message="")
+        m = SimpleNamespace(busy=False, cancel=threading.Event(), message="", live=None)
         window._overview_measure = m
         app = QApplication.instance()
         if app is not None:
@@ -213,10 +213,13 @@ class OverviewStorageController(QObject):
         self.message = m.message = "Measuring detected game and mod folders…"
         self.render()
         window, cancel = self.window, m.cancel
+        m.live = None
         def run(progress):
+            def live(totals, files):
+                m.live = (totals, files)           # read by the screen on the next progress tick
             try:
                 snapshot = measure_storage(inventory, canceled=cancel.is_set,
-                    progress=lambda checked, message: progress(checked, message))
+                    progress=lambda checked, message: progress(checked, message), live=live)
                 return snapshot, ""
             except InterruptedError:
                 return None, "Measurement canceled. Previous reading retained."
@@ -224,6 +227,7 @@ class OverviewStorageController(QObject):
                 return None, "Measurement unavailable: " + (str(exc)[:250] or type(exc).__name__)
         def finish(packet):
             m.busy = False
+            m.live = None
             if not isValid(window):
                 return
             result, error = packet
@@ -247,10 +251,24 @@ class OverviewStorageController(QObject):
             if control is not None:
                 control.message = message
                 control.window.overview_storage_note.setText(message)
+                control.render_live()
                 control.changed.emit()
         # Errors are data: an Overview measurement cannot reset another scan's
         # flags through the shared worker's failure handler.
         self.window.job(run, finish, progress=progress)
+
+    def render_live(self):
+        """Fill the ring and legend with the running totals while measuring, so the screen isn't stuck on "Measuring…"
+        (owner, 2026-11-27). Labelled "so far"; the finished measurement replaces them."""
+        live = self.measure.live
+        if not live or self.snapshot is not None or not self.valid():
+            return
+        totals, files = live
+        w = self.window
+        w.overview_ring.set_segments([(name, totals.get(name, 0), color) for name, color in CATEGORIES], "Measuring…")
+        for name, (caption, value, _) in w.overview_legend.items():
+            value.setText(human_size(totals.get(name, 0)) + " so far")
+            value.setToolTip(f"Still measuring: {files:,} files counted so far.")
 
     def snapshot_message(self):
         s = self.snapshot

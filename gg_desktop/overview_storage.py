@@ -178,9 +178,36 @@ def measurement_roots(inventory, catalog, canceled=lambda: False):
     return roots
 
 
+def _lstat_all(paths, pool):
+    """lstat many paths. On Windows each call opens the file, so they run on worker threads (Windows answers while the
+    GIL is released); results come back in the same order, so the measurement stays deterministic."""
+    def one(path):
+        try:
+            return path.lstat()
+        except OSError as exc:
+            return exc
+    if pool is None or len(paths) < 8:
+        return [one(p) for p in paths]
+    return list(pool.map(one, paths, chunksize=16))
+
+
 def measure_storage(inventory, *, canceled=lambda: False, progress=lambda checked, message: None,
                     max_entries=5_000_000, max_files=2_000_000, max_directories=250_000,
-                    catalog_reader=build_catalog):
+                    catalog_reader=build_catalog, live=lambda totals, files: None, workers=None):
+    """See _measure. `live` gets the running per-category totals about twice a second so the screen can fill in while
+    it measures; `workers` threads look up file identities in parallel (Windows only by default)."""
+    import concurrent.futures
+    count = workers if workers is not None else (min(16, (os.cpu_count() or 4) * 2) if os.name == "nt" else 0)
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=count, thread_name_prefix="gg-measure") if count else None
+    try:
+        return _measure(inventory, canceled=canceled, progress=progress, max_entries=max_entries, max_files=max_files,
+                        max_directories=max_directories, catalog_reader=catalog_reader, live=live, pool=pool)
+    finally:
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
+
+
+def _measure(inventory, *, canceled, progress, max_entries, max_files, max_directories, catalog_reader, live, pool):
     """Measure the union of detected roots without reading game file contents.
 
     Mod descriptors are read through the existing bounded catalog reader.
@@ -244,12 +271,13 @@ def measure_storage(inventory, *, canceled=lambda: False, progress=lambda checke
 
     pending = sorted(valid, key=lambda item: len(item[0].parts), reverse=True)
     directories, explicit_seen, seen_files = set(), set(), {}
-    last_progress = 0.0
-    def file(path, info):
+    last_progress = last_live = 0.0
+    def file(path, info, full=False):
         # Windows DirEntry.stat() deliberately supplies zero for st_ino,
         # st_dev and st_nlink. Query the path itself before identifying links;
         # a path fallback would otherwise charge Vortex deployments twice.
-        if os.name == "nt" or not info.st_ino:
+        # `full` means that query was already made (in parallel, below).
+        if not full and (os.name == "nt" or not info.st_ino):
             info = path.lstat()
         key = path_key(path)
         if key in explicit_files:
@@ -316,10 +344,11 @@ def measure_storage(inventory, *, canceled=lambda: False, progress=lambda checke
                 problem(path, "Linked or offline directory was skipped.", True)
                 continue
             directories.add(key)
+            files_here = []
             with os.scandir(path) as entries:
                 for entry in entries:
                     check()
-                    if result.checked >= max_entries or result.files >= max_files:
+                    if result.checked >= max_entries or result.files + len(files_here) >= max_files:
                         result.limited = True
                         break
                     result.checked += 1
@@ -329,13 +358,26 @@ def measure_storage(inventory, *, canceled=lambda: False, progress=lambda checke
                         if stat.S_ISDIR(state.st_mode):
                             pending.append((target, state))
                         else:
-                            file(target, state)
+                            files_here.append((target, state))
                     except OSError as exc:
                         problem(entry.path, "Entry unavailable: " + str(exc)[:250])
-                    now = time.monotonic()
-                    if now-last_progress >= .25:
-                        progress(result.checked, f"Measuring game/mod storage: {result.files:,} unique files checked…")
-                        last_progress = now
+            needs_identity = os.name == "nt" or any(not state.st_ino for _, state in files_here)
+            identities = _lstat_all([t for t, _ in files_here], pool) if needs_identity else [s for _, s in files_here]
+            for (target, _), info in zip(files_here, identities):
+                if isinstance(info, OSError):
+                    problem(target, "Entry unavailable: " + str(info)[:250])
+                    continue
+                try:
+                    file(target, info, full=True)
+                except OSError as exc:
+                    problem(target, "Entry unavailable: " + str(exc)[:250])
+            now = time.monotonic()
+            if now-last_progress >= .25:
+                progress(result.checked, f"Measuring game/mod storage: {result.files:,} unique files checked…")
+                last_progress = now
+            if now-last_live >= .5:
+                live(dict(result.totals), result.files)
+                last_live = now
             if result.limited:
                 break
         except OSError as exc:

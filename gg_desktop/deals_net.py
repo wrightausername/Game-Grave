@@ -55,21 +55,49 @@ def get_json(url):
         raise DealsError("The price service sent an answer Game Grave couldn't read.") from None
 
 
-def stores():
-    cache = folder() / "stores.json"
+def _stores_raw():
+    cache = folder() / "stores-raw.json"
     try:
         saved = json.loads(cache.read_text(encoding="utf-8"))
         if time.time() - float(saved.get("at", 0)) < STORES_TTL and saved.get("stores"):
-            return dict(saved["stores"])
+            return saved["stores"]
     except (OSError, ValueError, AttributeError, TypeError):
         pass
-    found = dc.parse_stores(get_json(dc.stores_url()))
-    if found:
+    raw = get_json(dc.stores_url())
+    if dc.parse_stores(raw):
         try:
-            cache.write_text(json.dumps({"at": time.time(), "stores": found}), encoding="utf-8")
+            cache.write_text(json.dumps({"at": time.time(), "stores": raw}), encoding="utf-8")
         except OSError:
             pass
-    return found
+    return raw
+
+
+def stores():
+    return dc.parse_stores(_stores_raw())
+
+
+def store_icons():
+    try:
+        return dc.parse_store_icons(_stores_raw())
+    except DealsError:
+        return {}
+
+
+def front():
+    """The storefront rows: {key: [Deal]}. A row that can't be read comes back empty with the others still shown."""
+    known = stores()
+    out, problems = {}, []
+    for n, (key, _title, _note, params) in enumerate(dc.FRONT):
+        try:
+            out[key] = dc.parse_deals(get_json(dc.deals_list_url(params)), known)
+        except DealsError as exc:
+            out[key] = []
+            problems.append(str(exc))
+        if n + 1 < len(dc.FRONT):
+            time.sleep(0.3)
+    if not any(out.values()) and problems:
+        raise DealsError(problems[0])
+    return out
 
 
 def search(title):

@@ -9,11 +9,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 import time
 
-from PySide6.QtCore import QSize, Qt, QTimer, QUrl
-from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPixmap
+from PySide6.QtCore import QRectF, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QDoubleSpinBox, QFrame, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QListWidgetItem, QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 from shiboken6 import isValid
 
@@ -39,13 +39,26 @@ QListWidget#dealsList::item:hover { background:#0f1a24; }
 QTableWidget#dealsTable { background:#070d13; border:1px solid #1b2836; border-radius:10px; color:#e8eef5;
                           gridline-color:#111c26; }
 QLineEdit#dealsSearch { font-size:14px; padding:8px 10px; }
+QFrame#dealCard { background:#0b131b; border:1px solid #1b2836; border-radius:12px; }
+QFrame#dealCard:hover { border:1px solid rgba(255,40,74,150); background:#0f1923; }
+QLabel#dealCardTitle { font-size:13px; font-weight:700; color:#f2f5f8; }
+QLabel#dealPrice { font-size:15px; font-weight:800; color:#32d67a; }
+QLabel#dealFree { font-size:15px; font-weight:800; color:#f6be24; }
+QLabel#dealOld { font-size:12px; color:#6f8091; }
+QLabel#dealBadge { background:#1d7a45; color:#ffffff; font-size:12px; font-weight:800; border-radius:6px; padding:1px 6px; }
+QLabel#dealBadgeFree { background:#a86f00; color:#ffffff; font-size:12px; font-weight:800; border-radius:6px; padding:1px 6px; }
+QLabel#dealStore { font-size:11px; color:#8fa0b3; }
+QLabel#dealRating { font-size:11px; color:#7fd7ff; }
+QLabel#dealsRowTitle { font-size:17px; font-weight:800; color:#ffffff; }
+QPushButton#dealsBack { padding:4px 10px; }
 """
 
 
 def state(window):
     if not hasattr(window, "_deals"):
         window._deals = SimpleNamespace(hits=[], game=None, keyshops=None, images={}, timer=None, checking=False,
-                                        query="", pending_images=set())
+                                        query="", pending_images=set(), front={}, front_at=0.0, front_error="",
+                                        icons={}, loading_front=False)
     return window._deals
 
 
@@ -95,9 +108,11 @@ def _run(window, work, done, title="Deals"):
 
 
 # ------------------------------------------------------------------ pictures
-def picture(window, url, size, label=None):
+def picture(window, url, size, label=None, fallback=""):
     st = state(window)
     if not url:
+        if fallback:
+            picture(window, fallback, size, label)
         return
     if url in st.images:
         pix = st.images[url]
@@ -115,6 +130,13 @@ def picture(window, url, size, label=None):
         if kind == "ok" and data:
             pix.loadFromData(data)
         st.images[url] = pix
+        if pix.isNull() and fallback and fallback != url:
+            picture(window, fallback, size, label)      # no Steam header for this game: use the store's picture
+            return
+        if label is not None and isValid(label) and not pix.isNull():
+            label.setPixmap(pix.scaled(size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+                            .copy(0, 0, size.width(), size.height()) if size.width() > 60 else
+                            pix.scaled(size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         if window.current_route == "Deals":
             refresh_pictures(window)
     _run(window, lambda: deals_net.image(url), done)
@@ -135,8 +157,204 @@ def refresh_pictures(window):
         pix = st.images.get(item.data(Qt.UserRole + 1) or "")
         if pix is not None and not pix.isNull():
             item.setIcon(QIcon(pix))
-    if st.game is not None and isValid(page.art):
-        picture(window, st.game.thumb, QSize(230, 108), page.art)
+    for r in range(page.table.rowCount()):
+        cell = page.table.item(r, 0)
+        if cell is not None and cell.icon().isNull():
+            pix = st.images.get(st.icons.get(str(cell.data(Qt.UserRole) or ""), ""))
+            if pix is not None and not pix.isNull():
+                cell.setIcon(QIcon(pix))
+
+
+# ------------------------------------------------------------------ storefront pieces
+CARD_W, ART_H = 214, 100
+
+
+class DealCard(QFrame):
+    """One game on the storefront: its picture, discount badge, price, usual price, store and Steam rating."""
+    clicked = Signal(str)
+
+    def __init__(self, window, deal):
+        super().__init__()
+        self.deal = deal
+        self.setObjectName("dealCard")
+        self.setFixedWidth(CARD_W)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAccessibleName(f"{deal.title}, {dc.price_text(deal.price)} at {deal.store}")
+        self.setToolTip(f"{deal.title}: every store's price")
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 10)
+        lay.setSpacing(5)
+        self.art = QLabel()
+        self.art.setFixedSize(CARD_W - 2, ART_H)
+        self.art.setAlignment(Qt.AlignCenter)
+        self.art.setStyleSheet("background:#111b25;border-top-left-radius:11px;border-top-right-radius:11px;")
+        lay.addWidget(self.art)
+        self.art_url = dc.art_url(deal.steam_app_id, deal.thumb)
+        picture(window, self.art_url, QSize(CARD_W - 2, ART_H), self.art, fallback=deal.thumb)
+        inner = QVBoxLayout()
+        inner.setContentsMargins(10, 0, 10, 0)
+        inner.setSpacing(3)
+        title = _text(deal.title, "dealCardTitle")
+        title.setFixedHeight(36)
+        title.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        inner.addWidget(title)
+        prices = QHBoxLayout()
+        prices.setSpacing(6)
+        free = deal.price == 0
+        badge = _text("FREE" if free else f"-{deal.savings}%", "dealBadgeFree" if free else "dealBadge", wrap=False)
+        if deal.savings or free:
+            prices.addWidget(badge)
+        prices.addWidget(_text(dc.price_text(deal.price), "dealFree" if free else "dealPrice", wrap=False))
+        if deal.retail and deal.retail > deal.price:
+            old = _text(dc.price_text(deal.retail), "dealOld", wrap=False)
+            font = old.font()
+            font.setStrikeOut(True)
+            old.setFont(font)
+            prices.addWidget(old)
+        prices.addStretch(1)
+        inner.addLayout(prices)
+        store = QHBoxLayout()
+        store.setSpacing(5)
+        self.store_icon = QLabel()
+        self.store_icon.setFixedSize(16, 16)
+        store.addWidget(self.store_icon)
+        icon_url = state(window).icons.get(deal.store_id, "")
+        if icon_url:
+            picture(window, icon_url, QSize(16, 16), self.store_icon)
+        store.addWidget(_text(deal.store, "dealStore", wrap=False), 1)
+        if deal.rating:
+            store.addWidget(_text(f"{deal.rating}", "dealRating", wrap=False))
+        inner.addLayout(store)
+        lay.addLayout(inner)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self.deal.game_id)
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space):
+            self.clicked.emit(self.deal.game_id)
+            return
+        super().keyPressEvent(event)
+
+
+class DealMeter(QWidget):
+    """Lowest ever on the left, the usual price on the right, today's best price marked between them."""
+
+    def __init__(self):
+        super().__init__()
+        self.values = None
+        self.setFixedHeight(46)
+        self.setAccessibleName("Deal meter")
+
+    def set_values(self, values):
+        self.values = values
+        if values:
+            now, usual, low = values
+            self.setToolTip(f"Today {dc.price_text(now)} · usual {dc.price_text(usual)} · lowest ever {dc.price_text(low)}")
+        self.setVisible(values is not None)
+        self.update()
+
+    def paintEvent(self, _event):
+        if not self.values:
+            return
+        now, usual, low = self.values
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        r = QRectF(6, 20, self.width() - 12, 8)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor("#1b2836"))
+        p.drawRoundedRect(r, 4, 4)
+        span = max(0.01, usual - low)
+        where = min(1.0, max(0.0, (now - low) / span))
+        good = QColor("#32d67a") if where <= .25 else QColor("#f6be24") if where <= .6 else QColor("#ff6b7e")
+        p.setBrush(good)
+        p.drawRoundedRect(QRectF(r.left(), r.top(), max(8, r.width() * (1 - where)), r.height()), 4, 4)
+        x = r.left() + r.width() * where
+        p.setBrush(QColor("#ffffff"))
+        p.drawEllipse(QRectF(x - 6, r.center().y() - 6, 12, 12))
+        small = QFont(self.font())
+        small.setPixelSize(11)
+        p.setFont(small)
+        p.setPen(QColor("#8fa0b3"))
+        p.drawText(QRectF(0, 30, 160, 16), Qt.AlignLeft, "Lowest ever " + dc.price_text(low))
+        p.drawText(QRectF(self.width() - 160, 30, 160, 16), Qt.AlignRight, "Usual " + dc.price_text(usual))
+        p.setPen(good)
+        bold = QFont(small)
+        bold.setBold(True)
+        p.setFont(bold)
+        p.drawText(QRectF(min(max(0, x - 60), self.width() - 120), 0, 120, 16), Qt.AlignCenter, "Today " + dc.price_text(now))
+        p.end()
+
+
+def build_front(window, holder):
+    """Fill the storefront: three rows of cards from CheapShark, loaded once an hour while Game Grave runs."""
+    st = state(window)
+    clear_layout(holder)
+    if st.loading_front and not st.front:
+        holder.addWidget(_text("Loading today's deals from 30+ stores…", "dealsNote"))
+        return
+    if not any(st.front.values()):
+        holder.addWidget(_text(st.front_error or "Today's deals show here.", "dealsNote"))
+        retry = _button("Try again", lambda: load_front(window, force=True))
+        holder.addWidget(retry, 0, Qt.AlignLeft)
+        return
+    from gg_desktop.insight_widgets import ActionFlow
+    for key, title, note, _params in dc.FRONT:
+        deals = st.front.get(key) or []
+        if not deals:
+            continue
+        head = QHBoxLayout()
+        head.addWidget(_text(title, "dealsRowTitle", wrap=False))
+        head.addStretch(1)
+        holder.addLayout(head)
+        holder.addWidget(_text(note, "dealsNote"))
+        flow = ActionFlow(spacing=10)
+        for deal in deals:
+            card = DealCard(window, deal)
+            card.setFocusPolicy(Qt.StrongFocus)
+            card.clicked.connect(lambda game_id: pick(window, game_id))
+            flow.addWidget(card)
+        box = QWidget()
+        box.setLayout(flow)
+        holder.addWidget(box)
+    holder.addWidget(_text("Prices in US dollars, as CheapShark reports them. Pick a card for every store's price. "
+                           "Game Grave never buys anything.", "dealsNote"))
+    holder.addStretch(1)
+
+
+def load_front(window, force=False):
+    st = state(window)
+    if st.loading_front or (not force and st.front and time.time() - st.front_at < 3600):
+        return
+    from gg_desktop import deals_net
+    st.loading_front = True
+    w = widgets(window)
+    if w is not None:
+        build_front(window, w.front_lay)
+
+    def work():
+        return deals_net.front(), deals_net.store_icons()
+
+    def done(kind, value):
+        st.loading_front = False
+        if kind == "error":
+            st.front_error = value
+        else:
+            st.front, st.icons = value
+            st.front_at, st.front_error = time.time(), ""
+        w2 = widgets(window)
+        if w2 is not None:
+            build_front(window, w2.front_lay)
+    _run(window, work, done)
+
+
+def show_front(window):
+    w = widgets(window)
+    if w is not None:
+        w.stack.setCurrentIndex(0)
+        w.results.clearSelection()
 
 
 # ------------------------------------------------------------------ the page
@@ -217,12 +435,15 @@ def build(window):
     top = QHBoxLayout()
     top.setSpacing(14)
     w.art = QLabel()
-    w.art.setFixedSize(230, 108)
+    w.art.setFixedSize(300, 140)
     w.art.setAlignment(Qt.AlignCenter)
     w.art.setStyleSheet("background:#111b25;border-radius:8px;")
     top.addWidget(w.art, 0, Qt.AlignTop)
     words = QVBoxLayout()
     words.setSpacing(4)
+    w.back = _button("‹  Back to deals", lambda: show_front(self))
+    w.back.setObjectName("dealsBack")
+    words.addWidget(w.back, 0, Qt.AlignLeft)
     w.title = _text("Search for a game", "dealsTitle")
     w.best = _text("Every store's price shows here, cheapest first.", "dealsBest")
     w.summary = _text("", "dealsNote")
@@ -231,6 +452,9 @@ def build(window):
     words.addStretch(1)
     top.addLayout(words, 1)
     right.addLayout(top)
+    w.meter = DealMeter()
+    w.meter.setVisible(False)
+    right.addWidget(w.meter)
 
     w.table = QTableWidget(0, 5)
     w.table.setObjectName("dealsTable")
@@ -286,12 +510,22 @@ def build(window):
     reseller_holder.setLayout(w.reseller_row)
     box.addWidget(reseller_holder)
     right.addWidget(w.resellers)
-    main.addWidget(card, 1)
+    w.stack = QStackedWidget()
+    front = QWidget()
+    w.front_lay = QVBoxLayout(front)
+    w.front_lay.setContentsMargins(0, 0, 0, 0)
+    w.front_lay.setSpacing(6)
+    w.stack.addWidget(front)
+    w.stack.addWidget(card)
+    main.addWidget(w.stack, 1)
     page.content.addLayout(main, 1)
 
     fill_results(self)
     fill_wishlist(self)
     show_game(self)
+    build_front(self, w.front_lay)
+    w.stack.setCurrentIndex(1 if st.game is not None and getattr(st, "showing_game", False) else 0)
+    load_front(self)
     if not st.hits and not st.game:
         w.search.setFocus()
     return page
@@ -359,6 +593,7 @@ def pick(window, game_id):
         return
     from gg_desktop import deals_net
     w.best.setText("Getting every store's price…")
+    w.stack.setCurrentIndex(1)
     key = deals_net.load_key()
 
     def work():
@@ -395,7 +630,10 @@ def show_game(window):
     if g is None:
         w.resellers.setVisible(False)
         return
+    w.stack.setCurrentIndex(1)
+    st.showing_game = True
     w.title.setText(g.title)
+    w.meter.set_values(dc.meter(g))
     best = g.best
     w.best.setText(f"{dc.price_text(best.price)} at {best.store}" if best else "Not on sale in CheapShark's stores right now")
     w.summary.setText(dc.summary(g) + "  Prices as CheapShark reports them, in US dollars.")
@@ -406,6 +644,14 @@ def show_game(window):
         cells = (offer.store, dc.price_text(offer.price), dc.price_text(offer.retail), f"{offer.savings}%" if offer.savings else "")
         for c, value in enumerate(cells):
             cell = QTableWidgetItem(value)
+            if c == 0:
+                cell.setData(Qt.UserRole, offer.store_id)
+                icon_url = st.icons.get(offer.store_id, "")
+                pix = st.images.get(icon_url)
+                if pix is not None and not pix.isNull():
+                    cell.setIcon(QIcon(pix))
+                elif icon_url:
+                    picture(window, icon_url, QSize(16, 16))
             if r == 0 and c in (0, 1):
                 cell.setForeground(QColor("#32d67a"))
             w.table.setItem(r, c, cell)
@@ -417,9 +663,8 @@ def show_game(window):
     w.watch.setText("Update wishlist" if on_list else "Add to wishlist")
     current = next((i for i in dc.wishlist(window.settings) if i["game_id"] == g.game_id), None)
     w.target.setValue((current["target"] or 0) if current else 0)
-    picture(window, g.thumb, QSize(230, 108), w.art)
-    if not g.thumb:
-        w.art.clear()
+    w.art.clear()
+    picture(window, dc.art_url(g.steam_app_id, g.thumb), QSize(300, 140), w.art, fallback=g.thumb)
 
     # Key resellers
     w.resellers.setVisible(True)
@@ -455,6 +700,9 @@ def clear_layout(layout):
         item = layout.takeAt(0)
         if item.widget() is not None:
             item.widget().deleteLater()
+        elif item.layout() is not None:          # rows of the storefront are layouts inside the layout
+            clear_layout(item.layout())
+            item.layout().deleteLater()
 
 
 def add_key(window):

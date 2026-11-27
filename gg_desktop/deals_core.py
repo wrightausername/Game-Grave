@@ -132,6 +132,95 @@ def reseller_links(title: str):
             ("GG.deals (all shops)", f"https://gg.deals/search/?title={q}"))
 
 
+@dataclass(frozen=True)
+class Deal:
+    """One card on the storefront: a game on sale at one store."""
+    game_id: str
+    title: str
+    steam_app_id: str
+    price: float
+    retail: float | None
+    savings: int
+    store: str
+    store_id: str
+    url: str
+    rating: str          # Steam's own review summary as CheapShark reports it ("Very Positive"), or ""
+    rating_pct: int
+    metacritic: int
+    thumb: str
+
+
+# The storefront's rows (owner, 2026-11-27: the tab "just feels heartless"). Each is one CheapShark /deals request.
+FRONT = (
+    ("best", "Best deals right now", "Ranked by CheapShark's deal rating (price, discount and reviews together).",
+     {"sortBy": "Deal Rating", "pageSize": 12, "onSale": 1}),
+    ("free", "Free to keep right now", "Full games their store lists at $0 for a limited time. Claim them in the store.",
+     {"upperPrice": 0, "pageSize": 8, "sortBy": "Recent"}),
+    ("big", "Big games, big discounts", "Games that usually cost $30 or more, biggest discount first.",
+     {"AAA": 1, "sortBy": "Savings", "pageSize": 12, "onSale": 1}),
+)
+
+
+def deals_list_url(params) -> str:
+    query = "&".join(f"{quote(str(k), safe='')}={quote(str(v), safe='')}" for k, v in params.items())
+    return f"{CHEAPSHARK}/deals?{query}"
+
+
+def art_url(steam_app_id, thumb="") -> str:
+    """A big picture for a card: Steam's own header image when the game is on Steam, else the store thumbnail."""
+    app = str(steam_app_id or "")
+    if app.isdigit():
+        return f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app}/header.jpg"
+    return str(thumb or "")
+
+
+def parse_store_icons(data) -> dict:
+    out = {}
+    for s in data if isinstance(data, list) else []:
+        images = s.get("images") if isinstance(s, dict) and isinstance(s.get("images"), dict) else {}
+        icon = str(images.get("icon") or "")
+        if icon.startswith("/"):
+            out[str(s.get("storeID"))] = "https://www.cheapshark.com" + icon
+    return out
+
+
+def _int(value):
+    try:
+        return int(round(float(value)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def parse_deals(data, stores) -> list:
+    out, seen = [], set()
+    for d in data if isinstance(data, list) else []:
+        if not isinstance(d, dict) or not d.get("dealID") or not d.get("gameID"):
+            continue
+        store_id = str(d.get("storeID", ""))
+        if stores and store_id not in stores:
+            continue
+        price = money(d.get("salePrice"))
+        if price is None or str(d["gameID"]) in seen:
+            continue
+        seen.add(str(d["gameID"]))
+        out.append(Deal(str(d["gameID"]), str(d.get("title") or "Unknown game"), str(d.get("steamAppID") or ""),
+                        price, money(d.get("normalPrice")), max(0, min(100, _int(d.get("savings")))),
+                        stores.get(store_id, f"Store {store_id}"), store_id, deal_url(d["dealID"]),
+                        str(d.get("steamRatingText") or ""), _int(d.get("steamRatingPercent")),
+                        _int(d.get("metacriticScore")), str(d.get("thumb") or "")))
+    return out
+
+
+def meter(game: GameDeals):
+    """Where today's best price sits between the lowest ever and the usual price: (now, usual, lowest), all known, else
+    None. Drawn as the deal meter; nothing is guessed."""
+    best = game.best
+    usual = max((o.retail for o in game.offers if o.retail), default=None)
+    if best is None or usual is None or game.lowest_ever is None or usual <= 0:
+        return None
+    return best.price, usual, min(game.lowest_ever, best.price)
+
+
 # ------------------------------------------------------------------ parsing CheapShark
 def parse_stores(data) -> dict:
     out = {}

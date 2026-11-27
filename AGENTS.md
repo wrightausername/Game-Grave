@@ -1555,3 +1555,21 @@ AI Assistant is reopened for its right-column panel look and the Local AI panel;
   isn't on screen. Cancel measurement and closing Game Grave still stop it. The PC scan itself already ran in the
   background. Covered by `tools/overview_live_smoke.py` (leave mid-measurement, come back to progress, result kept) and
   `tools/assistant_page_smoke.py` (memory line, Shut off now).
+
+Speed, storefront and fixes (owner instructions, 2026-11-27: "storage overview needs to be faster... it just sits there and
+says measuring for too long... the deals tab needs to be more lively... Scan the whole drive slower also doesnt seem to be
+clickable... AI assistant on the right panel is still scuffed up"). Reopens Overview (storage measurement), Deals, Old Files
+(the whole-drive switch only) and AI Assistant (right column layout only).
+- Overview: on Windows each file's identity (for counting hardlinks once) needs its own system call; these now run on up to
+  16 worker threads per folder (`overview_storage._lstat_all`), in order, so the result is identical
+  (`tests/test_overview_storage.py` compares parallel and one-at-a-time). While measuring, the ring and legend fill in with
+  the running totals, labelled "so far" (`render_live`); the finished measurement replaces them.
+- Deals: opens on a storefront: "Best deals right now" (CheapShark deal rating), "Free to keep right now" (listed at $0) and
+  "Big games, big discounts" (usually $30+), as cards with the Steam header picture (else the store's thumbnail), the
+  discount badge, the price and struck-through usual price, the store's icon and Steam's review summary. Loaded once an hour
+  while Game Grave runs. Picking a game shows a bigger picture, a deal meter (lowest ever, usual, today, only when all three
+  are known) and store icons in the price table, with "Back to deals". Same honesty rules; images over https only.
+- Old Files: "Scan the whole drive (slower)" is always clickable. Turned on with "Selected folder" chosen, it picks the
+  drive that folder is on (else the first drive). Protected and system places are still left out.
+- AI Assistant: the right-column panels size to their own content (no stretched empty gaps), side text is 12 px, and the
+  column is up to 340 px wide when there is room.

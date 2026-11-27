@@ -485,16 +485,22 @@ def build(window):
     auto = autopilot_ui.build_panel(self, accent)
     self.assistant_auto = auto
     right = QWidget()
-    right_lay = column(spacing=8)
+    right.setObjectName("assistantSide")
+    # Owner, 2026-11-27 ("still scuffed up"): each panel hugs its own content (no stretched empty gaps), the side text is
+    # readable, and the column takes up to 340 px when the window has room.
+    right.setStyleSheet(SIDE_STYLE)
+    right_lay = column(spacing=10)
+    right_lay.setContentsMargins(0, 0, 6, 0)
     right.setLayout(right_lay)
-    right_lay.addWidget(level_panel(self, accent))
-    right_lay.addWidget(can, 4)
-    right_lay.addWidget(auto, 3)
-    right_lay.addWidget(used, 4)
+    for box in (level_panel(self, accent), can, auto, used):
+        box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        right_lay.addWidget(box)
+    right_lay.addStretch(1)
 
     side = _detail_scroll(right)
+    side.setMaximumWidth(340)
     self.assistant_side = side
-    page.content.addWidget(_split(_split(left, chat, [222, 580]), side, [802, 232]), 1)
+    page.content.addWidget(_split(_split(left, chat, [222, 580]), side, [802, 300]), 1)
     show_side(self, bool(self.settings.get(SIDE_KEY, False)))
     page.assistant_ready = True
     refresh(self)
@@ -502,6 +508,10 @@ def build(window):
 
 
 SIDE_KEY = "assistant_side_open"
+SIDE_STYLE = ("QWidget#assistantSide QLabel#caption{font-size:12px;color:#9fb0c2;}"
+              "QWidget#assistantSide QLabel#warning{font-size:12px;color:#c9b27a;}"
+              "QWidget#assistantSide QLabel#sectionTitle{font-size:14px;}"
+              "QWidget#assistantSide QComboBox{min-height:26px;font-size:12px;}")
 
 
 def show_side(window, on):

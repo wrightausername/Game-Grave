@@ -13,8 +13,14 @@ import tempfile
 import time
 from unittest.mock import patch
 
-STORES = [{"storeID": "1", "storeName": "Steam", "isActive": 1}, {"storeID": "15", "storeName": "Fanatical", "isActive": 1},
-          {"storeID": "7", "storeName": "GOG", "isActive": 1}]
+STORES = [{"storeID": "1", "storeName": "Steam", "isActive": 1, "images": {"icon": "/img/stores/icons/0.png"}},
+          {"storeID": "15", "storeName": "Fanatical", "isActive": 1, "images": {"icon": "/img/stores/icons/14.png"}},
+          {"storeID": "7", "storeName": "GOG", "isActive": 1, "images": {"icon": "/img/stores/icons/6.png"}}]
+DEALS = [{"title": f"Deal Game {n}", "dealID": f"deal{n}", "storeID": ("1", "15", "7")[n % 3], "gameID": str(700 + n),
+          "salePrice": f"{n + 0.99:.2f}", "normalPrice": "29.99", "savings": str(90 - n * 5), "steamAppID": str(1000 + n),
+          "steamRatingText": "Very Positive", "steamRatingPercent": "91", "thumb": "https://img.test/t.jpg"} for n in range(6)]
+FREE = [{"title": "Free Game", "dealID": "free1", "storeID": "7", "gameID": "800", "salePrice": "0.00",
+         "normalPrice": "19.99", "savings": "100", "steamAppID": "", "thumb": "https://img.test/f.jpg"}]
 SEARCH = [{"gameID": "612", "steamAppID": "620", "cheapest": "1.99", "external": "Portal 2", "thumb": "https://img.test/p2.jpg"},
           {"gameID": "613", "steamAppID": "", "cheapest": "4.99", "external": "Portal 2 Soundtrack", "thumb": ""}]
 
@@ -77,6 +83,8 @@ def main():
             raise AssertionError("asked a host outside the allowlist: " + url)
         if url.endswith("/stores"):
             return STORES
+        if "/deals?" in url:
+            return FREE if "upperPrice=0" in url else DEALS
         if "games?title=" in url:
             return SEARCH
         if "games?ids=" in url:
@@ -124,7 +132,27 @@ def main():
             w = window.deals_page_widgets
             assert w.search.accessibleName() and w.target.accessibleName()
             assert not w.buy.isEnabled() and not w.watch.isEnabled()
-            assert window.grab().save(str(args.output / "deals-empty-1280.png"))
+
+            # The storefront: three rows of cards with pictures, badges and store icons (owner, 2026-11-27).
+            wait_for(lambda: len(window.findChildren(deals_page.DealCard)) >= 7)
+            cards = [c for c in window.findChildren(deals_page.DealCard) if c.isVisible()]
+            assert w.stack.currentIndex() == 0
+            titles = [c.deal.title for c in cards]
+            assert "Free Game" in titles and "Deal Game 0" in titles, titles
+            assert sum(1 for c in cards if c.deal.price == 0) >= 1
+            wait_for(lambda: all(c.art.pixmap() is not None and not c.art.pixmap().isNull() for c in cards))
+            settle(200)
+            assert window.grab().save(str(args.output / "deals-front-1280.png"))
+            first = next(c for c in cards if c.deal.title == "Deal Game 0")
+            QTest.mouseClick(first, Qt.LeftButton)
+            wait_for(lambda: deals_page.state(window).game is not None)
+            settle(100)
+            assert w.stack.currentIndex() == 1 and w.meter.isVisible()
+            w.back.click()
+            settle()
+            assert w.stack.currentIndex() == 0
+            deals_page.state(window).game = None
+            deals_page.show_game(window)
 
             # Search: results with "from" prices; the first is opened with every store cheapest first.
             QTest.keyClicks(w.search, "Portal 2")
@@ -133,7 +161,7 @@ def main():
             assert "from $1.99" in w.results.item(0).text()
             wait_for(lambda: deals_page.state(window).game is not None)
             settle(100)
-            assert w.title.text() == "Portal 2"
+            assert w.title.text() == "Portal 2" and w.stack.currentIndex() == 1
             assert w.best.text() == "$1.99 at Fanatical", w.best.text()
             assert [w.table.item(r, 0).text() for r in range(w.table.rowCount())] == ["Fanatical", "GOG", "Steam"]
             assert "Lowest ever: $0.99" in w.summary.text()
@@ -202,7 +230,7 @@ def main():
             assert errors.call_count == 0, errors.call_args_list
             window.close()
             settle()
-    print("PASS: Deals tab: Library row, search, stores cheapest first, Open store through CheapShark's link, reseller searches "
+    print("PASS: Deals tab: Library row, storefront rows with cards, search, stores cheapest first, Open store through CheapShark's link, reseller searches "
           "without a key, GG.deals keyshop prices with one, wishlist with target, watch skipped while playing, one quiet notice "
           "per real drop, remove, no sideways scroll.")
 
@@ -221,6 +249,12 @@ def main():
         assert all(o.store and o.price >= 0 and o.url.startswith("https://www.cheapshark.com/redirect?dealID=") for o in found.offers)
         many = deals_net.games([h.game_id for h in hits[:3]])
         assert many, "batch price check returned nothing"
+        rows = deals_net.front()
+        assert rows.get("best"), "live storefront 'best deals' row came back empty"
+        assert all(d.title and d.price >= 0 and d.url.startswith("https://www.cheapshark.com/redirect?dealID=")
+                   for row in rows.values() for d in row)
+        print("PASS real storefront rows:", {k: len(v) for k, v in rows.items()}, "e.g.",
+              [(d.title, d.price, d.store) for d in rows["best"][:3]])
         print(f"PASS real CheapShark: {len(hits)} results for Portal 2; {found.title}: {dc.summary(found)} "
               f"({len(found.offers)} stores); batch check returned {len(many)} games.")
 

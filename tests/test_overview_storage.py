@@ -134,6 +134,22 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(result.files, 1)
         self.assertEqual(result.shared_files, 1)
 
+    def test_parallel_identity_lookups_give_the_same_answer_and_live_totals(self):
+        game = self.game()
+        for n in range(40):
+            self.payload(f"Game/data/{n % 4}/file{n}.bin", 100 + n)
+        staging = self.root / "Staging" / "Pack"
+        staging.mkdir(parents=True)
+        for n in range(12):
+            os.link(self.root / "Game" / "data" / str(n % 4) / f"file{n}.bin", staging / f"file{n}.bin")
+        inventory = Inventory(games=[game], mods=[self.mod(staging.parent)])
+        seen = []
+        one = self.measure(inventory, workers=0)
+        many = self.measure(inventory, workers=6, live=lambda totals, files: seen.append((dict(totals), files)))
+        self.assertEqual((many.totals, many.files, many.shared_files), (one.totals, one.files, one.shared_files))
+        self.assertEqual(one.total, sum(100 + n for n in range(40)))
+        self.assertTrue(all(isinstance(t, dict) for t, _ in seen))
+
     def test_missing_and_empty_are_distinct(self):
         game = self.game()
         empty = self.measure(Inventory(games=[game]))

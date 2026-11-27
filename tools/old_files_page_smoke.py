@@ -107,6 +107,17 @@ def main():
             settle()
             assert window.photo_drives.currentIndex() == 2
             assert [c.isChecked() for c in window.old_drive_checks] == [False, False, True]
+            # "Scan the whole drive" is clickable even with "Selected folder" chosen; it picks a drive (owner, 2026-11-27).
+            window.photo_drives.setCurrentIndex(0)
+            settle()
+            assert window.photo_full.isEnabled(), "whole-drive switch must always be clickable"
+            window.photo_full.click()
+            settle()
+            assert window.photo_drives.currentIndex() >= 1 and window.page.old_files.state.full
+            assert window.photo_full.isChecked()
+            window.photo_full.click()
+            settle()
+            assert not window.page.old_files.state.full and not window.photo_full.isChecked()
             window.old_drive_checks[1].setChecked(True)
             settle()
             assert window.photo_drives.currentIndex() == 1
