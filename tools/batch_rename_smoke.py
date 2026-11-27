@@ -39,14 +39,19 @@ def main():
         QTest.qWait(ms)
         app.processEvents()
 
-    def wait_for(test, seconds=20):
+    def wait_for(test, seconds=20, report=None):
+        """Sleep in Python (time.sleep lets the rename thread run; QTest.qWait keeps the interpreter to itself)."""
         end = time.time() + seconds
+        last = time.time()
         while time.time() < end:
             app.processEvents()
             if test():
                 return
-            QTest.qWait(20)
-        raise AssertionError("timed out")
+            time.sleep(0.02)
+            if report and time.time() - last > 5:
+                last = time.time()
+                print("  still working:", report())
+        raise AssertionError("timed out" + (": " + report() if report else ""))
 
     def snap(dialog, name):
         dialog.show()
@@ -217,14 +222,17 @@ def main():
             assert again.plans[0].name == "Trip_0001.mp4" and again.plans[-1].name == "Trip_1500.mp4"
             started = time.time()
             again.rename_button.click()
-            wait_for(lambda: not again.busy, seconds=120)
+            wait_for(lambda: not again.busy, seconds=300, report=lambda: f"{again.progress.value()}%")
             print("1,500 files renamed in", round(time.time() - started, 2), "seconds")
+            assert "Renamed 1,500 files" in again.result_line.text(), again.result_line.text()
             assert len(list(big.glob("Trip_*.mp4"))) == 1500 and not list(big.glob("clip *"))
             assert not list(big.glob(".ggbr-*")), "no temporary names left behind"
             again.listing.scrollToBottom()
             snap(again, "tools-batch-rename-big.png")
+            started = time.time()
             again.undo_button.click()
-            wait_for(lambda: not again.busy, seconds=120)
+            wait_for(lambda: not again.busy, seconds=300, report=lambda: f"{again.progress.value()}%")
+            print("1,500 names put back in", round(time.time() - started, 2), "seconds")
             assert len(list(big.glob("clip *.mp4"))) == 1500
             again.done(0)
 

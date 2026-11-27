@@ -365,12 +365,12 @@ class Store:
         return self.folder / "rename-journal.json"
 
     def can_undo(self):
-        with self.lock:
-            return bool(self.history)
+        # No lock: the window asks this while a batch runs, and waiting here would freeze it until the batch ends.
+        return bool(self.history)
 
     def last(self):
-        with self.lock:
-            return self.history[-1] if self.history else None
+        history = self.history
+        return history[-1] if history else None
 
     def _save(self):
         _write_json(self.folder / "undo-history.json",
