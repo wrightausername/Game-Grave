@@ -225,7 +225,7 @@ def main():
 
             control = home()
             gate = threading.Event()
-            def delayed(_inventory, *, canceled, progress):
+            def delayed(_inventory, *, canceled, progress, **_):
                 gate.set()
                 while not canceled():
                     time.sleep(.003)

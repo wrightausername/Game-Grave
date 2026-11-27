@@ -222,7 +222,7 @@ def main():
                 assert "unavailable" in control.message
                 assert not window.scanning
             gate=threading.Event()
-            def slow(_inventory,*,canceled,progress):
+            def slow(_inventory,*,canceled,progress,**_):
                 gate.set()
                 while not canceled():
                     time.sleep(.002)
@@ -243,7 +243,7 @@ def main():
             # Leaving Overview keeps measuring; coming back shows its progress, then its result (owner, 2026-11-27).
             release,started=threading.Event(),threading.Event()
             real_measure=measure_storage
-            def gated(inv,*,canceled,progress):
+            def gated(inv,*,canceled,progress,**extra):
                 started.set()
                 progress(1,"Measuring folder 1 of 9…")
                 while not release.is_set():

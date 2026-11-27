@@ -346,7 +346,7 @@ def check_controls(*, window, inventory, storage, root, app, home, drive, clicke
     wait_for(lambda: not clone.workers)
     closing = clone.page.overview
     entered = threading.Event()
-    def slow(_inventory, *, canceled, progress):
+    def slow(_inventory, *, canceled, progress, **_):
         entered.set()
         while not canceled():
             time.sleep(.003)
