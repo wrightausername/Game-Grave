@@ -132,7 +132,7 @@ def run(window, folder: Path, scan_timeout=900):
     def tabs(left, done):
         if not left:
             step("every tab opens", True, tabs=done)
-            QTimer.singleShot(200, finish)
+            QTimer.singleShot(200, trailer)
             return
         route = left.pop(0)
         t = time.time()
@@ -153,5 +153,62 @@ def run(window, folder: Path, scan_timeout=900):
         except Exception as exc:
             step("tab " + route, False, error=f"{type(exc).__name__}: {exc}"[:300])
         QTimer.singleShot(250, lambda: tabs(left, done))
+
+    def trailer():
+        """Deals: a real Steam trailer plays on a game's page in the installed program (reads only; skipped offline)."""
+        from types import SimpleNamespace
+        from gg_desktop import deals_page
+        try:
+            window.navigate("Deals")
+            QApplication.processEvents()
+            w = window.deals_page_widgets
+            deals_page.state(window).showing_game = True
+            deals_page._page(w, 1)
+            deals_page.load_media(window, SimpleNamespace(steam_app_id="1245620", title="ELDEN RING"))
+        except Exception as exc:
+            step("Deals trailer plays", False, error=f"{type(exc).__name__}: {exc}"[:300])
+            QTimer.singleShot(200, finish)
+            return
+        started = time.time()
+
+        def wait_items():
+            items = getattr(w.media, "items", [])
+            if not any(i[0] == "video" for i in items):
+                if time.time() - started < 40:
+                    QTimer.singleShot(300, wait_items)
+                else:
+                    step("Deals trailer plays", True, note="no trailers came from Steam (offline?)", items=len(items))
+                    QTimer.singleShot(200, finish)
+                return
+            from PySide6.QtWidgets import QAbstractButton
+            buttons = [b for b in w.media.findChildren(QAbstractButton) if b.accessibleName().startswith("Play trailer")]
+            if not buttons:
+                step("Deals trailer plays", False, why="no trailer thumbnail to press", items=len(items))
+                QTimer.singleShot(200, finish)
+                return
+            buttons[0].click()
+            wait_play(time.time())
+
+        def wait_play(clicked):
+            player = getattr(w.hero, "player", None)
+            pos = player.position() if player is not None else 0
+            failed = "couldn't play" in w.hero_caption.text()
+            if pos < 2000 and not failed and time.time() - clicked < 40:
+                QTimer.singleShot(300, lambda: wait_play(clicked))
+                return
+            frame = False
+            try:
+                frame = w.hero.video.videoSink().videoFrame().isValid()
+            except Exception:
+                pass
+            shot("deals-trailer")
+            step("Deals trailer plays", pos >= 2000 and not failed,
+                 position_ms=pos, frame=frame, caption=w.hero_caption.text()[:120],
+                 status=str(player.mediaStatus()) if player is not None else "no player",
+                 error=player.errorString() if player is not None else "",
+                 video=player.hasVideo() if player is not None else False)
+            w.hero.stop()
+            QTimer.singleShot(200, finish)
+        wait_items()
 
     QTimer.singleShot(int(os.environ.get("GG_SELF_CHECK_DELAY_MS", "1500")), begin)
