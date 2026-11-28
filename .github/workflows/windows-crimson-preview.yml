@@ -1040,6 +1040,9 @@ jobs:
       - name: Game Grave's cost while a game runs
         if: ${{ matrix.part == 'game' }}
         run: python tools/realworld/game_running.py --output _ci_temp/realworld
+      - name: Real Steam trailers in Qt's video player
+        if: ${{ matrix.part == 'trailers' }}
+        run: python tools/realworld/trailers_real.py --output _ci_temp/realworld
       - name: The Gravekeeper on the Medium model
         if: ${{ matrix.part == 'ai' }}
         run: python tools/realworld/ai_harder.py --model medium --output _ci_temp/realworld
