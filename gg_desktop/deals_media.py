@@ -5,7 +5,7 @@ can't play a trailer, it opens on Steam's page in the browser instead. Only Stea
 on Steam's own hosts (deals_core.parse_media)."""
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt, QUrl
+from PySide6.QtCore import QRectF, QSize, Qt, QUrl
 from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import (QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QSlider, QVBoxLayout,
                                QWidget)
@@ -123,13 +123,59 @@ def fill(window, frame, title, shots, movies, picture, on_pick=None):
 
 
 def video_player():
-    """(QMediaPlayer, QAudioOutput, QVideoWidget) classes when this PC's Qt can play video, else None."""
+    """(QMediaPlayer, QAudioOutput, FrameView) when this PC's Qt can play video, else None.
+
+    Trailers are decoded on the processor and drawn by Game Grave itself (FrameView), not through the graphics card's
+    video path: on some graphics cards and drivers Qt's hardware path shows only a black box (owner, 2026-11-28). The two
+    settings only affect Game Grave's own video player and are set before Qt's video part first loads."""
+    import os
+    os.environ.setdefault("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", ",")     # an empty list: no hardware decoders
+    os.environ.setdefault("QT_DISABLE_HW_TEXTURES_CONVERSION", "1")
     try:
-        from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
-        from PySide6.QtMultimediaWidgets import QVideoWidget
-        return QMediaPlayer, QAudioOutput, QVideoWidget
+        from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer, QVideoSink  # noqa: F401
+        return QMediaPlayer, QAudioOutput, FrameView
     except Exception:
         return None
+
+
+class FrameView(QWidget):
+    """Draws each video frame itself, scaled to fit with black bars. Pass `view.sink` to QMediaPlayer.setVideoOutput.
+    `frames` counts the frames that arrived, so a trailer that plays without any picture can be noticed."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        from PySide6.QtMultimedia import QVideoSink
+        self.sink = QVideoSink(self)
+        self.sink.videoFrameChanged.connect(self._frame)
+        self.image = None
+        self.frames = 0
+        self.setAttribute(Qt.WA_OpaquePaintEvent)
+        self.setMinimumSize(320, 180)
+
+    def _frame(self, frame):
+        if not frame.isValid():
+            return
+        image = frame.toImage()
+        if image.isNull():
+            return
+        self.image = image
+        self.frames += 1
+        self.update()
+
+    def clear(self):
+        self.image = None
+        self.update()
+
+    def paintEvent(self, _event):
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor("#000000"))
+        if self.image is not None:
+            size = self.image.size().scaled(self.size(), Qt.KeepAspectRatio)
+            x = (self.width() - size.width()) // 2
+            y = (self.height() - size.height()) // 2
+            p.setRenderHint(QPainter.SmoothPixmapTransform)
+            p.drawImage(QRectF(x, y, size.width(), size.height()), self.image)
+        p.end()
 
 
 class MediaViewer(QDialog):
@@ -183,15 +229,15 @@ class MediaViewer(QDialog):
         classes = video_player()
         if not classes:
             return False
-        QMediaPlayer, QAudioOutput, QVideoWidget = classes
-        self.video = QVideoWidget()
+        QMediaPlayer, QAudioOutput, FrameView = classes
+        self.video = FrameView()
         self.video.setMinimumSize(640, 360)
         self.lay.insertWidget(1, self.video, 1)
         self.player = QMediaPlayer(self)
         self.audio = QAudioOutput(self)
         self.audio.setVolume(0.6)
         self.player.setAudioOutput(self.audio)
-        self.player.setVideoOutput(self.video)
+        self.player.setVideoOutput(self.video.sink)
         self.player.errorOccurred.connect(self.video_failed)
         self.player.durationChanged.connect(lambda d: self.seek.setRange(0, max(0, int(d))))
         self.player.positionChanged.connect(lambda p: self.seek.blockSignals(True) or self.seek.setValue(int(p))
@@ -212,10 +258,13 @@ class MediaViewer(QDialog):
             self.player.stop()
         if is_video and self.can_play and self._ensure_player():
             self.view.hide()
+            self.video.clear()
+            self.video.frames = 0
             self.video.show()
             self.pause.setText("Pause")
             self.player.setSource(QUrl(url))
             self.player.play()
+            self._watch(url, 0)
             return
         if self.video is not None:
             self.video.hide()
@@ -231,6 +280,18 @@ class MediaViewer(QDialog):
     def offer_steam(self, url):
         from gg_desktop.deals_page import open_url
         open_url(self.app_page or url)
+
+    def _watch(self, url, ticks):
+        """Time moving with no picture arriving counts as a trailer that can't play here (never a black box)."""
+        from PySide6.QtCore import QTimer
+        if self.player is None or self.player.source() != QUrl(url) or self.video.frames:
+            return
+        if self.player.position() > 3000:
+            self.player.stop()
+            self.video_failed()
+            return
+        if ticks < 60:
+            QTimer.singleShot(500, lambda: isValid(self) and self._watch(url, ticks + 1))
 
     def video_failed(self, *_args):
         if self.items and self.items[self.index][0] == "video" and self.video is not None:

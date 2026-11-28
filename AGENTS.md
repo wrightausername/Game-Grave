@@ -1651,3 +1651,13 @@ on the tabs is like very small... folks wont like that").
 - Deals viewer: the trailer player (and Windows audio) is now made only when a trailer is actually shown, and the viewer window is freed when closed, so looking at screenshots never starts the video system.
 - Deals smoke: its wait helper now processes events in bounded slices (like QTest.qWait), because on Windows an unbounded processEvents call could keep running while the game page settled. The 4-minute hang watchdog stays.
 - Deals at 960 px: the hidden game page started in its wide, side-by-side shape, which made the whole Deals area about 200 px wider than the window ("Try again" and the note ran past the edge in the layout check). Now the page that isn't showing (deals or game page) gives up its width in the Deals stack (`deals_page._page`).
+- Deals trailers, black box (owner, 2026-11-28: "videos in the deals tabs dont work and they need to"; on their PC the trailer
+  area stays black). Checked first on real Windows (`tools/realworld/trailers_real.py`, part `trailers`): Steam's store now
+  sends only `hls_h264`, `dash_h264` and `dash_av1` links; Qt's player plays the HLS one with picture and sound, the DASH
+  ones not at all. The build machine has no graphics card, so it decodes on the processor; a real graphics card goes through
+  Qt's hardware video path, which shows black on some cards and drivers. Now (`deals_media.video_player`, `FrameView`): trailers
+  are decoded on the processor (`QT_FFMPEG_DECODING_HW_DEVICE_TYPES=,` and `QT_DISABLE_HW_TEXTURES_CONVERSION=1`, set only
+  if the user hasn't set them, before Qt's video part loads) and every frame is drawn by Game Grave itself instead of Qt's
+  video widget. If a trailer's time moves past 3 seconds with no picture, it's treated as one that can't play here (the
+  message and Steam's page), never a silent black box. The installed program's self-check now presses a real trailer on
+  the Deals game page and needs moving time, frames and a picture that isn't black.

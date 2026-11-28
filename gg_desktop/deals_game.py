@@ -103,24 +103,39 @@ class Hero(QFrame):
         if classes is None:
             on_fail()
             return False
-        QMediaPlayer, QAudioOutput, QVideoWidget = classes
+        QMediaPlayer, QAudioOutput, FrameView = classes
         if self.player is None:
-            self.video = QVideoWidget()
+            self.video = FrameView()
             self.stack.addWidget(self.video)
             self.player = QMediaPlayer(self)
             self.audio = QAudioOutput(self)
             self.audio.setVolume(0.6)
             self.player.setAudioOutput(self.audio)
-            self.player.setVideoOutput(self.video)
+            self.player.setVideoOutput(self.video.sink)
         try:
             self.player.errorOccurred.disconnect()
         except (RuntimeError, TypeError):
             pass
         self.player.errorOccurred.connect(lambda *_a: on_fail())
+        self.video.clear()
+        self.video.frames = 0
         self.stack.setCurrentWidget(self.video)
         self.player.setSource(QUrl(url))
         self.player.play()
+        self._watch(on_fail, url, 0)
         return True
+
+    def _watch(self, on_fail, url, ticks):
+        """A trailer whose time moves but no picture ever arrives is treated as one that can't play here, so the box
+        never just stays black."""
+        from PySide6.QtCore import QTimer
+        if self.player is None or self.player.source() != QUrl(url) or self.video.frames:
+            return
+        if self.player.position() > 3000:
+            on_fail()
+            return
+        if ticks < 60:
+            QTimer.singleShot(500, lambda: isValid(self) and self._watch(on_fail, url, ticks + 1))
 
     def stop(self):
         if self.player is not None:

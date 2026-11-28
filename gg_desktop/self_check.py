@@ -16,6 +16,7 @@ import time
 import traceback
 from pathlib import Path
 
+from PySide6.QtGui import QColor
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
@@ -198,11 +199,17 @@ def run(window, folder: Path, scan_timeout=900):
                 return
             frame = False
             try:
-                frame = w.hero.video.videoSink().videoFrame().isValid()
+                frame = w.hero.video.frames
+                img = w.hero.video.image
+                if img is not None:                       # the picture isn't just black
+                    small = img.scaled(32, 18)
+                    lit = sum(QColor(small.pixel(x, y)).lightness() for x in range(32) for y in range(18)) / (32 * 18)
+                    report.setdefault("trailer_lightness", round(lit, 1))
+                    frame = frame if lit > 4 else 0
             except Exception:
                 pass
             shot("deals-trailer")
-            step("Deals trailer plays", pos >= 2000 and not failed,
+            step("Deals trailer plays", pos >= 2000 and not failed and bool(frame),
                  position_ms=pos, frame=frame, caption=w.hero_caption.text()[:120],
                  status=str(player.mediaStatus()) if player is not None else "no player",
                  error=player.errorString() if player is not None else "",
