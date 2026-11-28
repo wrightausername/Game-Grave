@@ -5,6 +5,7 @@ Then, unless --offline, a REAL check against CheapShark's live API so the parsin
 from __future__ import annotations
 
 import argparse
+import faulthandler
 from contextlib import ExitStack
 import os
 from pathlib import Path
@@ -34,6 +35,7 @@ def game_answer(price):
 
 
 def main():
+    faulthandler.dump_traceback_later(240, exit=True)   # a hang prints where it stuck instead of stalling CI
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("_ci_temp"))
     parser.add_argument("--offline", action="store_true")
