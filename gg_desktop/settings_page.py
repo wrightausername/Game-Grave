@@ -134,7 +134,7 @@ def frame(name, tone, title, symbol, badge="", header=True):
     if badge:
         chip = QLabel(badge)
         chip.setStyleSheet("color:#32d67a;border:1px solid #1c6a3a;background:#07160d;border-radius:4px;"
-                           "padding:1px 7px;font-size:10px;font-weight:700;")
+                           "padding:1px 7px;font-size:12px;font-weight:700;")
         head.addWidget(chip)
     body.addLayout(head)
     box.heading = heading

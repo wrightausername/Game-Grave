@@ -548,3 +548,66 @@ def parse_media(data, app_id):
         if video_allowed(url):
             movies.append((str(item.get("name") or "Trailer")[:80], thumb if image_allowed(thumb) else "", url))
     return shots[:MEDIA_SHOTS], movies[:MEDIA_MOVIES]
+
+
+
+def parse_details(data, app_id) -> dict:
+    """The game's whole store description and facts: about (full, plain text, never shortened), genres, released,
+    developer, publisher. Missing parts are left out."""
+    import html
+    import re
+    try:
+        entry = data[str(app_id)]
+        info = (entry.get("data") or {}) if entry.get("success") else {}
+    except (KeyError, TypeError, AttributeError):
+        return {}
+    out = {}
+    text = html.unescape(re.sub(r"<[^>]+>", " ", str(info.get("short_description") or "")))
+    text = " ".join(text.replace("—", ", ").replace("–", ", ").split())
+    if text:
+        out["about"] = text
+    genres = [str(g.get("description")) for g in info.get("genres") or [] if isinstance(g, dict) and g.get("description")]
+    if genres:
+        out["genres"] = ", ".join(genres[:4])
+    released = info.get("release_date") or {}
+    if isinstance(released, dict) and released.get("date"):
+        out["released"] = ("Coming " if released.get("coming_soon") else "Released ") + str(released["date"])
+    for key in ("developers", "publishers"):
+        names = [str(n) for n in info.get(key) or [] if n]
+        if names:
+            out[key[:-1]] = ", ".join(names[:2])
+    return out
+
+
+def details_line(details) -> str:
+    """"Action, Adventure · Released 18 Apr, 2011 · by Valve" from parse_details; "" when Steam had nothing."""
+    parts = [details.get("genres", ""), details.get("released", "")]
+    if details.get("developer"):
+        parts.append("by " + details["developer"])
+    return " · ".join(p for p in parts if p)
+
+
+
+def steam_search_url(title) -> str:
+    return "https://store.steampowered.com/api/storesearch/?term=" + quote(str(title)[:120]) + "&l=english&cc=US"
+
+
+def _flat(text) -> str:
+    import re
+    t = str(text or "").casefold().replace("&", "and")
+    t = re.sub(r"[™®©]", "", t)
+    return re.sub(r"[^a-z0-9]+", "", t)
+
+
+def match_steam(data, title) -> str:
+    """The Steam app number for a game CheapShark lists without one, from Steam's store search: only an exact match of
+    the name (ignoring case, punctuation and trademark signs). Never a similar game."""
+    want = _flat(title)
+    try:
+        items = data.get("items") or []
+    except AttributeError:
+        return ""
+    for item in items:
+        if isinstance(item, dict) and _flat(item.get("name")) == want and str(item.get("id", "")).isdigit():
+            return str(item["id"])
+    return ""

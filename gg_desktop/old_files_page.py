@@ -167,7 +167,7 @@ def build(window):
                                "leaving out protected and system places and linked or offline content.")
     scan.addWidget(self.photo_full)
     full_note = label("Off: only Downloads, Documents and your chosen folder.", "caption", wrap=True)
-    full_note.setStyleSheet("color:#8fa3b8;font-size:11px;")
+    full_note.setStyleSheet("color:#8fa3b8;font-size:12px;")
     scan.addWidget(full_note)
     scan.addWidget(tool("Change Folder", "folder", self._choose_scan_folder))
     detail_section(scan, "Age (Last Modified)")
@@ -591,7 +591,7 @@ def chip(text, symbol, color="#c5d5e2"):
     name = QLabel(QFontMetrics(frame.font()).elidedText(text, Qt.ElideMiddle, 52))
     name.setAlignment(Qt.AlignCenter)
     name.setToolTip(text)
-    name.setStyleSheet("font-size:9px; color:#c5d0da;")
+    name.setStyleSheet("font-size:12px; color:#c5d0da;")
     box.addWidget(name)
     return frame
 
@@ -599,7 +599,7 @@ def chip(text, symbol, color="#c5d5e2"):
 def badge(text, good):
     item = QLabel(text)
     color = "#27dc74" if good else "#f7b737"
-    item.setStyleSheet(f"color:{color}; border:1px solid {color}; border-radius:9px; padding:2px 8px; font-size:10px;")
+    item.setStyleSheet(f"color:{color}; border:1px solid {color}; border-radius:9px; padding:2px 8px; font-size:12px;")
     item.setAlignment(Qt.AlignCenter)
     return item
 

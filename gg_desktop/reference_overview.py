@@ -367,7 +367,7 @@ class OverviewScreens:
             line.addWidget(name_label, 1)
             percent = "<0.1%" if total and 0 < size / total < .001 else f"{size / total:.1%}" if total else "0%"
             value_label = label((human_size(size) + " · " + percent) if found else "Not scanned", "subtle")
-            value_label.setStyleSheet("color:" + color + ";font-size:11px;")
+            value_label.setStyleSheet("color:" + color + ";font-size:12px;")
             value_label.setMinimumWidth(value_label.fontMetrics().horizontalAdvance("999.9 GB · 100.0%") + 6)
             value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             line.addWidget(value_label)

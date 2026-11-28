@@ -21,7 +21,7 @@ QFrame#fixCard:hover { border: 1px solid #7A3644; }
 QLabel#fixCardTitle { font-size: 17px; font-weight: 800; color: #F6FAFF; background: transparent; }
 QLabel#fixCardText { font-size: 12.5px; color: #B9C6D3; background: transparent; }
 QLabel#fixIntro { font-size: 13px; color: #C9D4E0; }
-QLabel#fixSection { color: #8C9AA9; font-size: 11px; font-weight: 800; letter-spacing: 1.6px; }
+QLabel#fixSection { color: #8C9AA9; font-size: 12px; font-weight: 800; letter-spacing: 1.6px; }
 """
 
 CARDS = (

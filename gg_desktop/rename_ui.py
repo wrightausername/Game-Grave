@@ -34,7 +34,7 @@ LOCAL_STYLE = (
     "QSpinBox::up-button,QSpinBox::down-button{width:16px;border:none;background:transparent;}"
     "QLineEdit#renameName{font-size:15px;font-weight:600;padding:8px 10px;}"
     "QLineEdit:focus,QSpinBox:focus,QComboBox:focus{border-color:#ff284a;}"
-    "QLabel#renameLabel{color:#8fa0b3;font-size:11px;font-weight:700;letter-spacing:1px;}"
+    "QLabel#renameLabel{color:#8fa0b3;font-size:12px;font-weight:700;letter-spacing:1px;}"
     "QListWidget#renameList{background:#070d13;border:1px solid #1b2836;border-radius:12px;padding:2px;}"
     "QListWidget#renameList::item{padding:0;margin:0;border-radius:0;}"
     "QListWidget#renameList::item:selected,QListWidget#renameList::item:hover{background:transparent;}"
@@ -175,7 +175,7 @@ class RowPainter(QStyledItemDelegate):
         p.drawLine(r.left() + 14, r.bottom(), r.right() - 14, r.bottom())
 
         small, normal, bold = QFont(d.font()), QFont(d.font()), QFont(d.font())
-        small.setPixelSize(11)
+        small.setPixelSize(12)
         normal.setPixelSize(13)
         bold.setPixelSize(13)
         bold.setWeight(QFont.DemiBold)

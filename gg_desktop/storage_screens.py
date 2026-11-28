@@ -638,7 +638,7 @@ class StorageScreens:
         header.addWidget(_widget(intro))
         for name, amount, color in segments:
             info = label("●  " + name + "\n    " + human_size(amount), "subtle", wrap=True)
-            info.setStyleSheet("color:" + color + ";font-size:11px;")
+            info.setStyleSheet("color:" + color + ";font-size:12px;")
             self.dna_legend.layout().addWidget(info)
         self.dna_legend.layout().addWidget(label(f"{len(assets) - len(external)} linked locations are already included in the install size. Saves, configs and captures are not guessed.", "caption", wrap=True))
         self.dna_legend.layout().addStretch()

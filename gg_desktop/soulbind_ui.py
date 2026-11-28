@@ -67,7 +67,7 @@ class SoulbindBody(QWidget):
             at = 0
             for group in groups:
                 heading = label(group.upper(), "readyWhen")
-                heading.setStyleSheet("font-size:11px;font-weight:700;color:#9AA4AC;")
+                heading.setStyleSheet("font-size:12px;font-weight:700;color:#9AA4AC;")
                 grid.addWidget(heading, at, 0, 1, 3)
                 at += 1
                 for pref in (p for p in sb.PREFS if p.group == group):

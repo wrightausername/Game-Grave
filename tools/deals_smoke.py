@@ -45,6 +45,7 @@ def main():
     from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
     from PySide6.QtGui import QColor, QImage
     from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QPushButton
     from PySide6.QtWidgets import QApplication
     import core
     from gg_desktop import deals_core as dc, deals_net, deals_page, nav_groups
@@ -91,6 +92,10 @@ def main():
             return {"612": game_answer(price["fan"])}
         if "games?id=" in url:
             return game_answer(price["fan"])
+        if "store.steampowered.com/api/storesearch" in url:
+            term = url.split("term=")[1].split("&")[0]
+            return {"items": [{"id": 777, "name": "Free Game"}, {"id": 778, "name": "Free Game Deluxe"}]} \
+                if term == "Free%20Game" else {"items": []}
         if "store.steampowered.com/api/appdetails" in url:
             app = url.split("appids=")[1].split("&")[0]
             data = {"short_description": f"A test game number {app} about racing."}
@@ -157,7 +162,11 @@ def main():
             # What each game is: Steam's short description on the card (games not on Steam say so).
             wait_for(lambda: all("racing" in c.about.text() for c in cards if c.deal.steam_app_id), 20)
             free_card = next(c for c in cards if c.deal.title == "Free Game")
-            assert "Not sold on Steam" in free_card.about.text(), free_card.about.text()
+            wait_for(lambda: "777" in free_card.about.text(), 20)          # matched by its exact name on Steam
+            for c in cards:                                                 # three whole lines, never cut mid-line
+                lines = c.about.fontMetrics().boundingRect(0, 0, c.about.width(), 10000, int(Qt.TextWordWrap),
+                                                           c.about.text()).height()
+                assert lines <= c.about.height(), (c.deal.title, lines, c.about.height())
             assert "racing" in next(c for c in cards if c.deal.steam_app_id).toolTip()
             settle(200)
             assert window.grab().save(str(args.output / "deals-front-1280.png"))
@@ -167,7 +176,14 @@ def main():
             settle(100)
             assert w.stack.currentIndex() == 1 and w.meter.isVisible()
             # Screenshots and trailers: a strip under the prices, and a viewer with Back / Next.
+            assert not w.side.isVisible(), "the game's page gets the whole width"
+            assert w.back.text().startswith("←") and w.back.isVisible()
             wait_for(lambda: w.media.isVisible() and len(getattr(w.media, "items", [])) == 4, 20)
+            wait_for(lambda: w.hero.source is not None and "Screenshot 1" in w.hero_caption.text(), 20)
+            assert "Action" in w.info_line.text() or w.info_line.text() == "", w.info_line.text()
+            w.media.findChildren(QPushButton)[2].click()                    # another screenshot into the big area
+            wait_for(lambda: "Screenshot 2" in w.hero_caption.text())
+            assert w.price_panel.isVisible() and w.table.height() >= w.table.rowCount() * 40
             assert w.media.items[0][0] == "video" and "1 trailer and 3 screenshots" in w.media.caption.text()
             assert "racing" in w.about_line.text(), w.about_line.text()
             from gg_desktop import deals_media
@@ -182,6 +198,21 @@ def main():
                 assert viewer.grab().save(str(args.output / "deals-media-viewer.png"))
                 viewer.close()
             assert window.grab().save(str(args.output / "deals-game-media.png"))
+            window.resize(960, 760)
+            settle(200)
+            assert window.grab().save(str(args.output / "deals-game-960.png"))
+            window.resize(1280, 760)
+            settle(100)
+            w.back.click()
+            settle()
+            assert w.side.isVisible() and w.stack.currentIndex() == 0
+            QTest.mouseClick(first, Qt.LeftButton)
+            wait_for(lambda: w.stack.currentIndex() == 1)
+            QTest.keyClick(w.stack.currentWidget(), Qt.Key_Escape)
+            settle()
+            assert w.stack.currentIndex() == 0, "Esc goes back to the deals"
+            QTest.mouseClick(first, Qt.LeftButton)
+            wait_for(lambda: w.stack.currentIndex() == 1)
             w.back.click()
             settle()
             assert w.stack.currentIndex() == 0

@@ -86,12 +86,20 @@ def scan_inventory(settings: dict, canceled: Callable[[], bool],
         staged.mods = list(base.mods)
     if "files" in wanted:
         stage(2, STAGES[2])
-        staged.warnings = [w for w in staged.warnings if not w.startswith("Old Files folder")]
-        try:
-            staged.files = scan_old_files(Path(settings.get("scan_folder", str(Path.home() / "Downloads"))),
-                                         int(settings.get("files_stale_days", 180)), cancel=canceled)
-        except (ValueError, OSError) as exc:
-            staged.warnings.append("Old Files folder unavailable (" + type(exc).__name__ + ").")
+        staged.warnings = [w for w in staged.warnings if not w.startswith("Old Files")]
+        folder, note = old_files_folder(settings)
+        if folder is None:
+            staged.files = []
+            staged.warnings.append(note)
+        else:
+            try:
+                staged.files = scan_old_files(folder, int(settings.get("files_stale_days", 180)), cancel=canceled)
+                if note:
+                    staged.warnings.append(note)
+            except (ValueError, OSError):
+                staged.files = []
+                staged.warnings.append(f"Old Files folder unavailable: {folder} couldn't be read. Pick another folder "
+                                       "in Old Files.")
     else:
         staged.files = list(base.files)
         staged.file_scan_root, staged.file_scan_days = base.file_scan_root, base.file_scan_days
@@ -176,3 +184,50 @@ def add_never_touch_path(settings: dict, path: str) -> dict:
     updated["never_touch"] = [*list(settings.get("never_touch", [])), str(target)]
     save_settings(updated)
     return updated
+
+
+DOWNLOADS_ID = bytes.fromhex("90e24d373f126545916439c4925e467b")      # FOLDERID_Downloads
+
+
+def _known_downloads():
+    """Where Windows really keeps Downloads (it can be moved to another drive or into OneDrive), or None."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        guid = (ctypes.c_byte * 16).from_buffer_copy(DOWNLOADS_ID)
+        out = ctypes.c_wchar_p()
+        if ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(out)) != 0:
+            return None
+        try:
+            return Path(out.value) if out.value else None
+        finally:
+            ctypes.windll.ole32.CoTaskMemFree(out)
+    except (OSError, AttributeError, ValueError):
+        return None
+
+
+def old_files_folder(settings, *, ok=None, downloads=None):
+    """(folder to scan, note) for the PC scan's Old Files step. The chosen folder when it can be scanned; otherwise the
+    real Downloads folder (Windows' own answer, then the usual place), with a plain note saying why; (None, note) when
+    nothing usable is left. A drive root, the home folder itself and system folders are never scanned here (the Old
+    Files tab has its own whole-drive scan)."""
+    from core import safe_scan_root
+    ok = ok or safe_scan_root
+    usual = Path.home() / "Downloads"
+    chosen = settings.get("scan_folder")
+    candidates = []
+    if chosen:
+        candidates.append(Path(str(chosen)))
+    for extra in (downloads if downloads is not None else _known_downloads(), usual):
+        if extra is not None and all(os.path.normcase(str(extra)) != os.path.normcase(str(c)) for c in candidates):
+            candidates.append(Path(extra))
+    for n, folder in enumerate(candidates):
+        if ok(folder):
+            if n == 0 or not chosen:
+                return folder, ""
+            return folder, (f"Old Files scanned {folder} instead of your chosen folder ({chosen}), which can't be "
+                            "scanned here (missing, a whole drive or a system folder). Pick another folder in Old Files.")
+    where = chosen or str(usual)
+    return None, (f"Old Files folder unavailable: {where} can't be scanned here (missing, a whole drive or a system folder). Pick another "
+                  "folder in Old Files, or use its whole-drive scan.")

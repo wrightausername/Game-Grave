@@ -231,3 +231,21 @@ class MediaTests(unittest.TestCase):
         self.assertEqual(dc.parse_media({"1": {"success": False}}, "1"), ([], []))
         self.assertFalse(dc.video_allowed("https://steamstatic.com.evil.example/v.mp4"))
         self.assertTrue(dc.video_allowed("https://video.akamai.steamstatic.com/v.mp4"))
+
+
+class DetailsTests(unittest.TestCase):
+    def test_full_description_and_facts(self):
+        from gg_desktop import deals_core as dc
+        long = "word " * 80
+        data = {"620": {"success": True, "data": {"short_description": long, "genres": [{"description": "Action"},
+                {"description": "Adventure"}], "release_date": {"coming_soon": False, "date": "18 Apr, 2011"},
+                "developers": ["Valve"], "publishers": ["Valve"]}}}
+        details = dc.parse_details(data, "620")
+        self.assertEqual(len(details["about"]), len(long.strip()), "the page's description is never shortened")
+        self.assertEqual(dc.details_line(details), "Action, Adventure · Released 18 Apr, 2011 · by Valve")
+
+    def test_exact_name_match_only(self):
+        from gg_desktop import deals_core as dc
+        data = {"items": [{"id": 1, "name": "Portal 2 Soundtrack"}, {"id": 620, "name": "Portal™ 2"}]}
+        self.assertEqual(dc.match_steam(data, "Portal 2"), "620")
+        self.assertEqual(dc.match_steam(data, "Portal"), "")

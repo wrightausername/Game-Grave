@@ -46,9 +46,9 @@ KEEPER_SUGGESTIONS = (
     ("check", "Check my PC", "Give my PC a quick health check"),
 )
 WELCOME_TOOLS = ("Ask a question, or tell me what to do. I show a plan first, and nothing changes until you press Run all.")
-PROMPT_CHIP = ("QPushButton{background:#0f161e;border:1px solid #243243;border-radius:13px;color:#c9d4df;font-size:11px;"
+PROMPT_CHIP = ("QPushButton{background:#0f161e;border:1px solid #243243;border-radius:13px;color:#c9d4df;font-size:12px;"
                "padding:0 10px;text-align:left;} QPushButton:hover{border-color:#e5243b;color:#ffffff;}")
-PILL = ("QLabel{{color:{0};background:{1};border:1px solid {0};border-radius:10px;padding:2px 9px;font-size:11px;"
+PILL = ("QLabel{{color:{0};background:{1};border:1px solid {0};border-radius:10px;padding:2px 9px;font-size:12px;"
         "font-weight:700;}}")
 SUGGESTIONS = (   # the empty chat's cards: (icon, title, example asked when clicked)
     ("list", "Largest games", "What are my largest games by size?"),
@@ -195,7 +195,7 @@ class AnswerRow(QFrame):
         if game or item.tab:
             go.setIcon(icon("next", "#e8eef5", 12))
             go.setFixedHeight(26)
-            go.setStyleSheet("font-size:11px;padding:0 9px;")
+            go.setStyleSheet("font-size:12px;padding:0 9px;")
             line.addWidget(go)
 
 
@@ -234,7 +234,7 @@ def chip(text, tone):
     rgb = {"blue": ("#13bcf5", "#1b5f78", "#07151c"), "green": ("#30d76b", "#1c6a3a", "#07160d")}[tone]
     chip_label = QLabel(text)
     chip_label.setStyleSheet(f"color:{rgb[0]};border:1px solid {rgb[1]};background:{rgb[2]};border-radius:4px;"
-                             "padding:1px 6px;font-size:10px;font-weight:700;")
+                             "padding:1px 6px;font-size:12px;font-weight:700;")
     return chip_label
 
 
@@ -688,7 +688,7 @@ def welcome_hero(window, text, compact=False):
         basic = label("These are basic answers. For a real conversation that checks your PC, download the free Local AI "
                       "(Settings in the chat header).", "caption", wrap=True)
         basic.setAlignment(Qt.AlignCenter)
-        basic.setStyleSheet("color:#f6be24;font-size:11px;")
+        basic.setStyleSheet("color:#f6be24;font-size:12px;")
         basic.setAccessibleName("Basic answers")
         box.addWidget(basic)
     grid = QGridLayout()
@@ -716,7 +716,7 @@ def welcome_hero(window, text, compact=False):
         head = label(name, "detailValue", wrap=True)
         head.setStyleSheet("font-weight:700;color:#f2f5f8;font-size:12px;")
         example = label("\u201c" + question + "\u201d", "caption", wrap=True)
-        example.setStyleSheet("color:#8d9aa8;font-size:11px;")
+        example.setStyleSheet("color:#8d9aa8;font-size:12px;")
         for part in (head, example):
             part.setAttribute(Qt.WA_TransparentForMouseEvents)
             texts.addWidget(part)

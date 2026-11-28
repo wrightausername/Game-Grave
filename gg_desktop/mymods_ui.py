@@ -49,7 +49,7 @@ def pill(text, tone="muted"):
     tag = QLabel(text)
     tag.setStyleSheet(f"color:{TONE_HEX[tone]};background:rgba({color.red()},{color.green()},{color.blue()},38);"
                       f"border:1px solid rgba({color.red()},{color.green()},{color.blue()},90);border-radius:10px;"
-                      "padding:0px 9px;font-size:11px;font-weight:700;")
+                      "padding:0px 9px;font-size:12px;font-weight:700;")
     tag.setFixedHeight(22)
     tag.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
     return tag
@@ -128,11 +128,11 @@ class Card(QFrame):
         lay = column(spacing=2)
         outer.addLayout(lay, 1)
         self.head = label(symbol_text, "caption")
-        self.head.setStyleSheet("color:#7d8ea3;font-size:10px;font-weight:800;letter-spacing:1.4px;")
+        self.head.setStyleSheet("color:#7d8ea3;font-size:12px;font-weight:800;letter-spacing:1.4px;")
         self.big = label("", "readyDetail", wrap=True)
         self.big.setStyleSheet("color:#f4f7fb;font-size:15px;font-weight:800;")
         self.small = label("", "caption", wrap=True)
-        self.small.setStyleSheet("color:#93a3b6;font-size:11px;")
+        self.small.setStyleSheet("color:#93a3b6;font-size:12px;")
         for w in (self.head, self.big, self.small):
             lay.addWidget(w)
         self.setMinimumHeight(88)
@@ -271,7 +271,7 @@ class MyModsView(QWidget):
         self.list.model().rowsMoved.connect(self.dropped)
         lay.addWidget(self.list, 1)
         self.hint = label("", "caption", wrap=True)
-        self.hint.setStyleSheet("color:#6f8095;font-size:11px;")
+        self.hint.setStyleSheet("color:#6f8095;font-size:12px;")
         lay.addWidget(self.hint)
         self.load_sources()
 
@@ -483,7 +483,7 @@ class MyModsView(QWidget):
         frame.setLayout(lay)
         if mod.kind == "separator":
             text = label(mod.label.upper(), "caption")
-            text.setStyleSheet("color:#8fa6c0;font-size:10px;font-weight:800;letter-spacing:1.6px;")
+            text.setStyleSheet("color:#8fa6c0;font-size:12px;font-weight:800;letter-spacing:1.6px;")
             lay.addWidget(text, 1)
             return frame
         lay.addWidget(tile(mod.name, 40), 0, Qt.AlignVCenter)
@@ -502,7 +502,7 @@ class MyModsView(QWidget):
             if mod.nexus_id:
                 bits.append("from Nexus")
         sub = label(" · ".join(bits), "caption")
-        sub.setStyleSheet("color:#8394a8;font-size:11px;")
+        sub.setStyleSheet("color:#8394a8;font-size:12px;")
         words.addWidget(sub)
         lay.addLayout(words, 1)
         problem = next((f for f in rep.problems if mod.name in f.mods), None) if rep else None
@@ -601,7 +601,7 @@ class MyModsView(QWidget):
             bits.append(", ".join(item.tags[:3]))
         bits.append(f"#{item.item_id}")
         sub = label(" · ".join(b for b in bits if b), "caption")
-        sub.setStyleSheet("color:#8394a8;font-size:11px;")
+        sub.setStyleSheet("color:#8394a8;font-size:12px;")
         words.addWidget(sub)
         lay.addLayout(words, 1)
         if item.removed:
@@ -869,7 +869,7 @@ class MyModsView(QWidget):
         name.setStyleSheet("color:#f4f7fb;font-size:14px;font-weight:700;")
         words.addWidget(name)
         sub = label(mod.detail, "caption")
-        sub.setStyleSheet("color:#8394a8;font-size:11px;")
+        sub.setStyleSheet("color:#8394a8;font-size:12px;")
         words.addWidget(sub)
         lay.addLayout(words, 1)
         if self.loose.kind == "vortex":

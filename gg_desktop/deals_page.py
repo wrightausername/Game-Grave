@@ -27,7 +27,7 @@ WATCH_TICK_MS = 30 * 60 * 1000
 STYLE = """
 QFrame#dealsCard { background:#09121a; border:1px solid #1b2836; border-radius:12px; }
 QFrame#dealsWarn { background:rgba(246,190,36,18); border:1px solid rgba(246,190,36,90); border-radius:10px; }
-QLabel#dealsSection { color:#8C9AA9; font-size:11px; font-weight:800; letter-spacing:1.6px; }
+QLabel#dealsSection { color:#8C9AA9; font-size:12px; font-weight:800; letter-spacing:1.6px; }
 QLabel#dealsTitle { font-size:20px; font-weight:800; color:#ffffff; }
 QLabel#dealsBest { font-size:15px; font-weight:700; color:#32d67a; }
 QLabel#dealsNote { font-size:12px; color:#8fa0b3; }
@@ -47,9 +47,9 @@ QLabel#dealFree { font-size:15px; font-weight:800; color:#f6be24; }
 QLabel#dealOld { font-size:12px; color:#6f8091; }
 QLabel#dealBadge { background:#1d7a45; color:#ffffff; font-size:12px; font-weight:800; border-radius:6px; padding:1px 6px; }
 QLabel#dealBadgeFree { background:#a86f00; color:#ffffff; font-size:12px; font-weight:800; border-radius:6px; padding:1px 6px; }
-QLabel#dealStore { font-size:11px; color:#8fa0b3; }
-QLabel#dealAbout { font-size:11px; color:#a7b4c2; }
-QLabel#dealRating { font-size:11px; color:#7fd7ff; }
+QLabel#dealStore { font-size:12px; color:#8fa0b3; }
+QLabel#dealAbout { font-size:12px; color:#a7b4c2; }
+QLabel#dealRating { font-size:12px; color:#7fd7ff; }
 QLabel#dealsRowTitle { font-size:17px; font-weight:800; color:#ffffff; }
 QPushButton#dealsBack { padding:4px 10px; }
 """
@@ -194,6 +194,24 @@ def refresh_pictures(window):
 CARD_W, ART_H = 214, 100
 
 
+def fit_lines(text, metrics, width, lines):
+    """The longest start of `text`, ending on a whole word plus "…", that wraps into `lines` lines of `width` pixels."""
+    from PySide6.QtCore import QRect
+    room = metrics.lineSpacing() * lines + 1
+    fits = lambda t: metrics.boundingRect(QRect(0, 0, width, 10000), int(Qt.TextWordWrap), t).height() <= room
+    if fits(text):
+        return text
+    words = text.split()
+    low, high = 1, len(words)
+    while low < high:
+        mid = (low + high + 1) // 2
+        if fits(" ".join(words[:mid]).rstrip(",.;:") + "…"):
+            low = mid
+        else:
+            high = mid - 1
+    return " ".join(words[:low]).rstrip(",.;:") + "…"
+
+
 class DealCard(QFrame):
     """One game on the storefront: its picture, discount badge, price, usual price, store and Steam rating."""
     clicked = Signal(str)
@@ -224,10 +242,15 @@ class DealCard(QFrame):
         title.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         inner.addWidget(title)
         self.about = _text("", "dealAbout")            # what the game is, from Steam's store page (filled in a moment)
-        self.about.setFixedHeight(42)
+        font = self.about.font()
+        font.setPixelSize(12)
+        self.about.setFont(font)
+        self.about.setFixedHeight(self.about.fontMetrics().lineSpacing() * 3 + 3)   # exactly three whole lines
         self.about.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         inner.addWidget(self.about)
-        self.set_about(state(window).about.get(deal.steam_app_id, "") if hasattr(state(window), "about") else "")
+        st_ = state(window)
+        app_ = app_of(window, deal)
+        self.set_about(getattr(st_, "about", {}).get(app_, ""), known=bool(app_ and app_ in getattr(st_, "about", {})))
         prices = QHBoxLayout()
         prices.setSpacing(6)
         free = deal.price == 0
@@ -257,12 +280,14 @@ class DealCard(QFrame):
         inner.addLayout(store)
         lay.addLayout(inner)
 
-    def set_about(self, text):
-        """Up to three short lines; the whole description is in the hover text."""
-        self.about.setText(text or ("" if self.deal.steam_app_id else "Not sold on Steam, so no description here. "
-                                                                        "Pick the card for the store's page."))
-        if text:
-            self.setToolTip(f"{self.deal.title}: {text}\n\nPick it for every store's price.")
+    def set_about(self, text, known=True):
+        """Three lines that end on a whole word with "…" (never cut through a line); the whole text is on hover and on the
+        game's page. Until Steam has been asked, nothing; a game Steam doesn't have says so."""
+        if not text:
+            self.about.setText("" if not known else "No Steam description for this one. Pick it for the store's page.")
+            return
+        self.about.setText(fit_lines(text, self.about.fontMetrics(), CARD_W - 22, 3))
+        self.setToolTip(f"{self.deal.title}: {text}\n\nPick it for its pictures, trailers and every store's price.")
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -312,7 +337,7 @@ class DealMeter(QWidget):
         p.setBrush(QColor("#ffffff"))
         p.drawEllipse(QRectF(x - 6, r.center().y() - 6, 12, 12))
         small = QFont(self.font())
-        small.setPixelSize(11)
+        small.setPixelSize(12)
         p.setFont(small)
         p.setPen(QColor("#8fa0b3"))
         p.drawText(QRectF(0, 30, 160, 16), Qt.AlignLeft, "Lowest ever " + dc.price_text(low))
@@ -359,29 +384,49 @@ def build_front(window, holder):
     holder.addWidget(_text("Prices in US dollars, as CheapShark reports them. Descriptions are Steam's own. Pick a card "
                            "for every store's price. Game Grave never buys anything.", "dealsNote"))
     holder.addStretch(1)
-    load_about(window, [d.steam_app_id for key, *_r in dc.FRONT for d in (st.front.get(key) or [])])
+    load_about(window, [d for key, *_r in dc.FRONT for d in (st.front.get(key) or [])])
 
 
-def load_about(window, app_ids):
-    """Fill each card's short description from Steam's store page (cached for 30 days), in the background."""
+def app_of(window, deal_or_game):
+    """The Steam app number: CheapShark's, else one found by the game's exact name on Steam."""
+    app = str(getattr(deal_or_game, "steam_app_id", "") or "")
+    return app or getattr(state(window), "title_apps", {}).get(getattr(deal_or_game, "title", ""), "")
+
+
+def load_about(window, deals):
+    """Fill each card's short description from Steam's store page (cached for 30 days), in the background. Games
+    CheapShark lists without a Steam number are matched by their exact name first."""
     st = state(window)
-    if not hasattr(st, "about"):
-        st.about = {}
-    wanted = [a for a in dict.fromkeys(app_ids) if a and a not in st.about]
-    if not wanted or getattr(st, "loading_about", False):
+    for name, empty in (("about", {}), ("title_apps", {})):
+        if not hasattr(st, name):
+            setattr(st, name, dict(empty))
+    deals = list(deals)
+    titles = [d.title for d in deals if not d.steam_app_id and d.title not in st.title_apps]
+    known = [d.steam_app_id for d in deals if d.steam_app_id]
+    if (not titles and all(a in st.about for a in known)) or getattr(st, "loading_about", False):
         _fill_about(window)
         return
     st.loading_about = True
     from gg_desktop import deals_net
 
+    def work():
+        found = deals_net.steam_ids(titles) if titles else {}
+        apps = list(dict.fromkeys(known + [a for a in found.values() if a]))
+        wanted = [a for a in apps if a not in st.about]
+        return found, (deals_net.about(wanted) if wanted else {}), wanted
+
     def done(kind, value):
         st.loading_about = False
         if kind == "ok":
-            st.about.update(value)
-        for app in wanted:                 # never ask again this run, even when Steam had nothing
-            st.about.setdefault(app, "")
+            found, about, wanted = value
+            st.title_apps.update(found)
+            st.about.update(about)
+            for app in wanted:             # never ask again this run, even when Steam had nothing
+                st.about.setdefault(app, "")
+        for title in titles:
+            st.title_apps.setdefault(title, "")
         _fill_about(window)
-    _run(window, lambda: deals_net.about(wanted), done)
+    _run(window, work, done)
 
 
 def _fill_about(window):
@@ -391,7 +436,9 @@ def _fill_about(window):
         return
     for card in w.front_lay.parentWidget().findChildren(DealCard) if w.front_lay.parentWidget() else []:
         if isValid(card):
-            card.set_about(getattr(st, "about", {}).get(card.deal.steam_app_id, ""))
+            app = app_of(window, card.deal)
+            card.set_about(getattr(st, "about", {}).get(app, ""), known=bool(app) or
+                           card.deal.title in getattr(st, "title_apps", {}))
 
 
 def load_front(window, force=False):
@@ -423,7 +470,11 @@ def load_front(window, force=False):
 def show_front(window):
     w = widgets(window)
     if w is not None:
+        state(window).showing_game = False
+        if hasattr(w, "hero"):
+            w.hero.stop()
         w.stack.setCurrentIndex(0)
+        w.side.setVisible(True)
         w.results.clearSelection()
 
 
@@ -506,93 +557,12 @@ def build(window):
     holder.setMaximumWidth(340)
     main.addWidget(holder)
 
-    card = QFrame()
-    card.setObjectName("dealsCard")
-    right = QVBoxLayout(card)
-    right.setContentsMargins(16, 14, 16, 14)
-    right.setSpacing(8)
-    top = QHBoxLayout()
-    top.setSpacing(14)
-    w.art = QLabel()
-    w.art.setFixedSize(240, 112)
-    w.art.setAlignment(Qt.AlignCenter)
-    w.art.setStyleSheet("background:#111b25;border-radius:8px;")
-    top.addWidget(w.art, 0, Qt.AlignTop)
-    words = QVBoxLayout()
-    words.setSpacing(4)
-    w.back = _button("‹  Back to deals", lambda: show_front(self))
-    w.back.setObjectName("dealsBack")
-    words.addWidget(w.back, 0, Qt.AlignLeft)
-    w.title = _text("Search for a game", "dealsTitle")
-    w.best = _text("Every store's price shows here, cheapest first.", "dealsBest")
-    w.summary = _text("", "dealsNote")
-    w.about_line = _text("", "dealsText")            # what the game is (Steam's own description)
-    for widget in (w.title, w.about_line, w.best, w.summary):
-        words.addWidget(widget)
-    words.addStretch(1)
-    top.addLayout(words, 1)
-    right.addLayout(top)
-    w.meter = DealMeter()
-    w.meter.setVisible(False)
-    right.addWidget(w.meter)
-    from gg_desktop import deals_media
-    w.media = deals_media.strip(self)          # Steam's trailers and screenshots for the game (filled when it opens)
-    right.addWidget(w.media)
-
-    w.table = QTableWidget(0, 5)
-    w.table.setObjectName("dealsTable")
-    w.table.setAccessibleName("Prices by store")
-    w.table.setHorizontalHeaderLabels(["Store", "Price", "Usual price", "Off", ""])
-    w.table.verticalHeader().setVisible(False)
-    w.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-    w.table.setSelectionMode(QAbstractItemView.NoSelection)
-    head = w.table.horizontalHeader()
-    head.setSectionResizeMode(0, QHeaderView.Stretch)
-    for col in (1, 2, 3):
-        head.setSectionResizeMode(col, QHeaderView.ResizeToContents)
-    head.setSectionResizeMode(4, QHeaderView.Fixed)
-    w.table.setColumnWidth(4, 118)
-    w.table.verticalHeader().setDefaultSectionSize(38)
-    w.table.setMinimumHeight(200)
-    w.table.setMinimumWidth(0)
-    right.addWidget(w.table, 1)
-
+    from gg_desktop import deals_game
     from gg_desktop.insight_widgets import ActionFlow
-    actions = ActionFlow(spacing=8)          # wraps onto a second line in a narrow window
-    w.buy = _button("Open the cheapest store", lambda: st.game and st.game.best and open_url(st.game.best.url), primary=True,
-                    tip="Opens the store's own page in your browser. Game Grave doesn't buy anything.")
-    actions.addWidget(w.buy)
-    target_label = _text("Tell me under", "dealsNote", wrap=False)
-    actions.addWidget(target_label)
-    w.target = QDoubleSpinBox()
-    w.target.setAccessibleName("Target price for the wishlist")
-    w.target.setPrefix("$")
-    w.target.setRange(0, 999)
-    w.target.setDecimals(2)
-    w.target.setSpecialValueText("any drop")
-    w.target.setToolTip("Optional. With a target, the wishlist also tells you when the price reaches it. "
-                        "Leave at 'any drop' to hear about real price drops.")
-    actions.addWidget(w.target)
-    w.watch = _button("Add to wishlist", lambda: add_to_wishlist(self))
-    actions.addWidget(w.watch)
-    action_holder = QWidget()
-    action_holder.setLayout(actions)
-    right.addWidget(action_holder)
-
-    w.resellers = QFrame()
-    w.resellers.setObjectName("dealsWarn")
-    box = QVBoxLayout(w.resellers)
-    box.setContentsMargins(12, 10, 12, 10)
-    box.setSpacing(6)
-    box.addWidget(_section("Key resellers"))
-    w.keyshop = _text("", "dealsText")
-    box.addWidget(w.keyshop)
-    box.addWidget(_text(dc.RESELLER_WARNING, "dealsNote"))
-    w.reseller_row = ActionFlow(spacing=6)
-    reseller_holder = QWidget()
-    reseller_holder.setLayout(w.reseller_row)
-    box.addWidget(reseller_holder)
-    right.addWidget(w.resellers)
+    card = deals_game.build_view(self, w, st, show_front, open_url, add_to_wishlist, ActionFlow,
+                                 lambda text, fn, primary=False, tip="": _button(text, fn, primary=primary, tip=tip),
+                                 DealMeter)
+    w.side = holder
     w.stack = QStackedWidget()
     front = QWidget()
     w.front_lay = QVBoxLayout(front)
@@ -608,6 +578,7 @@ def build(window):
     show_game(self)
     build_front(self, w.front_lay)
     w.stack.setCurrentIndex(1 if st.game is not None and getattr(st, "showing_game", False) else 0)
+    w.side.setVisible(w.stack.currentIndex() == 0)
     load_front(self)
     if not st.hits and not st.game:
         w.search.setFocus()
@@ -716,10 +687,13 @@ def show_game(window):
         w.resellers.setVisible(False)
         return
     w.stack.setCurrentIndex(1)
+    w.side.setVisible(False)                 # the game's page gets the whole width; Back to deals brings the lists back
     st.showing_game = True
     w.title.setText(g.title)
+    w.info_line.setText("")
     w.meter.set_values(dc.meter(g))
     best = g.best
+    w.best_price.setText(dc.price_text(best.price) if best else "Not on sale")
     w.best.setText(f"{dc.price_text(best.price)} at {best.store}" if best else "Not on sale in CheapShark's stores right now")
     w.summary.setText(dc.summary(g) + "  Prices as CheapShark reports them, in US dollars.")
     w.buy.setText(f"Open {best.store}" if best else "Open the cheapest store")
@@ -740,16 +714,31 @@ def show_game(window):
             if r == 0 and c in (0, 1):
                 cell.setForeground(QColor("#32d67a"))
             w.table.setItem(r, c, cell)
-        control = _button("Open store", lambda _=False, u=offer.url: open_url(u),
+        control = _button("Open", lambda _=False, u=offer.url: open_url(u),
                           tip=f"Opens {offer.store}'s page for {g.title} in your browser.")
-        control.setMinimumWidth(104)
+        control.setMinimumWidth(72)
         w.table.setCellWidget(r, 4, control)
     on_list = dc.on_wishlist(dc.wishlist(window.settings), g.game_id)
     w.watch.setText("Update wishlist" if on_list else "Add to wishlist")
     current = next((i for i in dc.wishlist(window.settings) if i["game_id"] == g.game_id), None)
     w.target.setValue((current["target"] or 0) if current else 0)
+    from gg_desktop import deals_game
+    deals_game.fit_table(w)
     w.art.clear()
-    picture(window, dc.art_url(g.steam_app_id, g.thumb), QSize(240, 112), w.art, fallback=g.thumb)
+    w.hero.source = None
+    w.hero_caption.setText("")
+    w.hero_full.hide()
+    w.hero_pause.hide()
+    w.hero.stop()
+    w.hero.stack.setCurrentWidget(w.hero.picture)
+
+    def header_shown(label):
+        if isValid(label) and label.pixmap() is not None and not label.pixmap().isNull():
+            pix = st.images.get(dc.art_url(g.steam_app_id, g.thumb)) or st.images.get(g.thumb)
+            if pix is not None and not pix.isNull():
+                w.hero.show_pixmap(pix)
+    picture(window, dc.art_url(g.steam_app_id, g.thumb), QSize(640, 300), w.art, fallback=g.thumb, whole=True,
+            after=header_shown)
     load_media(window, g)
 
     # Key resellers
@@ -790,8 +779,8 @@ def load_media(window, g):
         return
     if not hasattr(st, "media"):
         st.media = {}
-    w.media.app_id = g.steam_app_id
-    app = str(g.steam_app_id or "")
+    app = str(g.steam_app_id or "") or getattr(st, "title_apps", {}).get(g.title, "")
+    w.media.app_id = app
     about = getattr(st, "about", {}).get(app, "")
     w.about_line.setText(about)
     w.about_line.setVisible(bool(about))
@@ -811,10 +800,17 @@ def load_media(window, g):
         w2 = widgets(window)
         if w2 is None or not isValid(w2.media) or str(getattr(w2.media, "app_id", "")) != app:
             return
-        shots, movies = found
-        deals_media.fill(window, w2.media, g.title, shots, movies,
-                         lambda url, size, label, after: picture(window, url, size, label, whole=size.width() > 300,
-                                                                 after=after))
+        shots, movies, details = found if len(found) == 3 else (found[0], found[1], {})
+        from gg_desktop import deals_game
+        loader = lambda url, size, label, after: picture(window, url, size, label, whole=size.width() > 300, after=after)
+        deals_media.fill(window, w2.media, g.title, shots, movies, loader,
+                         on_pick=lambda i: deals_game.show_item(window, w2, i, loader, open_url))
+        w2.info_line.setText(dc.details_line(details))
+        full = details.get("about", "")
+        if full:
+            w2.about_line.setText(full)
+            w2.about_line.show()
+        w2.steam_link.setVisible(app.isdigit())
     if not app.isdigit():
         w.media.hide()
         return
@@ -825,7 +821,7 @@ def load_media(window, g):
     from gg_desktop import deals_net
 
     def done(kind, value):
-        st.media[app] = value if kind == "ok" else ([], [])
+        st.media[app] = value if kind == "ok" else ([], [], {})
         show(st.media[app])
     _run(window, lambda: deals_net.media(app), done)
 

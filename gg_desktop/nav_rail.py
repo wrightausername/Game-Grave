@@ -23,7 +23,7 @@ QScrollArea#navScroll, QWidget#navList, QWidget#navPinned, QWidget#navHubBody { 
 QScrollArea#navScroll QScrollBar:vertical { width: 6px; background: transparent; margin: 2px; }
 QScrollArea#navScroll QScrollBar::handle:vertical { background: #2A3541; border-radius: 3px; min-height: 30px; }
 QScrollArea#navScroll QScrollBar::add-line:vertical, QScrollArea#navScroll QScrollBar::sub-line:vertical { height: 0; }
-QLabel#navSection { color: #6F7C8A; font-size: 11px; font-weight: 600; background: transparent; padding-left: 12px; }
+QLabel#navSection { color: #6F7C8A; font-size: 12px; font-weight: 600; background: transparent; padding-left: 12px; }
 QPushButton#navItem, QPushButton#navSubItem { border: none; background: transparent; border-radius: 8px; padding: 0;
                                               text-align: left; }
 QPushButton#navItem { min-height: 36px; max-height: 36px; }

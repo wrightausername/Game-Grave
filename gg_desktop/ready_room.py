@@ -363,7 +363,7 @@ class HealthGauge(QWidget):
         painter.setFont(font)
         painter.drawText(QRectF(9, 36, 107, 37), Qt.AlignCenter,
                          (self.text or f"{self.score}%") if self.score is not None else "—")
-        font.setPixelSize(11)
+        font.setPixelSize(12)
         font.setWeight(QFont.Normal)
         painter.setFont(font)
         painter.setPen(QColor("#D0D3D9"))
@@ -422,7 +422,7 @@ class ReadyRoomContent(ScrollPage):
         header_row.addWidget(search_box, 1)
         if data.reference:
             tag = label("REFERENCE PREVIEW · SAMPLE DATA")
-            tag.setStyleSheet("font-size:10px;color:#AAB1BA;")
+            tag.setStyleSheet("font-size:12px;color:#AAB1BA;")
             header_row.addWidget(tag)
         header_row.addStretch()
         self.content.addWidget(header)
@@ -681,7 +681,7 @@ class ReadyRoomContent(ScrollPage):
                         0, Qt.AlignHCenter)
         state.addWidget(label(self.data.mod_state, "readyState"), 0, Qt.AlignHCenter)
         note = label(self.data.mod_note, "readyDetail")
-        note.setStyleSheet("font-size:11px;color:#D0D1D5;")
+        note.setStyleSheet("font-size:12px;color:#D0D1D5;")
         state.addWidget(note, 0, Qt.AlignHCenter)
         summary.addWidget(state_box)
         divider = QFrame()
@@ -697,7 +697,7 @@ class ReadyRoomContent(ScrollPage):
             amount.setFixedWidth(25)
             line.addWidget(amount)
             detail = label(caption, "readyDetail")
-            detail.setStyleSheet("font-size:11px;color:#D0D1D5;")
+            detail.setStyleSheet("font-size:12px;color:#D0D1D5;")
             line.addWidget(detail, 1)
             stats.addLayout(line)
         summary.addLayout(stats, 1)
@@ -781,7 +781,7 @@ class ReadyRoomPage(ReadyRoomContent):
         self.reference_note = None
         if data.reference:
             self.reference_note = QLabel("REFERENCE PREVIEW · SAMPLE DATA", self.body)
-            self.reference_note.setStyleSheet("font-size:9px;color:#72808c;background:transparent;")
+            self.reference_note.setStyleSheet("font-size:12px;color:#72808c;background:transparent;")
             self.reference_note.setAttribute(Qt.WA_TransparentForMouseEvents)
             self._position_reference_note()
 

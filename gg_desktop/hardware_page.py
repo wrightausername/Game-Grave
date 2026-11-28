@@ -117,7 +117,7 @@ def _pill(text, tone):
     pill = QLabel(text)
     pill.setAlignment(Qt.AlignCenter)
     color = TONES[tone]
-    pill.setStyleSheet(f"font-size:11px;font-weight:700;color:{color};border:1px solid {color};"
+    pill.setStyleSheet(f"font-size:12px;font-weight:700;color:{color};border:1px solid {color};"
                        "border-radius:9px;padding:1px 9px;background:transparent;")
     return pill
 
@@ -147,7 +147,7 @@ def _spec_card(code, name, detail, tone="cyan", extra=()):
     chip = QLabel(code)
     chip.setAlignment(Qt.AlignCenter)
     chip.setFixedSize(46, 30)
-    chip.setStyleSheet(f"font-size:11px;font-weight:700;color:{TONES[tone]};border:1px solid {TONES[tone]};"
+    chip.setStyleSheet(f"font-size:12px;font-weight:700;color:{TONES[tone]};border:1px solid {TONES[tone]};"
                        "border-radius:6px;background:transparent;")
     line.addWidget(chip, 0, Qt.AlignTop)
     words = column(spacing=1)
@@ -167,7 +167,7 @@ def _spec_card(code, name, detail, tone="cyan", extra=()):
 def _peak_chip(name, value, color):
     chip = QLabel(f"{name} {'—' if value is None else str(round(value)) + '%'}")
     chip.setAlignment(Qt.AlignCenter)
-    chip.setStyleSheet(f"font-size:11px;font-weight:700;color:{color if value is not None else '#6c7a86'};"
+    chip.setStyleSheet(f"font-size:12px;font-weight:700;color:{color if value is not None else '#6c7a86'};"
                        f"border:1px solid {color if value is not None else '#2a3b4b'};border-radius:9px;padding:1px 8px;"
                        "background:transparent;")
     return chip

@@ -16,7 +16,7 @@ QDialog#welcome { background: #080C13; }
 QFrame#welcomeCard { background: #111922; border: 1px solid #2A3541; border-radius: 16px; }
 QLabel#welcomeBrand { font-size: 17px; font-weight: 900; letter-spacing: 1px; color: #F6FAFF; }
 QLabel#welcomeCount { color: #8C9AA9; font-size: 12px; }
-QLabel#welcomeKicker { color: #42D4F2; font-size: 11px; font-weight: 700; letter-spacing: 2px; }
+QLabel#welcomeKicker { color: #42D4F2; font-size: 12px; font-weight: 700; letter-spacing: 2px; }
 QLabel#welcomeTitle { font-size: 28px; font-weight: 900; color: #F6FAFF; }
 QLabel#welcomeBody { font-size: 13.5px; color: #D7E1ED; }
 QFrame#welcomePoint { background: #0C151C; border: 1px solid #2A3541; border-radius: 10px; }

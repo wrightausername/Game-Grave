@@ -171,7 +171,7 @@ def build(window):
     right.layout().addWidget(self.dna_game_header)
     self.dna_tabs = TabStrip(list(data.TABS), selected=state.tab)
     for control in self.dna_tabs.buttons.values():
-        control.setStyleSheet("font-size:11px; padding:4px 3px;")
+        control.setStyleSheet("font-size:12px; padding:4px 3px;")
         control.setIconSize(QSize(15, 15))
     for name, control in self.dna_tabs.buttons.items():
         control.setText(name.replace("&", "&&"))  # a lone ampersand would be eaten as a keyboard mnemonic
@@ -400,7 +400,7 @@ def render_chart(window, profile, total, segments, unknown):
         amount = shown.get(category)
         text = "—" if amount is None else f"{human_size(amount)}  ({data.percent(amount, total):.0f}%)"
         info = label(f"●  {category}   {text}", "subtle", wrap=True)
-        info.setStyleSheet(("color:" + data.COLORS[category] if amount else "color:#566271") + ";font-size:11px;")
+        info.setStyleSheet(("color:" + data.COLORS[category] if amount else "color:#566271") + ";font-size:12px;")
         legend.addWidget(info)
     note = ("Locations inside the install folder are counted once. Saves, configs and recordings appear only when you "
             "link them." + (f" {unknown} location(s) have no size yet. Press Analyze." if unknown else ""))

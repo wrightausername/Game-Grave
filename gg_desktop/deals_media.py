@@ -80,8 +80,9 @@ def _play_mark(pix):
     return out
 
 
-def fill(window, frame, title, shots, movies, picture):
-    """Show trailers first, then screenshots, as clickable thumbnails. `picture(url, size, label, after)` loads images."""
+def fill(window, frame, title, shots, movies, picture, on_pick=None):
+    """Show trailers first, then screenshots, as clickable thumbnails. `picture(url, size, label, after)` loads images.
+    `on_pick(index)` shows the picked one (the game page's big area); without it the viewer window opens."""
     _clear(frame.row)
     items = [("video", name, thumb, url) for name, thumb, url in movies] + \
             [("shot", f"Screenshot {n + 1}", thumb, full) for n, (thumb, full) in enumerate(shots)]
@@ -94,7 +95,7 @@ def fill(window, frame, title, shots, movies, picture):
         words.append(f"{len(movies)} trailer{'s' if len(movies) != 1 else ''}")
     if shots:
         words.append(f"{len(shots)} screenshot{'s' if len(shots) != 1 else ''}")
-    frame.caption.setText(" and ".join(words) + " from Steam's store page. Pick one to watch or look closer.")
+    frame.caption.setText(" and ".join(words) + " from Steam's store page. Pick one to show it above.")
     for index, (kind, name, thumb, _url) in enumerate(items):
         control = QPushButton()
         control.setObjectName("mediaThumb")
@@ -103,7 +104,8 @@ def fill(window, frame, title, shots, movies, picture):
         control.setCursor(Qt.PointingHandCursor)
         control.setToolTip(f"Play: {name}" if kind == "video" else name)
         control.setAccessibleName(f"{'Play trailer' if kind == 'video' else 'View'} {name} for {title}")
-        control.clicked.connect(lambda _=False, i=index: open_viewer(window, frame, title, i, picture))
+        control.clicked.connect(lambda _=False, i=index: on_pick(i) if on_pick else open_viewer(window, frame, title, i,
+                                                                                              picture))
         label = QLabel(control)
         label.setGeometry(1, 1, THUMB.width(), THUMB.height())
         label.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -114,6 +116,10 @@ def fill(window, frame, title, shots, movies, picture):
             picture(thumb, THUMB, label, None)
         frame.row.insertWidget(frame.row.count() - 1, control)
     frame.show()
+    if on_pick:                               # the first screenshot shows in the big area; trailers play when picked
+        first = next((i for i, item in enumerate(items) if item[0] == "shot"), None)
+        if first is not None:
+            on_pick(first)
 
 
 def video_player():

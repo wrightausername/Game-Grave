@@ -50,7 +50,7 @@ STYLE = (
     "QPushButton#toolDetails{color:#8fa0b3;background:transparent;border:none;font-size:12px;padding:2px 0;min-height:0;}"
     "QPushButton#toolDetails:hover{color:#e8eef5;}"
     "QLabel#toolTech{color:#9fb0c2;background:#070d13;border:1px solid #17222d;border-radius:8px;padding:8px 10px;"
-    "font-family:Consolas,monospace;font-size:11px;}"
+    "font-family:Consolas,monospace;font-size:12px;}"
     "QLabel#toolTitle{font-size:20px;font-weight:800;color:#ffffff;}"
     "QLabel#toolSummary{font-size:13px;color:#b6c2cf;}"
     "QLabel#toolLead{font-size:14px;font-weight:700;color:#ffffff;}"
@@ -92,7 +92,7 @@ def pill(value, tone=words.IDLE):
     tag.setObjectName("toolPill")
     tag.setTextFormat(Qt.PlainText)
     tag.setStyleSheet(f"color:{color};background:{rgba(color, 34)};border:1px solid {rgba(color, 100)};border-radius:11px;"
-                      "padding:0px 10px;font-size:11px;font-weight:700;")
+                      "padding:0px 10px;font-size:12px;font-weight:700;")
     tag.setFixedHeight(22)
     tag.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
     return tag
@@ -102,7 +102,7 @@ def set_pill(tag, value, tone):
     color = PILL.get(tone, PILL[words.IDLE])
     tag.setText(value)
     tag.setStyleSheet(f"color:{color};background:{rgba(color, 34)};border:1px solid {rgba(color, 100)};border-radius:11px;"
-                      "padding:0px 10px;font-size:11px;font-weight:700;")
+                      "padding:0px 10px;font-size:12px;font-weight:700;")
 
 
 def header(symbol, title, summary, color):

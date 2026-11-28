@@ -214,11 +214,49 @@ def about(app_ids, limit=30, pause=0.35):
         path.write_text(json.dumps(cache), encoding="utf-8")
     except OSError:
         pass
-    return {app: str(hit.get("text") or "") for app, hit in cache.items() if isinstance(hit, dict)}
+    return {app: str(hit.get("text") or "") for app, hit in cache.items() if isinstance(hit, dict) and app.isdigit()}
 
 
 def media(app_id):
-    """Steam's screenshots and trailers for one game: (screenshots, trailers). Only the Steam app number is sent."""
+    """Steam's screenshots, trailers and store facts for one game: (screenshots, trailers, details). Only the Steam app
+    number is sent."""
     if not str(app_id or "").isdigit():
-        return [], []
-    return dc.parse_media(get_json(dc.media_url(app_id)), app_id)
+        return [], [], {}
+    data = get_json(dc.media_url(app_id))
+    shots, movies = dc.parse_media(data, app_id)
+    return shots, movies, dc.parse_details(data, app_id)
+
+
+
+def steam_ids(titles, limit=20, pause=0.35):
+    """{title: Steam app number or ""} for games CheapShark lists without one, by an exact name match in Steam's store
+    search. Cached 30 days with the descriptions; only the title is sent."""
+    path = folder() / "about.json"
+    try:
+        cache = json.loads(path.read_text(encoding="utf-8"))
+        cache = cache if isinstance(cache, dict) else {}
+    except (OSError, ValueError):
+        cache = {}
+    now = time.time()
+    out, asked = {}, 0
+    for title in dict.fromkeys(t for t in titles if t):
+        key = "t:" + title.casefold()
+        hit = cache.get(key)
+        if isinstance(hit, dict) and now - float(hit.get("at", 0)) < dc.ABOUT_DAYS * 86400:
+            out[title] = str(hit.get("app") or "")
+            continue
+        if asked >= limit:
+            continue
+        try:
+            app = dc.match_steam(get_json(dc.steam_search_url(title)), title)
+        except DealsError:
+            break
+        asked += 1
+        cache[key] = {"at": now, "app": app}
+        out[title] = app
+        time.sleep(pause)
+    try:
+        path.write_text(json.dumps(cache), encoding="utf-8")
+    except OSError:
+        pass
+    return out

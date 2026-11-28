@@ -41,8 +41,8 @@ QFrame#modCard {{ background: {PANEL}; border: 1px solid {BORDER}; border-radius
 QFrame#modCard:hover {{ border: 1px solid #5D7A94; background: #16212B; }}
 QFrame#modCard[selected="true"] {{ border: 2px solid {RED}; background: #1A1F2A; }}
 QFrame#modCard:focus {{ border: 2px solid {CYAN}; }}
-QPushButton#cardAction {{ min-height: 16px; padding: 3px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; }}
-QPushButton#chip {{ min-height: 14px; padding: 4px 12px; border-radius: 14px; font-size: 11px; background: #17222D;
+QPushButton#cardAction {{ min-height: 16px; padding: 3px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; }}
+QPushButton#chip {{ min-height: 14px; padding: 4px 12px; border-radius: 14px; font-size: 12px; background: #17222D;
     border: 1px solid #384755; color: #D7E1ED; font-weight: 500; }}
 QPushButton#chip:checked {{ background: #2A1220; border: 1px solid {RED}; color: white; font-weight: 700; }}
 QPushButton#seg {{ min-height: 16px; padding: 5px 16px; border-radius: 7px; background: transparent; border: 1px solid transparent;
@@ -624,7 +624,7 @@ class ModsGallery(QWidget):
         foot = QLabel("Pictures are each game's own artwork when Game Grave has it. Mods share their game's picture and "
                       "get a colour of their own. Game Grave only reads your mod folders; it never changes them.")
         foot.setWordWrap(True)
-        foot.setStyleSheet(f"color:{MUTED};background:transparent;font-size:11px;")
+        foot.setStyleSheet(f"color:{MUTED};background:transparent;font-size:12px;")
         column.addWidget(foot)
         column.addStretch(1)
         self.cards = items
@@ -720,7 +720,7 @@ class ModsGallery(QWidget):
         left = QVBoxLayout()
         left.setSpacing(3)
         eyebrow = QLabel("SELECTED GAME" if chosen != gd.ALL_GAMES else "EVERY GAME")
-        eyebrow.setStyleSheet(f"color:{AMBER};font-size:10px;font-weight:700;letter-spacing:2px;background:transparent;")
+        eyebrow.setStyleSheet(f"color:{AMBER};font-size:12px;font-weight:700;letter-spacing:2px;background:transparent;")
         title = QLabel(name)
         title.setTextFormat(Qt.PlainText)
         title.setFont(_font(25, True))

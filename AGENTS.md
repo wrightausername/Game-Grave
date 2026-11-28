@@ -1621,3 +1621,25 @@ with Back / Next (arrow keys), trailers played inside Game Grave with sound, Pau
 build); if a trailer can't play here it opens Steam's page in the browser instead. Links are https on Steam's own hosts only;
 pictures go through the Deals picture loader (https, image content, 2 MB at most). Games not on Steam show no strip. Covered by
 `tools/deals_smoke.py` (strip with 1 trailer and 3 screenshots, viewer Back / Next).
+
+Deals game page, clearer Back, readable text, and the Old Files "ValueError" (owner, 2026-11-27: "deals section needs to be
+prettier... photos and video of said game along with a description of the game that doesnt cut off and a list somewhere
+seperate and clean of the prices", "also needs a more clear back button", "also fix that partial scan value error", "some text
+on the tabs is like very small... folks wont like that").
+- Deals: a game's page is now a store page (`gg_desktop/deals_game.py`). A big rounded "← Back to deals" button (Esc too), the
+  title and a line with genres, release date and developer. Left: a 16:9 picture area showing the header, then the first
+  screenshot; thumbnails below put a screenshot (shown whole) or a trailer (played there, with Pause; Full view opens the large
+  viewer) in that area; the whole Steam description underneath, never shortened (`deals_core.parse_details`); Open on Steam.
+  Right (under it below 860 px): a separate price panel: today's best price large, Open, the price bar and lowest-ever line,
+  "Every store" as a clean list without grid lines (store, price, % off, Open), the wishlist target and key resellers. The
+  results and wishlist column hides while a game is open and comes back with Back. Card descriptions end on a whole word with
+  "…" in exactly three lines (`fit_lines`). Games CheapShark lists without a Steam number are matched to Steam by their exact
+  name (Steam store search, `deals_core.match_steam`, only the title is sent, cached 30 days), so they get descriptions,
+  pictures and trailers too; a game Steam doesn't have says so.
+- Text size: every text style under 12 px across the app (9, 10, 10.5 and 11 px, 30 places in shared styles and tabs) is now
+  12 px, and the few fonts set in code below that were raised too. Nothing else about layouts changed; the CI layout checks
+  cover cut-off words.
+- PC scan, Old Files step (`backend.old_files_folder`, `tests/test_old_files_folder.py`): instead of "Old Files folder unavailable
+  (ValueError)" when the chosen folder can't be scanned (missing, a drive root, the home folder or a system folder), it scans the
+  real Downloads folder (Windows' own answer, so a moved Downloads is found, then the usual place) and says so in plain words;
+  with nothing usable it says what to do. The Old Files tab's own whole-drive scan is unchanged.

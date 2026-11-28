@@ -353,7 +353,7 @@ class GamesScreens:
                 opener.setCursor(Qt.PointingHandCursor)
                 opener.setToolTip("Open the install folder in File Explorer:\n" + install.path)
                 opener.setAccessibleName("Open install folder")
-                opener.setStyleSheet("QPushButton#placeOpen{padding:0 8px;font-size:11px;border-radius:6px;"
+                opener.setStyleSheet("QPushButton#placeOpen{padding:0 8px;font-size:12px;border-radius:6px;"
                                      "background:#1a2633;border:1px solid #2e4154;color:#e8eef5;}"
                                      "QPushButton#placeOpen:hover{border-color:#ff3b57;}")
                 opener.clicked.connect(lambda _=False, p=install.path: self._open_folder(p))
