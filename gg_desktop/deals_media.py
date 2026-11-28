@@ -151,20 +151,10 @@ class MediaViewer(QDialog):
         self.view.setMinimumSize(640, 360)
         self.view.setStyleSheet("background:#000;border-radius:8px;")
         lay.addWidget(self.view, 1)
-        self.player = None
-        classes = video_player()
-        if classes:
-            QMediaPlayer, QAudioOutput, QVideoWidget = classes
-            self.video = QVideoWidget()
-            self.video.setMinimumSize(640, 360)
-            self.video.hide()
-            lay.addWidget(self.video, 1)
-            self.player = QMediaPlayer(self)
-            self.audio = QAudioOutput(self)
-            self.audio.setVolume(0.6)
-            self.player.setAudioOutput(self.audio)
-            self.player.setVideoOutput(self.video)
-            self.player.errorOccurred.connect(self.video_failed)
+        self.player = self.video = self.audio = None
+        self.can_play = video_player() is not None   # the player itself is made only when a trailer is shown
+        self.lay = lay
+        self.setAttribute(Qt.WA_DeleteOnClose)        # closing frees the window and any player with it
         controls = QHBoxLayout()
         self.back = QPushButton("‹  Back")
         self.next = QPushButton("Next  ›")
@@ -185,12 +175,29 @@ class MediaViewer(QDialog):
         controls.addWidget(self.caption)
         controls.addWidget(self.next)
         lay.addLayout(controls)
-        if self.player is not None:
-            self.player.durationChanged.connect(lambda d: self.seek.setRange(0, max(0, int(d))))
-            self.player.positionChanged.connect(lambda p: self.seek.blockSignals(True) or self.seek.setValue(int(p))
-                                                or self.seek.blockSignals(False))
-            self.seek.sliderMoved.connect(lambda v: self.player.setPosition(int(v)))
         self.show_item(index)
+
+    def _ensure_player(self):
+        if self.player is not None:
+            return True
+        classes = video_player()
+        if not classes:
+            return False
+        QMediaPlayer, QAudioOutput, QVideoWidget = classes
+        self.video = QVideoWidget()
+        self.video.setMinimumSize(640, 360)
+        self.lay.insertWidget(1, self.video, 1)
+        self.player = QMediaPlayer(self)
+        self.audio = QAudioOutput(self)
+        self.audio.setVolume(0.6)
+        self.player.setAudioOutput(self.audio)
+        self.player.setVideoOutput(self.video)
+        self.player.errorOccurred.connect(self.video_failed)
+        self.player.durationChanged.connect(lambda d: self.seek.setRange(0, max(0, int(d))))
+        self.player.positionChanged.connect(lambda p: self.seek.blockSignals(True) or self.seek.setValue(int(p))
+                                            or self.seek.blockSignals(False))
+        self.seek.sliderMoved.connect(lambda v: self.player.setPosition(int(v)))
+        return True
 
     def show_item(self, index):
         if not self.items:
@@ -199,18 +206,18 @@ class MediaViewer(QDialog):
         kind, name, thumb, url = self.items[self.index]
         self.caption.setText(f"{name} · {self.index + 1} of {len(self.items)}")
         is_video = kind == "video"
-        self.pause.setVisible(is_video and self.player is not None)
-        self.seek.setVisible(is_video and self.player is not None)
+        self.pause.setVisible(is_video and self.can_play)
+        self.seek.setVisible(is_video and self.can_play)
         if self.player is not None:
             self.player.stop()
-        if is_video and self.player is not None:
+        if is_video and self.can_play and self._ensure_player():
             self.view.hide()
             self.video.show()
             self.pause.setText("Pause")
             self.player.setSource(QUrl(url))
             self.player.play()
             return
-        if self.player is not None:
+        if self.video is not None:
             self.video.hide()
         self.view.show()
         if is_video:                       # this PC's Qt can't play video: the trailer opens on Steam instead
@@ -226,7 +233,7 @@ class MediaViewer(QDialog):
         open_url(self.app_page or url)
 
     def video_failed(self, *_args):
-        if self.items and self.items[self.index][0] == "video":
+        if self.items and self.items[self.index][0] == "video" and self.video is not None:
             self.video.hide()
             self.view.show()
             self.view.setText("The trailer couldn't play here, so it opened on Steam's page in your browser.")

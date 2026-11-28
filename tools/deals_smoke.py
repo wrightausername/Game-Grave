@@ -54,28 +54,6 @@ def main():
     from gg_desktop.app import CrimsonWindow
 
     app = QApplication.instance() or QApplication([])
-    from collections import Counter as _Counter
-    from PySide6.QtCore import QObject as _QObject, QTimer as _QTimer
-
-    class _Spy(_QObject):
-        seen = _Counter()
-
-        def eventFilter(self, obj, event):
-            try:
-                self.seen[(type(obj).__name__, obj.objectName(), int(event.type()))] += 1
-            except Exception:
-                pass
-            return False
-    _spy = _Spy()
-    app.installEventFilter(_spy)
-
-    def _report():
-        print("DIAG", _spy.seen.most_common(8), flush=True)
-        _spy.seen.clear()
-    _dog = _QTimer()
-    _dog.setInterval(5000)
-    _dog.timeout.connect(_report)
-    _dog.start()
 
     def settle(ms=40):
         app.processEvents()
