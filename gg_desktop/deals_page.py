@@ -13,7 +13,7 @@ from PySide6.QtCore import QRectF, QSize, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QDoubleSpinBox, QFrame, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QListWidgetItem, QPushButton, QSizePolicy, QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 from shiboken6 import isValid
 
@@ -467,6 +467,17 @@ def load_front(window, force=False):
     _run(window, work, done)
 
 
+def _page(w, index):
+    """Switch between the deals (0) and a game's page (1). The page not showing gives up its width, so a hidden game
+    page can never make the deals wider than the window."""
+    w.stack.setCurrentIndex(index)
+    for n in range(w.stack.count()):
+        page = w.stack.widget(n)
+        policy = page.sizePolicy()
+        policy.setHorizontalPolicy(QSizePolicy.Preferred if n == index else QSizePolicy.Ignored)
+        page.setSizePolicy(policy)
+
+
 def show_front(window):
     w = widgets(window)
     if w is not None:
@@ -475,7 +486,7 @@ def show_front(window):
         st.pick_id = getattr(st, "pick_id", 0) + 1   # a price lookup still running won't pull the page back up
         if hasattr(w, "hero"):
             w.hero.stop()
-        w.stack.setCurrentIndex(0)
+        _page(w, 0)
         w.side.setVisible(True)
         w.results.clearSelection()
 
@@ -579,7 +590,7 @@ def build(window):
     fill_wishlist(self)
     show_game(self)
     build_front(self, w.front_lay)
-    w.stack.setCurrentIndex(1 if st.game is not None and getattr(st, "showing_game", False) else 0)
+    _page(w, 1 if st.game is not None and getattr(st, "showing_game", False) else 0)
     w.side.setVisible(w.stack.currentIndex() == 0)
     load_front(self)
     if not st.hits and not st.game:
@@ -651,7 +662,7 @@ def pick(window, game_id):
         return
     from gg_desktop import deals_net
     w.best.setText("Getting every store's price…")
-    w.stack.setCurrentIndex(1)
+    _page(w, 1)
     st.showing_game = True
     st.pick_id = getattr(st, "pick_id", 0) + 1
     mine = st.pick_id
@@ -691,7 +702,7 @@ def show_game(window):
     if g is None:
         w.resellers.setVisible(False)
         return
-    w.stack.setCurrentIndex(1)
+    _page(w, 1)
     w.side.setVisible(False)                 # the game's page gets the whole width; Back to deals brings the lists back
     if not w.search.hasFocus():
         w.stack.currentWidget().setFocus()   # so Esc goes back (another Esc shortcut in the window would make one ambiguous)

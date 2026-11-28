@@ -296,8 +296,7 @@ def build_view(window, w, st, show_front, open_url, add_to_wishlist, ActionFlow,
     page.w = w
     page.on_back = lambda: show_front(window)
     page.setFocusPolicy(Qt.StrongFocus)
-    arrange(w, 0)                 # start stacked (narrow), so the hidden page never makes the deals wider than the window;
-    page._narrow = True           # its first real resize switches to side by side when there's room
+    arrange(w, 1100)
     return page
 
 
