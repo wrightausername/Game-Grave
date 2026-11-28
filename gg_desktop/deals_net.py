@@ -215,3 +215,10 @@ def about(app_ids, limit=30, pause=0.35):
     except OSError:
         pass
     return {app: str(hit.get("text") or "") for app, hit in cache.items() if isinstance(hit, dict)}
+
+
+def media(app_id):
+    """Steam's screenshots and trailers for one game: (screenshots, trailers). Only the Steam app number is sent."""
+    if not str(app_id or "").isdigit():
+        return [], []
+    return dc.parse_media(get_json(dc.media_url(app_id)), app_id)

@@ -1612,3 +1612,12 @@ the Steam app number is sent), plain text, shortened at a word to about 150 char
 at most 30 lookups per storefront load, spaced out, network trouble stops quietly), `deals_page.load_about` (background, after
 the storefront is drawn). A game not sold on Steam says so instead of a description. Covered by `tools/deals_smoke.py` (faked
 answers, and a real Steam answer for Portal 2 when the store is reachable).
+
+Deals, screenshots and trailers (owner, 2026-11-27: "if you can browse photos and videos even better while checking out the
+games"). Deals only. A game's page shows Steam's own description at the top and a strip of its trailers (with a play mark) and
+screenshots under the price meter (`deals_media.py`; `deals_core.parse_media` / `video_allowed`, pure, `tests/test_deals.py`;
+`deals_net.media`, Steam's public appdetails, only the Steam app number sent). Picking one opens a viewer: pictures shown whole
+with Back / Next (arrow keys), trailers played inside Game Grave with sound, Pause and a seek bar (QtMultimedia, already in the
+build); if a trailer can't play here it opens Steam's page in the browser instead. Links are https on Steam's own hosts only;
+pictures go through the Deals picture loader (https, image content, 2 MB at most). Games not on Steam show no strip. Covered by
+`tools/deals_smoke.py` (strip with 1 trailer and 3 screenshots, viewer Back / Next).

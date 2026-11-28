@@ -116,26 +116,35 @@ def _fit(pix, size):
     return pix.scaled(size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
 
-def picture(window, url, size, label=None, fallback=""):
+def _show(label, pix, size, whole=False, after=None):
+    if label is None or not isValid(label):
+        return
+    label.setPixmap(pix.scaled(size, Qt.KeepAspectRatio, Qt.SmoothTransformation) if whole else _fit(pix, size))
+    if after is not None:
+        after(label)
+
+
+def picture(window, url, size, label=None, fallback="", whole=False, after=None):
     """Load a picture once and give it to every label waiting for it (the same game can be in two storefront rows).
-    A picture that can't be loaded falls back to `fallback` (the store's own thumbnail)."""
+    A picture that can't be loaded falls back to `fallback` (the store's own thumbnail). `whole` shows all of it (the
+    media viewer) instead of filling the label; `after(label)` runs once the label has its picture."""
     st = state(window)
     if not hasattr(st, "waiting"):
         st.waiting = {}
     if not url:
         if fallback:
-            picture(window, fallback, size, label)
+            picture(window, fallback, size, label, whole=whole, after=after)
         return
     if url in st.images:
         pix = st.images[url]
         if pix.isNull():
             if fallback and fallback != url:
-                picture(window, fallback, size, label)
-        elif label is not None and isValid(label):
-            label.setPixmap(_fit(pix, size))
+                picture(window, fallback, size, label, whole=whole, after=after)
+        else:
+            _show(label, pix, size, whole, after)
         return
     if label is not None or fallback:
-        st.waiting.setdefault(url, []).append((label, size, fallback))
+        st.waiting.setdefault(url, []).append((label, size, fallback, whole, after))
     if url in st.pending_images:
         return
     st.pending_images.add(url)
@@ -147,12 +156,12 @@ def picture(window, url, size, label=None, fallback=""):
         if kind == "ok" and data:
             pix.loadFromData(data)
         st.images[url] = pix
-        for waiting_label, waiting_size, waiting_fallback in st.waiting.pop(url, []):
+        for waiting_label, waiting_size, waiting_fallback, waiting_whole, waiting_after in st.waiting.pop(url, []):
             if pix.isNull():
                 if waiting_fallback and waiting_fallback != url:
-                    picture(window, waiting_fallback, waiting_size, waiting_label)
-            elif waiting_label is not None and isValid(waiting_label):
-                waiting_label.setPixmap(_fit(pix, waiting_size))
+                    picture(window, waiting_fallback, waiting_size, waiting_label, whole=waiting_whole, after=waiting_after)
+            else:
+                _show(waiting_label, pix, waiting_size, waiting_whole, waiting_after)
         if window.current_route == "Deals":
             refresh_pictures(window)
     _run(window, lambda: deals_net.image(url), done)
@@ -517,7 +526,8 @@ def build(window):
     w.title = _text("Search for a game", "dealsTitle")
     w.best = _text("Every store's price shows here, cheapest first.", "dealsBest")
     w.summary = _text("", "dealsNote")
-    for widget in (w.title, w.best, w.summary):
+    w.about_line = _text("", "dealsText")            # what the game is (Steam's own description)
+    for widget in (w.title, w.about_line, w.best, w.summary):
         words.addWidget(widget)
     words.addStretch(1)
     top.addLayout(words, 1)
@@ -525,6 +535,9 @@ def build(window):
     w.meter = DealMeter()
     w.meter.setVisible(False)
     right.addWidget(w.meter)
+    from gg_desktop import deals_media
+    w.media = deals_media.strip(self)          # Steam's trailers and screenshots for the game (filled when it opens)
+    right.addWidget(w.media)
 
     w.table = QTableWidget(0, 5)
     w.table.setObjectName("dealsTable")
@@ -737,6 +750,7 @@ def show_game(window):
     w.target.setValue((current["target"] or 0) if current else 0)
     w.art.clear()
     picture(window, dc.art_url(g.steam_app_id, g.thumb), QSize(240, 112), w.art, fallback=g.thumb)
+    load_media(window, g)
 
     # Key resellers
     w.resellers.setVisible(True)
@@ -765,6 +779,55 @@ def show_game(window):
         w.reseller_row.addWidget(_button("Remove GG.deals key", lambda: remove_key(window)))
     else:
         w.reseller_row.addWidget(_button("Add GG.deals key…", lambda: add_key(window), primary=True))
+
+
+def load_media(window, g):
+    """Steam's trailers and screenshots under the game's prices, fetched in the background once per game per run."""
+    from gg_desktop import deals_media
+    w = widgets(window)
+    st = state(window)
+    if w is None or not hasattr(w, "media"):
+        return
+    if not hasattr(st, "media"):
+        st.media = {}
+    w.media.app_id = g.steam_app_id
+    app = str(g.steam_app_id or "")
+    about = getattr(st, "about", {}).get(app, "")
+    w.about_line.setText(about)
+    w.about_line.setVisible(bool(about))
+    if app.isdigit() and app not in getattr(st, "about", {}):
+        def told(kind, value):
+            if kind == "ok":
+                st.about = dict(getattr(st, "about", {}), **value)
+            w3 = widgets(window)
+            if w3 is not None and isValid(w3.about_line) and str(getattr(w3.media, "app_id", "")) == app:
+                text = getattr(st, "about", {}).get(app, "")
+                w3.about_line.setText(text)
+                w3.about_line.setVisible(bool(text))
+        from gg_desktop import deals_net as _net
+        _run(window, lambda: _net.about([app], pause=0), told)
+
+    def show(found):
+        w2 = widgets(window)
+        if w2 is None or not isValid(w2.media) or str(getattr(w2.media, "app_id", "")) != app:
+            return
+        shots, movies = found
+        deals_media.fill(window, w2.media, g.title, shots, movies,
+                         lambda url, size, label, after: picture(window, url, size, label, whole=size.width() > 300,
+                                                                 after=after))
+    if not app.isdigit():
+        w.media.hide()
+        return
+    if app in st.media:
+        show(st.media[app])
+        return
+    w.media.hide()
+    from gg_desktop import deals_net
+
+    def done(kind, value):
+        st.media[app] = value if kind == "ok" else ([], [])
+        show(st.media[app])
+    _run(window, lambda: deals_net.media(app), done)
 
 
 def clear_layout(layout):

@@ -93,7 +93,14 @@ def main():
             return game_answer(price["fan"])
         if "store.steampowered.com/api/appdetails" in url:
             app = url.split("appids=")[1].split("&")[0]
-            return {app: {"success": True, "data": {"short_description": f"A test game number {app} about racing."}}}
+            data = {"short_description": f"A test game number {app} about racing."}
+            if "filters=basic" not in url:
+                data["screenshots"] = [{"path_thumbnail": f"https://shared.akamai.steamstatic.com/s{n}.600x338.jpg",
+                                        "path_full": f"https://shared.akamai.steamstatic.com/s{n}.1920x1080.jpg"}
+                                       for n in range(3)]
+                data["movies"] = [{"name": "Launch trailer", "thumbnail": "https://shared.akamai.steamstatic.com/m.jpg",
+                                   "mp4": {"max": "https://video.akamai.steamstatic.com/m.mp4"}}]
+            return {app: {"success": True, "data": data}}
         if "api.gg.deals" in url:
             assert "key=TESTKEY0123456789" in url
             return {"success": True, "data": {"620": {"title": "Portal 2", "url": "https://gg.deals/game/portal-2/",
@@ -159,6 +166,22 @@ def main():
             wait_for(lambda: deals_page.state(window).game is not None)
             settle(100)
             assert w.stack.currentIndex() == 1 and w.meter.isVisible()
+            # Screenshots and trailers: a strip under the prices, and a viewer with Back / Next.
+            wait_for(lambda: w.media.isVisible() and len(getattr(w.media, "items", [])) == 4, 20)
+            assert w.media.items[0][0] == "video" and "1 trailer and 3 screenshots" in w.media.caption.text()
+            assert "racing" in w.about_line.text(), w.about_line.text()
+            from gg_desktop import deals_media
+            with patch("gg_desktop.deals_page.open_url"):
+                viewer = deals_media.open_viewer(window, w.media, first.deal.title, 1, lambda url, size, label, after:
+                                                 deals_page.picture(window, url, size, label, whole=True, after=after))
+                wait_for(lambda: viewer.view.pixmap() is not None and not viewer.view.pixmap().isNull())
+                assert "2 of 4" in viewer.caption.text(), viewer.caption.text()
+                viewer.next.click()
+                settle()
+                assert "3 of 4" in viewer.caption.text()
+                assert viewer.grab().save(str(args.output / "deals-media-viewer.png"))
+                viewer.close()
+            assert window.grab().save(str(args.output / "deals-game-media.png"))
             w.back.click()
             settle()
             assert w.stack.currentIndex() == 0

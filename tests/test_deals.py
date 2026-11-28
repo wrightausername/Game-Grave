@@ -204,3 +204,30 @@ class AboutTests(unittest.TestCase):
         from gg_desktop import deals_core as dc
         self.assertTrue(dc.api_allowed(dc.about_url("620")))
         self.assertIn("filters=basic", dc.about_url("620"))
+
+
+class MediaTests(unittest.TestCase):
+    """Screenshots and trailers from Steam's store page, only on Steam's own https hosts."""
+
+    def test_shots_and_trailers(self):
+        from gg_desktop import deals_core as dc
+        data = {"620": {"success": True, "data": {
+            "screenshots": [{"path_thumbnail": "https://shared.akamai.steamstatic.com/a.600x338.jpg",
+                             "path_full": "https://shared.akamai.steamstatic.com/a.1920x1080.jpg"},
+                            {"path_thumbnail": "http://bad.example/x.jpg", "path_full": "http://bad.example/y.jpg"}],
+            "movies": [{"name": "Launch trailer", "thumbnail": "https://shared.akamai.steamstatic.com/m.jpg",
+                        "mp4": {"480": "https://video.akamai.steamstatic.com/m480.mp4",
+                                "max": "https://video.akamai.steamstatic.com/mmax.mp4"}},
+                       {"name": "Stream only", "thumbnail": "", "hls_h264": "https://video.akamai.steamstatic.com/h.m3u8"},
+                       {"name": "Elsewhere", "mp4": {"max": "https://evil.example/v.mp4"}}]}}}
+        shots, movies = dc.parse_media(data, "620")
+        self.assertEqual(shots, [("https://shared.akamai.steamstatic.com/a.600x338.jpg",
+                                  "https://shared.akamai.steamstatic.com/a.1920x1080.jpg")])
+        self.assertEqual([m[0] for m in movies], ["Launch trailer", "Stream only"])
+        self.assertTrue(movies[0][2].endswith("mmax.mp4"), "the largest mp4 first")
+
+    def test_nothing_for_unknown_games(self):
+        from gg_desktop import deals_core as dc
+        self.assertEqual(dc.parse_media({"1": {"success": False}}, "1"), ([], []))
+        self.assertFalse(dc.video_allowed("https://steamstatic.com.evil.example/v.mp4"))
+        self.assertTrue(dc.video_allowed("https://video.akamai.steamstatic.com/v.mp4"))

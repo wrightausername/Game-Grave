@@ -499,3 +499,52 @@ def about_wanted(app_ids, cache, now) -> list:
             continue
         out.append(app)
     return out
+
+
+# ------------------------------------------------------------------ screenshots and trailers (owner, 2026-11-27: "if you can
+# browse photos and videos even better while checking out the games"). Steam's own store media, by Steam app number.
+MEDIA_SHOTS, MEDIA_MOVIES = 14, 4
+VIDEO_HOSTS = ("steamstatic.com", "steampowered.com", "akamaihd.net")
+
+
+def media_url(app_id) -> str:
+    return f"https://store.steampowered.com/api/appdetails?appids={int(app_id)}&l=english"
+
+
+def video_allowed(url) -> bool:
+    parts = urlparse(str(url or ""))
+    host = (parts.hostname or "").casefold()
+    return parts.scheme == "https" and any(host == h or host.endswith("." + h) for h in VIDEO_HOSTS)
+
+
+def parse_media(data, app_id):
+    """(screenshots [(thumbnail, full picture)], trailers [(name, thumbnail, video url)]) from Steam's store answer.
+    Trailers prefer an mp4 file (largest first), then Steam's HLS stream. Only https links on Steam's own hosts."""
+    try:
+        entry = data[str(app_id)]
+        info = (entry.get("data") or {}) if entry.get("success") else {}
+    except (KeyError, TypeError, AttributeError):
+        return [], []
+    shots = []
+    for item in info.get("screenshots") or []:
+        if not isinstance(item, dict):
+            continue
+        thumb, full = str(item.get("path_thumbnail") or ""), str(item.get("path_full") or "")
+        if image_allowed(thumb) and image_allowed(full):
+            shots.append((thumb, full))
+    movies = []
+    for item in info.get("movies") or []:
+        if not isinstance(item, dict):
+            continue
+        url = ""
+        for kind in ("mp4", "webm"):
+            files = item.get(kind) or {}
+            if isinstance(files, dict):
+                url = str(files.get("max") or files.get("480") or "")
+            if url:
+                break
+        url = url or str(item.get("hls_h264") or "")
+        thumb = str(item.get("thumbnail") or "")
+        if video_allowed(url):
+            movies.append((str(item.get("name") or "Trailer")[:80], thumb if image_allowed(thumb) else "", url))
+    return shots[:MEDIA_SHOTS], movies[:MEDIA_MOVIES]
