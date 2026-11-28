@@ -44,7 +44,7 @@ def main():
     if sys.platform.startswith("linux"):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
+    from PySide6.QtCore import QBuffer, QByteArray, QEventLoop, QIODevice, Qt
     from PySide6.QtGui import QColor, QImage
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QPushButton
@@ -78,8 +78,10 @@ def main():
 
     def _report():
         ww = getattr(_report, "w", None)
-        print("DIAG", _windows(), "modal", app.activeModalWidget(), "index",
+        cpu = time.process_time()
+        print("DIAG cpu", round(cpu - getattr(_report, "cpu", 0), 2), _windows()[:3], "index",
               ww.stack.currentIndex() if ww else None, flush=True)
+        _report.cpu = cpu
     _dog = _QTimer()
     _dog.setInterval(5000)
     _dog.timeout.connect(_report)
@@ -93,7 +95,7 @@ def main():
     def wait_for(test, seconds=15):
         end = time.time() + seconds
         while time.time() < end:
-            app.processEvents()
+            app.processEvents(QEventLoop.AllEvents, 50)
             if test():
                 return
             time.sleep(0.02)
