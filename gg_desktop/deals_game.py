@@ -65,6 +65,7 @@ class Hero(QFrame):
         self.picture.setAlignment(Qt.AlignCenter)
         self.picture.setStyleSheet("background:#000;border-radius:11px;")
         self.picture.setMinimumSize(320, 180)
+        self.picture.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)   # the picture never pushes the page bigger
         self.stack.addWidget(self.picture)
         self.source = None
         self.player = self.video = self.audio = None
@@ -91,7 +92,9 @@ class Hero(QFrame):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.setMinimumHeight(self.heightForWidth(self.width()))
+        want = self.heightForWidth(self.width())
+        if abs(want - self.minimumHeight()) > 24:    # a scrollbar coming and going can't start a resize loop
+            self.setMinimumHeight(want)
         self._refit()
 
     def play(self, url, on_fail):
@@ -137,7 +140,8 @@ class GamePage(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if self.w is not None:
+        if self.w is not None and (self.width() < NARROW) != getattr(self, "_narrow", None):
+            self._narrow = self.width() < NARROW         # only re-arrange when it crosses the line
             arrange(self.w, self.width())
 
 

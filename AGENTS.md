@@ -1645,3 +1645,4 @@ on the tabs is like very small... folks wont like that").
   with nothing usable it says what to do. The Old Files tab's own whole-drive scan is unchanged.
 
 - Deals Back and Esc: Esc on a game's page now goes back through the window's own Esc shortcut. A price lookup that finishes after Back or Esc no longer pulls the game page back up (each pick gets a number, and Back retires it).
+- Deals game page resize loop: reopening a game right after Esc could spin the window forever (the big picture and its 16:9 height kept resizing each other). The picture no longer pushes the page size, the 16:9 height ignores small changes like a scrollbar, and the page re-arranges only when it crosses the narrow width. The Deals smoke now stops with a stack print if it ever hangs.

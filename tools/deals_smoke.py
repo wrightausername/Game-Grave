@@ -54,21 +54,6 @@ def main():
     from gg_desktop.app import CrimsonWindow
 
     app = QApplication.instance() or QApplication([])
-    from PySide6.QtCore import QTimer as _QTimer
-    from PySide6.QtWidgets import QMessageBox as _Box
-
-    def _say(kind):
-        def box(*a, **k):
-            print(f"DIAG modal {kind}: {[str(x)[:200] for x in a[1:3]]}", flush=True)
-            return _Box.StandardButton.Ok
-        return box
-    for _kind in ("warning", "critical", "information", "question"):
-        setattr(_Box, _kind, staticmethod(_say(_kind)))
-    _dog = _QTimer()
-    _dog.setInterval(5000)
-    _dog.timeout.connect(lambda: print("DIAG modal:", app.activeModalWidget(), "popup:", app.activePopupWidget(),
-                                       "focus:", app.focusWidget(), flush=True))
-    _dog.start()
 
     def settle(ms=40):
         app.processEvents()
