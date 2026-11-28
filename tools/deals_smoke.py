@@ -54,38 +54,6 @@ def main():
     from gg_desktop.app import CrimsonWindow
 
     app = QApplication.instance() or QApplication([])
-    from PySide6.QtCore import QTimer as _QTimer
-
-    def _windows():
-        if not sys.platform.startswith("win"):
-            return []
-        import ctypes
-        from ctypes import wintypes
-        user32, found, pid = ctypes.WinDLL("user32"), [], os.getpid()
-        proc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-
-        def each(hwnd, _l):
-            owner = wintypes.DWORD()
-            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
-            if owner.value == pid and user32.IsWindowVisible(hwnd):
-                name, title = ctypes.create_unicode_buffer(200), ctypes.create_unicode_buffer(200)
-                user32.GetClassNameW(hwnd, name, 200)
-                user32.GetWindowTextW(hwnd, title, 200)
-                found.append((name.value, title.value))
-            return True
-        user32.EnumWindows(proc(each), 0)
-        return found
-
-    def _report():
-        ww = getattr(_report, "w", None)
-        cpu = time.process_time()
-        print("DIAG cpu", round(cpu - getattr(_report, "cpu", 0), 2), _windows()[:3], "index",
-              ww.stack.currentIndex() if ww else None, flush=True)
-        _report.cpu = cpu
-    _dog = _QTimer()
-    _dog.setInterval(5000)
-    _dog.timeout.connect(_report)
-    _dog.start()
 
     def settle(ms=40):
         app.processEvents()
@@ -179,7 +147,6 @@ def main():
             settle(200)
             assert window.current_route == "Deals"
             w = window.deals_page_widgets
-            _report.w = w
             assert w.search.accessibleName() and w.target.accessibleName()
             assert not w.buy.isEnabled() and not w.watch.isEnabled()
 
