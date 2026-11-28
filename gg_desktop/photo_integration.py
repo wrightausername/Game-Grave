@@ -457,5 +457,8 @@ class PhotoIntegration:
     def _escape_current_route(self):
         if self.scanning:
             self.cancel_scan()
+        elif self.current_route == "Deals" and getattr(getattr(self, "_deals", None), "showing_game", False):
+            from gg_desktop import deals_page
+            deals_page.show_front(self)              # Esc on a game's page goes back to the deals
         else:
             self.global_search.clear()
