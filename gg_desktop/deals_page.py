@@ -688,6 +688,8 @@ def show_game(window):
         return
     w.stack.setCurrentIndex(1)
     w.side.setVisible(False)                 # the game's page gets the whole width; Back to deals brings the lists back
+    if not w.search.hasFocus():
+        w.stack.currentWidget().setFocus()   # so Esc goes back (another Esc shortcut in the window would make one ambiguous)
     st.showing_game = True
     w.title.setText(g.title)
     w.info_line.setText("")

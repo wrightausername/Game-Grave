@@ -167,8 +167,6 @@ def build_view(window, w, st, show_front, open_url, add_to_wishlist, ActionFlow,
     words.addWidget(w.info_line)
     head.addLayout(words, 1)
     outer.addLayout(head)
-    w.back_key = QShortcut(QKeySequence(Qt.Key_Escape), page)
-    w.back_key.activated.connect(lambda: show_front(window))
 
     w.game_body = QBoxLayout(QBoxLayout.LeftToRight)
     w.game_body.setSpacing(16)
