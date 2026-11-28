@@ -125,8 +125,15 @@ class Hero(QFrame):
 
 
 class GamePage(QWidget):
-    """Re-arranges itself (side by side or stacked) whenever its width changes."""
+    """Re-arranges itself (side by side or stacked) whenever its width changes. Esc goes back to the deals."""
     w = None
+    on_back = None
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape and self.on_back is not None:
+            self.on_back()
+            return
+        super().keyPressEvent(event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -285,6 +292,8 @@ def build_view(window, w, st, show_front, open_url, add_to_wishlist, ActionFlow,
     pl.addStretch(1)
     w.game_body.addWidget(panel, 0)
     page.w = w
+    page.on_back = lambda: show_front(window)
+    page.setFocusPolicy(Qt.StrongFocus)
     arrange(w, 1100)
     return page
 
