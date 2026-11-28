@@ -28,13 +28,14 @@ def _known_documents() -> Path | None:
         from ctypes import wintypes
         guid = (ctypes.c_byte * 16).from_buffer_copy(bytes.fromhex('d0 9a d3 fd 8f 23 af 46 ad b4 6c 85 48 03 69 c7'))
         out = ctypes.c_wchar_p()
-        if ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(out)) != 0:
+        shell32 = ctypes.WinDLL("shell32")     # its own copy: other code may set argument types on windll's
+        if shell32.SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(out)) != 0:
             return None
         try:
             return Path(out.value) if out.value else None
         finally:
-            ctypes.windll.ole32.CoTaskMemFree(out)
-    except (OSError, AttributeError, ValueError):
+            ctypes.WinDLL("ole32").CoTaskMemFree(out)
+    except Exception:                      # any trouble asking Windows means: use the usual places
         return None
 
 
