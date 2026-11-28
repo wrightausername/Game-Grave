@@ -152,7 +152,7 @@ class CheckRow(QWidget):
         self.name.setToolTip(text)
         self.name.clicked.connect(self.box.toggle)
         self.count = QLabel("0")
-        self.count.setStyleSheet("color:#9ca8bd;font-size:12px;")
+        self.count.setStyleSheet("color:#9ca8bd;font-size:10px;")
         self.count.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         line.addWidget(self.box)
         line.addWidget(self.name, 1)
@@ -282,7 +282,7 @@ def build(window):
         space_ui.add_card(self, page.content)
     self.grave_tabs = TabStrip([(name, TAB_ICONS[name]) for name in data.TABS], selected=state.tab)
     for control in self.grave_tabs.buttons.values():
-        control.setStyleSheet("font-size:12px; padding:4px 3px;")
+        control.setStyleSheet("font-size:11px; padding:4px 3px;")
         control.setIconSize(QSize(15, 15))
     page.content.addWidget(self.grave_tabs)
 
@@ -586,7 +586,7 @@ def fill_table(window, previous, pending=None):
                 unlock.setToolTip("Remove this exact personal rule after confirmation. No file is removed.\nEvidence: "
                                   + data.EVIDENCE_TEXT[item.evidence])
                 unlock.setFixedHeight(24)
-                unlock.setStyleSheet("font-size:12px; padding:0 4px;")
+                unlock.setStyleSheet("font-size:10px; padding:0 4px;")
                 table.setCellWidget(n, 5, unlock)
             table.setRowHeight(n, 30 if state.compact else 44)
         if window._shown_graves:
@@ -722,7 +722,7 @@ def selection_count(window):
 # ------------------------------------------------------------------ details
 def pill(text, color):
     item = QLabel(text)
-    item.setStyleSheet(f"color:{color}; border:1px solid {color}; border-radius:9px; padding:2px 8px; font-size:12px;")
+    item.setStyleSheet(f"color:{color}; border:1px solid {color}; border-radius:9px; padding:2px 8px; font-size:10px;")
     item.setAlignment(Qt.AlignCenter)
     return item
 

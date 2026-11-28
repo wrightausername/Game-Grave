@@ -161,7 +161,7 @@ def tile_action(text, symbol, action, tip=""):
     control.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
     control.setAccessibleName(text)
     control.setToolTip(tip or text)
-    control.setStyleSheet("font-size:12px;")
+    control.setStyleSheet("font-size:10px;")
     control.setMinimumWidth(0)
     control.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
     control.setFixedHeight(47)

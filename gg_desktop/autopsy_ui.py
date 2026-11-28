@@ -118,7 +118,7 @@ class FrameGraph(QWidget):
         p.drawRect(box.adjusted(0.5, 0.5, -0.5, -0.5))
         plot = QRectF(40, 22, self.width() - 52, self.height() - 36)
         small = QFont(self.font())
-        small.setPointSize(9)
+        small.setPointSize(8)
         p.setFont(small)
         if not self.before and not self.after:
             p.setPen(QColor("#9AA4AC"))
@@ -374,7 +374,7 @@ class AutopsyBody(QWidget):
             return
         for col, text in enumerate(("Metric", "Before", "After", "Change")):
             head = label(text, "readyWhen")
-            head.setStyleSheet("font-size:12px;font-weight:700;color:#9AA4AC;")
+            head.setStyleSheet("font-size:11px;font-weight:700;color:#9AA4AC;")
             self.grid.addWidget(head, 0, col, Qt.AlignLeft if col == 0 else Qt.AlignRight)
         for at, r in enumerate(comparison.rows, start=1):
             self.grid.addWidget(label(r.metric, "readyDetail"), at, 0)
@@ -385,7 +385,7 @@ class AutopsyBody(QWidget):
             tone = TONES[r.tone]
             pill = QLabel(f"{r.change}  {r.verdict}" if r.verdict else r.change)
             pill.setAlignment(Qt.AlignCenter)
-            pill.setStyleSheet(f"font-size:12px;font-weight:700;color:{tone};border:1px solid {tone};"
+            pill.setStyleSheet(f"font-size:11px;font-weight:700;color:{tone};border:1px solid {tone};"
                                "border-radius:9px;padding:1px 8px;background:transparent;")
             pill.setAccessibleName(f"{r.metric}: {r.change} {r.verdict}")
             self.grid.addWidget(pill, at, 3, Qt.AlignRight)

@@ -62,7 +62,7 @@ def install(window, topbox, bell):
     window.bell_badge = QLabel(bell)
     window.bell_badge.setObjectName("bellBadge")
     window.bell_badge.setAlignment(Qt.AlignCenter)
-    window.bell_badge.setStyleSheet("QLabel#bellBadge{background:#ff284a;color:white;border-radius:7px;font-size:12px;"
+    window.bell_badge.setStyleSheet("QLabel#bellBadge{background:#ff284a;color:white;border-radius:7px;font-size:9px;"
                                     "font-weight:800;padding:0 3px;}")
     window.bell_badge.setFixedHeight(14)
     window.bell_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -70,7 +70,7 @@ def install(window, topbox, bell):
     window.paused_chip = QLabel("")
     window.paused_chip.setObjectName("pausedChip")
     window.paused_chip.setStyleSheet("QLabel#pausedChip{color:#f6be24;background:rgba(246,190,36,28);border:1px solid "
-                                     "rgba(246,190,36,90);border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700;}")
+                                     "rgba(246,190,36,90);border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700;}")
     window.paused_chip.setToolTip("A game is running, so Game Grave has paused its own background work (scans it starts by "
                                   "itself, routines, the local AI). Anything you start yourself still runs.")
     window.paused_chip.hide()

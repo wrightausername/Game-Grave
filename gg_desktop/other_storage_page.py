@@ -220,7 +220,7 @@ def build(window):
     page.content.addWidget(self.storage_metrics)
     self.storage_tabs = TabStrip(TABS)
     for button in self.storage_tabs.buttons.values():
-        button.setStyleSheet("font-size:12px; padding:4px 3px;")
+        button.setStyleSheet("font-size:11px; padding:4px 3px;")
         button.setIconSize(QSize(15, 15))
     page.content.addWidget(self.storage_tabs)
     clear_tab = self.storage_tabs.buttons["Cleanup Assistant"]
@@ -370,7 +370,7 @@ def refresh(window):
         for kind, _, percent in shares[left:left + 2]:
             cell = row(spacing=4)
             dot = QLabel("■")
-            dot.setStyleSheet(f"color:{STORAGE_COLORS[STORAGE_TYPES.index(kind)]}; font-size:12px;")
+            dot.setStyleSheet(f"color:{STORAGE_COLORS[STORAGE_TYPES.index(kind)]}; font-size:10px;")
             cell.addWidget(dot)
             cell.addWidget(label(f"{insight.PILLS[kind]}  {percent}", "caption", wrap=True))
             cell.addStretch()
@@ -480,7 +480,7 @@ def selection_count(window):
 def badge(text):
     item = QLabel(text)
     color = BADGE_COLORS.get(text, "#f7b737")
-    item.setStyleSheet(f"color:{color}; border:1px solid {color}; border-radius:9px; padding:2px 8px; font-size:12px;")
+    item.setStyleSheet(f"color:{color}; border:1px solid {color}; border-radius:9px; padding:2px 8px; font-size:10px;")
     item.setAlignment(Qt.AlignCenter)
     return item
 

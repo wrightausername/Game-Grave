@@ -621,7 +621,7 @@ def sync_panel(window):
                                  ("Delete", lambda _=False, r=routine["id"]: delete_routine(window, r), "Delete this routine")):
             control = button(caption, fn, tip=tip)
             control.setFixedHeight(24)
-            control.setStyleSheet("font-size:12px;padding:0 6px;")
+            control.setStyleSheet("font-size:11px;padding:0 6px;")
             control.setAccessibleName(f"{caption} {routine['name']}")
             actions.addWidget(control)
         lay.addLayout(actions)

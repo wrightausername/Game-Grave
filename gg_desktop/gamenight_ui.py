@@ -13,7 +13,7 @@ from gg_desktop import gamenight_core as gn
 from gg_desktop.tools_shell import Steps
 from gg_desktop.widgets import button, column, label, row
 
-PILL = ("QLabel{{color:{0};background:{1};border:1px solid {0};border-radius:9px;padding:1px 8px;font-size:12px;"
+PILL = ("QLabel{{color:{0};background:{1};border:1px solid {0};border-radius:9px;padding:1px 8px;font-size:11px;"
         "font-weight:700;}}")
 
 

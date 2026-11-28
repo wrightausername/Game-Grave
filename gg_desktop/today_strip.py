@@ -10,7 +10,7 @@ from gg_desktop import today_core
 
 TONES = {"good": "#32d67a", "warn": "#f6be24", "bad": "#ff5a6e", "info": "#13bcf5"}
 STYLE = ("QFrame#todayStrip{background:#09121a;border:1px solid #1b2836;border-radius:10px;}"
-         "QLabel#todayLabel{color:#8C9AA9;font-size:12px;font-weight:800;letter-spacing:1.6px;}"
+         "QLabel#todayLabel{color:#8C9AA9;font-size:11px;font-weight:800;letter-spacing:1.6px;}"
          "QPushButton#todayChip{background:#0f1a24;border:1px solid #233243;border-radius:13px;color:#e8eef5;"
          "font-size:12px;padding:3px 12px 3px 10px;text-align:left;}"
          "QPushButton#todayChip:hover{border-color:rgba(255,40,74,160);background:#142230;}"

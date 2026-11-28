@@ -1636,9 +1636,11 @@ on the tabs is like very small... folks wont like that").
   "…" in exactly three lines (`fit_lines`). Games CheapShark lists without a Steam number are matched to Steam by their exact
   name (Steam store search, `deals_core.match_steam`, only the title is sent, cached 30 days), so they get descriptions,
   pictures and trailers too; a game Steam doesn't have says so.
-- Text size: every text style under 12 px across the app (9, 10, 10.5 and 11 px, 30 places in shared styles and tabs) is now
-  12 px, and the few fonts set in code below that were raised too. Nothing else about layouts changed; the CI layout checks
-  cover cut-off words.
+- Text size: every text style under 12 px across the app was raised to 12 px, then REVERTED outside Deals (2026-11-28).
+  The real-world layout check showed 89 cut-off failures, and the change reached locked tabs through `theme.py` and their
+  own pages without the owner reopening them. Deals keeps 12 px minimum. Raising text in the locked tabs (Ready Room, Mods,
+  Old Files, Other Storage, Captures, Graveyard, Game DNA, Undo Center, AI Assistant, Settings, Hardware) and fixing the
+  room each needs waits for the owner to reopen those tabs.
 - PC scan, Old Files step (`backend.old_files_folder`, `tests/test_old_files_folder.py`): instead of "Old Files folder unavailable
   (ValueError)" when the chosen folder can't be scanned (missing, a drive root, the home folder or a system folder), it scans the
   real Downloads folder (Windows' own answer, so a moved Downloads is found, then the usual place) and says so in plain words;

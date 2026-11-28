@@ -45,7 +45,7 @@ def chip(text, tone="cyan"):
     color = HEX[tone]
     chip_label = QLabel(text)
     chip_label.setStyleSheet(f"color:{color};border:1px solid {color};background:rgba({TONES[tone]},28);"
-                             "border-radius:4px;padding:1px 7px;font-size:12px;font-weight:700;")
+                             "border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;")
     return chip_label
 
 
@@ -126,13 +126,13 @@ class ToolTile(QToolButton):
         self.setCursor(Qt.ArrowCursor if off else Qt.PointingHandCursor)
         rgb = TONES[tone]
         if off:
-            self.setStyleSheet("QToolButton{background:#080d13;border:1px dashed #243242;border-radius:7px;color:#6b7788;font-size:12px;}"
+            self.setStyleSheet("QToolButton{background:#080d13;border:1px dashed #243242;border-radius:7px;color:#6b7788;font-size:10px;}"
                                "QToolButton:hover{border-color:#44566b;}")
         elif tile.key == "resurrection_kit":
             self.setStyleSheet(f"QToolButton{{background:rgba({rgb},40);border:1.5px solid rgba({rgb},230);border-radius:7px;"
-                               "color:#e8eef5;font-size:12px;font-weight:700;}}")
+                               "color:#e8eef5;font-size:10px;font-weight:700;}}")
         else:
-            self.setStyleSheet("QToolButton{background:#0a1118;border:1px solid #243242;border-radius:7px;color:#e8eef5;font-size:12px;}"
+            self.setStyleSheet("QToolButton{background:#0a1118;border:1px solid #243242;border-radius:7px;color:#e8eef5;font-size:10px;}"
                                f"QToolButton:hover{{border-color:rgba({rgb},230);background:rgba({rgb},26);}}")
         self.clicked.connect(lambda _=False: on_click(tile))
 

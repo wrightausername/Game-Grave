@@ -221,7 +221,7 @@ def build(window):
     page.content.addWidget(self.capture_metrics)
     self.capture_tabs = TabStrip(TABS, selected=state.tab)
     for control in self.capture_tabs.buttons.values():
-        control.setStyleSheet("font-size:12px; padding:4px 3px;")
+        control.setStyleSheet("font-size:11px; padding:4px 3px;")
         control.setIconSize(QSize(15, 15))
     page.content.addWidget(self.capture_tabs)
 

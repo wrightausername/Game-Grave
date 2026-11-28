@@ -661,7 +661,7 @@ def sync_buttons(window):
 # ------------------------------------------------------------------ details
 def pill(text, color):
     item = QLabel(text)
-    item.setStyleSheet(f"color:{color}; border:1px solid {color}; border-radius:9px; padding:2px 8px; font-size:12px;")
+    item.setStyleSheet(f"color:{color}; border:1px solid {color}; border-radius:9px; padding:2px 8px; font-size:10px;")
     item.setAlignment(Qt.AlignCenter)
     return item
 

@@ -55,7 +55,7 @@ class GamesCoverDelegate(CoverDelegate):
         """A small pill saying whether this game already follows the owner's Soulbind preferences."""
         color = QColor({"green": "#35dc7c", "amber": "#dfac46"}.get(tone, "#9aa4ac"))
         font = painter.font()
-        font.setPixelSize(12)
+        font.setPixelSize(10)
         font.setBold(True)
         painter.setFont(font)
         width = painter.fontMetrics().horizontalAdvance(text) + 18

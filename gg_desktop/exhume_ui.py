@@ -141,7 +141,7 @@ class ExhumeBody(QWidget):
         pill = QLabel(text)
         pill.setAlignment(Qt.AlignCenter)
         color = TONES[tone]
-        pill.setStyleSheet(f"font-size:12px;font-weight:700;color:{color};border:1px solid {color};"
+        pill.setStyleSheet(f"font-size:11px;font-weight:700;color:{color};border:1px solid {color};"
                            "border-radius:9px;padding:1px 8px;background:transparent;")
         return pill
 
