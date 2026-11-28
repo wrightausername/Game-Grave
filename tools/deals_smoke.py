@@ -209,7 +209,7 @@ def main():
             QTest.mouseClick(first, Qt.LeftButton)
             wait_for(lambda: w.stack.currentIndex() == 1)
             QTest.keyClick(w.stack.currentWidget(), Qt.Key_Escape)
-            settle()
+            settle(300)                      # a price lookup finishing after Esc must not reopen the page
             assert w.stack.currentIndex() == 0, "Esc goes back to the deals"
             QTest.mouseClick(first, Qt.LeftButton)
             wait_for(lambda: w.stack.currentIndex() == 1)

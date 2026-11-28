@@ -470,7 +470,9 @@ def load_front(window, force=False):
 def show_front(window):
     w = widgets(window)
     if w is not None:
-        state(window).showing_game = False
+        st = state(window)
+        st.showing_game = False
+        st.pick_id = getattr(st, "pick_id", 0) + 1   # a price lookup still running won't pull the page back up
         if hasattr(w, "hero"):
             w.hero.stop()
         w.stack.setCurrentIndex(0)
@@ -650,6 +652,9 @@ def pick(window, game_id):
     from gg_desktop import deals_net
     w.best.setText("Getting every store's price…")
     w.stack.setCurrentIndex(1)
+    st.showing_game = True
+    st.pick_id = getattr(st, "pick_id", 0) + 1
+    mine = st.pick_id
     key = deals_net.load_key()
 
     def work():
@@ -663,8 +668,8 @@ def pick(window, game_id):
         return found, shops, problem
 
     def done(kind, value):
-        if widgets(window) is None:
-            return
+        if widgets(window) is None or st.pick_id != mine or not st.showing_game:
+            return                           # Back was pressed (or another game picked) while the prices loaded
         if kind == "error":
             widgets(window).best.setText(value)
             return

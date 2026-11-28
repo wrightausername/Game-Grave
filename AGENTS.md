@@ -1643,3 +1643,5 @@ on the tabs is like very small... folks wont like that").
   (ValueError)" when the chosen folder can't be scanned (missing, a drive root, the home folder or a system folder), it scans the
   real Downloads folder (Windows' own answer, so a moved Downloads is found, then the usual place) and says so in plain words;
   with nothing usable it says what to do. The Old Files tab's own whole-drive scan is unchanged.
+
+- Deals Back and Esc: Esc on a game's page now goes back through the window's own Esc shortcut. A price lookup that finishes after Back or Esc no longer pulls the game page back up (each pick gets a number, and Back retires it).
